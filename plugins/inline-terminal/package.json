@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-inline-terminal",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Run shell code blocks from chat in an inline, interactive terminal.",
   "license": "MIT",
   "repository": {
