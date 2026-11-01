@@ -17,12 +17,13 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { SubagentBadge } from "./SubagentBadge";
+import { StatusDot } from "./StatusDot";
 import { formatAge } from "./time";
 import { ancestorsOf, buildForest, groupRows, type TreeGroup, type TreeRow } from "./tree";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentSet } from "./usePersistentSet";
 
-const INDENT_PX = 14;
+const INDENT_PX = 12;
 
 export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate }: PluginThreadListProps) {
   const { status, threads, projects } = useSidebarThreads();
@@ -69,7 +70,7 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
   }
 
   return (
-    <div role="tree" aria-label="Threads" className="flex flex-col gap-2 px-1.5 pb-3 pt-1">
+    <div role="tree" aria-label="Threads" className="flex flex-col gap-1 px-1 pb-2 pt-0.5">
       {groups.map((group) => (
         <GroupSection
           key={group.key}
@@ -122,7 +123,7 @@ function GroupSection({
   const title = group.key === "pinned" ? "Pinned" : (project?.name ?? "Unknown project");
   return (
     <section>
-      <div className="group/header flex h-7 items-center gap-1 px-1.5">
+      <div className="group/header flex h-6 items-center gap-1 px-1">
         <button
           type="button"
           onClick={onToggle}
@@ -186,16 +187,16 @@ function ThreadRowView({
         aria-expanded={row.hasChildren ? row.isExpanded : undefined}
         aria-selected={isActive}
         className={cn(
-          "group/row relative flex h-8 items-center gap-1 rounded-md pr-1 text-sm text-sidebar-foreground/90",
+          "group/row relative flex h-7 items-center gap-0.5 rounded-md pr-1 text-sm text-sidebar-foreground/90",
           isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60",
         )}
-        style={{ paddingLeft: 4 + depth * INDENT_PX }}
+        style={{ paddingLeft: 2 + depth * INDENT_PX }}
       >
         {depth > 0 ? (
           <span
             aria-hidden
             className="pointer-events-none absolute inset-y-0 border-l border-sidebar-border"
-            style={{ left: 4 + (depth - 1) * INDENT_PX + 8 }}
+            style={{ left: 2 + (depth - 1) * INDENT_PX + 6 }}
           />
         ) : null}
         {row.hasChildren ? (
@@ -203,12 +204,12 @@ function ThreadRowView({
             type="button"
             onClick={onToggle}
             aria-label={row.isExpanded ? "Collapse subthreads" : "Expand subthreads"}
-            className="flex size-4 shrink-0 items-center justify-center rounded text-sidebar-foreground/50 hover:text-sidebar-foreground"
+            className="flex size-3 shrink-0 items-center justify-center rounded text-sidebar-foreground/50 hover:text-sidebar-foreground"
           >
             <Icon name="ChevronRight" aria-hidden className={cn("size-3 transition-transform", row.isExpanded && "rotate-90")} />
           </button>
         ) : (
-          <span aria-hidden className="size-4 shrink-0" />
+          <span aria-hidden className="size-3 shrink-0" />
         )}
         <a
           href={thread.href}
@@ -218,7 +219,7 @@ function ThreadRowView({
           aria-label={thread.displayTitle}
           {...splitProps}
           onClick={(event) => onOpen(thread, event)}
-          className="flex min-w-0 flex-1 items-center gap-1.5 self-stretch outline-none"
+          className="flex min-w-0 flex-1 items-center gap-1 self-stretch outline-none"
         >
           <span className="flex size-4 shrink-0 items-center justify-center">
             <ThreadStatusGlyph indicator={indicator} rowStatus={rowStatus} size="compact" />
@@ -232,7 +233,7 @@ function ThreadRowView({
             className="flex shrink-0 items-center gap-1 text-2xs tabular-nums text-sidebar-foreground/50"
             title={`${row.descendantCount} subthread${row.descendantCount === 1 ? "" : "s"}`}
           >
-            {row.hasHiddenActivity ? <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-primary" /> : null}
+            {row.hiddenState ? <StatusDot state={row.hiddenState} /> : null}
             {row.descendantCount}
           </span>
         ) : null}

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ancestorsOf, buildForest, effectiveState, groupRows, summarize, type TreeThread } from "../src/tree.ts";
+import { ancestorsOf, buildForest, effectiveState, groupRows, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
@@ -14,6 +14,8 @@ const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
   isHidden: false,
   isArchived: false,
   status: "idle",
+  indicator: "none",
+  hasPendingInteraction: false,
   activity: { backgroundAgents: 0 },
   createdAt: 0,
   updatedAt: 0,
@@ -66,7 +68,7 @@ test("collapsing hides the subtree and flags live work inside it", () => {
   const threads = [thread("root"), thread("kid", { parentThreadId: "root", status: "active" })];
   const rows = groupRows(buildForest(threads), new Set(["root"]), new Set())[0]!.rows;
   assert.deepEqual(ids(rows), ["root"]);
-  assert.equal(rows[0]!.hasHiddenActivity, true);
+  assert.equal(rows[0]!.hiddenState, "running");
   assert.equal(rows[0]!.descendantCount, 1);
 });
 
@@ -116,6 +118,31 @@ test("a running subagent under a thread with no live work reads stopped", () => 
 test("summary dot prefers running, then failed", () => {
   const live = thread("t", { status: "active" });
   assert.equal(summarize(2, [agent({}), agent({ state: "failed" })], live).dot, "running");
-  assert.equal(summarize(2, [agent({ state: "completed" }), agent({ state: "failed" })], live).dot, "failed");
+  assert.equal(summarize(2, [agent({ state: "completed" }), agent({ state: "failed" })], live).dot, "error");
   assert.deepEqual(summarize(1, [agent({ state: "completed" })], live), { total: 1, running: 0, failed: 0, dot: "done" });
+});
+
+test("thread dot: input, then unread error, then running, else done", () => {
+  assert.equal(threadDotState(thread("t", { hasPendingInteraction: true, status: "active" })), "input");
+  assert.equal(threadDotState(thread("t", { indicator: "waiting-for-input" })), "input");
+  assert.equal(threadDotState(thread("t", { indicator: "unread-error" })), "error");
+  assert.equal(threadDotState(thread("t", { status: "active" })), "running");
+  assert.equal(threadDotState(thread("t")), "done");
+});
+
+test("a collapsed parent shows its most urgent descendant, at any depth", () => {
+  const threads = [
+    thread("root"),
+    thread("busy", { parentThreadId: "root", status: "active" }),
+    thread("mid", { parentThreadId: "root" }),
+    thread("asking", { parentThreadId: "mid", hasPendingInteraction: true }),
+    thread("broke", { parentThreadId: "root", indicator: "unread-error" }),
+  ];
+  const forest = buildForest(threads);
+  assert.equal(groupRows(forest, new Set(["root"]), new Set())[0]!.rows[0]!.hiddenState, "input");
+  const midCollapsed = groupRows(forest, new Set(["mid"]), new Set())[0]!.rows;
+  assert.equal(midCollapsed.find((r) => r.thread.id === "mid")!.hiddenState, "input");
+  assert.equal(midCollapsed.find((r) => r.thread.id === "root")!.hiddenState, null);
+  const calm = buildForest([thread("p"), thread("c", { parentThreadId: "p" })]);
+  assert.equal(groupRows(calm, new Set(["p"]), new Set())[0]!.rows[0]!.hiddenState, "done");
 });

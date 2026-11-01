@@ -1,18 +1,10 @@
 import * as HoverCard from "@radix-ui/react-hover-card";
-import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import type { SubagentState } from "./subagents";
 import { effectiveState, summarize, type TreeThread } from "./tree";
 import type { ThreadSubagents } from "./useSubagents";
 import { formatDuration } from "./time";
-
-const DOT_CLASS: Record<SubagentState | "done", string> = {
-  running: "bg-primary animate-pulse",
-  failed: "bg-destructive",
-  stopped: "bg-muted-foreground/40",
-  completed: "bg-muted-foreground/60",
-  done: "bg-muted-foreground/60",
-};
+import { StatusDot, subagentDot } from "./StatusDot";
 
 const STATE_LABEL: Record<SubagentState, string> = {
   running: "Running",
@@ -20,10 +12,6 @@ const STATE_LABEL: Record<SubagentState, string> = {
   failed: "Failed",
   stopped: "Stopped",
 };
-
-function Dot({ tone, className }: { tone: SubagentState | "done"; className?: string }) {
-  return <span aria-hidden className={cn("inline-block size-1.5 shrink-0 rounded-full", DOT_CLASS[tone], className)} />;
-}
 
 export function SubagentBadge({ thread, data }: { thread: TreeThread; data: ThreadSubagents | undefined }) {
   const portalProps = usePortalScopeProps();
@@ -44,7 +32,7 @@ export function SubagentBadge({ thread, data }: { thread: TreeThread; data: Thre
           onClick={(event) => event.stopPropagation()}
           className="flex h-4 shrink-0 items-center gap-1 rounded-full px-1.5 text-2xs leading-none tabular-nums text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
         >
-          <Dot tone={summary.dot} />
+          <StatusDot state={summary.dot} />
           {summary.running > 0 ? `${summary.running}/${summary.total}` : summary.total}
         </button>
       </HoverCard.Trigger>
@@ -71,7 +59,7 @@ export function SubagentBadge({ thread, data }: { thread: TreeThread; data: Thre
               ].filter(Boolean);
               return (
                 <li key={agent.id} className="flex items-start gap-2 rounded-md px-1.5 py-1">
-                  <Dot tone={state} className="mt-1.5" />
+                  <StatusDot state={subagentDot(state)} className="mt-1.5" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm" title={agent.label}>
                       {agent.label}

@@ -13,6 +13,8 @@ export interface TreeThread {
   isHidden: boolean;
   isArchived: boolean;
   status: string;
+  indicator: string;
+  hasPendingInteraction: boolean;
   activity: { backgroundAgents: number };
   createdAt: number;
   updatedAt: number;
@@ -24,8 +26,26 @@ export interface TreeRow<T extends TreeThread> {
   descendantCount: number;
   hasChildren: boolean;
   isExpanded: boolean;
-  /** A collapsed descendant is still working. */
-  hasHiddenActivity: boolean;
+  /** The most urgent state among a collapsed thread's descendants. */
+  hiddenState: DotState | null;
+}
+
+/** Dot colors, shared by thread rollups and subagents. */
+export type DotState = "input" | "error" | "running" | "done" | "stopped";
+
+/** Most urgent first: what needs the user, then what broke, then live work. */
+const THREAD_DOT_PRIORITY: readonly DotState[] = ["input", "error", "running", "done"];
+
+export function threadDotState(thread: TreeThread): DotState {
+  if (thread.hasPendingInteraction || thread.indicator === "waiting-for-input") return "input";
+  if (thread.indicator === "unread-error") return "error";
+  if (isWorking(thread)) return "running";
+  return "done";
+}
+
+function moreUrgent(a: DotState | null, b: DotState): DotState {
+  if (a === null) return b;
+  return THREAD_DOT_PRIORITY.indexOf(b) < THREAD_DOT_PRIORITY.indexOf(a) ? b : a;
 }
 
 export interface TreeGroup<T extends TreeThread> {
@@ -123,32 +143,33 @@ export function flattenRows<T extends TreeThread>(
   collapsed: ReadonlySet<string>,
 ): TreeRow<T>[] {
   const rows: TreeRow<T>[] = [];
-  const stats = new Map<string, { count: number; working: boolean }>();
-  const statsOf = (thread: T): { count: number; working: boolean } => {
+  const stats = new Map<string, { count: number; state: DotState | null }>();
+  const statsOf = (thread: T): { count: number; state: DotState | null } => {
     const cached = stats.get(thread.id);
     if (cached) return cached;
     let count = 0;
-    let working = false;
+    let state: DotState | null = null;
     for (const kid of forest.children.get(thread.id) ?? []) {
       const kidStats = statsOf(kid);
       count += 1 + kidStats.count;
-      working ||= isWorking(kid) || kidStats.working;
+      state = moreUrgent(state, threadDotState(kid));
+      if (kidStats.state) state = moreUrgent(state, kidStats.state);
     }
-    const result = { count, working };
+    const result = { count, state };
     stats.set(thread.id, result);
     return result;
   };
   const walk = (thread: T, depth: number) => {
     const kids = forest.children.get(thread.id) ?? [];
     const isExpanded = kids.length > 0 && !collapsed.has(thread.id);
-    const { count, working } = statsOf(thread);
+    const { count, state } = statsOf(thread);
     rows.push({
       thread,
       depth,
       descendantCount: count,
       hasChildren: kids.length > 0,
       isExpanded,
-      hasHiddenActivity: !isExpanded && working,
+      hiddenState: isExpanded ? null : state,
     });
     if (isExpanded) for (const kid of kids) walk(kid, depth + 1);
   };
@@ -188,7 +209,8 @@ export interface SubagentSummary {
   total: number;
   running: number;
   failed: number;
-  dot: "running" | "failed" | "done";
+  /** Live work first; a failure stays visible once nothing runs. */
+  dot: DotState;
 }
 
 /**
@@ -210,5 +232,5 @@ export function summarize(total: number, agents: readonly Subagent[], thread: Tr
     if (state === "running") running += 1;
     else if (state === "failed") failed += 1;
   }
-  return { total, running, failed, dot: running > 0 ? "running" : failed > 0 ? "failed" : "done" };
+  return { total, running, failed, dot: running > 0 ? "running" : failed > 0 ? "error" : "done" };
 }
