@@ -7,6 +7,7 @@ import {
   experimental_ThreadActionsMenu as ThreadActionsMenu,
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
   experimental_useSidebarThreads as useSidebarThreads,
+  experimental_useThreadActions as useThreadActions,
   useBbNavigate,
   useSdk,
   type PluginSidebarProject,
@@ -39,6 +40,7 @@ const ROW_PAD_PX = 6;
 /** One level puts a child's status icon under its parent's title. */
 const INDENT_PX = 24;
 
+const ARCHIVE_ACTION_KEY = "bb--core/archive";
 const RECENT_LIMIT = 5;
 const RECENT_MORE_LIMIT = 15;
 
@@ -498,8 +500,8 @@ function ThreadRowView({
         ) : null}
         {thread.status === "error" ? <RetryButton threadId={thread.id} /> : null}
         <SubagentBadge thread={thread} data={subagents} />
-        {/* Age and the actions button share one fixed slot, so hovering never reflows the title. */}
-        <span className="relative flex h-5 w-8 shrink-0 items-center justify-end">
+        {/* Age and the hover buttons share one fixed slot, so hovering never reflows the title. */}
+        <span className={cn("relative flex h-5 shrink-0 items-center justify-end", isCompactViewport ? "w-8" : "w-11")}>
           <span
             className={cn(
               "text-2xs tabular-nums text-sidebar-foreground/45",
@@ -509,6 +511,11 @@ function ThreadRowView({
           >
             {formatAge(thread.updatedAt, now)}
           </span>
+          {isCompactViewport ? null : (
+            <span className={cn("absolute right-[22px]", menuOpen ? "flex" : "hidden group-hover/row:flex")}>
+              <ArchiveButton thread={target} />
+            </span>
+          )}
           <ThreadActionsMenu
             thread={target}
             onOpenChange={setMenuOpen}
@@ -531,6 +538,27 @@ function ThreadRowView({
         </span>
       </div>
     </ThreadActionsContextMenu>
+  );
+}
+
+/** bb's own Archive, so its confirmation for threads with children and its Undo still apply. */
+function ArchiveButton({ thread }: { thread: PluginThreadActionTarget }) {
+  const [entry] = useThreadActions(thread, { keys: [ARCHIVE_ACTION_KEY] });
+  if (!entry) return null;
+  const { action } = entry;
+  return (
+    <button
+      type="button"
+      aria-label={action.label}
+      title={action.label}
+      onClick={(event) => {
+        event.stopPropagation();
+        void action.run();
+      }}
+      className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+    >
+      <Icon name={action.icon ?? "Archive"} fallback="Archive" aria-hidden className="size-3.5" />
+    </button>
   );
 }
 
