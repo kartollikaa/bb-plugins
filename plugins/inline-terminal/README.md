@@ -1,23 +1,43 @@
 # bb-plugin-inline-terminal
 
 Shell code blocks in agent replies get a **Run** button. Clicking it starts an
-interactive shell for the thread, types the block in, and shows a live
-terminal (xterm.js) right under the block. You can keep typing in it.
+interactive shell for the thread, runs the block in it, and shows a live
+terminal (xterm.js) right under the block. When the block finishes, its exit
+code and output are posted to the thread so the agent replies at once, like
+`!command` in Claude Code.
+
+## How it works
 
 - `app.tsx` registers `experimental_codeFenceRenderer` for `bash`, `sh`,
-  `shell`, `zsh`, `console`, `shell-session`, `terminal`. It renders bb's own
-  code block (`Original`) plus the controls: Run / Run again, Ctrl-C, Panel
-  (opens the same session in bb's terminal panel), Close.
-- Sessions are created with `useSdk().terminals.create` in thread scope
-  (`start: shell`), so the cwd is the thread's workspace. Input goes through
-  `terminals.input`, output is polled with `terminals.output({ sinceSeq })`.
-- The terminal id is kept in `sessionStorage` under the fence key
-  (`message.id#language#index`), so scrolling away or reloading the page
-  reattaches to the running session and replays its tail.
-- `lib/command.ts` turns a fence body into shell input: `$ `/`% ` transcript
-  lines are extracted, multi-line blocks go in as a bracketed paste.
-- `skills/inline-terminal/SKILL.md` tells agents how to write runnable blocks.
-- `server.ts` is an empty backend; the manifest requires one.
+  `shell`, `zsh`, `console`, `shell-session`, `terminal`. It renders bb's code
+  block (`Original`) plus Run / Run again, Ctrl-C, Panel (same session in bb's
+  terminal panel), Close, and the result badge (exit code, Sent to chat /
+  Send to chat).
+- `lib/command.ts` → `wrapperArgv(command, nonce)` starts the session with
+  `terminals.create({ start: { mode: "argv" } })`. The launcher writes a
+  temporary rc (zsh via `ZDOTDIR` shims for `.zshenv`/`.zprofile`/`.zshrc`,
+  bash via `--rcfile`, others via `ENV`) that loads the user's own startup
+  files and then runs the block with `eval` inside the interactive shell. So
+  `cd`, venvs, aliases and history stay in the session the user keeps typing
+  in. Command and nonce are argv, never spliced into the script.
+- The rc prints OSC 777 markers `bb-inline-terminal;<nonce>;start` and
+  `…;exit;<code>`. An EXIT trap covers `exit`/`set -e`, an INT trap covers
+  Ctrl-C (reports 130, stops the rest of the block, keeps the shell). The
+  per-run nonce stops output that happens to contain a marker from faking it.
+- xterm's OSC handler catches the exit marker, takes the rendered text between
+  the start marker and the cursor, and sends it with `sdk.threads.send`
+  (`queue-if-active`): a short visible line plus an `agent-only` part with
+  command, exit code and output (tail-clipped, fenced longer than any backtick
+  run inside).
+- Per-tab `sessionStorage` keeps the terminal id per fence and a run record
+  (`command`, `nonce`, `reported`, `delivered`) per terminal, so a reload or
+  scroll-out reattaches, replays the tail and never reports a run twice. The
+  fence key changes with the props, so a reused component instance picks up
+  the right fence's state; identical keys get separate slots.
+- Setting `autoSendResult` (default on) in the plugin settings turns
+  auto-send off; results then wait for **Send to chat**.
+- `skills/inline-terminal/SKILL.md` tells agents how to write runnable blocks
+  and what the result message means.
 
 ## Develop
 
@@ -28,3 +48,6 @@ npm run typecheck
 bb plugin install .
 bb plugin dev
 ```
+
+`npm test` includes `test/wrapper_pty.py`, which runs the launcher in a real
+pty under zsh and bash (state kept, `exit 4`, Ctrl-C).

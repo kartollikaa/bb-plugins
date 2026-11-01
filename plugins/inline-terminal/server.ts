@@ -1,6 +1,14 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
-/** Frontend-only plugin: terminals are created through the app SDK, so the server has nothing to own. */
+/** Terminals and sends go through the app SDK; the server only declares settings. */
 export default async function plugin(bb: BbPluginApi) {
-  bb.log.info("loaded");
+  bb.settings.define({
+    autoSendResult: {
+      type: "boolean",
+      label: "Send command results to the chat",
+      description:
+        "When a command started from a code block finishes, post its exit code and output to the thread so the agent replies.",
+      default: true,
+    },
+  });
 }
