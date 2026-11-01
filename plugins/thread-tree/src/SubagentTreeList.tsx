@@ -34,7 +34,7 @@ import {
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentSet } from "./usePersistentSet";
 
-const INDENT_PX = 12;
+const INDENT_PX = 16;
 
 const RECENT_LIMIT = 5;
 const RECENT_MORE_LIMIT = 15;
@@ -133,7 +133,7 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
   );
 
   return (
-    <div className="flex flex-col gap-1 px-1 pb-2 pt-0.5">
+    <div className="flex flex-col gap-3 px-1.5 pb-3 pt-1">
       <section aria-label="Recent activity">
         <GroupHeader
           title="Recent Activity"
@@ -143,7 +143,7 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
           onToggle={() => collapsedGroups.toggle("recent")}
         />
         {recentCollapsed ? null : (
-          <div role="list">
+          <div role="list" className="mt-0.5 flex flex-col gap-0.5">
             {recent.map((thread) =>
               renderRow(
                 {
@@ -161,7 +161,7 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
               <button
                 type="button"
                 onClick={() => flags.toggle("recent-more")}
-                className="ml-[30px] h-6 rounded-md px-1 text-2xs text-sidebar-foreground/45 hover:text-sidebar-foreground"
+                className="ml-[34px] h-6 self-start rounded-md px-1 text-xs text-sidebar-foreground/45 hover:text-sidebar-foreground"
               >
                 {showMoreRecent ? "Show less" : "Show more"}
               </button>
@@ -170,14 +170,14 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
         )}
       </section>
 
-      <div className="mx-1 mt-0.5 border-t border-sidebar-border" />
+      <div className="mx-1.5 border-t border-sidebar-border" />
 
-      <div className="flex h-6 items-center justify-between px-1">
+      <div className="-mb-1 flex h-6 items-center justify-between px-1.5">
         <span className="text-xs font-medium text-sidebar-foreground/45">Threads</span>
         <GroupByMenu mode={groupMode} onChange={setGroupMode} />
       </div>
 
-      <div role="tree" aria-label="Threads" className="flex flex-col gap-1">
+      <div role="tree" aria-label="Threads" className="flex flex-col gap-3">
         {groups.map((group) => {
           const isCollapsed = collapsedGroups.has(group.key);
           const project = group.projectId ? projectById.get(group.projectId) : undefined;
@@ -199,7 +199,7 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
                     : undefined
                 }
               />
-              {isCollapsed ? null : <div role="group">{group.rows.map((row) => renderRow(row, "tree"))}</div>}
+              {isCollapsed ? null : <div role="group" className="mt-0.5 flex flex-col gap-0.5">{group.rows.map((row) => renderRow(row, "tree"))}</div>}
             </section>
           );
         })}
@@ -248,12 +248,12 @@ function GroupHeader({
   onNewThread?: () => void;
 }) {
   return (
-    <div className="group/header flex h-6 items-center gap-1 px-1">
+    <div className="group/header flex h-7 items-center gap-1 px-1.5">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={!isCollapsed}
-        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md text-left text-xs font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left text-xs font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground"
       >
         <span className="flex shrink-0 items-center text-sidebar-foreground/50">{icon}</span>
         <span className="truncate">{title}</span>
@@ -362,16 +362,16 @@ function ThreadRowView({
         aria-selected={isTree ? isActive : undefined}
         title={context ? `${thread.displayTitle} · ${context}` : undefined}
         className={cn(
-          "group/row relative flex h-7 items-center gap-0.5 rounded-md pr-1 text-sm text-sidebar-foreground/90",
+          "group/row relative flex h-8 items-center gap-1.5 rounded-md pr-2 text-sm text-sidebar-foreground/90",
           isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60",
         )}
-        style={{ paddingLeft: 2 + depth * INDENT_PX }}
+        style={{ paddingLeft: 6 + depth * INDENT_PX }}
       >
         {depth > 0 ? (
           <span
             aria-hidden
             className="pointer-events-none absolute inset-y-0 border-l border-sidebar-border"
-            style={{ left: 2 + (depth - 1) * INDENT_PX + 6 }}
+            style={{ left: 6 + (depth - 1) * INDENT_PX + 6 }}
           />
         ) : null}
         {isTree && row.hasChildren ? (
@@ -393,7 +393,7 @@ function ThreadRowView({
           aria-label={thread.displayTitle}
           {...splitProps}
           onClick={(event) => onOpen(thread, event)}
-          className="flex min-w-0 flex-1 items-center gap-1 self-stretch outline-none"
+          className="flex min-w-0 flex-1 items-center gap-2 self-stretch outline-none"
         >
           <span className="flex size-4 shrink-0 items-center justify-center">
             {isParent ? (
@@ -418,7 +418,7 @@ function ThreadRowView({
         <SubagentBadge thread={thread} data={subagents} />
         <span
           className={cn(
-            "w-7 shrink-0 text-right text-2xs tabular-nums text-sidebar-foreground/45",
+            "w-8 shrink-0 text-right text-2xs tabular-nums text-sidebar-foreground/45",
             !isCompactViewport && "group-hover/row:hidden",
             menuOpen && "hidden",
           )}

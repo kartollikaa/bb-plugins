@@ -30,7 +30,7 @@ export function SubagentBadge({ thread, data }: { thread: TreeThread; data: Thre
           type="button"
           aria-label={label}
           onClick={(event) => event.stopPropagation()}
-          className="flex h-4 shrink-0 items-center gap-1 rounded-full px-1.5 text-2xs leading-none tabular-nums text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          className="flex h-5 shrink-0 items-center gap-1 rounded-full px-1.5 text-2xs leading-none tabular-nums text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
         >
           <StatusDot state={summary.dot} />
           {summary.running > 0 ? `${summary.running}/${summary.total}` : summary.total}
