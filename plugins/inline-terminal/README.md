@@ -3,16 +3,16 @@
 Shell code blocks in agent replies get a **Run** button. Clicking it starts an
 interactive shell for the thread, runs the block in it, and shows a live
 terminal (xterm.js) right under the block. When the block finishes, its exit
-code and output are posted to the thread so the agent replies at once, like
-`!command` in Claude Code.
+code and output go to the agent as hidden context and the agent replies at
+once, like `!command` in Claude Code. Nothing extra appears in the chat.
 
 ## How it works
 
 - `app.tsx` registers `experimental_codeFenceRenderer` for `bash`, `sh`,
   `shell`, `zsh`, `console`, `shell-session`, `terminal`. It renders bb's code
   block (`Original`) plus Run / Run again, Ctrl-C, Panel (same session in bb's
-  terminal panel), Close, and the result badge (exit code, Sent to chat /
-  Send to chat).
+  terminal panel), Close, and the result badge (exit code, Sent to agent /
+  Send to agent).
 - `lib/command.ts` → `wrapperArgv(command, nonce)` starts the session with
   `terminals.create({ start: { mode: "argv" } })`. The launcher writes a
   temporary rc (zsh via `ZDOTDIR` shims for `.zshenv`/`.zprofile`/`.zshrc`,
@@ -26,16 +26,17 @@ code and output are posted to the thread so the agent replies at once, like
   per-run nonce stops output that happens to contain a marker from faking it.
 - xterm's OSC handler catches the exit marker, takes the rendered text between
   the start marker and the cursor, and sends it with `sdk.threads.send`
-  (`queue-if-active`): a short visible line plus an `agent-only` part with
-  command, exit code and output (tail-clipped, fenced longer than any backtick
-  run inside).
+  (`queue-if-active`) as a single `agent-only` text part: command, exit code
+  and output (tail-clipped, fenced longer than any backtick run inside).
+- Output polling backs off while idle and wakes immediately after each
+  keystroke, so the exit marker is seen as soon as the command ends.
 - Per-tab `sessionStorage` keeps the terminal id per fence and a run record
   (`command`, `nonce`, `reported`, `delivered`) per terminal, so a reload or
   scroll-out reattaches, replays the tail and never reports a run twice. The
   fence key changes with the props, so a reused component instance picks up
   the right fence's state; identical keys get separate slots.
 - Setting `autoSendResult` (default on) in the plugin settings turns
-  auto-send off; results then wait for **Send to chat**.
+  auto-send off; results then wait for **Send to agent**.
 - `skills/inline-terminal/SKILL.md` tells agents how to write runnable blocks
   and what the result message means.
 

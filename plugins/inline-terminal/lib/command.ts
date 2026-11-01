@@ -136,26 +136,21 @@ function fenced(body: string, info = ""): string {
   return `${fence}${info}\n${body}\n${fence}`;
 }
 
-/** What gets posted to the thread: a short visible line plus the full output for the agent only. */
-export function resultMessage(command: string, exitCode: number, output: string) {
+/** The agent-only context posted to the thread; nothing of it is shown in the chat. */
+export function resultMessage(command: string, exitCode: number, output: string): string {
   const trimmed = output.replace(/\s+$/, "");
   const clipped =
     trimmed.length > MAX_OUTPUT_CHARS
       ? `[… first ${trimmed.length - MAX_OUTPUT_CHARS} chars omitted]\n${trimmed.slice(-MAX_OUTPUT_CHARS)}`
       : trimmed;
-  const firstLine = command.split("\n")[0] ?? "";
-  const shown = command.includes("\n") ? `${firstLine} …` : firstLine;
-  return {
-    visible: `Ran \`${shown.replace(/`/g, "'")}\` in the inline terminal — exit ${exitCode}.`,
-    agentOnly: [
-      "Output of the command the user just ran from your shell code block (inline terminal, this thread's workspace).",
-      "Command:",
-      fenced(command, "sh"),
-      `Exit code: ${exitCode}`,
-      "Output:",
-      fenced(clipped === "" ? "(no output)" : clipped),
-    ].join("\n"),
-  };
+  return [
+    "[inline-terminal] The user ran your shell code block in the inline terminal (this thread's workspace). Reply to the result.",
+    "Command:",
+    fenced(command, "sh"),
+    `Exit code: ${exitCode}`,
+    "Output:",
+    fenced(clipped === "" ? "(no output)" : clipped),
+  ].join("\n");
 }
 
 export function encodeBase64(text: string): string {

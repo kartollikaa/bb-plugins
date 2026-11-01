@@ -5,9 +5,9 @@ export default async function plugin(bb: BbPluginApi) {
   bb.settings.define({
     autoSendResult: {
       type: "boolean",
-      label: "Send command results to the chat",
+      label: "Send command results to the agent",
       description:
-        "When a command started from a code block finishes, post its exit code and output to the thread so the agent replies.",
+        "When a command started from a code block finishes, pass its exit code and output to the agent as hidden context so it replies.",
       default: true,
     },
   });

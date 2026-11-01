@@ -1,6 +1,6 @@
 ---
 name: inline-terminal
-description: How shell code blocks in your replies become runnable for the user, and how their results come back to you. Use when you suggest a command the user should run themselves, when the user asks to run a command from chat, or when a message reports "Ran `…` in the inline terminal".
+description: How shell code blocks in your replies become runnable for the user, and how their results come back to you. Use when you suggest a command the user should run themselves, when the user asks to run a command from chat, or when a message starts with "[inline-terminal]".
 ---
 
 # Inline Terminal
@@ -15,13 +15,14 @@ venvs and variables set by the block stay in that session.
 
 ## Results come back to you
 
-When the block finishes, the plugin posts a user message to this thread:
-a visible line "Ran `<command>` in the inline terminal — exit N." plus an
-agent-only part with the full command, exit code and output (long output keeps
-its tail). React to it like the user pasted the result: explain a failure,
-suggest the next step, or carry on with the task. If the thread is busy, the
-message queues until your current turn ends. Users can turn auto-send off in
-the plugin settings; then they press **Send to chat** themselves.
+When the block finishes, the plugin sends you an agent-only message that
+starts with `[inline-terminal]` and holds the command, exit code and output
+(long output keeps its tail). The user does not see it in the chat; they see
+the output in the terminal above. Reply to the result directly and briefly:
+explain a failure, suggest the next step, or carry on with the task. Don't
+repeat the output back. If the thread is busy, the message queues until your
+current turn ends. Users can turn auto-send off in the plugin settings; then
+they press **Send to agent** themselves.
 
 Only the block's own run is reported. Commands the user types afterwards in
 the same terminal are not.

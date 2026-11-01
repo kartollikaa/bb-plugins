@@ -48,7 +48,7 @@ interface QueuedResult {
 
 const ROWS = 14;
 const POLL_FAST_MS = 60;
-const POLL_IDLE_MAX_MS = 800;
+const POLL_IDLE_MAX_MS = 250;
 
 /** Storage lives per browser tab, so scrolling away or reloading reattaches instead of losing the session. */
 const sessionKey = (fenceKey: string) => `inline-terminal:session:${fenceKey}`;
@@ -170,14 +170,12 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
     async ({ terminalId: id, command, exitCode, output }: QueuedResult) => {
       setError(null);
       setResult({ exitCode, output, delivery: "sending" });
-      const message = resultMessage(command, exitCode, output);
       try {
         await sdk.threads.send({
           threadId,
           mode: "queue-if-active",
           input: [
-            { type: "text", text: message.visible, mentions: [] },
-            { type: "text", text: message.agentOnly, mentions: [], visibility: "agent-only" },
+            { type: "text", text: resultMessage(command, exitCode, output), mentions: [], visibility: "agent-only" },
           ],
         });
         updateRun(id, { delivered: true });
@@ -247,8 +245,12 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
 
     let disposed = false;
     const abort = new AbortController();
+    let wakePoll: (() => void) | null = null;
     const inputSub = term.onData((data) => {
-      void sdk.terminals.input({ terminalId, dataBase64: encodeBase64(data) }).catch(() => {});
+      void sdk.terminals
+        .input({ terminalId, dataBase64: encodeBase64(data) })
+        .catch(() => {})
+        .then(() => wakePoll?.());
     });
 
     let resizeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -269,6 +271,7 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
       let sinceSeq: number | undefined;
       let delay = POLL_FAST_MS;
       while (!disposed) {
+        let woken = false;
         try {
           const out = await sdk.terminals.output({
             terminalId,
@@ -291,7 +294,16 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
           setError(errorText(cause));
           return;
         }
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, delay);
+          wakePoll = () => {
+            woken = true;
+            clearTimeout(timer);
+            resolve();
+          };
+        });
+        wakePoll = null;
+        if (woken) delay = POLL_FAST_MS;
       }
     })();
 
@@ -370,13 +382,13 @@ function ResultBadge({ result, onSend }: { result: CommandResult; onSend: () => 
         exit {result.exitCode}
       </span>
       {result.delivery === "sending" ? (
-        <span className="text-xs text-muted-foreground">Sending to chat…</span>
+        <span className="text-xs text-muted-foreground">Sending to agent…</span>
       ) : result.delivery === "sent" ? (
-        <span className="text-xs text-muted-foreground">Sent to chat</span>
+        <span className="text-xs text-muted-foreground">Sent to agent</span>
       ) : (
         <Button size="sm" variant="ghost" className={actionClass} onClick={onSend}>
           <Icon name="Send" className="size-3.5" />
-          Send to chat
+          Send to agent
         </Button>
       )}
     </>
