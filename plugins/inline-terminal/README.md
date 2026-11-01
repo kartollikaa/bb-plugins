@@ -52,3 +52,7 @@ bb plugin dev
 
 `npm test` includes `test/wrapper_pty.py`, which runs the launcher in a real
 pty under zsh and bash (state kept, `exit 4`, Ctrl-C).
+
+## License
+
+MIT, see [LICENSE](LICENSE).

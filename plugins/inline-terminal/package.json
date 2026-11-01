@@ -1,6 +1,12 @@
 {
   "name": "bb-plugin-inline-terminal",
   "version": "0.1.0",
+  "description": "Run shell code blocks from chat in an inline, interactive terminal.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kartollikaa/bb-plugin-inline-terminal.git"
+  },
   "type": "module",
   "engines": {
     "bb": ">=0.48",
@@ -47,7 +53,6 @@
     "typescript": "^5.7.0",
     "vaul": "^1.1.2"
   },
-  "description": "Run shell code blocks from chat in an inline, interactive terminal.",
   "scripts": {
     "test": "node --experimental-strip-types --test lib/command.test.ts",
     "typecheck": "tsc -p .",
