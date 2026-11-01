@@ -28,6 +28,12 @@ export interface TreeRow<T extends TreeThread> {
   isExpanded: boolean;
   /** The most urgent state among a collapsed thread's descendants. */
   hiddenState: DotState | null;
+  /**
+   * One entry per level above this row: whether that level's guide line runs
+   * on past this row. The last entry is this row's own: false bends it into an
+   * elbow because no sibling follows.
+   */
+  guides: boolean[];
 }
 
 /** Dot colors, shared by thread rollups and subagents. */
@@ -165,7 +171,7 @@ export function flattenRows<T extends TreeThread>(
     stats.set(thread.id, result);
     return result;
   };
-  const walk = (thread: T, depth: number) => {
+  const walk = (thread: T, depth: number, guides: boolean[]) => {
     const kids = forest.children.get(thread.id) ?? [];
     const isExpanded = kids.length > 0 && !collapsed.has(thread.id);
     const { count, state } = statsOf(thread);
@@ -176,10 +182,11 @@ export function flattenRows<T extends TreeThread>(
       hasChildren: kids.length > 0,
       isExpanded,
       hiddenState: isExpanded ? null : state,
+      guides,
     });
-    if (isExpanded) for (const kid of kids) walk(kid, depth + 1);
+    if (isExpanded) kids.forEach((kid, index) => walk(kid, depth + 1, [...guides, index < kids.length - 1]));
   };
-  for (const root of roots) walk(root, 0);
+  for (const root of roots) walk(root, 0, []);
   return rows;
 }
 

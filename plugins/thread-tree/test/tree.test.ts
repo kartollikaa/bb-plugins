@@ -195,3 +195,22 @@ test("a background command, workflow, or bb working indicator counts as running"
   assert.equal(threadDotState(thread("t", { indicator: "runtime" })), "running");
   assert.equal(threadDotState(thread("t", { indicator: "unread-success" })), "done");
 });
+
+test("guide lines run on past middle children and bend at the last one", () => {
+  const threads = [
+    thread("root"),
+    thread("a", { parentThreadId: "root", createdAt: 1 }),
+    thread("a1", { parentThreadId: "a", createdAt: 2 }),
+    thread("b", { parentThreadId: "root", createdAt: 3 }),
+  ];
+  const rows = groupRows(buildForest(threads), new Set(), new Set())[0]!.rows;
+  assert.deepEqual(
+    rows.map((r) => [r.thread.id, r.guides]),
+    [
+      ["root", []],
+      ["a", [true]],
+      ["a1", [true, false]],
+      ["b", [false]],
+    ],
+  );
+});
