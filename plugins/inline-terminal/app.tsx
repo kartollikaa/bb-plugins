@@ -46,7 +46,9 @@ interface QueuedResult {
   output: string;
 }
 
-const ROWS = 14;
+const MIN_ROWS = 3;
+/** The pty always gets this height, so full-screen programs lay out for the capped window. */
+const MAX_ROWS = 14;
 const POLL_FAST_MS = 60;
 const POLL_IDLE_MAX_MS = 250;
 
@@ -205,7 +207,7 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
     const host = hostRef.current;
     if (terminalId === null || host === null) return;
     const term = new Terminal({
-      rows: ROWS,
+      rows: MIN_ROWS,
       fontSize: 12,
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
       cursorBlink: true,
@@ -257,15 +259,24 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
     const pushSize = () => {
       const size = fit.proposeDimensions();
       if (size === undefined || !Number.isFinite(size.cols) || size.cols < 2) return;
-      term.resize(size.cols, ROWS);
+      if (size.cols !== term.cols) term.resize(size.cols, term.rows);
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        void sdk.terminals.resize({ terminalId, cols: term.cols, rows: term.rows }).catch(() => {});
+        void sdk.terminals.resize({ terminalId, cols: term.cols, rows: MAX_ROWS }).catch(() => {});
       }, 120);
     };
     const observer = new ResizeObserver(pushSize);
     observer.observe(host);
     pushSize();
+
+    const fitRowsToContent = () => {
+      const buffer = term.buffer.active;
+      const usedRows = buffer.baseY + buffer.cursorY + 1;
+      const rows = buffer.type === "alternate" ? MAX_ROWS : Math.min(MAX_ROWS, Math.max(MIN_ROWS, usedRows));
+      if (rows !== term.rows) term.resize(term.cols, rows);
+    };
+    const writeSub = term.onWriteParsed(fitRowsToContent);
+    const bufferSub = term.buffer.onBufferChange(fitRowsToContent);
 
     void (async () => {
       let sinceSeq: number | undefined;
@@ -314,6 +325,8 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
       observer.disconnect();
       oscSub.dispose();
       inputSub.dispose();
+      writeSub.dispose();
+      bufferSub.dispose();
       outputStart?.dispose();
       term.dispose();
       termRef.current = null;
@@ -332,7 +345,7 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
           scope: { kind: "thread", threadId },
           start: { mode: "argv", argv: wrapperArgv(command, nonce) },
           cols: 100,
-          rows: ROWS,
+          rows: MAX_ROWS,
           title: terminalTitle(command),
         });
         const record: RunRecord = { command, nonce, reported: false, delivered: false };

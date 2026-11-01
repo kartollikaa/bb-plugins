@@ -30,6 +30,9 @@ once, like `!command` in Claude Code. Nothing extra appears in the chat.
   and output (tail-clipped, fenced longer than any backtick run inside).
 - Output polling backs off while idle and wakes immediately after each
   keystroke, so the exit marker is seen as soon as the command ends.
+- The terminal grows with its content from 3 rows up to 14, then scrolls; a
+  full-screen program (alternate screen) gets all 14 at once. The pty always
+  gets 14 rows, so programs lay out for the capped window.
 - Per-tab `sessionStorage` keeps the terminal id per fence and a run record
   (`command`, `nonce`, `reported`, `delivered`) per terminal, so a reload or
   scroll-out reattaches, replays the tail and never reports a run twice. The
