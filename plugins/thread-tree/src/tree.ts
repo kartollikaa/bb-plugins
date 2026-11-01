@@ -15,7 +15,7 @@ export interface TreeThread {
   status: string;
   indicator: string;
   hasPendingInteraction: boolean;
-  activity: { backgroundAgents: number };
+  activity: { backgroundAgents: number; backgroundCommands: number; workflows: number };
   createdAt: number;
   updatedAt: number;
 }
@@ -132,8 +132,14 @@ export function ancestorsOf<T extends TreeThread>(forest: Forest<T>, threadId: s
   return out;
 }
 
-function isWorking(thread: TreeThread): boolean {
-  return thread.status === "active" || thread.status === "starting" || thread.activity.backgroundAgents > 0;
+/** bb indicators that mean the thread is doing something right now. */
+const WORKING_INDICATORS = new Set(["runtime", "background-agent", "background-command", "workflow", "working-draft"]);
+
+export function isWorking(thread: TreeThread): boolean {
+  if (thread.status === "active" || thread.status === "starting") return true;
+  const { backgroundAgents, backgroundCommands, workflows } = thread.activity;
+  if (backgroundAgents > 0 || backgroundCommands > 0 || workflows > 0) return true;
+  return WORKING_INDICATORS.has(thread.indicator);
 }
 
 /** Depth-first rows under each root, skipping the subtrees of collapsed threads. */
@@ -177,21 +183,32 @@ export function flattenRows<T extends TreeThread>(
   return rows;
 }
 
-/** Pinned first, then one group per project, most recently active first. */
+export type GroupMode = "project" | "status" | "none";
+
+/**
+ * Pinned first, then the mode's groups. Project groups order by latest
+ * activity; status groups go most urgent first and file a root by the most
+ * urgent state in its whole subtree.
+ */
 export function groupRows<T extends TreeThread>(
   forest: Forest<T>,
   collapsed: ReadonlySet<string>,
   collapsedGroups: ReadonlySet<string>,
+  mode: GroupMode = "project",
 ): TreeGroup<T>[] {
   const pinned = forest.roots.filter((root) => root.isPinned).sort(byPinOrder);
-  const byProject = new Map<string, T[]>();
+  const buckets = new Map<string, { projectId: string | null; roots: T[] }>();
+  const add = (key: string, projectId: string | null, root: T) => {
+    const bucket = buckets.get(key);
+    if (bucket) bucket.roots.push(root);
+    else buckets.set(key, { projectId, roots: [root] });
+  };
   for (const root of forest.roots) {
     if (root.isPinned) continue;
-    const bucket = byProject.get(root.projectId);
-    if (bucket) bucket.push(root);
-    else byProject.set(root.projectId, [root]);
+    if (mode === "project") add(`project:${root.projectId}`, root.projectId, root);
+    else if (mode === "status") add(`status:${subtreeDotState(forest, root)}`, null, root);
+    else add("all", null, root);
   }
-  const groups: TreeGroup<T>[] = [];
   const makeGroup = (key: string, projectId: string | null, roots: T[]): TreeGroup<T> => ({
     key,
     projectId,
@@ -199,10 +216,32 @@ export function groupRows<T extends TreeThread>(
     latestActivityAt: Math.max(0, ...roots.map((root) => root.updatedAt)),
     rows: collapsedGroups.has(key) ? [] : flattenRows(forest, roots, collapsed),
   });
-  if (pinned.length > 0) groups.push(makeGroup("pinned", null, pinned));
-  const projectGroups = [...byProject].map(([projectId, roots]) => makeGroup(`project:${projectId}`, projectId, roots));
-  projectGroups.sort((a, b) => b.latestActivityAt - a.latestActivityAt || a.key.localeCompare(b.key));
-  return [...groups, ...projectGroups];
+  const rest = [...buckets].map(([key, bucket]) => makeGroup(key, bucket.projectId, bucket.roots));
+  if (mode === "status") {
+    const rank = (key: string) => THREAD_DOT_PRIORITY.indexOf(key.slice("status:".length) as DotState);
+    rest.sort((a, b) => rank(a.key) - rank(b.key));
+  } else {
+    rest.sort((a, b) => b.latestActivityAt - a.latestActivityAt || a.key.localeCompare(b.key));
+  }
+  return pinned.length > 0 ? [makeGroup("pinned", null, pinned), ...rest] : rest;
+}
+
+function subtreeDotState<T extends TreeThread>(forest: Forest<T>, root: T): DotState {
+  let state = threadDotState(root);
+  const stack = [...(forest.children.get(root.id) ?? [])];
+  for (let kid = stack.pop(); kid; kid = stack.pop()) {
+    state = moreUrgent(state, threadDotState(kid));
+    stack.push(...(forest.children.get(kid.id) ?? []));
+  }
+  return state;
+}
+
+/** The most recently active visible threads, children included, newest first. */
+export function recentThreads<T extends TreeThread>(threads: readonly T[], limit: number): T[] {
+  return threads
+    .filter((thread) => !thread.isHidden && !thread.isArchived)
+    .sort(byActivity)
+    .slice(0, limit);
 }
 
 export interface SubagentSummary {

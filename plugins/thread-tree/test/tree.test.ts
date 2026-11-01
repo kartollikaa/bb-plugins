@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ancestorsOf, buildForest, effectiveState, groupRows, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
+import { ancestorsOf, buildForest, effectiveState, groupRows, recentThreads, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
@@ -16,7 +16,7 @@ const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
   status: "idle",
   indicator: "none",
   hasPendingInteraction: false,
-  activity: { backgroundAgents: 0 },
+  activity: { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 },
   createdAt: 0,
   updatedAt: 0,
   ...extra,
@@ -111,7 +111,7 @@ const agent = (extra: Partial<Subagent>): Subagent => ({
 test("a running subagent under a thread with no live work reads stopped", () => {
   assert.equal(effectiveState(agent({}), thread("t", { status: "idle" })), "stopped");
   assert.equal(effectiveState(agent({}), thread("t", { status: "active" })), "running");
-  assert.equal(effectiveState(agent({ background: true }), thread("t", { activity: { backgroundAgents: 1 } })), "running");
+  assert.equal(effectiveState(agent({ background: true }), thread("t", { activity: { backgroundAgents: 1, backgroundCommands: 0, workflows: 0 } })), "running");
   assert.equal(effectiveState(agent({ state: "failed" }), thread("t")), "failed");
 });
 
@@ -145,4 +145,53 @@ test("a collapsed parent shows its most urgent descendant, at any depth", () => 
   assert.equal(midCollapsed.find((r) => r.thread.id === "root")!.hiddenState, null);
   const calm = buildForest([thread("p"), thread("c", { parentThreadId: "p" })]);
   assert.equal(groupRows(calm, new Set(["p"]), new Set())[0]!.rows[0]!.hiddenState, "done");
+});
+
+test("status grouping files a root by its most urgent subtree state, urgent groups first", () => {
+  const threads = [
+    thread("calm", { updatedAt: 9 }),
+    thread("busy", { status: "active" }),
+    thread("parent"),
+    thread("asking", { parentThreadId: "parent", hasPendingInteraction: true }),
+    thread("broke", { indicator: "unread-error" }),
+    thread("pin", { isPinned: true, status: "active" }),
+  ];
+  const groups = groupRows(buildForest(threads), new Set(), new Set(), "status");
+  assert.deepEqual(
+    groups.map((g) => [g.key, ids(g.rows)]),
+    [
+      ["pinned", ["pin"]],
+      ["status:input", ["parent", "-asking"]],
+      ["status:error", ["broke"]],
+      ["status:running", ["busy"]],
+      ["status:done", ["calm"]],
+    ],
+  );
+});
+
+test("no grouping puts every unpinned root in one group by activity", () => {
+  const threads = [thread("a", { projectId: "x", updatedAt: 1 }), thread("b", { projectId: "y", updatedAt: 2 })];
+  const groups = groupRows(buildForest(threads), new Set(), new Set(), "none");
+  assert.deepEqual(groups.map((g) => [g.key, ids(g.rows)]), [["all", ["b", "a"]]]);
+});
+
+test("recent activity is flat, newest first, children included, hidden and archived left out", () => {
+  const threads = [
+    thread("old", { updatedAt: 1 }),
+    thread("kid", { parentThreadId: "old", updatedAt: 5 }),
+    thread("mid", { updatedAt: 3 }),
+    thread("gone", { isArchived: true, updatedAt: 9 }),
+    thread("ghost", { isHidden: true, updatedAt: 8 }),
+  ];
+  assert.deepEqual(recentThreads(threads, 2).map((t) => t.id), ["kid", "mid"]);
+  assert.deepEqual(recentThreads(threads, 10).map((t) => t.id), ["kid", "mid", "old"]);
+});
+
+test("a background command, workflow, or bb working indicator counts as running", () => {
+  const idle = { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 };
+  assert.equal(threadDotState(thread("t", { activity: { ...idle, backgroundCommands: 1 } })), "running");
+  assert.equal(threadDotState(thread("t", { activity: { ...idle, workflows: 1 } })), "running");
+  assert.equal(threadDotState(thread("t", { indicator: "background-command" })), "running");
+  assert.equal(threadDotState(thread("t", { indicator: "runtime" })), "running");
+  assert.equal(threadDotState(thread("t", { indicator: "unread-success" })), "done");
 });

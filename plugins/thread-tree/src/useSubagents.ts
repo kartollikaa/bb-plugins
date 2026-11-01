@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRpc, type PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../server";
 import type { Subagent } from "./subagents";
+import { isWorking } from "./tree";
 
 export interface ThreadSubagents {
   total: number;
@@ -12,8 +13,7 @@ const POLL_MS = 4_000;
 const BATCH = 200;
 
 function hasLiveWork(thread: PluginSidebarThread, known: ThreadSubagents | undefined): boolean {
-  if (thread.status === "active" || thread.status === "starting") return true;
-  if (thread.activity.backgroundAgents > 0) return true;
+  if (isWorking(thread)) return true;
   return known?.subagents.some((agent) => agent.state === "running") ?? false;
 }
 

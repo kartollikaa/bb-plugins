@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   ThreadTitle,
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
@@ -16,20 +17,56 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
+import { usePortalScopeProps } from "@/lib/portal-scope";
 import { SubagentBadge } from "./SubagentBadge";
 import { StatusDot } from "./StatusDot";
 import { formatAge } from "./time";
-import { ancestorsOf, buildForest, groupRows, threadDotState, type TreeGroup, type TreeRow } from "./tree";
+import {
+  ancestorsOf,
+  buildForest,
+  groupRows,
+  recentThreads,
+  threadDotState,
+  type DotState,
+  type GroupMode,
+  type TreeRow,
+} from "./tree";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
-import { usePersistentSet } from "./usePersistentSet";
+import { usePersistentChoice, usePersistentSet } from "./usePersistentSet";
 
 const INDENT_PX = 12;
+
+const RECENT_LIMIT = 5;
+const RECENT_MORE_LIMIT = 15;
+
+const GROUP_MODES: readonly { id: GroupMode; label: string; icon: React.ReactNode }[] = [
+  { id: "project", label: "Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },
+  {
+    id: "status",
+    label: "Status",
+    icon: (
+      <span className="flex size-3.5 items-center justify-center">
+        <StatusDot state="running" className="size-2 animate-none" />
+      </span>
+    ),
+  },
+  { id: "none", label: "None", icon: <Icon name="Layers" aria-hidden className="size-3.5" /> },
+];
+
+const STATUS_GROUP_TITLE: Record<string, string> = {
+  input: "Needs input",
+  error: "Error",
+  running: "Working",
+  done: "Done",
+};
 
 export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate }: PluginThreadListProps) {
   const { status, threads, projects } = useSidebarThreads();
   const navigate = useBbNavigate();
   const collapsedThreads = usePersistentSet("collapsed-threads");
   const collapsedGroups = usePersistentSet("collapsed-groups");
+  const flags = usePersistentSet("flags");
+  const [groupMode, setGroupMode] = usePersistentChoice<GroupMode>("group-mode", ["project", "status", "none"], "project");
   const now = useNow(30_000);
 
   const forest = useMemo(() => buildForest(threads), [threads]);
@@ -42,10 +79,21 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
   }, [activeThreadId, forest, collapsedThreads]);
 
   const groups = useMemo(
-    () => groupRows(forest, collapsedThreads.values, collapsedGroups.values),
-    [forest, collapsedThreads.values, collapsedGroups.values],
+    () => groupRows(forest, collapsedThreads.values, collapsedGroups.values, groupMode),
+    [forest, collapsedThreads.values, collapsedGroups.values, groupMode],
   );
-  const visibleThreads = useMemo(() => groups.flatMap((group) => group.rows.map((row) => row.thread)), [groups]);
+  const showMoreRecent = flags.has("recent-more");
+  const recentCollapsed = collapsedGroups.has("recent");
+  const recent = useMemo(
+    () => recentThreads(threads, showMoreRecent ? RECENT_MORE_LIMIT : RECENT_LIMIT),
+    [threads, showMoreRecent],
+  );
+  const visibleThreads = useMemo(() => {
+    const byId = new Map<string, PluginSidebarThread>();
+    if (!recentCollapsed) for (const thread of recent) byId.set(thread.id, thread);
+    for (const group of groups) for (const row of group.rows) byId.set(row.thread.id, row.thread);
+    return [...byId.values()];
+  }, [groups, recent, recentCollapsed]);
   const subagents = useSubagents(visibleThreads);
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
 
@@ -69,93 +117,214 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
     return <div className="px-3 py-2 text-xs text-muted-foreground">No threads yet.</div>;
   }
 
+  const renderRow = (row: TreeRow<PluginSidebarThread>, variant: "tree" | "recent") => (
+    <ThreadRowView
+      key={row.thread.id}
+      row={row}
+      variant={variant}
+      context={variant === "recent" ? projectById.get(row.thread.projectId)?.name : undefined}
+      isActive={row.thread.id === activeThreadId}
+      isCompactViewport={isCompactViewport}
+      subagents={subagents.get(row.thread.id)}
+      now={now}
+      onToggle={() => collapsedThreads.toggle(row.thread.id)}
+      onOpen={open}
+    />
+  );
+
   return (
-    <div role="tree" aria-label="Threads" className="flex flex-col gap-1 px-1 pb-2 pt-0.5">
-      {groups.map((group) => (
-        <GroupSection
-          key={group.key}
-          group={group}
-          project={group.projectId ? projectById.get(group.projectId) : undefined}
-          isCollapsed={collapsedGroups.has(group.key)}
-          onToggle={() => collapsedGroups.toggle(group.key)}
-          onNewThread={
-            group.projectId
-              ? () => {
-                  navigate.toCompose({ projectId: group.projectId!, focusPrompt: true });
-                  onNavigate();
+    <div className="flex flex-col gap-1 px-1 pb-2 pt-0.5">
+      <section aria-label="Recent activity">
+        <GroupHeader
+          title="Recent Activity"
+          icon={<Icon name="Clock" aria-hidden className="size-3.5" />}
+          isCollapsed={recentCollapsed}
+          count={recent.length}
+          onToggle={() => collapsedGroups.toggle("recent")}
+        />
+        {recentCollapsed ? null : (
+          <div role="list">
+            {recent.map((thread) =>
+              renderRow(
+                {
+                  thread,
+                  depth: 0,
+                  descendantCount: 0,
+                  hasChildren: (forest.children.get(thread.id)?.length ?? 0) > 0,
+                  isExpanded: false,
+                  hiddenState: null,
+                },
+                "recent",
+              ),
+            )}
+            {threads.length > RECENT_LIMIT ? (
+              <button
+                type="button"
+                onClick={() => flags.toggle("recent-more")}
+                className="ml-[30px] h-6 rounded-md px-1 text-2xs text-sidebar-foreground/45 hover:text-sidebar-foreground"
+              >
+                {showMoreRecent ? "Show less" : "Show more"}
+              </button>
+            ) : null}
+          </div>
+        )}
+      </section>
+
+      <div className="mx-1 mt-0.5 border-t border-sidebar-border" />
+
+      <div className="flex h-6 items-center justify-between px-1">
+        <span className="text-xs font-medium text-sidebar-foreground/45">Threads</span>
+        <GroupByMenu mode={groupMode} onChange={setGroupMode} />
+      </div>
+
+      <div role="tree" aria-label="Threads" className="flex flex-col gap-1">
+        {groups.map((group) => {
+          const isCollapsed = collapsedGroups.has(group.key);
+          const project = group.projectId ? projectById.get(group.projectId) : undefined;
+          const { title, icon } = groupLook(group.key, project, isCollapsed);
+          return (
+            <section key={group.key}>
+              <GroupHeader
+                title={title}
+                icon={icon}
+                isCollapsed={isCollapsed}
+                count={group.rootCount}
+                onToggle={() => collapsedGroups.toggle(group.key)}
+                onNewThread={
+                  group.projectId
+                    ? () => {
+                        navigate.toCompose({ projectId: group.projectId!, focusPrompt: true });
+                        onNavigate();
+                      }
+                    : undefined
                 }
-              : undefined
-          }
-        >
-          {group.rows.map((row) => (
-            <ThreadRowView
-              key={row.thread.id}
-              row={row}
-              isActive={row.thread.id === activeThreadId}
-              isCompactViewport={isCompactViewport}
-              subagents={subagents.get(row.thread.id)}
-              now={now}
-              onToggle={() => collapsedThreads.toggle(row.thread.id)}
-              onOpen={open}
-            />
-          ))}
-        </GroupSection>
-      ))}
+              />
+              {isCollapsed ? null : <div role="group">{group.rows.map((row) => renderRow(row, "tree"))}</div>}
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function GroupSection({
-  group,
-  project,
+function groupLook(
+  key: string,
+  project: PluginSidebarProject | undefined,
+  isCollapsed: boolean,
+): { title: string; icon: React.ReactNode } {
+  if (key === "pinned") return { title: "Pinned", icon: <Icon name="Pin" aria-hidden className="size-3.5" /> };
+  if (key === "all") return { title: "All threads", icon: <Icon name="Layers" aria-hidden className="size-3.5" /> };
+  if (key.startsWith("status:")) {
+    const state = key.slice("status:".length) as DotState;
+    return {
+      title: STATUS_GROUP_TITLE[state] ?? state,
+      icon: (
+        <span className="flex size-3.5 items-center justify-center">
+          <StatusDot state={state} className="size-2" />
+        </span>
+      ),
+    };
+  }
+  return {
+    title: project?.name ?? "Unknown project",
+    icon: <Icon name={isCollapsed ? "Folder" : "FolderOpen"} fallback="Folder" aria-hidden className="size-3.5" />,
+  };
+}
+
+function GroupHeader({
+  title,
+  icon,
   isCollapsed,
+  count,
   onToggle,
   onNewThread,
-  children,
 }: {
-  group: TreeGroup<PluginSidebarThread>;
-  project: PluginSidebarProject | undefined;
+  title: string;
+  icon: React.ReactNode;
   isCollapsed: boolean;
+  count: number;
   onToggle: () => void;
-  onNewThread: (() => void) | undefined;
-  children: React.ReactNode;
+  onNewThread?: () => void;
 }) {
-  const title = group.key === "pinned" ? "Pinned" : (project?.name ?? "Unknown project");
   return (
-    <section>
-      <div className="group/header flex h-6 items-center gap-1 px-1">
+    <div className="group/header flex h-6 items-center gap-1 px-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!isCollapsed}
+        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md text-left text-xs font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground"
+      >
+        <span className="flex shrink-0 items-center text-sidebar-foreground/50">{icon}</span>
+        <span className="truncate">{title}</span>
+        {isCollapsed ? <span className="tabular-nums text-sidebar-foreground/40">{count}</span> : null}
+        <Icon
+          name="ChevronRight"
+          aria-hidden
+          className={cn(
+            "size-3 shrink-0 text-sidebar-foreground/40 opacity-0 transition group-hover/header:opacity-100",
+            !isCollapsed && "rotate-90",
+          )}
+        />
+      </button>
+      {onNewThread ? (
         <button
           type="button"
-          onClick={onToggle}
-          aria-expanded={!isCollapsed}
-          className="flex min-w-0 flex-1 items-center gap-1 rounded-md text-left text-xs font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground"
+          onClick={onNewThread}
+          aria-label={`New thread in ${title}`}
+          className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 opacity-0 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:opacity-100 group-hover/header:opacity-100"
         >
-          <Icon
-            name="ChevronRight"
-            aria-hidden
-            className={cn("size-3 shrink-0 transition-transform", !isCollapsed && "rotate-90")}
-          />
-          <span className="truncate">{title}</span>
-          {isCollapsed ? <span className="tabular-nums text-sidebar-foreground/40">{group.rootCount}</span> : null}
+          <Icon name="Plus" aria-hidden className="size-3.5" />
         </button>
-        {onNewThread ? (
-          <button
-            type="button"
-            onClick={onNewThread}
-            aria-label={`New thread in ${title}`}
-            className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 opacity-0 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:opacity-100 group-hover/header:opacity-100"
-          >
-            <Icon name="Plus" aria-hidden className="size-3.5" />
-          </button>
-        ) : null}
-      </div>
-      {isCollapsed ? null : <div role="group">{children}</div>}
-    </section>
+      ) : null}
+    </div>
+  );
+}
+
+function GroupByMenu({ mode, onChange }: { mode: GroupMode; onChange: (mode: GroupMode) => void }) {
+  const portalProps = usePortalScopeProps();
+  const current = GROUP_MODES.find((entry) => entry.id === mode) ?? GROUP_MODES[0]!;
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          aria-label={`Group threads by ${current.label}`}
+          className="flex h-5 items-center gap-1 rounded-md px-1.5 text-2xs text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
+        >
+          <Icon name="SlidersHorizontal" aria-hidden className="size-3" />
+          {current.label}
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          {...portalProps}
+          align="end"
+          sideOffset={4}
+          className="z-50 min-w-36 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          <DropdownMenu.Label className="px-2 py-1 text-xs text-muted-foreground">Group by</DropdownMenu.Label>
+          {GROUP_MODES.map((entry) => (
+            <DropdownMenu.Item
+              key={entry.id}
+              onSelect={() => onChange(entry.id)}
+              className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+            >
+              <span className="flex text-muted-foreground">{entry.icon}</span>
+              <span className="flex-1">{entry.label}</span>
+              {entry.id === mode ? <Icon name="Check" aria-hidden className="size-3.5" /> : null}
+            </DropdownMenu.Item>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 
 function ThreadRowView({
   row,
+  variant,
+  context,
   isActive,
   isCompactViewport,
   subagents,
@@ -164,6 +333,9 @@ function ThreadRowView({
   onOpen,
 }: {
   row: TreeRow<PluginSidebarThread>;
+  /** A recent row is flat and leaves bb's keyboard shortcuts to the tree. */
+  variant: "tree" | "recent";
+  context?: string;
   isActive: boolean;
   isCompactViewport: boolean;
   subagents: ThreadSubagents | undefined;
@@ -179,14 +351,16 @@ function ThreadRowView({
   const indicator = thread.indicator === "none" && hasUnsubmittedDraft ? "draft" : thread.indicator;
   const target = useMemo(() => toActionTarget(thread), [thread]);
   const isParent = row.hasChildren || (subagents?.total ?? 0) > 0;
+  const isTree = variant === "tree";
 
   return (
     <ThreadActionsContextMenu thread={target}>
       <div
-        role="treeitem"
-        aria-level={depth + 1}
-        aria-expanded={row.hasChildren ? row.isExpanded : undefined}
-        aria-selected={isActive}
+        role={isTree ? "treeitem" : "listitem"}
+        aria-level={isTree ? depth + 1 : undefined}
+        aria-expanded={isTree && row.hasChildren ? row.isExpanded : undefined}
+        aria-selected={isTree ? isActive : undefined}
+        title={context ? `${thread.displayTitle} · ${context}` : undefined}
         className={cn(
           "group/row relative flex h-7 items-center gap-0.5 rounded-md pr-1 text-sm text-sidebar-foreground/90",
           isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60",
@@ -200,7 +374,7 @@ function ThreadRowView({
             style={{ left: 2 + (depth - 1) * INDENT_PX + 6 }}
           />
         ) : null}
-        {row.hasChildren ? (
+        {isTree && row.hasChildren ? (
           <button
             type="button"
             onClick={onToggle}
@@ -214,8 +388,7 @@ function ThreadRowView({
         )}
         <a
           href={thread.href}
-          data-sidebar-thread-shortcut-target=""
-          data-sidebar-thread-id={thread.id}
+          {...(isTree ? { "data-sidebar-thread-shortcut-target": "", "data-sidebar-thread-id": thread.id } : {})}
           aria-current={isActive ? "page" : undefined}
           aria-label={thread.displayTitle}
           {...splitProps}
@@ -233,7 +406,7 @@ function ThreadRowView({
             <ThreadTitle threadId={thread.id} />
           </span>
         </a>
-        {row.hasChildren && !row.isExpanded ? (
+        {isTree && row.hasChildren && !row.isExpanded ? (
           <span
             className="flex shrink-0 items-center gap-1 text-2xs tabular-nums text-sidebar-foreground/50"
             title={`${row.descendantCount} subthread${row.descendantCount === 1 ? "" : "s"}`}

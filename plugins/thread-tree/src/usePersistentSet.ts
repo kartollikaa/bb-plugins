@@ -42,3 +42,27 @@ export function usePersistentSet(key: string) {
     [values, update],
   );
 }
+
+/** One choice out of a fixed list, kept per client; an unknown stored value falls back. */
+export function usePersistentChoice<T extends string>(key: string, allowed: readonly T[], fallback: T) {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const stored = window.localStorage.getItem(PREFIX + key);
+      return allowed.includes(stored as T) ? (stored as T) : fallback;
+    } catch {
+      return fallback;
+    }
+  });
+  const choose = useCallback(
+    (next: T) => {
+      setValue(next);
+      try {
+        window.localStorage.setItem(PREFIX + key, next);
+      } catch {
+        // Storage full or blocked: the choice still applies for this session.
+      }
+    },
+    [key],
+  );
+  return [value, choose] as const;
+}
