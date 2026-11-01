@@ -19,6 +19,9 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import { SubagentBadge } from "./SubagentBadge";
+import { GroupHeader } from "./GroupHeader";
+import { ROW_HOVER_SOLID_BG } from "./rowStyles";
+import { AutomationsSection } from "./AutomationsSection";
 import { StatusDot } from "./StatusDot";
 import { formatAge } from "./time";
 import {
@@ -158,6 +161,16 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
 
   return (
     <div className="flex flex-col gap-3 px-1.5 pb-3 pt-1">
+      <AutomationsSection
+        isCollapsed={collapsedGroups.has("automations")}
+        onToggle={() => collapsedGroups.toggle("automations")}
+        showPaused={flags.has("automations-paused")}
+        onTogglePaused={() => flags.toggle("automations-paused")}
+        activeThreadId={activeThreadId}
+        now={now}
+        onNavigate={onNavigate}
+      />
+
       <section aria-label="Recent activity">
         <GroupHeader
           title="Recent Activity"
@@ -248,11 +261,15 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
                 isCollapsed={isCollapsed}
                 count={group.rootCount}
                 onToggle={() => collapsedGroups.toggle(group.key)}
-                onNewThread={
+                action={
                   group.projectId
-                    ? () => {
-                        navigate.toCompose({ projectId: group.projectId!, focusPrompt: true });
-                        onNavigate();
+                    ? {
+                        label: `New thread in ${title}`,
+                        icon: "Plus",
+                        onClick: () => {
+                          navigate.toCompose({ projectId: group.projectId!, focusPrompt: true });
+                          onNavigate();
+                        },
                       }
                     : undefined
                 }
@@ -288,55 +305,6 @@ function groupLook(
     title: project?.name ?? "Unknown project",
     icon: <Icon name={isCollapsed ? "Folder" : "FolderOpen"} fallback="Folder" aria-hidden className="size-3.5" />,
   };
-}
-
-function GroupHeader({
-  title,
-  icon,
-  isCollapsed,
-  count,
-  onToggle,
-  onNewThread,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  isCollapsed: boolean;
-  count: number;
-  onToggle: () => void;
-  onNewThread?: () => void;
-}) {
-  return (
-    <div className="group/header flex h-7 items-center gap-1 px-1.5">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={!isCollapsed}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left text-xs font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground"
-      >
-        <span className="flex w-4 shrink-0 items-center justify-center text-sidebar-foreground/50">{icon}</span>
-        <span className="truncate">{title}</span>
-        {isCollapsed ? <span className="tabular-nums text-sidebar-foreground/40">{count}</span> : null}
-        <Icon
-          name="ChevronRight"
-          aria-hidden
-          className={cn(
-            "size-3 shrink-0 text-sidebar-foreground/40 opacity-0 transition group-hover/header:opacity-100",
-            !isCollapsed && "rotate-90",
-          )}
-        />
-      </button>
-      {onNewThread ? (
-        <button
-          type="button"
-          onClick={onNewThread}
-          aria-label={`New thread in ${title}`}
-          className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 opacity-0 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:opacity-100 group-hover/header:opacity-100"
-        >
-          <Icon name="Plus" aria-hidden className="size-3.5" />
-        </button>
-      ) : null}
-    </div>
-  );
 }
 
 function GroupByMenu({
@@ -500,42 +468,42 @@ function ThreadRowView({
         ) : null}
         {thread.status === "error" ? <RetryButton threadId={thread.id} /> : null}
         <SubagentBadge thread={thread} data={subagents} />
-        {/* Age and the hover buttons share one fixed slot, so hovering never reflows the title. */}
-        <span className={cn("relative flex h-5 shrink-0 items-center justify-end", isCompactViewport ? "w-8" : "w-11")}>
+        <span
+          className={cn(
+            "shrink-0 text-right text-2xs tabular-nums text-sidebar-foreground/45",
+            !isCompactViewport && "group-hover/row:invisible",
+            menuOpen && "invisible",
+          )}
+        >
+          {formatAge(thread.updatedAt, now)}
+        </span>
+        {isCompactViewport ? null : (
+          // Hover actions overlay the row's end instead of reserving width, so nothing reflows.
           <span
             className={cn(
-              "text-2xs tabular-nums text-sidebar-foreground/45",
-              !isCompactViewport && "group-hover/row:invisible",
-              menuOpen && "invisible",
+              "absolute inset-y-0 right-1 items-center gap-0.5 pl-2",
+              isActive ? "bg-sidebar-accent" : ROW_HOVER_SOLID_BG,
+              menuOpen ? "flex" : "hidden group-hover/row:flex",
             )}
           >
-            {formatAge(thread.updatedAt, now)}
+            <ArchiveButton thread={target} />
+            <ThreadActionsMenu
+              thread={target}
+              onOpenChange={setMenuOpen}
+              align="start"
+              trigger={(props) => (
+                <button
+                  type="button"
+                  aria-label="Thread actions"
+                  {...props}
+                  className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                >
+                  <Icon name="MoreHorizontal" fallback="Ellipsis" aria-hidden className="size-3.5" />
+                </button>
+              )}
+            />
           </span>
-          {isCompactViewport ? null : (
-            <span className={cn("absolute right-[22px]", menuOpen ? "flex" : "hidden group-hover/row:flex")}>
-              <ArchiveButton thread={target} />
-            </span>
-          )}
-          <ThreadActionsMenu
-            thread={target}
-            onOpenChange={setMenuOpen}
-            align="start"
-            trigger={(props) => (
-              <button
-                type="button"
-                aria-label="Thread actions"
-                {...props}
-                className={cn(
-                  "absolute right-0 size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                  // Touch opens the same menu by long-press, so compact rows keep the age instead.
-                  isCompactViewport ? "hidden" : menuOpen ? "flex" : "hidden group-hover/row:flex",
-                )}
-              >
-                <Icon name="MoreHorizontal" fallback="Ellipsis" aria-hidden className="size-3.5" />
-              </button>
-            )}
-          />
-        </span>
+        )}
       </div>
     </ThreadActionsContextMenu>
   );

@@ -4,10 +4,33 @@
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { createSubagentFolder, subagentSchema } from "./src/subagents";
+import {
+  AUTOMATION_ACTION_METHOD,
+  AUTOMATIONS_PLUGIN_ID,
+  automationSummarySchema,
+  overviewSchema,
+  summarizeOverview,
+} from "./src/automations";
 
 const MAX_THREADS_PER_CALL = 200;
 
 export const rpcContract = defineRpcContract({
+  automations: {
+    input: z.null(),
+    output: z.object({
+      /** False when bb's Automations plugin is off or unreachable. */
+      available: z.boolean(),
+      automations: z.array(automationSummarySchema),
+    }),
+  },
+  automationAction: {
+    input: z.object({
+      projectId: z.string().trim().min(1),
+      automationId: z.string().trim().min(1),
+      action: z.enum(["run", "pause", "resume"]),
+    }),
+    output: z.object({ ok: z.literal(true) }),
+  },
   subagents: {
     input: z.object({
       threadIds: z.array(z.string().trim().min(1)).max(MAX_THREADS_PER_CALL),
@@ -31,6 +54,29 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.rpc.register(rpcContract, {
+    automations: async () => {
+      try {
+        const overview = await bb.sdk.plugins.callRpc({
+          pluginId: AUTOMATIONS_PLUGIN_ID,
+          method: "automations_overview",
+          input: null,
+          outputSchema: overviewSchema,
+        });
+        return { available: true, automations: summarizeOverview(overview) };
+      } catch (error) {
+        bb.log.warn(`automations overview failed: ${error instanceof Error ? error.message : String(error)}`);
+        return { available: false, automations: [] };
+      }
+    },
+    automationAction: async ({ projectId, automationId, action }) => {
+      await bb.sdk.plugins.callRpc({
+        pluginId: AUTOMATIONS_PLUGIN_ID,
+        method: AUTOMATION_ACTION_METHOD[action],
+        input: { projectId, automationId },
+        outputSchema: z.unknown(),
+      });
+      return { ok: true as const };
+    },
     subagents: async ({ threadIds }) => ({
       threads: await Promise.all(
         [...new Set(threadIds)].map(async (threadId) => ({
