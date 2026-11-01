@@ -16,7 +16,7 @@
     "name": "Inline Terminal",
     "description": "Adds a Run button to shell code blocks in agent replies, opens an interactive terminal under the block, and sends the result back to the chat.",
     "branding": {
-      "icon": "SquareTerminal"
+      "icon": "Terminal"
     },
     "server": "./server.ts",
     "app": "./app.tsx"

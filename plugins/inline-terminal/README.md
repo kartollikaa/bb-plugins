@@ -10,9 +10,10 @@ once, like `!command` in Claude Code. Nothing extra appears in the chat.
 
 - `app.tsx` registers `experimental_codeFenceRenderer` for `bash`, `sh`,
   `shell`, `zsh`, `console`, `shell-session`, `terminal`. It renders bb's code
-  block (`Original`) plus Run / Run again, Ctrl-C, Panel (same session in bb's
-  terminal panel), Close, and the result badge (exit code, Sent to agent /
-  Send to agent).
+  block (`Original`), a Run / Run again button while no shell is live, and the
+  terminal. The only control on a live terminal is a terminal icon in its
+  top-right corner that opens the session in bb's terminal panel; Ctrl-C and
+  `exit` are typed in the terminal itself. Send errors show beside the block.
 - `lib/command.ts` → `wrapperArgv(command, nonce)` starts the session with
   `terminals.create({ start: { mode: "argv" } })`. The launcher writes a
   temporary rc (zsh via `ZDOTDIR` shims for `.zshenv`/`.zprofile`/`.zshrc`,
@@ -38,8 +39,8 @@ once, like `!command` in Claude Code. Nothing extra appears in the chat.
   scroll-out reattaches, replays the tail and never reports a run twice. The
   fence key changes with the props, so a reused component instance picks up
   the right fence's state; identical keys get separate slots.
-- Setting `autoSendResult` (default on) in the plugin settings turns
-  auto-send off; results then wait for **Send to agent**.
+- Setting `autoSendResult` (default on) in the plugin settings stops results
+  from going to the agent.
 - `skills/inline-terminal/SKILL.md` tells agents how to write runnable blocks
   and what the result message means.
 

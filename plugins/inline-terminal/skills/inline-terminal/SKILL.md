@@ -21,8 +21,8 @@ starts with `[inline-terminal]` and holds the command, exit code and output
 the output in the terminal above. Reply to the result directly and briefly:
 explain a failure, suggest the next step, or carry on with the task. Don't
 repeat the output back. If the thread is busy, the message queues until your
-current turn ends. Users can turn auto-send off in the plugin settings; then
-they press **Send to agent** themselves.
+current turn ends. Users can turn this off in the plugin settings; then no
+result reaches you, so ask for it if you need it.
 
 Only the block's own run is reported. Commands the user types afterwards in
 the same terminal are not.
@@ -43,5 +43,5 @@ the same terminal are not.
 
 - The user decides whether to run it. Until a result message arrives, don't
   assume the block ran.
-- The session belongs to the thread and also shows up in its terminal panel
-  (**Panel** button). **Close** ends the shell.
+- The session belongs to the thread. The terminal icon in its corner opens it
+  in the thread's terminal panel; `exit` ends the shell.

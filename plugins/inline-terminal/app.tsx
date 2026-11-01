@@ -27,17 +27,10 @@ import {
 
 type Sdk = ReturnType<typeof useSdk>;
 type RunState = "idle" | "starting" | "running" | "exited" | "error";
-type Delivery = "sending" | "sent" | "manual" | "failed";
-interface CommandResult {
-  exitCode: number;
-  output: string;
-  delivery: Delivery;
-}
 interface RunRecord {
   command: string;
   nonce: string;
   reported: boolean;
-  delivered: boolean;
 }
 interface QueuedResult {
   terminalId: string;
@@ -62,7 +55,7 @@ function readRun(terminalId: string): RunRecord | null {
   try {
     const value = JSON.parse(raw) as Partial<RunRecord>;
     if (typeof value.command !== "string" || typeof value.nonce !== "string") return null;
-    return { command: value.command, nonce: value.nonce, reported: value.reported === true, delivered: value.delivered === true };
+    return { command: value.command, nonce: value.nonce, reported: value.reported === true };
   } catch {
     return null;
   }
@@ -144,16 +137,12 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
   const [terminalId, setTerminalId] = useState<string | null>(() => storedSession(fenceKey));
   const [state, setState] = useState<RunState>(terminalId === null ? "idle" : "starting");
   const [error, setError] = useState<string | null>(null);
-  const [shellExitCode, setShellExitCode] = useState<number | null>(null);
-  const [result, setResult] = useState<CommandResult | null>(null);
 
   if (boundKey !== fenceKey) {
     const stored = storedSession(fenceKey);
     setBoundKey(fenceKey);
     setTerminalId(stored);
     setState(stored === null ? "idle" : "starting");
-    setShellExitCode(null);
-    setResult(null);
     setError(null);
   }
 
@@ -169,9 +158,8 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
   );
 
   const deliver = useCallback(
-    async ({ terminalId: id, command, exitCode, output }: QueuedResult) => {
+    async ({ command, exitCode, output }: QueuedResult) => {
       setError(null);
-      setResult({ exitCode, output, delivery: "sending" });
       try {
         await sdk.threads.send({
           threadId,
@@ -180,10 +168,7 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
             { type: "text", text: resultMessage(command, exitCode, output), mentions: [], visibility: "agent-only" },
           ],
         });
-        updateRun(id, { delivered: true });
-        setResult({ exitCode, output, delivery: "sent" });
       } catch (cause) {
-        setResult({ exitCode, output, delivery: "failed" });
         setError(`Could not send the result: ${errorText(cause)}`);
       }
     },
@@ -232,16 +217,10 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
       }
       const fromLine = outputStart !== undefined && !outputStart.isDisposed ? outputStart.line : 0;
       const finished: QueuedResult = { terminalId, command: run.command, exitCode: signal.code, output: bufferText(term, fromLine) };
-      if (run.reported) {
-        setResult((current) => current ?? { ...finished, delivery: run.delivered ? "sent" : "manual" });
-        return true;
-      }
+      if (run.reported) return true;
       updateRun(terminalId, { reported: true });
       if (autoSendRef.current === true) void deliverRef.current(finished);
-      else {
-        if (autoSendRef.current === undefined) awaitingSettingsRef.current = finished;
-        setResult({ ...finished, delivery: "manual" });
-      }
+      else if (autoSendRef.current === undefined) awaitingSettingsRef.current = finished;
       return true;
     });
 
@@ -294,7 +273,6 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
           sinceSeq = out.nextSeq;
           if (out.status === "exited" || out.status === "disconnected") {
             setState("exited");
-            setShellExitCode(out.exitCode);
             return;
           }
           setState("running");
@@ -336,8 +314,6 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
   const run = useCallback(
     async (command: string) => {
       setError(null);
-      setShellExitCode(null);
-      setResult(null);
       setState("starting");
       const nonce = newNonce();
       try {
@@ -348,7 +324,7 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
           rows: MAX_ROWS,
           title: terminalTitle(command),
         });
-        const record: RunRecord = { command, nonce, reported: false, delivered: false };
+        const record: RunRecord = { command, nonce, reported: false };
         sessionStorage.setItem(runKey(session.id), JSON.stringify(record));
         remember(session.id);
       } catch (cause) {
@@ -359,12 +335,6 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
     [sdk, threadId, remember],
   );
 
-  const interrupt = useCallback(() => {
-    if (terminalId === null) return;
-    void sdk.terminals.input({ terminalId, dataBase64: encodeBase64("\x03") }).catch(() => {});
-    termRef.current?.focus();
-  }, [sdk, terminalId]);
-
   const close = useCallback(async () => {
     if (terminalId !== null) {
       sessionStorage.removeItem(runKey(terminalId));
@@ -374,39 +344,12 @@ function useInlineTerminal(sdk: Sdk, threadId: string, fenceKey: string | null, 
     remember(null);
     setState("idle");
     setError(null);
-    setResult(null);
   }, [sdk, terminalId, remember]);
 
-  const resend = useCallback(() => {
-    const run = terminalId === null ? null : readRun(terminalId);
-    if (terminalId === null || run === null || result === null) return;
-    void deliver({ terminalId, command: run.command, exitCode: result.exitCode, output: result.output });
-  }, [terminalId, result, deliver]);
-
-  return { hostRef, termRef, terminalId, state, error, shellExitCode, result, run, interrupt, close, resend };
+  return { hostRef, termRef, terminalId, state, error, run, close };
 }
 
 const actionClass = "h-7 gap-1.5 px-2 text-xs";
-
-function ResultBadge({ result, onSend }: { result: CommandResult; onSend: () => void }) {
-  return (
-    <>
-      <span className={result.exitCode === 0 ? "text-xs text-muted-foreground" : "text-xs text-destructive"}>
-        exit {result.exitCode}
-      </span>
-      {result.delivery === "sending" ? (
-        <span className="text-xs text-muted-foreground">Sending to agent…</span>
-      ) : result.delivery === "sent" ? (
-        <span className="text-xs text-muted-foreground">Sent to agent</span>
-      ) : (
-        <Button size="sm" variant="ghost" className={actionClass} onClick={onSend}>
-          <Icon name="Send" className="size-3.5" />
-          Send to agent
-        </Button>
-      )}
-    </>
-  );
-}
 
 function ShellFence({ code, language, status, index, message, Original }: ExperimentalCodeFenceRendererProps) {
   const sdk = useSdk();
@@ -424,64 +367,48 @@ function ShellFence({ code, language, status, index, message, Original }: Experi
   return (
     <div className="my-2" data-inline-terminal-fence={fenceKey ?? ""}>
       <Original />
-      <div className="-mt-1 flex flex-wrap items-center gap-1.5">
-        {live ? null : (
-          <Button
-            size="sm"
-            variant="outline"
-            className={actionClass}
-            disabled={!ready || fenceKey === null}
-            aria-label={ready ? `Run in this thread shell: ${command}` : "Waiting for the block to finish"}
-            onClick={() => void (hasSession ? term.close() : Promise.resolve()).then(() => term.run(command))}
-          >
-            <Icon name={hasSession ? "RotateCcw" : "Play"} className="size-3.5" />
-            {hasSession ? "Run again" : "Run"}
-          </Button>
-        )}
-        {hasSession && live ? (
-          <>
-            <Button size="sm" variant="ghost" className={actionClass} onClick={term.interrupt}>
-              <Icon name="Square" className="size-3.5" />
-              Ctrl-C
-            </Button>
+      {live && hasSession && term.error === null ? null : (
+        <div className="-mt-1 flex flex-wrap items-center gap-1.5">
+          {live && hasSession ? null : (
             <Button
               size="sm"
-              variant="ghost"
+              variant="outline"
               className={actionClass}
-              aria-label="Show this session in the terminal panel"
-              onClick={() => {
-                if (term.terminalId !== null) void navigate.experimental_openTerminal({ terminalId: term.terminalId });
-              }}
+              disabled={!ready || fenceKey === null}
+              aria-label={ready ? `Run in this thread shell: ${command}` : "Waiting for the block to finish"}
+              onClick={() => void (hasSession ? term.close() : Promise.resolve()).then(() => term.run(command))}
             >
-              <Icon name="PanelRight" className="size-3.5" />
-              Panel
+              <Icon name={hasSession ? "RotateCcw" : "Play"} className="size-3.5" />
+              {hasSession ? "Run again" : "Run"}
             </Button>
-          </>
-        ) : null}
-        {hasSession ? (
-          <Button size="sm" variant="ghost" className={actionClass} onClick={() => void term.close()}>
-            <Icon name="X" className="size-3.5" />
-            Close
-          </Button>
-        ) : null}
-        {term.result !== null ? <ResultBadge result={term.result} onSend={term.resend} /> : null}
-        {term.state === "exited" && term.result === null ? (
-          <span className="text-xs text-muted-foreground">
-            Shell exited{term.shellExitCode === null ? "" : ` with code ${term.shellExitCode}`}
-          </span>
-        ) : null}
-        {term.error !== null ? (
-          <span role="alert" className="text-xs text-destructive">
-            {term.error}
-          </span>
-        ) : null}
-      </div>
+          )}
+          {term.error !== null ? (
+            <span role="alert" className="text-xs text-destructive">
+              {term.error}
+            </span>
+          ) : null}
+        </div>
+      )}
       {hasSession ? (
         <div
-          className="mt-1.5 overflow-hidden rounded-md border border-border bg-card p-1.5 text-card-foreground"
+          className="group relative mt-1.5 overflow-hidden rounded-md border border-border bg-card p-1.5 text-card-foreground"
           onClick={() => term.termRef.current?.focus()}
         >
           <div ref={term.hostRef} className="w-full" />
+          {live ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="absolute right-1.5 top-1.5 z-10 size-6 text-muted-foreground opacity-60 hover:opacity-100 group-hover:opacity-100"
+              aria-label="Open in terminal panel"
+              onClick={(event) => {
+                event.stopPropagation();
+                if (term.terminalId !== null) void navigate.experimental_openTerminal({ terminalId: term.terminalId });
+              }}
+            >
+              <Icon name="Terminal" className="size-3.5" />
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>
