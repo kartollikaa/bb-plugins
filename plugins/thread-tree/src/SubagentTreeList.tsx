@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { toast } from "sonner";
 import {
@@ -44,6 +44,13 @@ const ROW_PAD_PX = 6;
 const INDENT_PX = 24;
 
 const ARCHIVE_ACTION_KEY = "bb--core/archive";
+/** How far the hover actions reach in from the row's right edge, plus breathing room. */
+const HOVER_ACTIONS_REACH_PX = 58;
+/** The row's right padding plus the gap before the age label. */
+const ROW_END_PAD_PX = 16;
+const SLIDE_ON_HOVER = "group-hover/row:[transform:translateX(calc(var(--slide)*-1))]";
+const SLIDE_NOW = "[transform:translateX(calc(var(--slide)*-1))]";
+const ROW_HOVER_SOLID_BG_ON_HOVER = "group-hover/row:bg-[color-mix(in_oklab,var(--sidebar-accent)_60%,var(--sidebar))]";
 const RECENT_LIMIT = 5;
 const RECENT_MORE_LIMIT = 15;
 
@@ -404,6 +411,12 @@ function ThreadRowView({
   const { thread, depth } = row;
   const { splitProps } = useSidebarThreadSplit(thread.id);
   const [menuOpen, setMenuOpen] = useState(false);
+  const age = formatAge(thread.updatedAt, now);
+  const ageRef = useRef<HTMLSpanElement>(null);
+  const [slidePx, setSlidePx] = useState(0);
+  useLayoutEffect(() => {
+    setSlidePx(Math.max(0, HOVER_ACTIONS_REACH_PX - ROW_END_PAD_PX - (ageRef.current?.offsetWidth ?? 0)));
+  }, [age]);
   const target = useMemo(() => toActionTarget(thread), [thread]);
   const isTree = variant === "tree";
   const leading = <StatusDot state={threadDotState(thread)} className="size-2" />;
@@ -466,16 +479,27 @@ function ThreadRowView({
             {row.descendantCount}
           </span>
         ) : null}
-        {thread.status === "error" ? <RetryButton threadId={thread.id} /> : null}
-        <SubagentBadge thread={thread} data={subagents} />
+        {/* On hover these slide left, clear of the action buttons, rather than being covered. */}
         <span
+          style={{ "--slide": `${slidePx}px` } as React.CSSProperties}
+          className={cn(
+            "flex shrink-0 items-center gap-2 rounded-md transition-transform duration-150 ease-out",
+            !isCompactViewport && [SLIDE_ON_HOVER, ROW_HOVER_SOLID_BG_ON_HOVER],
+            menuOpen && SLIDE_NOW,
+          )}
+        >
+          {thread.status === "error" ? <RetryButton threadId={thread.id} /> : null}
+          <SubagentBadge thread={thread} data={subagents} />
+        </span>
+        <span
+          ref={ageRef}
           className={cn(
             "shrink-0 text-right text-2xs tabular-nums text-sidebar-foreground/45",
             !isCompactViewport && "group-hover/row:invisible",
             menuOpen && "invisible",
           )}
         >
-          {formatAge(thread.updatedAt, now)}
+          {age}
         </span>
         {isCompactViewport ? null : (
           // Hover actions overlay the row's end instead of reserving width, so nothing reflows.
