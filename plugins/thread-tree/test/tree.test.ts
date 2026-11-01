@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ancestorsOf, buildForest, effectiveState, groupRows, recentThreads, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
+import { ancestorsOf, buildForest, effectiveState, groupRows, moveBefore, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
@@ -213,4 +213,35 @@ test("guide lines run on past middle children and bend at the last one", () => {
       ["b", [false]],
     ],
   );
+});
+
+test("a fixed project order ignores activity", () => {
+  const threads = [thread("a", { projectId: "pa", updatedAt: 1 }), thread("b", { projectId: "pb", updatedAt: 9 })];
+  const forest = buildForest(threads);
+  assert.deepEqual(groupRows(forest, new Set(), new Set(), "project", ["pa", "pb"]).map((g) => g.key), ["project:pa", "project:pb"]);
+  assert.deepEqual(groupRows(forest, new Set(), new Set(), "project", null).map((g) => g.key), ["project:pb", "project:pa"]);
+  assert.deepEqual(groupRows(forest, new Set(), new Set(), "project", ["pb"]).map((g) => g.key), ["project:pb", "project:pa"]);
+});
+
+test("project order keeps the saved order, then bb's with personal first, and drops gone ids", () => {
+  const projects = [
+    { id: "x", isPersonal: false },
+    { id: "me", isPersonal: true },
+    { id: "y", isPersonal: false },
+    { id: "z", isPersonal: false },
+  ];
+  assert.deepEqual(resolveProjectOrder([], projects), ["me", "x", "y", "z"]);
+  assert.deepEqual(resolveProjectOrder(["z", "gone", "x", "z"], projects), ["z", "x", "me", "y"]);
+});
+
+test("moveBefore places a project right before the drop target", () => {
+  assert.deepEqual(moveBefore(["a", "b", "c", "d"], "d", "b"), ["a", "d", "b", "c"]);
+  assert.deepEqual(moveBefore(["a", "b", "c"], "a", "c"), ["b", "a", "c"]);
+  assert.deepEqual(moveBefore(["a", "b"], "a", "a"), ["a", "b"]);
+});
+
+test("a thread whose turn failed is red even once read, and outranks live background work", () => {
+  const busy = { backgroundAgents: 0, backgroundCommands: 1, workflows: 0 };
+  assert.equal(threadDotState(thread("t", { status: "error" })), "error");
+  assert.equal(threadDotState(thread("t", { status: "error", activity: busy, indicator: "runtime" })), "error");
 });

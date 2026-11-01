@@ -9,6 +9,8 @@ under it, and the subagents it runs inside its own session show on its row.
 - Below it, Threads grouped by Project (folder icons), by Status (needs input,
   error, working, done; a parent files under the most urgent state in its
   subtree), or None, with Pinned on top. Pick it from the Group by menu.
+  Projects keep a fixed order you set by dragging their headers, or follow
+  recent activity (Project order in the same menu).
 - Each child thread sits under the thread that spawned it, at any depth, even
   when it lives in another project. Collapse a parent to fold its subtree; the
   dot on the fold shows the most urgent state inside it.
@@ -18,8 +20,8 @@ under it, and the subagents it runs inside its own session show on its row.
   threads and cannot be messaged. They show as a counter with a status dot on
   the right of the parent's row; hover it to list each one with its type,
   state, duration and tokens.
-- A parent thread (one with child threads or subagents) shows its own state as
-  a dot before its title.
+- Every thread shows its own state as a dot before its title; a thread whose
+  turn failed (an app exit, a daemon disconnect) is red and gets a Retry button.
 - Dot colors: blue (pulsing) running, green done, yellow needs your input, red
   error, gray stopped.
 - `bb subagent-tree list` prints the same list from a terminal.
@@ -28,4 +30,5 @@ under it, and the subagents it runs inside its own session show on its row.
 
 The list reads bb's own thread data. Subagents come from each thread's event
 log, read incrementally on the bb server; nothing leaves the machine. Collapse
-state, grouping, and the Recent Activity length are kept per client.
+state, grouping, project order, and the Recent Activity length are kept per
+client.

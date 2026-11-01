@@ -66,3 +66,20 @@ export function usePersistentChoice<T extends string>(key: string, allowed: read
   );
   return [value, choose] as const;
 }
+
+/** An ordered string list kept per client. */
+export function usePersistentList(key: string) {
+  const [values, setValues] = useState<readonly string[]>(() => [...read(key)]);
+  const save = useCallback(
+    (next: readonly string[]) => {
+      setValues(next);
+      try {
+        window.localStorage.setItem(PREFIX + key, JSON.stringify(next));
+      } catch {
+        // Storage full or blocked: the order still applies for this session.
+      }
+    },
+    [key],
+  );
+  return [values, save] as const;
+}

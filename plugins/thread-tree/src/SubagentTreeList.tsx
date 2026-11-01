@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { toast } from "sonner";
 import {
   ThreadTitle,
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
   experimental_ThreadActionsMenu as ThreadActionsMenu,
-  experimental_ThreadStatusGlyph as ThreadStatusGlyph,
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
   experimental_useSidebarThreads as useSidebarThreads,
   useBbNavigate,
-  useSidebarThreadDraft,
-  useSidebarThreadRowStatus,
+  useSdk,
   type PluginSidebarProject,
   type PluginSidebarThread,
   type PluginThreadActionTarget,
@@ -25,14 +24,16 @@ import {
   ancestorsOf,
   buildForest,
   groupRows,
+  moveBefore,
   recentThreads,
+  resolveProjectOrder,
   threadDotState,
   type DotState,
   type GroupMode,
   type TreeRow,
 } from "./tree";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
-import { usePersistentChoice, usePersistentSet } from "./usePersistentSet";
+import { usePersistentChoice, usePersistentList, usePersistentSet } from "./usePersistentSet";
 
 const ROW_PAD_PX = 6;
 /** One level puts a child's status icon under its parent's title. */
@@ -55,6 +56,13 @@ const GROUP_MODES: readonly { id: GroupMode; label: string; icon: React.ReactNod
   { id: "none", label: "None", icon: <Icon name="Layers" aria-hidden className="size-3.5" /> },
 ];
 
+type ProjectOrderMode = "fixed" | "activity";
+
+const PROJECT_ORDER_MODES: readonly { id: ProjectOrderMode; label: string; icon: string }[] = [
+  { id: "fixed", label: "Fixed", icon: "Pin" },
+  { id: "activity", label: "Recent activity", icon: "Clock" },
+];
+
 const STATUS_GROUP_TITLE: Record<string, string> = {
   input: "Needs input",
   error: "Error",
@@ -69,6 +77,13 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
   const collapsedGroups = usePersistentSet("collapsed-groups");
   const flags = usePersistentSet("flags");
   const [groupMode, setGroupMode] = usePersistentChoice<GroupMode>("group-mode", ["project", "status", "none"], "project");
+  const [projectOrderMode, setProjectOrderMode] = usePersistentChoice<ProjectOrderMode>(
+    "project-order-mode",
+    ["fixed", "activity"],
+    "fixed",
+  );
+  const [savedProjectOrder, setSavedProjectOrder] = usePersistentList("project-order");
+  const [drag, setDrag] = useState<{ projectId: string; overId: string | null } | null>(null);
   const now = useNow(30_000);
 
   const forest = useMemo(() => buildForest(threads), [threads]);
@@ -80,9 +95,14 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
     if (hidden.length > 0) collapsedThreads.remove(hidden);
   }, [activeThreadId, forest, collapsedThreads]);
 
+  const projectOrder = useMemo(
+    () => (projectOrderMode === "fixed" ? resolveProjectOrder(savedProjectOrder, projects) : null),
+    [projectOrderMode, savedProjectOrder, projects],
+  );
+  const canReorder = groupMode === "project" && projectOrder !== null;
   const groups = useMemo(
-    () => groupRows(forest, collapsedThreads.values, collapsedGroups.values, groupMode),
-    [forest, collapsedThreads.values, collapsedGroups.values, groupMode],
+    () => groupRows(forest, collapsedThreads.values, collapsedGroups.values, groupMode, projectOrder),
+    [forest, collapsedThreads.values, collapsedGroups.values, groupMode, projectOrder],
   );
   const showMoreRecent = flags.has("recent-more");
   const recentCollapsed = collapsedGroups.has("recent");
@@ -177,7 +197,12 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
 
       <div className="-mb-1 flex h-6 items-center justify-between px-1.5">
         <span className="text-xs font-medium text-sidebar-foreground/45">Threads</span>
-        <GroupByMenu mode={groupMode} onChange={setGroupMode} />
+        <GroupByMenu
+          mode={groupMode}
+          onChange={setGroupMode}
+          projectOrderMode={projectOrderMode}
+          onProjectOrderChange={setProjectOrderMode}
+        />
       </div>
 
       <div role="tree" aria-label="Threads" className="flex flex-col gap-3">
@@ -185,8 +210,36 @@ export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate
           const isCollapsed = collapsedGroups.has(group.key);
           const project = group.projectId ? projectById.get(group.projectId) : undefined;
           const { title, icon } = groupLook(group.key, project, isCollapsed);
+          const projectId = group.projectId;
+          const reorderable = canReorder && projectId !== null;
           return (
-            <section key={group.key}>
+            <section
+              key={group.key}
+              draggable={reorderable}
+              onDragStart={(event) => {
+                if (!reorderable) return;
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", title);
+                setDrag({ projectId, overId: null });
+              }}
+              onDragOver={(event) => {
+                if (!drag || !reorderable) return;
+                event.preventDefault();
+                if (drag.overId !== projectId) setDrag({ ...drag, overId: projectId });
+              }}
+              onDrop={(event) => {
+                if (!drag || !reorderable || !projectOrder) return;
+                event.preventDefault();
+                setSavedProjectOrder(moveBefore(projectOrder, drag.projectId, projectId));
+                setDrag(null);
+              }}
+              onDragEnd={() => setDrag(null)}
+              className={cn(
+                "rounded-md",
+                drag?.overId === projectId && drag.projectId !== projectId && "shadow-[inset_0_2px_0_0_var(--color-blue-500)]",
+                drag?.projectId === projectId && "opacity-50",
+              )}
+            >
               <GroupHeader
                 title={title}
                 icon={icon}
@@ -284,7 +337,17 @@ function GroupHeader({
   );
 }
 
-function GroupByMenu({ mode, onChange }: { mode: GroupMode; onChange: (mode: GroupMode) => void }) {
+function GroupByMenu({
+  mode,
+  onChange,
+  projectOrderMode,
+  onProjectOrderChange,
+}: {
+  mode: GroupMode;
+  onChange: (mode: GroupMode) => void;
+  projectOrderMode: ProjectOrderMode;
+  onProjectOrderChange: (mode: ProjectOrderMode) => void;
+}) {
   const portalProps = usePortalScopeProps();
   const current = GROUP_MODES.find((entry) => entry.id === mode) ?? GROUP_MODES[0]!;
   return (
@@ -318,6 +381,28 @@ function GroupByMenu({ mode, onChange }: { mode: GroupMode; onChange: (mode: Gro
               {entry.id === mode ? <Icon name="Check" aria-hidden className="size-3.5" /> : null}
             </DropdownMenu.Item>
           ))}
+          {mode === "project" ? (
+            <>
+              <DropdownMenu.Separator className="my-1 h-px bg-border" />
+              <DropdownMenu.Label className="px-2 py-1 text-xs text-muted-foreground">Project order</DropdownMenu.Label>
+              {PROJECT_ORDER_MODES.map((entry) => (
+                <DropdownMenu.Item
+                  key={entry.id}
+                  onSelect={() => onProjectOrderChange(entry.id)}
+                  className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                >
+                  <span className="flex text-muted-foreground">
+                    <Icon name={entry.icon} aria-hidden className="size-3.5" />
+                  </span>
+                  <span className="flex-1">{entry.label}</span>
+                  {entry.id === projectOrderMode ? <Icon name="Check" aria-hidden className="size-3.5" /> : null}
+                </DropdownMenu.Item>
+              ))}
+              {projectOrderMode === "fixed" ? (
+                <div className="px-2 pb-1 pt-0.5 text-xs text-muted-foreground">Drag a project to move it.</div>
+              ) : null}
+            </>
+          ) : null}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
@@ -347,19 +432,11 @@ function ThreadRowView({
   onOpen: (thread: PluginSidebarThread, event: MouseEvent) => void;
 }) {
   const { thread, depth } = row;
-  const rowStatus = useSidebarThreadRowStatus(thread.id);
-  const { hasUnsubmittedDraft } = useSidebarThreadDraft(thread.id);
   const { splitProps } = useSidebarThreadSplit(thread.id);
   const [menuOpen, setMenuOpen] = useState(false);
-  const indicator = thread.indicator === "none" && hasUnsubmittedDraft ? "draft" : thread.indicator;
   const target = useMemo(() => toActionTarget(thread), [thread]);
-  const isParent = row.hasChildren || (subagents?.total ?? 0) > 0;
   const isTree = variant === "tree";
-  const leading = isParent ? (
-    <StatusDot state={threadDotState(thread)} className="size-2" />
-  ) : (
-    <ThreadStatusGlyph indicator={indicator} rowStatus={rowStatus} size="compact" />
-  );
+  const leading = <StatusDot state={threadDotState(thread)} className="size-2" />;
 
   return (
     <ThreadActionsContextMenu thread={target}>
@@ -419,6 +496,7 @@ function ThreadRowView({
             {row.descendantCount}
           </span>
         ) : null}
+        {thread.status === "error" ? <RetryButton threadId={thread.id} /> : null}
         <SubagentBadge thread={thread} data={subagents} />
         {/* Age and the actions button share one fixed slot, so hovering never reflows the title. */}
         <span className="relative flex h-5 w-8 shrink-0 items-center justify-end">
@@ -453,6 +531,34 @@ function ThreadRowView({
         </span>
       </div>
     </ThreadActionsContextMenu>
+  );
+}
+
+/** Re-submits the failed turn, the same as bb's own Retry in the thread. */
+function RetryButton({ threadId }: { threadId: string }) {
+  const sdk = useSdk();
+  const [pending, setPending] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={async (event) => {
+        event.stopPropagation();
+        setPending(true);
+        try {
+          await sdk.threads.retry({ threadId });
+        } catch (error) {
+          toast.error("Retry failed", { description: error instanceof Error ? error.message : String(error) });
+        } finally {
+          setPending(false);
+        }
+      }}
+      aria-label="Retry the failed turn"
+      className="flex h-5 shrink-0 items-center gap-1 rounded-full border border-destructive/40 px-1.5 text-2xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-60"
+    >
+      <Icon name={pending ? "Loading" : "RotateCcw"} aria-hidden className="size-3" />
+      Retry
+    </button>
   );
 }
 

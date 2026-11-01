@@ -44,7 +44,8 @@ const THREAD_DOT_PRIORITY: readonly DotState[] = ["input", "error", "running", "
 
 export function threadDotState(thread: TreeThread): DotState {
   if (thread.hasPendingInteraction || thread.indicator === "waiting-for-input") return "input";
-  if (thread.indicator === "unread-error") return "error";
+  // A failed turn (an app exit, a daemon disconnect) stays failed until retried, read or not.
+  if (thread.status === "error" || thread.indicator === "unread-error") return "error";
   if (isWorking(thread)) return "running";
   return "done";
 }
@@ -202,6 +203,8 @@ export function groupRows<T extends TreeThread>(
   collapsed: ReadonlySet<string>,
   collapsedGroups: ReadonlySet<string>,
   mode: GroupMode = "project",
+  /** Project ids in display order; null orders projects by latest activity. */
+  projectOrder: readonly string[] | null = null,
 ): TreeGroup<T>[] {
   const pinned = forest.roots.filter((root) => root.isPinned).sort(byPinOrder);
   const buckets = new Map<string, { projectId: string | null; roots: T[] }>();
@@ -227,6 +230,12 @@ export function groupRows<T extends TreeThread>(
   if (mode === "status") {
     const rank = (key: string) => THREAD_DOT_PRIORITY.indexOf(key.slice("status:".length) as DotState);
     rest.sort((a, b) => rank(a.key) - rank(b.key));
+  } else if (mode === "project" && projectOrder) {
+    const rank = (group: TreeGroup<T>) => {
+      const index = projectOrder.indexOf(group.projectId ?? "");
+      return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+    };
+    rest.sort((a, b) => rank(a) - rank(b) || a.key.localeCompare(b.key));
   } else {
     rest.sort((a, b) => b.latestActivityAt - a.latestActivityAt || a.key.localeCompare(b.key));
   }
@@ -279,4 +288,31 @@ export function summarize(total: number, agents: readonly Subagent[], thread: Tr
     else if (state === "failed") failed += 1;
   }
   return { total, running, failed, dot: running > 0 ? "running" : failed > 0 ? "error" : "done" };
+}
+
+/**
+ * The saved manual order, then every other project in bb's order with the
+ * personal project first. Ids bb no longer lists drop out.
+ */
+export function resolveProjectOrder(
+  saved: readonly string[],
+  projects: readonly { id: string; isPersonal: boolean }[],
+): string[] {
+  const known = new Set(projects.map((project) => project.id));
+  const kept = saved.filter((id, index) => known.has(id) && saved.indexOf(id) === index);
+  const keptSet = new Set(kept);
+  const rest = [...projects]
+    .sort((a, b) => Number(b.isPersonal) - Number(a.isPersonal))
+    .map((project) => project.id)
+    .filter((id) => !keptSet.has(id));
+  return [...kept, ...rest];
+}
+
+/** `order` with `moved` placed right before `target`. */
+export function moveBefore(order: readonly string[], moved: string, target: string): string[] {
+  if (moved === target) return [...order];
+  const without = order.filter((id) => id !== moved);
+  const index = without.indexOf(target);
+  if (index === -1) return [...without, moved];
+  return [...without.slice(0, index), moved, ...without.slice(index)];
 }
