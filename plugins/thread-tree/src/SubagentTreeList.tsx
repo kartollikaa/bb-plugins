@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { SubagentBadge } from "./SubagentBadge";
 import { StatusDot } from "./StatusDot";
 import { formatAge } from "./time";
-import { ancestorsOf, buildForest, groupRows, type TreeGroup, type TreeRow } from "./tree";
+import { ancestorsOf, buildForest, groupRows, threadDotState, type TreeGroup, type TreeRow } from "./tree";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentSet } from "./usePersistentSet";
 
@@ -178,6 +178,7 @@ function ThreadRowView({
   const [menuOpen, setMenuOpen] = useState(false);
   const indicator = thread.indicator === "none" && hasUnsubmittedDraft ? "draft" : thread.indicator;
   const target = useMemo(() => toActionTarget(thread), [thread]);
+  const isParent = row.hasChildren || (subagents?.total ?? 0) > 0;
 
   return (
     <ThreadActionsContextMenu thread={target}>
@@ -222,7 +223,11 @@ function ThreadRowView({
           className="flex min-w-0 flex-1 items-center gap-1 self-stretch outline-none"
         >
           <span className="flex size-4 shrink-0 items-center justify-center">
-            <ThreadStatusGlyph indicator={indicator} rowStatus={rowStatus} size="compact" />
+            {isParent ? (
+              <StatusDot state={threadDotState(thread)} className="size-2" />
+            ) : (
+              <ThreadStatusGlyph indicator={indicator} rowStatus={rowStatus} size="compact" />
+            )}
           </span>
           <span className={cn("min-w-0 flex-1 truncate", thread.isUnread && "font-semibold text-sidebar-foreground")}>
             <ThreadTitle threadId={thread.id} />

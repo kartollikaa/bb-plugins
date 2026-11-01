@@ -13,6 +13,8 @@ under it, and the subagents it runs inside its own session show on its row.
   threads and cannot be messaged. They show as a counter with a status dot on
   the right of the parent's row; hover it to list each one with its type,
   state, duration and tokens.
+- A parent thread (one with child threads or subagents) shows its own state as
+  a dot before its title.
 - Dot colors: blue (pulsing) running, green done, yellow needs your input, red
   error, gray stopped.
 - `bb subagent-tree list` prints the same list from a terminal.
