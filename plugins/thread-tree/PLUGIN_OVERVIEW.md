@@ -3,7 +3,11 @@ under it, and the subagents it runs inside its own session show on its row.
 
 ## What you get
 
-- Recent Activity on top: the most recently active threads, child threads
+- Automations at the very top: each scheduled automation with its status dot
+  and next run; hover to run it now or pause and resume it. Clicking one opens
+  its last run's thread. Paused ones fold under an "N paused" toggle. It reads
+  bb's own Automations plugin and hides itself when that plugin is off.
+- Recent Activity below it: the most recently active threads, child threads
   included, newest first, whatever grouping the list below uses. Show more
   extends it; the project is in each row's tooltip.
 - Below it, Threads grouped by Project (folder icons), by Status (needs input,
@@ -15,7 +19,9 @@ under it, and the subagents it runs inside its own session show on its row.
   when it lives in another project. Collapse a parent to fold its subtree; the
   dot on the fold shows the most urgent state inside it.
 - Child threads are ordinary threads: open one, message it, pin, archive or
-  split it with bb's own menu.
+  split it with bb's own menu. Hovering a row shows Archive and the thread
+  menu over the end of the row; Archive is bb's own, with its confirmation
+  for threads that have children.
 - Provider subagents (Claude Code `Agent` calls, Codex subagents) are not
   threads and cannot be messaged. They show as a counter with a status dot on
   the right of the parent's row; hover it to list each one with its type,
