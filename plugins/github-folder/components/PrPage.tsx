@@ -26,7 +26,7 @@ import {
 /** The panel: a PR's context card over bb's new-thread composer, or the folder's PRs at the root. */
 export function PrPage({ subPath }: PluginNavPanelProps) {
   const url = prUrlFromSubPath(subPath);
-  return url ? <PrCompose key={url} url={url} /> : <PrIndex />;
+  return <div className="h-full overflow-y-auto">{url ? <PrCompose key={url} url={url} /> : <PrIndex />}</div>;
 }
 
 function useFolderPr(url: string): GithubPr | undefined {
@@ -151,7 +151,7 @@ function PrCard({
           <p className="text-xs text-muted-foreground">No description</p>
         ) : (
           <>
-            <div className={cn("relative overflow-hidden", !isExpanded && "max-h-32")}>
+            <div className={cn("relative", isExpanded ? "max-h-[50vh] overflow-y-auto" : "max-h-32 overflow-hidden")}>
               <Markdown content={description} className="text-sm" />
               {isExpanded ? null : <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-card" />}
             </div>
