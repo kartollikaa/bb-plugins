@@ -72,7 +72,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Agent skill:** `skills/thread-links/`.
 - **Tests:** `npm test` covers `test/links.test.ts` (URL extraction, classification, check rollup,
   PR chips). Run `npm run typecheck`.
-- Not in `marketplace.json` yet: it needs a first `thread-links/v0.1.0` tag.
+- MIT. Not in `marketplace.json` yet: it needs a first `thread-links/v0.1.0` tag.
 
 ## github-folder — `plugins/github-folder/`
 
@@ -92,7 +92,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Agent skill:** `skills/github-folder/`.
 - **Tests:** `npm test` covers `test/github.test.ts` (query, parsing, filters, settings). Run
   `npm run typecheck`.
-- Not in `marketplace.json` yet: it needs a first `github-folder/v0.1.0` tag.
+- MIT. Not in `marketplace.json` yet: it needs a first `github-folder/v0.1.0` tag.
 
 ## Retired repos
 
