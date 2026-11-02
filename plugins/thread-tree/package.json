@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kartollikaa/bb-plugins.git",
+    "directory": "plugins/thread-tree"
+  },
   "engines": {
     "bb": ">=0.48",
     "bbPluginSdk": ">=0.6.104"
