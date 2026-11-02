@@ -41,5 +41,5 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 ## Retired repos
 
-Before the monorepo, each plugin had its own repo: `kartollikaa/bb-plugin-<id>`. They are archived
-and their READMEs point here. Their old `vX.Y.Z` tags still install for anyone who used them.
+Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on
+2026-11-02; only Dmitrii had installed from them. Their history lives on here under `plugins/<id>/`.
