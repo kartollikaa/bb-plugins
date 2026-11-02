@@ -17,9 +17,13 @@ bb plugin dev
 ## Layout
 
 - `lib/github.ts`: the GraphQL query, parsing, filters and settings. Pure, covered by `test/`.
-- `lib/gh.ts`: runs the query once per gh login (`~/.config/gh-*` profiles too) and caches it.
+- `lib/gh.ts`: runs the query once per gh login (`~/.config/gh-*` profiles too) and caches it;
+  `viewPr` reads one PR with `gh pr view`, trying each login.
+- `lib/pr-context.ts`: the prompt a new thread about a PR starts with, and the bb project whose
+  remote is the PR's repository. Pure, covered by `test/`.
 - `lib/contract.ts`: the RPC contract. `folder` is the view both sidebars draw; `updateSettings`,
-  `snooze` and `refresh` change it and invalidate the `folder` tag.
+  `snooze` and `refresh` change it and invalidate the `folder` tag. `prContext` returns the
+  prompt and project a row click opens the New thread screen with.
 - `server.ts`: settings in `bb.storage.kv`, a background refresh, RPC, `bb github-folder list`.
 - `lib/sidebar-anchor.ts`, `components/FolderSection.tsx`: an app overlay that portals the folder
   above bb's own thread list, drawn with that list's row and label classes.

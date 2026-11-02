@@ -1,6 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { FOLDER_TAG, rpcContract, type FolderView } from "./lib/contract";
-import { createGithubFolder, type GithubSnapshot } from "./lib/gh";
+import { createGithubFolder, viewPr, type GithubSnapshot } from "./lib/gh";
+import { composePrompt, parsePrUrl, projectForRepo } from "./lib/pr-context";
 import {
   ATTENTION_LABEL,
   applyPatch,
@@ -68,6 +69,12 @@ export default async function plugin(bb: BbPluginApi) {
     updateSettings: async (patch) => {
       await saveSettings(applyPatch(await loadSettings(), patch));
       return { ok: true as const };
+    },
+    prContext: async ({ url }) => {
+      const target = parsePrUrl(url);
+      if (target === null) throw new Error("Not a GitHub pull request URL");
+      const [pr, projects] = await Promise.all([viewPr(url), bb.sdk.projects.list()]);
+      return { prompt: composePrompt(pr), projectId: projectForRepo(projects, target.repo) };
     },
     snooze: async ({ key, snoozed }) => {
       await saveSettings(setSnoozed(await loadSettings(), key, snoozed));

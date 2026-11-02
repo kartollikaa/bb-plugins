@@ -68,6 +68,18 @@ export function FolderSection() {
     toast.error(what, { description: error instanceof Error ? error.message : String(error) });
   const update = (patch: SettingsPatch) => void rpc.call("updateSettings", patch).catch(report("Could not save the folder settings"));
   const snooze = (key: string, snoozed: boolean) => void rpc.call("snooze", { key, snoozed }).catch(report("Could not snooze"));
+  const [openingUrl, setOpeningUrl] = useState<string | null>(null);
+  const startThread = (url: string) => {
+    if (openingUrl !== null) return;
+    setOpeningUrl(url);
+    rpc
+      .call("prContext", { url })
+      .then(({ prompt, projectId }) =>
+        navigate.toCompose({ initialPrompt: prompt, focusPrompt: true, ...(projectId ? { projectId } : {}) }),
+      )
+      .catch(report("Could not read the pull request"))
+      .finally(() => setOpeningUrl(null));
+  };
   const refresh = () => {
     setIsRefreshing(true);
     rpc
@@ -123,7 +135,9 @@ export function FolderSection() {
               item={item}
               isSnoozed={snoozed.includes(item)}
               now={now}
-              onOpen={() => navigate.openUrl(item.pr.url)}
+              isOpening={openingUrl === item.pr.url}
+              onOpen={(event) => (event.metaKey || event.ctrlKey ? navigate.openUrl(item.pr.url) : startThread(item.pr.url))}
+              onOpenOnGithub={() => navigate.openUrl(item.pr.url)}
               onToggleSnooze={(value) => snooze(item.snoozeKey, value)}
             />
           ))}
@@ -176,13 +190,17 @@ function PullRequestRow({
   item,
   isSnoozed,
   now,
+  isOpening,
   onOpen,
+  onOpenOnGithub,
   onToggleSnooze,
 }: {
   item: FolderItem;
   isSnoozed: boolean;
   now: number;
-  onOpen: () => void;
+  isOpening: boolean;
+  onOpen: (event: React.MouseEvent) => void;
+  onOpenOnGithub: () => void;
   onToggleSnooze: (snoozed: boolean) => void;
 }) {
   const { pr, attention } = item;
@@ -192,6 +210,7 @@ function PullRequestRow({
     attention.map((reason) => ATTENTION_LABEL[reason]).join(", ") || "Your pull request",
     pr.isDraft ? "Draft" : "",
     `by @${pr.author} · updated ${formatAge(pr.updatedAt, now)} ago`,
+    "Click: new thread about this PR · ⌘-click: open on GitHub",
   ]
     .filter(Boolean)
     .join("\n");
@@ -204,6 +223,7 @@ function PullRequestRow({
       className={cn(
         "group/gh-row relative flex h-[var(--bb-sidebar-row-height)] w-full cursor-pointer select-none items-center gap-2 rounded-md pr-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground max-md:pointer-coarse:h-[var(--bb-sidebar-row-height-coarse)]",
         isSnoozed && "text-muted-foreground",
+        isOpening && "cursor-progress opacity-60",
       )}
     >
       <span className={cn("mr-0.5 flex size-4 shrink-0 items-center justify-center", style.className)}>
@@ -215,6 +235,18 @@ function PullRequestRow({
       </span>
       <span className="hidden shrink-0 items-center gap-1 group-hover/gh-row:flex">
         <span className="text-xs text-muted-foreground">#{pr.number}</span>
+        <button
+          type="button"
+          aria-label="Open on GitHub"
+          title="Open on GitHub"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenOnGithub();
+          }}
+          className="inline-flex size-6 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-muted-foreground"
+        >
+          <Icon name="ArrowUpRight" aria-hidden className="size-3.5" />
+        </button>
         <button
           type="button"
           aria-label={isSnoozed ? "Unsnooze" : "Snooze until it changes"}

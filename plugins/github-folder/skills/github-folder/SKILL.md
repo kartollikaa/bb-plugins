@@ -19,6 +19,10 @@ error, fetchedAt }`; each item has `pr` (`url`, `number`, `title`, `repo`, `owne
 `review`, `changes_requested`, `ci_failed`, `conflicts`, `ready`, `assigned`, `mentioned`. An
 empty `attention` means one of the user's PRs listed because the folder shows all of them.
 
+Clicking a row in the folder opens a new bb thread whose prompt starts with that PR's title,
+link, status, branch and description. A thread started that way has the PR context in its first
+message; read the rest (diff, review comments) with `gh pr view` / `gh pr diff`.
+
 The command refreshes from GitHub first. It reads every `gh` login on the bb server machine;
 when it reports it can't reach GitHub, check `gh auth status` there.
 

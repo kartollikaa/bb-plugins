@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { GITHUB_QUERY, mergeAccounts, parseSearch, type GithubPr } from "./github";
+import { PR_VIEW_FIELDS, parsePrView, type PrDetails } from "./pr-context";
 
 const GH_TIMEOUT_MS = 20_000;
 const CACHE_MS = 60_000;
@@ -83,4 +84,17 @@ export function createGithubFolder() {
       return value;
     },
   };
+}
+
+/** One PR's details, read with the first gh login that can see it. */
+export async function viewPr(url: string): Promise<PrDetails> {
+  let lastError: unknown = new Error("gh is not signed in");
+  for (const dir of ghConfigDirs()) {
+    try {
+      return parsePrView(JSON.parse(await runGh(["pr", "view", url, "--json", PR_VIEW_FIELDS.join(",")], dir)));
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
 }

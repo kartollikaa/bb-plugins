@@ -31,6 +31,10 @@ export const rpcContract = defineRpcContract({
     input: settingsPatchSchema,
     output: z.object({ ok: z.literal(true) }),
   },
+  prContext: {
+    input: z.object({ url: z.string().min(1).max(400) }).strict(),
+    output: z.object({ prompt: z.string(), projectId: z.string().nullable() }),
+  },
   snooze: {
     input: z.object({ key: z.string().min(1).max(400), snoozed: z.boolean() }).strict(),
     output: z.object({ ok: z.literal(true) }),
