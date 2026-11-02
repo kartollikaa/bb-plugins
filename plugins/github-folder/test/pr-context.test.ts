@@ -1,6 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { composePrompt, githubRepoOfRemote, parsePrUrl, parsePrView, projectForRepo } from "../lib/pr-context.ts";
+import {
+  agentContext,
+  createPrReader,
+  detailParts,
+  githubRepoOfRemote,
+  parsePrUrl,
+  parsePrView,
+  prSubPath,
+  prUrlFromSubPath,
+  projectForRepo,
+  statusParts,
+} from "../lib/pr-context.ts";
 
 const VIEW = {
   url: "https://github.com/acme/app/pull/42",
@@ -46,22 +57,56 @@ test("parsePrView reads status, review and checks", () => {
   assert.equal(parsePrView({}).title, "");
 });
 
-test("composePrompt carries title, status and a cleaned description", () => {
-  const prompt = composePrompt(parsePrView(VIEW));
-  assert.match(prompt, /^Pull request acme\/app#42: Add login\nhttps:\/\/github.com\/acme\/app\/pull\/42\n/);
-  assert.match(prompt, /Status: Open, draft · Review: changes requested · CI: 2 failed \(lint, ci\/legacy\) · Merge conflicts/);
-  assert.match(prompt, /Branch: feature\/login → main · by @dima · \+120 −4 in 1 file · Labels: ui/);
-  assert.match(prompt, /Description:\nAdds the login screen.\n\nCloses #7\n\n$/);
-  assert.doesNotMatch(prompt, /template hint|\r/);
+test("statusParts and detailParts describe where the PR stands", () => {
+  const pr = parsePrView(VIEW);
+  assert.deepEqual(statusParts(pr), ["Open, draft", "Review: changes requested", "CI: 2 failed (lint, ci/legacy)", "Merge conflicts"]);
+  assert.deepEqual(detailParts(pr), ["feature/login → main", "@dima", "+120 −4 in 1 file", "Labels: ui"]);
+  assert.deepEqual(statusParts(parsePrView({ ...VIEW, state: "MERGED", reviewDecision: "", mergeable: "", statusCheckRollup: [] })), ["Merged"]);
 });
 
-test("composePrompt handles an empty description and truncates a long one", () => {
-  const empty = composePrompt(parsePrView({ ...VIEW, body: "", statusCheckRollup: [] }));
-  assert.match(empty, /\(no description\)/);
-  assert.doesNotMatch(empty, /CI:/);
-  const long = composePrompt(parsePrView({ ...VIEW, body: "x".repeat(10_000) }));
+test("agentContext carries title, status and a cleaned description", () => {
+  const context = agentContext(parsePrView(VIEW));
+  assert.match(context, /^\[github-folder\] .* acme\/app#42\./);
+  assert.match(context, /\nTitle: Add login\nURL: https:\/\/github.com\/acme\/app\/pull\/42\n/);
+  assert.match(context, /Status: Open, draft · Review: changes requested · CI: 2 failed/);
+  assert.match(context, /Description:\nAdds the login screen.\n\nCloses #7\n/);
+  assert.doesNotMatch(context, /template hint|\r/);
+});
+
+test("agentContext handles an empty description and truncates a long one", () => {
+  assert.match(agentContext(parsePrView({ ...VIEW, body: "" })), /\(no description\)/);
+  const long = agentContext(parsePrView({ ...VIEW, body: "x".repeat(10_000) }));
   assert.ok(long.length < 7_000);
   assert.match(long, /truncated/);
+});
+
+test("PR page routes round-trip and reject anything else", () => {
+  const url = "https://github.com/acme/my.app/pull/42";
+  assert.equal(prSubPath(url), "acme/my.app/42");
+  assert.equal(prUrlFromSubPath("acme/my.app/42"), url);
+  assert.equal(prUrlFromSubPath("acme%2Fx/app/42"), null);
+  assert.equal(prUrlFromSubPath(""), null);
+  assert.equal(prUrlFromSubPath("acme/app"), null);
+  assert.equal(prUrlFromSubPath("acme/app/abc"), null);
+  assert.equal(prUrlFromSubPath("%E0%A4%A"), null);
+  assert.equal(prSubPath("https://github.com/acme/app/issues/1"), null);
+});
+
+test("createPrReader shares one read per PR and retries after a failure", async () => {
+  let calls = 0;
+  const read = createPrReader(async (url) => {
+    calls += 1;
+    if (url.endsWith("/1") && calls === 1) throw new Error("boom");
+    return parsePrView({ ...VIEW, url });
+  });
+  const a = "https://github.com/acme/app/pull/2";
+  await Promise.all([read(a), read(a)]);
+  assert.equal(calls, 1);
+  const b = "https://github.com/acme/app/pull/1";
+  calls = 0;
+  await assert.rejects(read(b));
+  assert.equal((await read(b)).url, b);
+  assert.equal(calls, 2);
 });
 
 test("githubRepoOfRemote reads every remote form", () => {

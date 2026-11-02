@@ -1,6 +1,7 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { folderItemSchema, settingsPatchSchema, settingsSchema } from "./github";
+import { prDetailsSchema } from "./pr-context";
 
 export const FOLDER_TAG = "folder";
 
@@ -31,9 +32,15 @@ export const rpcContract = defineRpcContract({
     input: settingsPatchSchema,
     output: z.object({ ok: z.literal(true) }),
   },
+  /** The PR's details and the agent-only context a thread about it starts with. */
   prContext: {
     input: z.object({ url: z.string().min(1).max(400) }).strict(),
-    output: z.object({ prompt: z.string(), projectId: z.string().nullable() }),
+    output: z.object({ pr: prDetailsSchema, context: z.string() }),
+  },
+  /** The bb project whose git remote is this `owner/repo`; no GitHub call, so it answers at once. */
+  prProject: {
+    input: z.object({ repo: z.string().min(3).max(200) }).strict(),
+    output: z.object({ projectId: z.string().nullable() }),
   },
   snooze: {
     input: z.object({ key: z.string().min(1).max(400), snoozed: z.boolean() }).strict(),

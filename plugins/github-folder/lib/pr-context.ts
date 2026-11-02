@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const PR_VIEW_FIELDS = [
   "url",
   "number",
@@ -20,25 +22,26 @@ export const PR_VIEW_FIELDS = [
 const BODY_LIMIT = 6_000;
 const FAILED_NAMES_LIMIT = 5;
 
-export interface PrDetails {
-  url: string;
-  repo: string;
-  number: number;
-  title: string;
-  body: string;
-  state: "open" | "closed" | "merged";
-  isDraft: boolean;
-  author: string;
-  head: string;
-  base: string;
-  review: "approved" | "changes_requested" | "review_required" | null;
-  conflicts: boolean;
-  additions: number;
-  deletions: number;
-  changedFiles: number;
-  labels: string[];
-  checks: { failed: string[]; pending: number; passed: number };
-}
+export const prDetailsSchema = z.object({
+  url: z.string(),
+  repo: z.string(),
+  number: z.number(),
+  title: z.string(),
+  body: z.string(),
+  state: z.enum(["open", "closed", "merged"]),
+  isDraft: z.boolean(),
+  author: z.string(),
+  head: z.string(),
+  base: z.string(),
+  review: z.enum(["approved", "changes_requested", "review_required"]).nullable(),
+  conflicts: z.boolean(),
+  additions: z.number(),
+  deletions: z.number(),
+  changedFiles: z.number(),
+  labels: z.array(z.string()),
+  checks: z.object({ failed: z.array(z.string()), pending: z.number(), passed: z.number() }),
+});
+export type PrDetails = z.infer<typeof prDetailsSchema>;
 
 type Json = Record<string, unknown>;
 
@@ -107,7 +110,7 @@ export function parsePrView(raw: unknown): PrDetails {
   };
 }
 
-function cleanBody(body: string): string {
+export function cleanDescription(body: string): string {
   const text = body
     .replace(/\r\n?/g, "\n")
     .replace(/<!--[\s\S]*?-->/g, "")
@@ -132,32 +135,39 @@ const REVIEW_LABEL: Record<NonNullable<PrDetails["review"]>, string> = {
   review_required: "Review: required",
 };
 
-/** The draft a new thread starts with: the PR's title, status and description, then room for the ask. */
-export function composePrompt(pr: PrDetails): string {
-  const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
-  const status = [
+/** Status chips for the card and the context: state, review, CI, conflicts. */
+export function statusParts(pr: PrDetails): string[] {
+  return [
     pr.state === "open" ? (pr.isDraft ? "Open, draft" : "Open") : pr.state === "merged" ? "Merged" : "Closed",
     pr.review ? REVIEW_LABEL[pr.review] : "",
     checksLine(pr.checks),
     pr.conflicts ? "Merge conflicts" : "",
   ].filter(Boolean);
-  const details = [
-    pr.head && pr.base ? `Branch: ${pr.head} → ${pr.base}` : "",
-    pr.author ? `by @${pr.author}` : "",
+}
+
+/** Branch, author, size and labels on one line. */
+export function detailParts(pr: PrDetails): string[] {
+  const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+  return [
+    pr.head && pr.base ? `${pr.head} → ${pr.base}` : "",
+    pr.author ? `@${pr.author}` : "",
     `+${pr.additions} −${pr.deletions} in ${plural(pr.changedFiles, "file")}`,
     pr.labels.length > 0 ? `Labels: ${pr.labels.join(", ")}` : "",
   ].filter(Boolean);
-  const body = cleanBody(pr.body);
+}
+
+/** The agent-only part of a new thread's first message: what the PR is, where it stands, what it says. */
+export function agentContext(pr: PrDetails): string {
   return [
-    `Pull request ${pr.repo}#${pr.number}: ${pr.title}`,
-    pr.url,
-    `Status: ${status.join(" · ")}`,
-    details.join(" · "),
-    "",
+    `[github-folder] The user started this thread from pull request ${pr.repo}#${pr.number}. Their message is about it.`,
+    `Title: ${pr.title}`,
+    `URL: ${pr.url}`,
+    `Status: ${statusParts(pr).join(" · ")}`,
+    `Branch: ${detailParts(pr).join(" · ")}`,
     "Description:",
-    body || "(no description)",
+    cleanDescription(pr.body) || "(no description)",
     "",
-    "",
+    "Read more with `gh pr view` / `gh pr diff` / `gh pr checks` when the question needs it.",
   ].join("\n");
 }
 
@@ -172,4 +182,44 @@ export function projectForRepo(projects: readonly { id: string; gitRemoteUrl: st
   const wanted = repo.toLowerCase();
   const matches = projects.filter((project) => project.gitRemoteUrl !== null && githubRepoOfRemote(project.gitRemoteUrl) === wanted);
   return matches.length === 1 ? matches[0]!.id : null;
+}
+
+/** The nav panel's URL segment: `/plugins/github-folder/pr/<owner>/<repo>/<number>`. */
+export const PR_PANEL_PATH = "pr";
+
+/** `owner/repo/number` for a PR URL, the page's subPath; null for anything that isn't a PR. */
+export function prSubPath(url: string): string | null {
+  const target = parsePrUrl(url);
+  return target ? `${target.repo}/${target.number}` : null;
+}
+
+/** The PR URL a page subPath points at; null at the panel root or for a malformed path. */
+export function prUrlFromSubPath(subPath: string): string | null {
+  let segments: string[];
+  try {
+    segments = subPath.split("/").filter(Boolean).map(decodeURIComponent);
+  } catch {
+    return null;
+  }
+  if (segments.length !== 3) return null;
+  const url = `https://github.com/${segments[0]}/${segments[1]}/pull/${segments[2]}`;
+  return parsePrUrl(url) ? url : null;
+}
+
+const PR_CACHE_MS = 120_000;
+
+/** `viewPr` with one read in flight per PR and answers reused for two minutes, so a hover can warm it. */
+export function createPrReader(read: (url: string) => Promise<PrDetails>) {
+  const cache = new Map<string, { at: number; value: Promise<PrDetails> }>();
+  return (url: string): Promise<PrDetails> => {
+    const hit = cache.get(url);
+    if (hit && Date.now() - hit.at < PR_CACHE_MS) return hit.value;
+    for (const [key, entry] of cache) if (Date.now() - entry.at >= PR_CACHE_MS) cache.delete(key);
+    const value = read(url);
+    cache.set(url, { at: Date.now(), value });
+    value.catch(() => {
+      if (cache.get(url)?.value === value) cache.delete(url);
+    });
+    return value;
+  };
 }

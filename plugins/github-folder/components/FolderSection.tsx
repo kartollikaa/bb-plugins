@@ -10,6 +10,7 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import { rpcContract } from "@/lib/contract";
+import { PR_PANEL_PATH, prSubPath } from "@/lib/pr-context";
 import { ATTENTION_LABEL, type Attention, type FolderItem, type FolderSettings, type SettingsPatch } from "@/lib/github";
 
 const PULLS_URL = "https://github.com/pulls/review-requested";
@@ -68,18 +69,11 @@ export function FolderSection() {
     toast.error(what, { description: error instanceof Error ? error.message : String(error) });
   const update = (patch: SettingsPatch) => void rpc.call("updateSettings", patch).catch(report("Could not save the folder settings"));
   const snooze = (key: string, snoozed: boolean) => void rpc.call("snooze", { key, snoozed }).catch(report("Could not snooze"));
-  const [openingUrl, setOpeningUrl] = useState<string | null>(null);
   const startThread = (url: string) => {
-    if (openingUrl !== null) return;
-    setOpeningUrl(url);
-    rpc
-      .call("prContext", { url })
-      .then(({ prompt, projectId }) =>
-        navigate.toCompose({ initialPrompt: prompt, focusPrompt: true, ...(projectId ? { projectId } : {}) }),
-      )
-      .catch(report("Could not read the pull request"))
-      .finally(() => setOpeningUrl(null));
+    const subPath = prSubPath(url);
+    if (subPath) navigate.toPluginPanel(PR_PANEL_PATH, { subPath });
   };
+  const prefetch = (url: string) => void rpc.call("prContext", { url }).catch(() => undefined);
   const refresh = () => {
     setIsRefreshing(true);
     rpc
@@ -135,7 +129,7 @@ export function FolderSection() {
               item={item}
               isSnoozed={snoozed.includes(item)}
               now={now}
-              isOpening={openingUrl === item.pr.url}
+              onHover={() => prefetch(item.pr.url)}
               onOpen={(event) => (event.metaKey || event.ctrlKey ? navigate.openUrl(item.pr.url) : startThread(item.pr.url))}
               onOpenOnGithub={() => navigate.openUrl(item.pr.url)}
               onToggleSnooze={(value) => snooze(item.snoozeKey, value)}
@@ -190,7 +184,7 @@ function PullRequestRow({
   item,
   isSnoozed,
   now,
-  isOpening,
+  onHover,
   onOpen,
   onOpenOnGithub,
   onToggleSnooze,
@@ -198,7 +192,7 @@ function PullRequestRow({
   item: FolderItem;
   isSnoozed: boolean;
   now: number;
-  isOpening: boolean;
+  onHover: () => void;
   onOpen: (event: React.MouseEvent) => void;
   onOpenOnGithub: () => void;
   onToggleSnooze: (snoozed: boolean) => void;
@@ -219,11 +213,11 @@ function PullRequestRow({
       role="listitem"
       title={tooltip}
       onClick={onOpen}
+      onPointerEnter={onHover}
       style={{ paddingLeft: 8 }}
       className={cn(
         "group/gh-row relative flex h-[var(--bb-sidebar-row-height)] w-full cursor-pointer select-none items-center gap-2 rounded-md pr-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground max-md:pointer-coarse:h-[var(--bb-sidebar-row-height-coarse)]",
         isSnoozed && "text-muted-foreground",
-        isOpening && "cursor-progress opacity-60",
       )}
     >
       <span className={cn("mr-0.5 flex size-4 shrink-0 items-center justify-center", style.className)}>

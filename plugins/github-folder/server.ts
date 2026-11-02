@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { FOLDER_TAG, rpcContract, type FolderView } from "./lib/contract";
 import { createGithubFolder, viewPr, type GithubSnapshot } from "./lib/gh";
-import { composePrompt, parsePrUrl, projectForRepo } from "./lib/pr-context";
+import { agentContext, createPrReader, parsePrUrl, projectForRepo } from "./lib/pr-context";
 import {
   ATTENTION_LABEL,
   applyPatch,
@@ -27,6 +27,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 
 export default async function plugin(bb: BbPluginApi) {
   const github = createGithubFolder();
+  const readPr = createPrReader(viewPr);
   let snapshot: GithubSnapshot | null = null;
 
   const loadSettings = async () => readSettings(await bb.storage.kv.get(SETTINGS_KEY));
@@ -71,11 +72,11 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true as const };
     },
     prContext: async ({ url }) => {
-      const target = parsePrUrl(url);
-      if (target === null) throw new Error("Not a GitHub pull request URL");
-      const [pr, projects] = await Promise.all([viewPr(url), bb.sdk.projects.list()]);
-      return { prompt: composePrompt(pr), projectId: projectForRepo(projects, target.repo) };
+      if (parsePrUrl(url) === null) throw new Error("Not a GitHub pull request URL");
+      const pr = await readPr(url);
+      return { pr, context: agentContext(pr) };
     },
+    prProject: async ({ repo }) => ({ projectId: projectForRepo(await bb.sdk.projects.list(), repo) }),
     snooze: async ({ key, snoozed }) => {
       await saveSettings(setSnoozed(await loadSettings(), key, snoozed));
       return { ok: true as const };
