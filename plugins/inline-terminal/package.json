@@ -5,7 +5,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kartollikaa/bb-plugin-inline-terminal.git"
+    "url": "https://github.com/kartollikaa/bb-plugins.git",
+    "directory": "plugins/inline-terminal"
   },
   "type": "module",
   "engines": {
