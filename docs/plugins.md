@@ -20,8 +20,8 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   It also shows automations, recent activity, the archived toggle, and provider subagents as a
   counter on the parent's row. CLI: `bb thread-tree list`.
 - **GitHub folder:** when the `github-folder` plugin is installed, the top section draws its folder
-  in thread-tree's row style. The server proxies `githubFolder`, `githubFolderUpdate` and
-  `githubFolderSnooze` to that plugin's RPC, like Automations; without it the section is hidden.
+  in thread-tree's row style. The server proxies `githubFolder`, `githubFolderUpdate`,
+  `githubFolderSnooze` and `githubFolderPrContext` to that plugin's RPC, like Automations; without it the section is hidden.
 - **Agent skills:** `skills/thread-tree/` and `skills/delegate-to-threads/`. The second one is how
   agents spawn child threads with `bb thread spawn --parent-self`.
 - **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations). Run
@@ -81,7 +81,9 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **What:** a folder of the open GitHub PRs that need Dmitrii, like Arc's GitHub live folder: review
   requests, his PRs with changes requested, failing checks, conflicts or ready to merge, optionally
   assigned and mentions. A header button customizes sources, drafts and orgs; rows snooze until
-  the PR changes. CLI: `bb github-folder list [--json]`.
+  the PR changes. A row click opens bb's New thread screen with the PR's title, status and
+  description in the prompt (`navigate.toCompose`), in the project whose remote is the PR's repo;
+  ⌘-click or the hover arrow opens GitHub. CLI: `bb github-folder list [--json]`.
 - **How:** the server runs one GraphQL search per gh login (default, then each `~/.config/gh-*`
   profile, deduplicated by login) on a background loop, keeps settings and snoozes in `bb.storage.kv`,
   and invalidates the `folder` RPC tag on change. The frontend is an `experimental_appOverlay` that
