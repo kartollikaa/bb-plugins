@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { describeBattery, describeDeviceBattery, footerText, isLow, isRemoteClient, parsePmset } from "../lib/battery.ts";
+import { describeBattery, chargeLevel, deviceSummary, laptopSummary, footerText, isLow, isRemoteClient, parsePmset } from "../lib/battery.ts";
 
 const header = (source: string) => `Now drawing from '${source}'\n`;
 const line = (rest: string) => ` -InternalBattery-0 (id=22610019)\t${rest} present: true\n`;
@@ -47,11 +47,24 @@ test("flags low charge only while discharging", () => {
   assert.equal(isLow(parsePmset(header("AC Power") + line("10%; charging; 1:30 remaining"))), false);
 });
 
-test("describes the viewing device's battery", () => {
-  assert.equal(describeDeviceBattery({ level: 0.8, charging: false, chargingTime: Infinity, dischargingTime: 7500 }), "80%, on battery, 2:05 left");
-  assert.equal(describeDeviceBattery({ level: 0.42, charging: true, chargingTime: 1800, dischargingTime: Infinity }), "42%, charging, 0:30 to full");
-  assert.equal(describeDeviceBattery({ level: 1, charging: true, chargingTime: 0, dischargingTime: Infinity }), "100%, charged");
-  assert.equal(describeDeviceBattery({ level: 0.5, charging: false, chargingTime: Infinity, dischargingTime: Infinity }), "50%, on battery");
+test("summarises the viewing device's battery without a timer", () => {
+  assert.deepEqual(deviceSummary({ level: 0.8, charging: false, chargingTime: Infinity, dischargingTime: 7500 }), { percent: 80, state: "on battery", charging: false });
+  assert.deepEqual(deviceSummary({ level: 0.42, charging: true, chargingTime: 1800, dischargingTime: Infinity }), { percent: 42, state: "charging", charging: true });
+  assert.deepEqual(deviceSummary({ level: 1, charging: true, chargingTime: 0, dischargingTime: Infinity }), { percent: 100, state: "charged", charging: false });
+});
+
+test("summarises the laptop without a timer", () => {
+  const reading = parsePmset(header("AC Power") + line("64%; charging; 0:40 remaining"));
+  assert.deepEqual(laptopSummary(reading!), { percent: 64, state: "charging", charging: true });
+});
+
+test("colours the charge red, yellow, green", () => {
+  assert.equal(chargeLevel(5), "low");
+  assert.equal(chargeLevel(20), "low");
+  assert.equal(chargeLevel(21), "medium");
+  assert.equal(chargeLevel(50), "medium");
+  assert.equal(chargeLevel(51), "high");
+  assert.equal(chargeLevel(100), "high");
 });
 
 test("shows the device battery only away from the server machine", () => {

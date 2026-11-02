@@ -1,9 +1,10 @@
 # Battery
 
 Shows the battery charge of the machine running the bb server in bb's sidebar footer: a battery icon
-and the percentage, at the right end of the footer row. The text turns red at 20% or less while on
-battery. A click opens a popup with the laptop's state and time left; when bb is open on another
-device, such as a phone, the popup also shows that device's own battery where its browser reports one.
+and the percentage, at the right end of the footer row. The battery fill is red at 20% or less,
+yellow up to 50% and green above; a bolt marks charging. A click opens a popup with a row per device
+(icon, name, state, coloured battery, percentage), without time estimates. When bb is open on another
+device, such as a phone, the popup adds that device's own battery where its browser reports one.
 The footer button always shows the laptop.
 
 `bb battery status [--json]` prints the same reading in a terminal.

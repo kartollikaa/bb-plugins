@@ -75,25 +75,28 @@ export interface DeviceBattery {
   dischargingTime: number;
 }
 
-function formatSeconds(seconds: number): string | null {
-  if (!Number.isFinite(seconds) || seconds <= 0) return null;
-  const minutes = Math.round(seconds / 60);
-  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
+export type ChargeLevel = "low" | "medium" | "high";
+
+export function chargeLevel(percent: number): ChargeLevel {
+  if (percent <= LOW_BATTERY_PERCENT) return "low";
+  if (percent <= 50) return "medium";
+  return "high";
 }
 
-export function describeDeviceBattery(battery: DeviceBattery): string {
+export interface BatterySummary {
+  percent: number;
+  state: string;
+  charging: boolean;
+}
+
+export function laptopSummary(reading: BatteryReading): BatterySummary {
+  return { percent: reading.percent, state: stateLabels[reading.state], charging: reading.state === "charging" };
+}
+
+export function deviceSummary(battery: DeviceBattery): BatterySummary {
   const percent = Math.round(battery.level * 100);
-  const parts = [`${percent}%`];
-  if (battery.charging) {
-    parts.push(percent >= 100 ? "charged" : "charging");
-    const toFull = formatSeconds(battery.chargingTime);
-    if (toFull !== null && percent < 100) parts.push(`${toFull} to full`);
-  } else {
-    parts.push("on battery");
-    const left = formatSeconds(battery.dischargingTime);
-    if (left !== null) parts.push(`${left} left`);
-  }
-  return parts.join(", ");
+  const state = battery.charging ? (percent >= 100 ? "charged" : "charging") : "on battery";
+  return { percent, state, charging: battery.charging && percent < 100 };
 }
 
 /** The server's own browser would report the laptop twice, so only remote clients show their battery. */

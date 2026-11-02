@@ -4,7 +4,8 @@ the sidebar footer.
 ## What you get
 
 - The charge of the machine running the bb server, refreshed every minute.
-- A popup on click with the state (charging, on battery, charged) and the time left.
+- A battery fill coloured by charge: red at 20% or less, yellow up to 50%, green above.
+- A popup on click with each device's state (charging, on battery, charged) and charge.
 - When you open bb on another device, the popup also shows that device's battery, if its browser
   reports one (Chrome on Android does; Safari doesn't).
 - Red text at 20% or less while on battery.

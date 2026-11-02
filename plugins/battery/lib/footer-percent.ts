@@ -1,4 +1,14 @@
-import { describeBattery, describeDeviceBattery, footerText, isLow, isRemoteClient, type BatteryReading, type DeviceBattery } from "./battery.ts";
+import {
+  chargeLevel,
+  deviceSummary,
+  footerText,
+  isLow,
+  isRemoteClient,
+  laptopSummary,
+  type BatteryReading,
+  type BatterySummary,
+  type DeviceBattery,
+} from "./battery.ts";
 
 const REFRESH_MS = 60_000;
 const FOOTER_ROW = '[data-sidebar="footer"] > ul[data-sidebar="menu"]';
@@ -18,38 +28,89 @@ const STYLE = `
 [${ITEM_ATTR}] button:focus-visible { outline: 2px solid var(--sidebar-ring); outline-offset: -2px; }
 [${ITEM_ATTR}][data-low] button { color: var(--destructive); }
 [${ITEM_ATTR}] svg { width: 16px; height: 16px; flex-shrink: 0; }
+[data-level="low"] { --battery-fill: var(--destructive); }
+[data-level="medium"] { --battery-fill: #eab308; }
+[data-level="high"] { --battery-fill: #22c55e; }
+[data-battery-level] { fill: var(--battery-fill, currentColor); }
 [${POPUP_ATTR}] {
-  position: fixed; z-index: 50; min-width: 220px; max-width: calc(100vw - 16px); padding: 4px;
-  border: 1px solid var(--border); border-radius: 8px; background: var(--popover); color: var(--popover-foreground);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); font-size: 13px; line-height: 1.35;
+  position: fixed; z-index: 50; width: 240px; max-width: calc(100vw - 16px); padding: 6px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--popover); color: var(--popover-foreground);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.3); font-size: 13px; line-height: 1.3;
 }
-[${POPUP_ATTR}] [data-row] { padding: 6px 8px; }
-[${POPUP_ATTR}] [data-title] { font-size: 11px; color: var(--muted-foreground); }
-[${POPUP_ATTR}] [data-value] { font-variant-numeric: tabular-nums; }
-[${POPUP_ATTR}] [data-low] [data-value] { color: var(--destructive); }
+[${POPUP_ATTR}] [data-row] {
+  display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 10px; padding: 8px;
+}
+[${POPUP_ATTR}] [data-row] + [data-row] { border-top: 1px solid var(--border); }
+[${POPUP_ATTR}] [data-device] {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px;
+  background: var(--muted); color: var(--muted-foreground);
+}
+[${POPUP_ATTR}] [data-device] svg { width: 18px; height: 18px; }
+[${POPUP_ATTR}] [data-name] { font-weight: 500; }
+[${POPUP_ATTR}] [data-state] { font-size: 12px; color: var(--muted-foreground); }
+[${POPUP_ATTR}] [data-charge] { display: flex; align-items: center; gap: 6px; }
+[${POPUP_ATTR}] [data-charge] svg { width: 24px; height: 24px; color: var(--muted-foreground); }
+[${POPUP_ATTR}] [data-percent] {
+  min-width: 3.2em; text-align: right; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--battery-fill);
+}
 `;
 
-function batteryGlyph(): SVGSVGElement {
-  const svg = document.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "1.5");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("aria-hidden", "true");
-  const body = document.createElementNS(SVG_NS, "rect");
-  for (const [name, value] of Object.entries({ x: "2.5", y: "7", width: "16", height: "10", rx: "2.5" })) {
-    body.setAttribute(name, value);
-  }
-  const tip = document.createElementNS(SVG_NS, "path");
-  tip.setAttribute("d", "M21.5 10.5v3");
-  const level = document.createElementNS(SVG_NS, "rect");
-  for (const [name, value] of Object.entries({ x: "5", y: "9.5", height: "5", rx: "1", fill: "currentColor", stroke: "none" })) {
-    level.setAttribute(name, value);
-  }
-  svg.append(body, tip, level);
+function svgElement<K extends keyof SVGElementTagNameMap>(tag: K, attributes: Record<string, string>): SVGElementTagNameMap[K] {
+  const element = document.createElementNS(SVG_NS, tag);
+  for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+  return element;
+}
+
+function outlineIcon(...children: SVGElement[]): SVGSVGElement {
+  const svg = svgElement("svg", {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.5",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    "aria-hidden": "true",
+  });
+  svg.append(...children);
   return svg;
 }
+
+const LEVEL_MAX_WIDTH = 11;
+
+/** A battery outline whose inner bar is sized by `setBatteryLevel`. */
+function batteryGlyph(): { svg: SVGSVGElement; level: SVGRectElement; bolt: SVGPathElement } {
+  const level = svgElement("rect", { x: "5", y: "9.5", height: "5", rx: "1", stroke: "none", "data-battery-level": "" });
+  const bolt = svgElement("path", {
+    d: "M11.5 8.5 9 12.5h3l-1.5 3",
+    stroke: "var(--background, #000)",
+    "stroke-width": "1.75",
+    visibility: "hidden",
+  });
+  const svg = outlineIcon(
+    svgElement("rect", { x: "2.5", y: "7", width: "16", height: "10", rx: "2.5" }),
+    svgElement("path", { d: "M21.5 10.5v3" }),
+    level,
+    bolt,
+  );
+  return { svg, level, bolt };
+}
+
+function setBatteryLevel(level: SVGRectElement, percent: number) {
+  level.setAttribute("width", String(Math.max(1, Math.round((percent / 100) * LEVEL_MAX_WIDTH))));
+}
+
+const laptopIcon = () =>
+  outlineIcon(
+    svgElement("rect", { x: "4", y: "5", width: "16", height: "11", rx: "1.5" }),
+    svgElement("path", { d: "M2 19h20" }),
+  );
+
+const phoneIcon = () =>
+  outlineIcon(
+    svgElement("rect", { x: "6.5", y: "2.5", width: "11", height: "19", rx: "2.5" }),
+    svgElement("path", { d: "M11 18.5h2" }),
+  );
 
 interface BatteryManagerLike extends DeviceBattery, EventTarget {}
 
@@ -63,17 +124,34 @@ async function deviceBattery(): Promise<BatteryManagerLike | null> {
   }
 }
 
-function popupRow(title: string, value: string, low: boolean): HTMLElement {
+function popupRow(name: string, icon: SVGSVGElement, summary: BatterySummary | null): HTMLElement {
   const row = document.createElement("div");
   row.setAttribute("data-row", "");
-  row.toggleAttribute("data-low", low);
-  const heading = document.createElement("div");
-  heading.setAttribute("data-title", "");
-  heading.textContent = title;
+  const device = document.createElement("div");
+  device.setAttribute("data-device", "");
+  device.append(icon);
   const text = document.createElement("div");
-  text.setAttribute("data-value", "");
-  text.textContent = value;
-  row.append(heading, text);
+  const title = document.createElement("div");
+  title.setAttribute("data-name", "");
+  title.textContent = name;
+  const state = document.createElement("div");
+  state.setAttribute("data-state", "");
+  state.textContent = summary?.state ?? "No battery";
+  text.append(title, state);
+  row.append(device, text);
+  if (summary !== null) {
+    const charge = document.createElement("div");
+    charge.setAttribute("data-charge", "");
+    charge.setAttribute("data-level", chargeLevel(summary.percent));
+    const glyph = batteryGlyph();
+    setBatteryLevel(glyph.level, summary.percent);
+    glyph.bolt.setAttribute("visibility", summary.charging ? "visible" : "hidden");
+    const percent = document.createElement("span");
+    percent.setAttribute("data-percent", "");
+    percent.textContent = `${summary.percent}%`;
+    charge.append(glyph.svg, percent);
+    row.append(charge);
+  }
   return row;
 }
 
@@ -84,10 +162,10 @@ function buildItem(onClick: () => void) {
   button.type = "button";
   const glyph = batteryGlyph();
   const label = document.createElement("span");
-  button.append(glyph, label);
+  button.append(glyph.svg, label);
   button.addEventListener("click", onClick);
   item.append(button);
-  return { item, button, level: glyph.lastElementChild as SVGRectElement, label };
+  return { item, button, level: glyph.level, bolt: glyph.bolt, label };
 }
 
 /** Adds a battery button to the right end of the sidebar footer row and keeps it current. */
@@ -121,14 +199,11 @@ export function mountFooterPercent({ statusUrl, signal }: { statusUrl: string; s
 
   function renderPopup() {
     if (!popup.isConnected) return;
-    const rows = [
-      popupRow(
-        "Laptop",
-        reading === undefined ? "Reading battery…" : describeBattery(reading),
-        isLow(reading ?? null),
-      ),
-    ];
-    if (device !== null) rows.push(popupRow("This device", describeDeviceBattery(device), false));
+    const rows = [popupRow("Laptop", laptopIcon(), reading == null ? null : laptopSummary(reading))];
+    if (device !== null) {
+      const touch = window.matchMedia("(pointer: coarse)").matches;
+      rows.push(popupRow(touch ? "Phone" : "This device", touch ? phoneIcon() : laptopIcon(), deviceSummary(device)));
+    }
     popup.replaceChildren(...rows);
     const anchor = view.button.getBoundingClientRect();
     popup.style.bottom = `${window.innerHeight - anchor.top + 6}px`;
@@ -167,10 +242,14 @@ export function mountFooterPercent({ statusUrl, signal }: { statusUrl: string; s
     if (view.item.parentElement !== row || row.lastElementChild !== view.item) row.append(view.item);
     const text = reading === undefined ? "…" : footerText(reading);
     if (view.label.textContent !== text) view.label.textContent = text;
-    const description = reading === undefined ? "Reading battery…" : describeBattery(reading);
+    const summary = reading == null ? null : laptopSummary(reading);
+    const description = reading === undefined ? "reading…" : summary === null ? "no battery" : `${summary.percent}%, ${summary.state}`;
     view.button.setAttribute("aria-label", `Battery: ${description}`);
     view.item.toggleAttribute("data-low", isLow(reading ?? null));
-    view.level.setAttribute("width", String(Math.max(1, Math.round(((reading?.percent ?? 0) / 100) * 11))));
+    setBatteryLevel(view.level, reading?.percent ?? 0);
+    view.bolt.setAttribute("visibility", reading?.state === "charging" ? "visible" : "hidden");
+    if (reading == null) view.item.removeAttribute("data-level");
+    else view.item.setAttribute("data-level", chargeLevel(reading.percent));
     renderPopup();
   };
   function schedule() {
