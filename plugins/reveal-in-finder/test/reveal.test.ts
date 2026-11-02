@@ -1,23 +1,25 @@
 import assert from "node:assert/strict";
+import { homedir } from "node:os";
 import { test } from "node:test";
-import { hrefToPath, reveal } from "../server.ts";
+import { openArgs, toAbsolutePath } from "../server.ts";
 
-test("file URLs decode to absolute paths", () => {
-  assert.equal(hrefToPath("file:///Users/me/My%20Files/a.apk"), "/Users/me/My Files/a.apk");
-  assert.equal(hrefToPath("/tmp/../tmp/x"), "/tmp/x");
+test("file URLs, home paths and absolute paths resolve", () => {
+  assert.equal(toAbsolutePath("file:///Users/me/My%20Files/a.apk", null), "/Users/me/My Files/a.apk");
+  assert.equal(toAbsolutePath("~/Downloads/x.zip", null), `${homedir()}/Downloads/x.zip`);
+  assert.equal(toAbsolutePath("/tmp/../tmp/x", null), "/tmp/x");
 });
 
-test("relative paths, foreign schemes and NUL are refused", () => {
-  assert.equal(hrefToPath("docs/x.md"), null);
-  assert.equal(hrefToPath("https://example.com/x"), null);
-  assert.equal(hrefToPath("file:///tmp/a%00b"), null);
+test("relative paths need a worktree", () => {
+  assert.equal(toAbsolutePath("docs/x.md", null), null);
+  assert.equal(toAbsolutePath("docs/x.md", "/work/repo"), "/work/repo/docs/x.md");
 });
 
-test("an existing path is revealed, a missing one is not", async () => {
-  const seen: string[] = [];
-  const run = async (path: string) => { seen.push(path); };
-  assert.deepEqual(await reveal("file:///tmp", run, "darwin"), { ok: true, path: "/tmp" });
-  assert.deepEqual(await reveal("file:///tmp/no-such-file-42", run, "darwin"), { ok: false, reason: "File not found" });
-  assert.deepEqual(await reveal("file:///tmp", run, "linux"), { ok: false, reason: "Finder exists only on macOS" });
-  assert.deepEqual(seen, ["/tmp"]);
+test("foreign schemes and NUL are refused", () => {
+  assert.equal(toAbsolutePath("https://example.com/x", null), null);
+  assert.equal(toAbsolutePath("file:///tmp/a%00b", null), null);
+});
+
+test("Finder reveals, the default app opens", () => {
+  assert.deepEqual(openArgs("/tmp/a", "finder"), ["-R", "/tmp/a"]);
+  assert.deepEqual(openArgs("/tmp/a", "default"), ["/tmp/a"]);
 });

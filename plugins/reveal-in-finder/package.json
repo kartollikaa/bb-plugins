@@ -8,7 +8,7 @@
   },
   "bb": {
     "name": "Reveal In Finder",
-    "description": "Show a file linked in chat in Finder: hover the link and press Finder, or ⌥-click it.",
+    "description": "Shows files an agent hands over as cards in chat, with Open in Finder, the default app or bb's preview.",
     "branding": {
       "icon": "FolderOpen"
     },

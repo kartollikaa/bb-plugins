@@ -1,14 +1,20 @@
 # bb-plugin-reveal-in-finder
 
-Shows a file linked in a bb chat in Finder, on the Mac that runs the bb server.
+Renders a file an agent hands over as a card in the chat, like Codex does: an icon, the
+name, its type and size, and **Open in ▾** — Finder, the default app, or bb's preview.
+Clicking the card opens bb's preview (a folder opens in Finder).
 
-- Hover a file link in a message: a **Finder** button appears beside it.
-- Or hold ⌥ (Option) and click the link.
-- From a shell: `bb reveal-in-finder <absolute-path>`.
+An agent writes the card as a directive on its own line:
 
-A file link is any link whose address starts with `file:` — bb turns file paths
-in agent messages into such links. A path that no longer exists reports
-"File not found" instead of opening anything.
+```
+::file{path="/Users/me/Downloads/cats-radar-1.10.2.apk"}
+```
 
-Install: `bb plugin install ~/Projects/bb-plugins/bb-plugin-reveal-in-finder`, then
-`bb plugin build` after each change.
+`path` takes an absolute path, `~/…`, a `file://` URL, or a path relative to the thread's
+worktree. A path that does not exist renders as "Not found". Finder and the default app run
+on the Mac that runs the bb server.
+
+From a shell: `bb reveal-in-finder show <absolute-path>`.
+
+Install: `bb plugin install ~/Projects/bb-plugins/bb-plugin-reveal-in-finder`; after a change,
+`npm test && bb plugin build && bb plugin reload reveal-in-finder`.
