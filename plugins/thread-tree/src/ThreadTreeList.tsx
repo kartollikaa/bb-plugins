@@ -189,7 +189,12 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   return (
     <div className="flex flex-col gap-3 px-1.5 pb-3 pt-1">
-      <GithubSection isCollapsed={collapsedGroups.has("github")} onToggle={() => collapsedGroups.toggle("github")} />
+      <GithubSection
+        isCollapsed={collapsedGroups.has("github")}
+        onToggle={() => collapsedGroups.toggle("github")}
+        showSnoozed={flags.has("github-snoozed")}
+        onToggleSnoozed={() => flags.toggle("github-snoozed")}
+      />
 
       <AutomationsSection
         isCollapsed={collapsedGroups.has("automations")}

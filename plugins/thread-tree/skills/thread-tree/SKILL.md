@@ -9,13 +9,9 @@ The Thread Tree plugin replaces the sidebar thread list. Child threads nest
 under the thread that spawned them; provider subagents, which are not threads
 and cannot be messaged, show as a counter with a status dot on the parent's row.
 
-At the top of the list, a GitHub folder shows the open pull requests that need
-the user: review requests, their own PRs with changes requested, failing
-checks, conflicts or a ready-to-merge approval, plus assigned and mentioning
-PRs. It reads every `gh` login on the bb server. If the user says the folder
-is empty or can't reach GitHub, check `gh auth status` on that machine. Its
-filters live in the folder's customize menu, per client; there is no CLI
-for it.
+When the GitHub Folder plugin is installed, the list's top section is its
+folder of pull requests that need the user. Use that plugin's
+`bb github-folder list` to read it.
 
 ## Command
 

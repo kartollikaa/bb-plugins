@@ -1,105 +1,61 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
+import { toast } from "sonner";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import type { rpcContract } from "../server";
 import {
   ATTENTION_LABEL,
-  DEFAULT_SOURCES,
-  buildFolder,
-  hideKey,
   type Attention,
-  type FolderItem,
-  type FolderSettings,
-  type GithubPr,
-  type PrSource,
-} from "./github";
+  type GithubFolderItem,
+  type GithubFolderView,
+  type GithubSettings,
+  type GithubSettingsPatch,
+} from "./githubFolder";
 import { GroupHeader } from "./GroupHeader";
 import { ROW_HOVER_SOLID_BG } from "./rowStyles";
 import { formatAge } from "./time";
-import { usePersistentSet } from "./usePersistentSet";
 
-const POLL_MS = 120_000;
+const POLL_MS = 60_000;
 const PULLS_URL = "https://github.com/pulls/review-requested";
 
-interface Snapshot {
-  accounts: string[];
-  prs: GithubPr[];
-  error: string | null;
-  fetchedAt: number;
-}
-
-function useGithubPrs() {
+/** The GitHub Folder plugin's view; null while loading or when that plugin is absent. */
+function useGithubFolder() {
   const rpc = useRpc<typeof rpcContract>();
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const refresh = useCallback(
-    (force = false) => {
-      setIsLoading(true);
-      rpc
-        .call("githubPrs", { force })
-        .then(setSnapshot, (error: unknown) =>
-          setSnapshot((previous) => ({
-            accounts: previous?.accounts ?? [],
-            prs: previous?.prs ?? [],
-            error: error instanceof Error ? error.message : String(error),
-            fetchedAt: Date.now(),
-          })),
-        )
-        .finally(() => setIsLoading(false));
-    },
+  const [state, setState] = useState<{ view: GithubFolderView | null } | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const load = useCallback(
+    (refresh: boolean) =>
+      rpc.call("githubFolder", { refresh }).then(setState, () => setState((previous) => previous)),
     [rpc],
   );
   useEffect(() => {
-    refresh();
-    const timer = window.setInterval(() => refresh(), POLL_MS);
-    const onFocus = () => refresh();
+    void load(false);
+    const timer = window.setInterval(() => void load(false), POLL_MS);
+    const onFocus = () => void load(false);
     window.addEventListener("focus", onFocus);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
     };
-  }, [refresh]);
-  return { snapshot, isLoading, refresh };
-}
+  }, [load]);
 
-/** Keys stored in the flags set mean "the opposite of the default". */
-const FLAG_DEFAULTS = {
-  "source:review": DEFAULT_SOURCES.review,
-  "source:author": DEFAULT_SOURCES.author,
-  "source:assigned": DEFAULT_SOURCES.assigned,
-  "source:mentioned": DEFAULT_SOURCES.mentioned,
-  "my-prs-all": false,
-  "team-reviews": true,
-  drafts: true,
-  "show-hidden": false,
-} as const;
-type Flag = keyof typeof FLAG_DEFAULTS;
-
-function useFolderSettings() {
-  const flags = usePersistentSet("github-flags");
-  const hiddenOrgs = usePersistentSet("github-hidden-orgs");
-  const hiddenPrs = usePersistentSet("github-hidden-prs");
-  const isOn = useCallback((flag: Flag) => FLAG_DEFAULTS[flag] !== flags.has(flag), [flags]);
-  const settings = useMemo<FolderSettings>(
-    () => ({
-      sources: {
-        review: isOn("source:review"),
-        author: isOn("source:author"),
-        assigned: isOn("source:assigned"),
-        mentioned: isOn("source:mentioned"),
-      },
-      myPrs: isOn("my-prs-all") ? "all" : "attention",
-      teamReviews: isOn("team-reviews"),
-      drafts: isOn("drafts"),
-      hiddenOrgs: hiddenOrgs.values,
-      hiddenPrs: hiddenPrs.values,
-    }),
-    [isOn, hiddenOrgs.values, hiddenPrs.values],
-  );
-  return { settings, isOn, toggle: (flag: Flag) => flags.toggle(flag), hiddenOrgs, hiddenPrs };
+  const report = (what: string) => (error: unknown) =>
+    toast.error(what, { description: error instanceof Error ? error.message : String(error) });
+  return {
+    view: state?.view ?? null,
+    isRefreshing,
+    refresh: () => {
+      setIsRefreshing(true);
+      load(true).finally(() => setIsRefreshing(false));
+    },
+    update: (patch: GithubSettingsPatch) =>
+      void rpc.call("githubFolderUpdate", patch).then(() => load(false), report("Could not save the folder settings")),
+    snooze: (key: string, snoozed: boolean) =>
+      void rpc.call("githubFolderSnooze", { key, snoozed }).then(() => load(false), report("Could not snooze")),
+  };
 }
 
 const ATTENTION_STYLE: Record<Attention | "none", { short: string; className: string }> = {
@@ -113,22 +69,23 @@ const ATTENTION_STYLE: Record<Attention | "none", { short: string; className: st
   none: { short: "", className: "text-sidebar-foreground/45" },
 };
 
-export function GithubSection({ isCollapsed, onToggle }: { isCollapsed: boolean; onToggle: () => void }) {
-  const { snapshot, isLoading, refresh } = useGithubPrs();
-  const { settings, isOn, toggle, hiddenOrgs, hiddenPrs } = useFolderSettings();
+export function GithubSection({
+  isCollapsed,
+  onToggle,
+  showSnoozed,
+  onToggleSnoozed,
+}: {
+  isCollapsed: boolean;
+  onToggle: () => void;
+  showSnoozed: boolean;
+  onToggleSnoozed: () => void;
+}) {
+  const { view, isRefreshing, refresh, update, snooze } = useGithubFolder();
   const navigate = useBbNavigate();
-  const folder = useMemo(() => buildFolder(snapshot?.prs ?? [], settings), [snapshot, settings]);
-  const showHidden = isOn("show-hidden");
-
-  useEffect(() => {
-    if (!snapshot || snapshot.error !== null) return;
-    const live = new Set(snapshot.prs.map(hideKey));
-    const stale = [...hiddenPrs.values].filter((key) => !live.has(key));
-    if (stale.length > 0) hiddenPrs.remove(stale);
-  }, [snapshot, hiddenPrs]);
+  if (!view) return null;
 
   const now = Date.now();
-  const rows = showHidden ? [...folder.items, ...folder.hidden] : folder.items;
+  const rows = showSnoozed ? [...view.items, ...view.snoozed] : view.items;
 
   return (
     <section aria-label="GitHub pull requests">
@@ -136,53 +93,47 @@ export function GithubSection({ isCollapsed, onToggle }: { isCollapsed: boolean;
         title="GitHub"
         icon={<Icon name="Github" aria-hidden className="size-3.5" />}
         isCollapsed={isCollapsed}
-        count={folder.items.length}
+        count={view.items.length}
         onToggle={onToggle}
         extra={
           <CustomizeMenu
-            isOn={isOn}
-            toggle={toggle}
-            orgs={folder.orgs}
-            hiddenOrgs={hiddenOrgs.values}
-            onToggleOrg={hiddenOrgs.toggle}
-            accounts={snapshot?.accounts ?? []}
-            fetchedAt={snapshot?.fetchedAt ?? null}
-            isLoading={isLoading}
-            onRefresh={() => refresh(true)}
+            settings={view.settings}
+            orgs={view.orgs}
+            accounts={view.accounts}
+            fetchedAt={view.fetchedAt}
+            isRefreshing={isRefreshing}
+            onUpdate={update}
+            onRefresh={refresh}
           />
         }
         action={{ label: "Open pull requests on GitHub", icon: "ArrowUpRight", onClick: () => navigate.openUrl(PULLS_URL) }}
       />
       {isCollapsed ? null : (
         <div role="list" className="mt-0.5 flex flex-col gap-0.5">
-          {rows.map((item) => {
-            const key = hideKey(item.pr);
-            const isHidden = hiddenPrs.has(key);
-            return (
-              <PullRequestRow
-                key={item.pr.url}
-                item={item}
-                isHidden={isHidden}
-                now={now}
-                onOpen={() => navigate.openUrl(item.pr.url)}
-                onToggleHidden={() => hiddenPrs.toggle(key)}
-              />
-            );
-          })}
-          {snapshot === null ? (
+          {rows.map((item) => (
+            <PullRequestRow
+              key={item.pr.url}
+              item={item}
+              isSnoozed={view.snoozed.includes(item)}
+              now={now}
+              onOpen={() => navigate.openUrl(item.pr.url)}
+              onToggleSnoozed={(snoozed) => snooze(item.snoozeKey, snoozed)}
+            />
+          ))}
+          {view.error !== null && view.items.length === 0 ? (
+            <Note title={view.error}>Can’t reach GitHub: {view.error}</Note>
+          ) : view.fetchedAt === null ? (
             <Note>Loading…</Note>
-          ) : snapshot.error !== null && snapshot.prs.length === 0 ? (
-            <Note title={snapshot.error}>Can’t reach GitHub: {snapshot.error}</Note>
-          ) : folder.items.length === 0 && !showHidden ? (
+          ) : view.items.length === 0 && !showSnoozed ? (
             <Note>Nothing needs you</Note>
           ) : null}
-          {folder.hidden.length > 0 ? (
+          {view.snoozed.length > 0 ? (
             <button
               type="button"
-              onClick={() => toggle("show-hidden")}
+              onClick={onToggleSnoozed}
               className="ml-[26px] h-6 self-start rounded-md px-1 text-xs text-sidebar-foreground/45 hover:text-sidebar-foreground"
             >
-              {showHidden ? "Hide snoozed" : `${folder.hidden.length} snoozed`}
+              {showSnoozed ? "Hide snoozed" : `${view.snoozed.length} snoozed`}
             </button>
           ) : null}
         </div>
@@ -201,16 +152,16 @@ function Note({ children, title }: { children: React.ReactNode; title?: string }
 
 function PullRequestRow({
   item,
-  isHidden,
+  isSnoozed,
   now,
   onOpen,
-  onToggleHidden,
+  onToggleSnoozed,
 }: {
-  item: FolderItem;
-  isHidden: boolean;
+  item: GithubFolderItem;
+  isSnoozed: boolean;
   now: number;
   onOpen: () => void;
-  onToggleHidden: () => void;
+  onToggleSnoozed: (snoozed: boolean) => void;
 }) {
   const { pr, attention } = item;
   const style = ATTENTION_STYLE[attention[0] ?? "none"];
@@ -232,7 +183,7 @@ function PullRequestRow({
       }}
       className={cn(
         "group/row relative flex h-8 cursor-default items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90 hover:bg-sidebar-accent/60",
-        isHidden && "text-sidebar-foreground/50",
+        isSnoozed && "text-sidebar-foreground/50",
       )}
     >
       <span className={cn("flex size-4 shrink-0 items-center justify-center", style.className)}>
@@ -248,22 +199,22 @@ function PullRequestRow({
         </span>
         <button
           type="button"
-          aria-label={isHidden ? "Unsnooze" : "Snooze until it changes"}
-          title={isHidden ? "Unsnooze" : "Snooze until it changes"}
+          aria-label={isSnoozed ? "Unsnooze" : "Snooze until it changes"}
+          title={isSnoozed ? "Unsnooze" : "Snooze until it changes"}
           onClick={(event) => {
             event.stopPropagation();
-            onToggleHidden();
+            onToggleSnoozed(!isSnoozed);
           }}
           className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
         >
-          <Icon name={isHidden ? "Eye" : "EyeOff"} aria-hidden className="size-3.5" />
+          <Icon name={isSnoozed ? "Eye" : "EyeOff"} aria-hidden className="size-3.5" />
         </button>
       </span>
     </div>
   );
 }
 
-const SOURCE_ITEMS: readonly { source: PrSource; label: string }[] = [
+const SOURCE_ITEMS: readonly { source: keyof GithubSettings["sources"]; label: string }[] = [
   { source: "review", label: "Review requests" },
   { source: "author", label: "My pull requests" },
   { source: "assigned", label: "Assigned to me" },
@@ -307,28 +258,29 @@ function CheckItem({
 }
 
 function CustomizeMenu({
-  isOn,
-  toggle,
+  settings,
   orgs,
-  hiddenOrgs,
-  onToggleOrg,
   accounts,
   fetchedAt,
-  isLoading,
+  isRefreshing,
+  onUpdate,
   onRefresh,
 }: {
-  isOn: (flag: Flag) => boolean;
-  toggle: (flag: Flag) => void;
+  settings: GithubSettings;
   orgs: string[];
-  hiddenOrgs: ReadonlySet<string>;
-  onToggleOrg: (org: string) => void;
   accounts: string[];
   fetchedAt: number | null;
-  isLoading: boolean;
+  isRefreshing: boolean;
+  onUpdate: (patch: GithubSettingsPatch) => void;
   onRefresh: () => void;
 }) {
   const portalProps = usePortalScopeProps();
+  const hiddenOrgs = new Set(settings.hiddenOrgs);
   const shownOrgs = orgs.filter((org) => !hiddenOrgs.has(org)).length;
+  const toggleOrg = (org: string) =>
+    onUpdate({
+      hiddenOrgs: hiddenOrgs.has(org) ? settings.hiddenOrgs.filter((hidden) => hidden !== org) : [...settings.hiddenOrgs, org],
+    });
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
@@ -351,15 +303,18 @@ function CustomizeMenu({
           <DropdownMenu.Label className="px-2 py-1 text-xs text-muted-foreground">Show</DropdownMenu.Label>
           {SOURCE_ITEMS.map(({ source, label }) => (
             <div key={source}>
-              <CheckItem checked={isOn(`source:${source}`)} onToggle={() => toggle(`source:${source}`)}>
+              <CheckItem
+                checked={settings.sources[source]}
+                onToggle={() => onUpdate({ sources: { [source]: !settings.sources[source] } })}
+              >
                 {label}
               </CheckItem>
               {source === "review" ? (
                 <CheckItem
                   inset
-                  disabled={!isOn("source:review")}
-                  checked={isOn("team-reviews")}
-                  onToggle={() => toggle("team-reviews")}
+                  disabled={!settings.sources.review}
+                  checked={settings.teamReviews}
+                  onToggle={() => onUpdate({ teamReviews: !settings.teamReviews })}
                 >
                   Include team requests
                 </CheckItem>
@@ -367,9 +322,9 @@ function CustomizeMenu({
               {source === "author" ? (
                 <CheckItem
                   inset
-                  disabled={!isOn("source:author")}
-                  checked={!isOn("my-prs-all")}
-                  onToggle={() => toggle("my-prs-all")}
+                  disabled={!settings.sources.author}
+                  checked={settings.myPrs === "attention"}
+                  onToggle={() => onUpdate({ myPrs: settings.myPrs === "attention" ? "all" : "attention" })}
                 >
                   Only when they need me
                 </CheckItem>
@@ -377,7 +332,7 @@ function CustomizeMenu({
             </div>
           ))}
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
-          <CheckItem checked={isOn("drafts")} onToggle={() => toggle("drafts")}>
+          <CheckItem checked={settings.drafts} onToggle={() => onUpdate({ drafts: !settings.drafts })}>
             Include drafts
           </CheckItem>
           <DropdownMenu.Sub>
@@ -398,7 +353,7 @@ function CustomizeMenu({
                 className="z-50 max-h-80 min-w-44 overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
               >
                 {orgs.map((org) => (
-                  <CheckItem key={org} checked={!hiddenOrgs.has(org)} onToggle={() => onToggleOrg(org)}>
+                  <CheckItem key={org} checked={!hiddenOrgs.has(org)} onToggle={() => toggleOrg(org)}>
                     {org}
                   </CheckItem>
                 ))}
@@ -407,7 +362,7 @@ function CustomizeMenu({
           </DropdownMenu.Sub>
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
           <DropdownMenu.Item
-            disabled={isLoading}
+            disabled={isRefreshing}
             onSelect={(event) => {
               event.preventDefault();
               onRefresh();
@@ -415,12 +370,10 @@ function CustomizeMenu({
             className={MENU_ITEM}
           >
             <span className="flex size-3.5 items-center justify-center text-muted-foreground">
-              <Icon name="RefreshCw" aria-hidden className={cn("size-3.5", isLoading && "animate-spin")} />
+              <Icon name="RefreshCw" aria-hidden className={cn("size-3.5", isRefreshing && "animate-spin")} />
             </span>
             <span className="flex-1">Refresh</span>
-            {fetchedAt !== null ? (
-              <span className="text-xs text-muted-foreground">{formatAge(fetchedAt, Date.now())}</span>
-            ) : null}
+            {fetchedAt !== null ? <span className="text-xs text-muted-foreground">{formatAge(fetchedAt, Date.now())}</span> : null}
           </DropdownMenu.Item>
           {accounts.length > 0 ? (
             <div className="px-2 pb-1 pt-0.5 text-xs text-muted-foreground">

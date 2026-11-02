@@ -1,5 +1,5 @@
-// bb-plugin-thread-tree backend: per-thread subagent lists, the automations
-// summary, and the GitHub folder's PR search through the local gh logins.
+// bb-plugin-thread-tree backend: per-thread subagent lists, plus the automations
+// summary and the GitHub folder read from the plugins that own them.
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { createSubagentFolder, subagentSchema } from "./src/subagents";
@@ -10,8 +10,11 @@ import {
   overviewSchema,
   summarizeOverview,
 } from "./src/automations";
-import { createGithubFolder } from "./src/gh";
-import { githubPrSchema } from "./src/github";
+import {
+  GITHUB_FOLDER_PLUGIN_ID,
+  githubFolderViewSchema,
+  githubSettingsPatchSchema,
+} from "./src/githubFolder";
 
 const MAX_THREADS_PER_CALL = 200;
 
@@ -32,14 +35,18 @@ export const rpcContract = defineRpcContract({
     }),
     output: z.object({ ok: z.literal(true) }),
   },
-  githubPrs: {
-    input: z.object({ force: z.boolean() }),
-    output: z.object({
-      accounts: z.array(z.string()),
-      prs: z.array(githubPrSchema),
-      error: z.string().nullable(),
-      fetchedAt: z.number(),
-    }),
+  githubFolder: {
+    input: z.object({ refresh: z.boolean() }),
+    /** Null view when the GitHub Folder plugin is not installed, off or unreachable. */
+    output: z.object({ view: githubFolderViewSchema.nullable() }),
+  },
+  githubFolderUpdate: {
+    input: githubSettingsPatchSchema,
+    output: z.object({ ok: z.literal(true) }),
+  },
+  githubFolderSnooze: {
+    input: z.object({ key: z.string().min(1).max(400), snoozed: z.boolean() }).strict(),
+    output: z.object({ ok: z.literal(true) }),
   },
   subagents: {
     input: z.object({
@@ -63,10 +70,21 @@ export default async function plugin(bb: BbPluginApi) {
     log: (message) => bb.log.warn(message),
   });
 
-  const github = createGithubFolder();
+  type RpcInput = Parameters<typeof bb.sdk.plugins.callRpc>[0]["input"];
+  const callGithubFolder = <T,>(method: string, input: RpcInput, outputSchema: z.ZodType<T>) =>
+    bb.sdk.plugins.callRpc({ pluginId: GITHUB_FOLDER_PLUGIN_ID, method, input, outputSchema });
+  const ok = z.object({ ok: z.literal(true) });
 
   bb.rpc.register(rpcContract, {
-    githubPrs: ({ force }) => github.read(force),
+    githubFolder: async ({ refresh }) => {
+      try {
+        return { view: await callGithubFolder(refresh ? "refresh" : "folder", null, githubFolderViewSchema) };
+      } catch {
+        return { view: null };
+      }
+    },
+    githubFolderUpdate: (patch) => callGithubFolder("updateSettings", patch, ok),
+    githubFolderSnooze: (input) => callGithubFolder("snooze", input, ok),
     automations: async () => {
       try {
         const overview = await bb.sdk.plugins.callRpc({
