@@ -6,8 +6,9 @@ description: Read the bb server machine's battery charge with `bb battery status
 # Battery
 
 The Battery plugin shows the charge of the machine that runs the bb server as a button at the right end
-of the sidebar footer: a battery icon and the percentage. The tooltip adds the state and time left;
-a click refreshes it. It turns red at 20% or less while on battery.
+of the sidebar footer: a battery icon and the percentage, red at 20% or less while on battery. A click
+opens a popup with the state and time left, plus the viewing device's own battery when bb is open
+remotely (a phone) and its browser exposes one.
 
 From a shell:
 

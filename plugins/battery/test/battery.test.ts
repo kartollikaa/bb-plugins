@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { describeBattery, footerText, isLow, parsePmset } from "../lib/battery.ts";
+import { describeBattery, describeDeviceBattery, footerText, isLow, isRemoteClient, parsePmset } from "../lib/battery.ts";
 
 const header = (source: string) => `Now drawing from '${source}'\n`;
 const line = (rest: string) => ` -InternalBattery-0 (id=22610019)\t${rest} present: true\n`;
@@ -45,4 +45,17 @@ test("flags low charge only while discharging", () => {
   assert.equal(isLow(parsePmset(header("Battery Power") + line("20%; discharging; 0:30 remaining"))), true);
   assert.equal(isLow(parsePmset(header("Battery Power") + line("21%; discharging; 0:30 remaining"))), false);
   assert.equal(isLow(parsePmset(header("AC Power") + line("10%; charging; 1:30 remaining"))), false);
+});
+
+test("describes the viewing device's battery", () => {
+  assert.equal(describeDeviceBattery({ level: 0.8, charging: false, chargingTime: Infinity, dischargingTime: 7500 }), "80%, on battery, 2:05 left");
+  assert.equal(describeDeviceBattery({ level: 0.42, charging: true, chargingTime: 1800, dischargingTime: Infinity }), "42%, charging, 0:30 to full");
+  assert.equal(describeDeviceBattery({ level: 1, charging: true, chargingTime: 0, dischargingTime: Infinity }), "100%, charged");
+  assert.equal(describeDeviceBattery({ level: 0.5, charging: false, chargingTime: Infinity, dischargingTime: Infinity }), "50%, on battery");
+});
+
+test("shows the device battery only away from the server machine", () => {
+  assert.equal(isRemoteClient("localhost"), false);
+  assert.equal(isRemoteClient("127.0.0.1"), false);
+  assert.equal(isRemoteClient("kartollika.getbb.app"), true);
 });

@@ -3,8 +3,10 @@ the sidebar footer.
 
 ## What you get
 
-- The charge of the machine running the bb server, refreshed every minute and on click.
-- A tooltip with the state (charging, on battery, charged) and the time left.
+- The charge of the machine running the bb server, refreshed every minute.
+- A popup on click with the state (charging, on battery, charged) and the time left.
+- When you open bb on another device, the popup also shows that device's battery, if its browser
+  reports one (Chrome on Android does; Safari doesn't).
 - Red text at 20% or less while on battery.
 - `bb battery status [--json]` for terminals and agents.
 

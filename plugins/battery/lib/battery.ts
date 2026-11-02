@@ -66,3 +66,37 @@ export function isLow(reading: BatteryReading | null): boolean {
 export function footerText(reading: BatteryReading | null): string {
   return reading === null ? "—" : `${reading.percent}%`;
 }
+
+/** The subset of the browser's BatteryManager the popup reads. */
+export interface DeviceBattery {
+  level: number;
+  charging: boolean;
+  chargingTime: number;
+  dischargingTime: number;
+}
+
+function formatSeconds(seconds: number): string | null {
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  const minutes = Math.round(seconds / 60);
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+export function describeDeviceBattery(battery: DeviceBattery): string {
+  const percent = Math.round(battery.level * 100);
+  const parts = [`${percent}%`];
+  if (battery.charging) {
+    parts.push(percent >= 100 ? "charged" : "charging");
+    const toFull = formatSeconds(battery.chargingTime);
+    if (toFull !== null && percent < 100) parts.push(`${toFull} to full`);
+  } else {
+    parts.push("on battery");
+    const left = formatSeconds(battery.dischargingTime);
+    if (left !== null) parts.push(`${left} left`);
+  }
+  return parts.join(", ");
+}
+
+/** The server's own browser would report the laptop twice, so only remote clients show their battery. */
+export function isRemoteClient(hostname: string): boolean {
+  return !["localhost", "127.0.0.1", "[::1]", "::1"].includes(hostname);
+}

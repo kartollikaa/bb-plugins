@@ -1,8 +1,9 @@
-import { describeBattery, footerText, isLow, type BatteryReading } from "./battery.ts";
+import { describeBattery, describeDeviceBattery, footerText, isLow, isRemoteClient, type BatteryReading, type DeviceBattery } from "./battery.ts";
 
 const REFRESH_MS = 60_000;
 const FOOTER_ROW = '[data-sidebar="footer"] > ul[data-sidebar="menu"]';
 const ITEM_ATTR = "data-battery-footer";
+const POPUP_ATTR = "data-battery-popup";
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const STYLE = `
@@ -17,6 +18,15 @@ const STYLE = `
 [${ITEM_ATTR}] button:focus-visible { outline: 2px solid var(--sidebar-ring); outline-offset: -2px; }
 [${ITEM_ATTR}][data-low] button { color: var(--destructive); }
 [${ITEM_ATTR}] svg { width: 16px; height: 16px; flex-shrink: 0; }
+[${POPUP_ATTR}] {
+  position: fixed; z-index: 50; min-width: 220px; max-width: calc(100vw - 16px); padding: 4px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--popover); color: var(--popover-foreground);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); font-size: 13px; line-height: 1.35;
+}
+[${POPUP_ATTR}] [data-row] { padding: 6px 8px; }
+[${POPUP_ATTR}] [data-title] { font-size: 11px; color: var(--muted-foreground); }
+[${POPUP_ATTR}] [data-value] { font-variant-numeric: tabular-nums; }
+[${POPUP_ATTR}] [data-low] [data-value] { color: var(--destructive); }
 `;
 
 function batteryGlyph(): SVGSVGElement {
@@ -39,6 +49,32 @@ function batteryGlyph(): SVGSVGElement {
   }
   svg.append(body, tip, level);
   return svg;
+}
+
+interface BatteryManagerLike extends DeviceBattery, EventTarget {}
+
+async function deviceBattery(): Promise<BatteryManagerLike | null> {
+  const getBattery = (navigator as Navigator & { getBattery?: () => Promise<BatteryManagerLike> }).getBattery;
+  if (typeof getBattery !== "function" || !isRemoteClient(location.hostname)) return null;
+  try {
+    return await getBattery.call(navigator);
+  } catch {
+    return null;
+  }
+}
+
+function popupRow(title: string, value: string, low: boolean): HTMLElement {
+  const row = document.createElement("div");
+  row.setAttribute("data-row", "");
+  row.toggleAttribute("data-low", low);
+  const heading = document.createElement("div");
+  heading.setAttribute("data-title", "");
+  heading.textContent = title;
+  const text = document.createElement("div");
+  text.setAttribute("data-value", "");
+  text.textContent = value;
+  row.append(heading, text);
+  return row;
 }
 
 function buildItem(onClick: () => void) {
@@ -72,7 +108,57 @@ export function mountFooterPercent({ statusUrl, signal }: { statusUrl: string; s
       // A failed poll keeps the last reading on screen.
     }
   };
-  const view = buildItem(() => void refresh());
+  const popup = document.createElement("div");
+  popup.setAttribute(POPUP_ATTR, "");
+  popup.setAttribute("role", "dialog");
+  popup.setAttribute("aria-label", "Battery");
+  let device: BatteryManagerLike | null = null;
+  const devicePromise = deviceBattery().then((battery) => {
+    device = battery;
+    battery?.addEventListener("levelchange", renderPopup);
+    battery?.addEventListener("chargingchange", renderPopup);
+  });
+
+  function renderPopup() {
+    if (!popup.isConnected) return;
+    const rows = [
+      popupRow(
+        "Laptop",
+        reading === undefined ? "Reading battery…" : describeBattery(reading),
+        isLow(reading ?? null),
+      ),
+    ];
+    if (device !== null) rows.push(popupRow("This device", describeDeviceBattery(device), false));
+    popup.replaceChildren(...rows);
+    const anchor = view.button.getBoundingClientRect();
+    popup.style.bottom = `${window.innerHeight - anchor.top + 6}px`;
+    popup.style.left = `${Math.max(8, anchor.right - popup.offsetWidth)}px`;
+  }
+  const closePopup = () => {
+    popup.remove();
+    view.button.setAttribute("aria-expanded", "false");
+  };
+  const togglePopup = () => {
+    if (popup.isConnected) return closePopup();
+    document.body.append(popup);
+    view.button.setAttribute("aria-expanded", "true");
+    renderPopup();
+    void refresh();
+    void devicePromise.then(renderPopup);
+  };
+  const onPointerDown = (event: PointerEvent) => {
+    const target = event.target as Node;
+    if (popup.isConnected && !popup.contains(target) && !view.item.contains(target)) closePopup();
+  };
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape" && popup.isConnected) closePopup();
+  };
+  document.addEventListener("pointerdown", onPointerDown, true);
+  document.addEventListener("keydown", onKeyDown);
+
+  const view = buildItem(togglePopup);
+  view.button.setAttribute("aria-haspopup", "dialog");
+  view.button.setAttribute("aria-expanded", "false");
 
   const paint = () => {
     frame = 0;
@@ -82,10 +168,10 @@ export function mountFooterPercent({ statusUrl, signal }: { statusUrl: string; s
     const text = reading === undefined ? "…" : footerText(reading);
     if (view.label.textContent !== text) view.label.textContent = text;
     const description = reading === undefined ? "Reading battery…" : describeBattery(reading);
-    view.button.title = description;
     view.button.setAttribute("aria-label", `Battery: ${description}`);
     view.item.toggleAttribute("data-low", isLow(reading ?? null));
     view.level.setAttribute("width", String(Math.max(1, Math.round(((reading?.percent ?? 0) / 100) * 11))));
+    renderPopup();
   };
   function schedule() {
     if (frame === 0) frame = requestAnimationFrame(paint);
@@ -109,6 +195,11 @@ export function mountFooterPercent({ statusUrl, signal }: { statusUrl: string; s
     document.removeEventListener("visibilitychange", onVisible);
     clearInterval(timer);
     if (frame !== 0) cancelAnimationFrame(frame);
+    document.removeEventListener("pointerdown", onPointerDown, true);
+    document.removeEventListener("keydown", onKeyDown);
+    device?.removeEventListener("levelchange", renderPopup);
+    device?.removeEventListener("chargingchange", renderPopup);
+    popup.remove();
     view.item.remove();
     style.remove();
   };

@@ -42,7 +42,8 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 ## battery — `plugins/battery/`
 
 - **What:** a button at the right end of the sidebar footer row with a battery icon and the server
-  machine's charge. Tooltip: state and time left; a click refreshes; red at 20% or less on battery.
+  machine's charge, red at 20% or less on battery. A click opens a popup: the laptop's state and time
+  left, plus the viewing device's battery (`navigator.getBattery`) when bb is opened remotely.
   CLI: `bb battery status [--json]`. Reads `pmset -g batt`, so macOS only.
 - **How:** a content script (`lib/footer-percent.ts`) adds its own `<li>` to
   `[data-sidebar="footer"] > ul` and polls the plugin's `GET /status` HTTP route. It is deliberately
