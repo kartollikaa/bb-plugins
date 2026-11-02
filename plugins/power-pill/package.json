@@ -1,0 +1,37 @@
+{
+  "name": "bb-plugin-power-pill",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kartollikaa/bb-plugins.git",
+    "directory": "plugins/power-pill"
+  },
+  "engines": {
+    "bb": ">=0.48",
+    "bbPluginSdk": ">=0.6.104"
+  },
+  "bb": {
+    "name": "Power Pill",
+    "description": "Keeps the Mac awake from a sidebar footer switch, with a timer and an optional closed-lid mode.",
+    "branding": {
+      "icon": "./icons/power-pill.svg"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.104",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "hono": "^4.13.16",
+    "typescript": "^5.7.0"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "typecheck": "tsc -p ."
+  }
+}
