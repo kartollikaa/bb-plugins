@@ -8,6 +8,7 @@ Plugins for [bb](https://getbb.app), each in its own folder with its own README.
 | [thread-tree](plugins/thread-tree) | A sidebar thread list that nests child threads under their parent and shows each thread's subagents. |
 | [reveal-in-finder](plugins/reveal-in-finder) | Files an agent hands over show as cards in chat, with Open in Finder, the default app or bb's preview. |
 | [battery](plugins/battery) | The laptop's battery charge as an icon and percentage at the right end of the sidebar footer. |
+| [thread-links](plugins/thread-links) | The PRs, Kaiten cards, docs and other links a thread mentions, in its context card, with each PR's review, checks and merge status. |
 
 ## Install
 

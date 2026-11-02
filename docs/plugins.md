@@ -54,6 +54,26 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Tests:** `npm test` covers `test/battery.test.ts` (pmset parsing, labels). Run `npm run typecheck`.
 - Not in `marketplace.json` yet: it needs a first `battery/v0.1.0` tag and a store icon.
 
+## thread-links — `plugins/thread-links/`
+
+- **What:** a "Links" section in the thread context card listing every URL the thread's prompts and
+  agent replies mention (tool output is skipped), one row per page: PRs first, then issues, Kaiten,
+  Buildin, Figma, commits, repos and other sites, latest mention first. A GitHub PR row shows its
+  title, the most urgent status beside it, and a chip line under it: state, approvals and change
+  requests by reviewer, awaited reviewers, failed checks by name, running checks, conflicts / behind
+  / blocked / ready to merge, auto-merge, size. CLI: `bb thread-links list <thread-id> [--json]`.
+- **How:** the server reads `client/turn/requested` and `item/completed` events with
+  `bb.sdk.threads.events.list`, incrementally per thread, and invalidates the `links:<thread>` RPC
+  tag on `experimental_thread.events`. PR and issue status comes from `gh pr view` / `gh issue view`
+  on the server: the default login first, then each `~/.config/gh-*` profile, remembering which one
+  worked per owner. Open PRs refresh while the card is mounted.
+- **Card only:** the section shows where bb draws the thread context card (the `threadContextCard`
+  experiment, a thread opened as a page, not on phones). There is no banner segment.
+- **Agent skill:** `skills/thread-links/`.
+- **Tests:** `npm test` covers `test/links.test.ts` (URL extraction, classification, check rollup,
+  PR chips). Run `npm run typecheck`.
+- Not in `marketplace.json` yet: it needs a first `thread-links/v0.1.0` tag.
+
 ## Retired repos
 
 Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on
