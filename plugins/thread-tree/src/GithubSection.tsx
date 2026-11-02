@@ -55,6 +55,11 @@ function useGithubFolder() {
       void rpc.call("githubFolderUpdate", patch).then(() => load(false), report("Could not save the folder settings")),
     snooze: (key: string, snoozed: boolean) =>
       void rpc.call("githubFolderSnooze", { key, snoozed }).then(() => load(false), report("Could not snooze")),
+    prContext: (url: string) =>
+      rpc.call("githubFolderPrContext", { url }).catch((error: unknown) => {
+        report("Could not read the pull request")(error);
+        return null;
+      }),
   };
 }
 
@@ -80,9 +85,21 @@ export function GithubSection({
   showSnoozed: boolean;
   onToggleSnoozed: () => void;
 }) {
-  const { view, isRefreshing, refresh, update, snooze } = useGithubFolder();
+  const { view, isRefreshing, refresh, update, snooze, prContext } = useGithubFolder();
   const navigate = useBbNavigate();
+  const [openingUrl, setOpeningUrl] = useState<string | null>(null);
   if (!view) return null;
+
+  const startThread = (url: string) => {
+    if (openingUrl !== null) return;
+    setOpeningUrl(url);
+    void prContext(url)
+      .then((context) => {
+        if (context)
+          navigate.toCompose({ initialPrompt: context.prompt, focusPrompt: true, ...(context.projectId ? { projectId: context.projectId } : {}) });
+      })
+      .finally(() => setOpeningUrl(null));
+  };
 
   const now = Date.now();
   const rows = showSnoozed ? [...view.items, ...view.snoozed] : view.items;
@@ -116,7 +133,9 @@ export function GithubSection({
               item={item}
               isSnoozed={view.snoozed.includes(item)}
               now={now}
-              onOpen={() => navigate.openUrl(item.pr.url)}
+              isOpening={openingUrl === item.pr.url}
+              onOpen={() => startThread(item.pr.url)}
+              onOpenOnGithub={() => navigate.openUrl(item.pr.url)}
               onToggleSnoozed={(snoozed) => snooze(item.snoozeKey, snoozed)}
             />
           ))}
@@ -154,13 +173,17 @@ function PullRequestRow({
   item,
   isSnoozed,
   now,
+  isOpening,
   onOpen,
+  onOpenOnGithub,
   onToggleSnoozed,
 }: {
   item: GithubFolderItem;
   isSnoozed: boolean;
   now: number;
+  isOpening: boolean;
   onOpen: () => void;
+  onOpenOnGithub: () => void;
   onToggleSnoozed: (snoozed: boolean) => void;
 }) {
   const { pr, attention } = item;
@@ -170,6 +193,7 @@ function PullRequestRow({
     attention.map((reason) => ATTENTION_LABEL[reason]).join(", ") || "Your pull request",
     pr.isDraft ? "Draft" : "",
     `by @${pr.author} · updated ${formatAge(Date.parse(pr.updatedAt), now)} ago`,
+    "Click: new thread about this PR · ⌘-click or middle-click: open on GitHub",
   ]
     .filter(Boolean)
     .join("\n");
@@ -177,13 +201,14 @@ function PullRequestRow({
     <div
       role="listitem"
       title={tooltip}
-      onClick={onOpen}
+      onClick={(event) => (event.metaKey || event.ctrlKey ? onOpenOnGithub() : onOpen())}
       onAuxClick={(event) => {
-        if (event.button === 1) onOpen();
+        if (event.button === 1) onOpenOnGithub();
       }}
       className={cn(
         "group/row relative flex h-8 cursor-default items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90 hover:bg-sidebar-accent/60",
         isSnoozed && "text-sidebar-foreground/50",
+        isOpening && "cursor-progress opacity-60",
       )}
     >
       <span className={cn("flex size-4 shrink-0 items-center justify-center", style.className)}>
@@ -197,6 +222,18 @@ function PullRequestRow({
         <span className="text-2xs text-sidebar-foreground/45">
           {pr.repo.split("/")[1]}#{pr.number}
         </span>
+        <button
+          type="button"
+          aria-label="Open on GitHub"
+          title="Open on GitHub"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenOnGithub();
+          }}
+          className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+        >
+          <Icon name="ArrowUpRight" aria-hidden className="size-3.5" />
+        </button>
         <button
           type="button"
           aria-label={isSnoozed ? "Unsnooze" : "Snooze until it changes"}

@@ -44,6 +44,10 @@ export const rpcContract = defineRpcContract({
     input: githubSettingsPatchSchema,
     output: z.object({ ok: z.literal(true) }),
   },
+  githubFolderPrContext: {
+    input: z.object({ url: z.string().min(1).max(400) }).strict(),
+    output: z.object({ prompt: z.string(), projectId: z.string().nullable() }),
+  },
   githubFolderSnooze: {
     input: z.object({ key: z.string().min(1).max(400), snoozed: z.boolean() }).strict(),
     output: z.object({ ok: z.literal(true) }),
@@ -85,6 +89,8 @@ export default async function plugin(bb: BbPluginApi) {
     },
     githubFolderUpdate: (patch) => callGithubFolder("updateSettings", patch, ok),
     githubFolderSnooze: (input) => callGithubFolder("snooze", input, ok),
+    githubFolderPrContext: (input) =>
+      callGithubFolder("prContext", input, z.object({ prompt: z.string(), projectId: z.string().nullable() })),
     automations: async () => {
       try {
         const overview = await bb.sdk.plugins.callRpc({
