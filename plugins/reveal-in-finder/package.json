@@ -1,7 +1,13 @@
 {
   "name": "bb-plugin-reveal-in-finder",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kartollikaa/bb-plugins.git",
+    "directory": "plugins/reveal-in-finder"
+  },
   "engines": {
     "bb": ">=0.48",
     "bbPluginSdk": ">=0.6.104"
