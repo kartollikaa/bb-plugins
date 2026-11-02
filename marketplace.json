@@ -79,6 +79,31 @@
           "tagPrefix": "reveal-in-finder/"
         }
       }
+    },
+    {
+      "id": "battery",
+      "displayName": "Battery",
+      "description": "Shows the laptop's battery charge in the sidebar footer, with a popup of each device's state and charge.",
+      "icon": {
+        "url": "./icons/battery.svg"
+      },
+      "tags": [
+        "battery",
+        "sidebar",
+        "macos"
+      ],
+      "author": {
+        "name": "Dmitrii Maksimov",
+        "github": "kartollikaa"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/kartollikaa/bb-plugins.git",
+          "subdir": "plugins/battery",
+          "range": "^0.1.0",
+          "tagPrefix": "battery/"
+        }
+      }
     }
   ]
 }
