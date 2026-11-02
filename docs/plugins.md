@@ -129,6 +129,23 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   `npm run typecheck`. The sprite and animations are checked by eye in the app.
 - MIT. Not released and not in `marketplace.json` yet: it needs a first `mouse-pet/v0.1.0` tag.
 
+## power-pill — `plugins/power-pill/`
+
+- **What:** a capsule button in the sidebar footer, left of battery's, amber with the time left while
+  on. Its popup has an on/off switch, a duration (∞, 1/2/4/8 h) and "Also with the lid closed". The
+  session ends on its timer or at low battery (`BATTERY_FLOOR`), and survives reloads and bb restarts (kv `session`).
+  CLI: `bb power-pill status [--json] | on [--for 2h] [--lid] | off`.
+- **How:** the server runs `caffeinate -i -m -s -w <pid>`. Closed-lid mode runs
+  `sudo -n pmset -a disablesleep 1` (macOS ignores assertions on lid close) and resets it at the end;
+  a detached `sh` watchdog resets it if the server process dies. It needs a sudoers rule for exactly
+  those commands; readiness is checked with `sudo -k -n -l`, which ignores cached credentials. The
+  footer button is a content script (`lib/footer.ts`) over `GET /status`, `POST /start`, `POST /stop`;
+  it inserts itself before `[data-battery-footer]` so the two don't fight over the last slot.
+- **Agent skill:** `skills/power-pill/`.
+- **Tests:** `npm test` covers `test/pill.test.ts` (pmset parsing, request validation, stop rules,
+  durations, labels, setup command). Run `npm run typecheck`. The popup was checked in the live app.
+- MIT. Not released and not in `marketplace.json` yet: it needs a first `power-pill/v0.1.0` tag.
+
 ## Retired repos
 
 Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on

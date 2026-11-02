@@ -10,6 +10,7 @@
     { "name": "thread-links", "source": "./plugins/thread-links" },
     { "name": "github-folder", "source": "./plugins/github-folder" },
     { "name": "artifacts", "source": "./plugins/artifacts" },
-    { "name": "mouse-pet", "source": "./plugins/mouse-pet" }
+    { "name": "mouse-pet", "source": "./plugins/mouse-pet" },
+    { "name": "power-pill", "source": "./plugins/power-pill" }
   ]
 }
