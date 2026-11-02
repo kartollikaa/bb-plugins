@@ -1,6 +1,6 @@
 # Plugins
 
-Check the live state with `bb plugin list` and `bb plugin source <id>`. This page records what the
+Check the live state with `bb plugin list` and `bb plugin source <id>`. Release and store state: [publication.md](publication.md). This page records what the
 plugins are for and how each one is wired. All of them are installed on Dmitrii's Mac from the local
 checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
@@ -38,9 +38,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   line for deliverables, never inside code.
 - **Tests:** `npm test` covers `test/reveal.test.ts` (path resolution, open args, card labels).
   There is no `typecheck` script. Run `npx tsc -p .` when touching types.
-- No license file and no `PLUGIN_OVERVIEW.md` yet. Both are needed before a bb-community
-  submission. Tag: `reveal-in-finder/v0.1.0`.
-- **Not verified yet:** how the card looks in the real chat. Headless screenshots came out black.
+- MIT. Tags: `reveal-in-finder/v0.1.0`, `v0.1.1`.
 
 ## battery — `plugins/battery/`
 
@@ -55,7 +53,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   The selector depends on bb's footer DOM; if the button disappears after a bb upgrade, check it first.
 - **Agent skill:** `skills/battery/`.
 - **Tests:** `npm test` covers `test/battery.test.ts` (pmset parsing, labels). Run `npm run typecheck`.
-- Not in `marketplace.json` yet: it needs a first `battery/v0.1.0` tag and a store icon.
+- MIT. Tag: `battery/v0.1.0`.
 
 ## thread-links — `plugins/thread-links/`
 

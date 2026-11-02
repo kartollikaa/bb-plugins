@@ -1,27 +1,35 @@
 # Publication status
 
 One row per plugin. Update it in the same commit as a tag, a `marketplace.json` entry or a
-bb-community submission. Verify against the repo with `git ls-remote --tags origin` before trusting it.
+bb-community PR. Verify before trusting it: `git ls-remote --tags origin` for tags,
+`gh pr list -R get-bb/marketplace --author kartollikaa --state all` for the store.
 
 Stages: **local** (only in `.bb/plugins.json`) → **self-hosted** (tagged, in `marketplace.json`,
-installable with `bb marketplace add`) → **bb-community** (submitted to bb's store).
+installable with `bb marketplace add`) → **bb-community** (an entry in
+[get-bb/marketplace](https://github.com/get-bb/marketplace), bb's store).
 
-| Plugin | Stage | Latest tag | Unreleased on main | Icon | License | `PLUGIN_OVERVIEW.md` | Next step |
-|---|---|---|---|---|---|---|---|
-| inline-terminal | self-hosted | `v0.1.2` | `repository` field fix only | yes | yes | yes | Submit to bb-community |
-| thread-tree | self-hosted | `v0.1.0` | GitHub folder (2 commits) | yes | yes | yes | Release `v0.2.0`, raise `range` in `marketplace.json` |
-| reveal-in-finder | self-hosted | `v0.1.0` | none | yes | no | no | Add LICENSE and `PLUGIN_OVERVIEW.md`, then submit |
-| github-folder | queued | none | everything | yes | yes | yes | Tag `v0.1.0`, add to `marketplace.json` |
-| thread-links | queued | none | everything | yes | no | yes | Add LICENSE, tag `v0.1.0`, add to `marketplace.json` |
-| battery | queued | none | everything | no | no | yes | Add icon and LICENSE, tag `v0.1.0`, add to `marketplace.json` |
+| Plugin | Self-hosted | bb-community | Next step |
+|---|---|---|---|
+| inline-terminal | yes (`v0.1.2`) | PR [#796](https://github.com/get-bb/marketplace/pull/796), open | Push the monorepo source fix, then wait for merge |
+| reveal-in-finder | yes (`v0.1.1`) | entry ready, PR not opened | Open PR from `submit-reveal-in-finder` |
+| battery | yes (`v0.1.0`) | entry ready, PR not opened | Open PR from `submit-battery` |
+| thread-tree | yes | not submitted | Release the GitHub folder work, then submit |
+| github-folder | no tag | not submitted | Tag `v0.1.0`, add to `marketplace.json` |
+| thread-links | no tag | not submitted | Add LICENSE, tag `v0.1.0`, add to `marketplace.json` |
 
-## bb-community
+## bb-community entries
 
-No plugin has been submitted. Nothing in the repo records a submission, so treat all as not submitted
-until a row here says otherwise. Submission needs Dmitrii's go-ahead; see `docs/workflow.md`.
+Each entry lives in the marketplace repo as `entries/<id>.json`, `icons/<id>-<hash>.svg`,
+`screenshots/<id>/` and `overview/<id>.md` (a copy of the plugin's `PLUGIN_OVERVIEW.md`). Its source
+is this repo with `subdir: plugins/<id>` and `tagPrefix: <id>/`, so a new tag within the range reaches
+users without a new PR. A change to the overview, screenshots or description needs one.
+
+A store submission needs a LICENSE, `PLUGIN_OVERVIEW.md`, a store icon and at least one screenshot
+at 1200 px wide or more. Blur thread names and private paths in screenshots.
+
+`thread-images` was submitted once (PR #780) and withdrawn; it isn't in this repo.
 
 ## Notes
 
 - thread-tree's GitHub folder only works with `github-folder` installed, so release `github-folder`
-  `v0.1.0` before or together with thread-tree `v0.2.0`.
-- Checked 2026-11-02 against `origin/main` at `46ba48b`.
+  before or together with that thread-tree release.
