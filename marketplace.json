@@ -104,6 +104,32 @@
           "tagPrefix": "battery/"
         }
       }
+    },
+    {
+      "id": "artifacts",
+      "displayName": "Artifacts",
+      "description": "Your published Claude Code artifacts and Codex Sites in one bb page, opened in bb's browser.",
+      "icon": {
+        "url": "./icons/artifacts.svg"
+      },
+      "tags": [
+        "claude",
+        "codex",
+        "artifacts",
+        "sites"
+      ],
+      "author": {
+        "name": "Dmitrii Maksimov",
+        "github": "kartollikaa"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/kartollikaa/bb-plugins.git",
+          "subdir": "plugins/artifacts",
+          "range": "^0.1.0",
+          "tagPrefix": "artifacts/"
+        }
+      }
     }
   ]
 }

@@ -111,7 +111,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Agent skill:** `skills/artifacts/`.
 - **Tests:** `npm test` covers `test/sources.test.ts` (credentials, parsing, paging, errors, URL
   lookup). Run `npm run typecheck`.
-- MIT. Not in `marketplace.json` yet: it needs a first `artifacts/v0.1.0` tag.
+- MIT. Released as `artifacts/v0.1.0` and listed in `marketplace.json`.
 
 ## Retired repos
 
