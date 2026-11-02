@@ -19,6 +19,14 @@ import { ROW_HOVER_SOLID_BG } from "./rowStyles";
 import { formatAge } from "./time";
 
 const POLL_MS = 60_000;
+
+/** The GitHub Folder plugin's PR page; `toPluginPanel` only reaches this plugin's own panels, so go through the router's history. */
+function openGithubFolderPrPage(url: string) {
+  const match = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/.exec(url);
+  if (!match) return;
+  window.history.pushState(window.history.state, "", `/plugins/github-folder/pr/${match[1]}/${match[2]}/${match[3]}`);
+  window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
+}
 const PULLS_URL = "https://github.com/pulls/review-requested";
 
 /** The GitHub Folder plugin's view; null while loading or when that plugin is absent. */
@@ -55,11 +63,7 @@ function useGithubFolder() {
       void rpc.call("githubFolderUpdate", patch).then(() => load(false), report("Could not save the folder settings")),
     snooze: (key: string, snoozed: boolean) =>
       void rpc.call("githubFolderSnooze", { key, snoozed }).then(() => load(false), report("Could not snooze")),
-    prContext: (url: string) =>
-      rpc.call("githubFolderPrContext", { url }).catch((error: unknown) => {
-        report("Could not read the pull request")(error);
-        return null;
-      }),
+    prefetch: (url: string) => void rpc.call("githubFolderPrefetch", { url }).catch(() => undefined),
   };
 }
 
@@ -85,21 +89,9 @@ export function GithubSection({
   showSnoozed: boolean;
   onToggleSnoozed: () => void;
 }) {
-  const { view, isRefreshing, refresh, update, snooze, prContext } = useGithubFolder();
+  const { view, isRefreshing, refresh, update, snooze, prefetch } = useGithubFolder();
   const navigate = useBbNavigate();
-  const [openingUrl, setOpeningUrl] = useState<string | null>(null);
   if (!view) return null;
-
-  const startThread = (url: string) => {
-    if (openingUrl !== null) return;
-    setOpeningUrl(url);
-    void prContext(url)
-      .then((context) => {
-        if (context)
-          navigate.toCompose({ initialPrompt: context.prompt, focusPrompt: true, ...(context.projectId ? { projectId: context.projectId } : {}) });
-      })
-      .finally(() => setOpeningUrl(null));
-  };
 
   const now = Date.now();
   const rows = showSnoozed ? [...view.items, ...view.snoozed] : view.items;
@@ -133,8 +125,8 @@ export function GithubSection({
               item={item}
               isSnoozed={view.snoozed.includes(item)}
               now={now}
-              isOpening={openingUrl === item.pr.url}
-              onOpen={() => startThread(item.pr.url)}
+              onHover={() => prefetch(item.pr.url)}
+              onOpen={() => openGithubFolderPrPage(item.pr.url)}
               onOpenOnGithub={() => navigate.openUrl(item.pr.url)}
               onToggleSnoozed={(snoozed) => snooze(item.snoozeKey, snoozed)}
             />
@@ -173,7 +165,7 @@ function PullRequestRow({
   item,
   isSnoozed,
   now,
-  isOpening,
+  onHover,
   onOpen,
   onOpenOnGithub,
   onToggleSnoozed,
@@ -181,7 +173,7 @@ function PullRequestRow({
   item: GithubFolderItem;
   isSnoozed: boolean;
   now: number;
-  isOpening: boolean;
+  onHover: () => void;
   onOpen: () => void;
   onOpenOnGithub: () => void;
   onToggleSnoozed: (snoozed: boolean) => void;
@@ -202,13 +194,13 @@ function PullRequestRow({
       role="listitem"
       title={tooltip}
       onClick={(event) => (event.metaKey || event.ctrlKey ? onOpenOnGithub() : onOpen())}
+      onPointerEnter={onHover}
       onAuxClick={(event) => {
         if (event.button === 1) onOpenOnGithub();
       }}
       className={cn(
         "group/row relative flex h-8 cursor-default items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90 hover:bg-sidebar-accent/60",
         isSnoozed && "text-sidebar-foreground/50",
-        isOpening && "cursor-progress opacity-60",
       )}
     >
       <span className={cn("flex size-4 shrink-0 items-center justify-center", style.className)}>

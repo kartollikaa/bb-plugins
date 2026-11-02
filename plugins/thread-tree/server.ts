@@ -44,9 +44,10 @@ export const rpcContract = defineRpcContract({
     input: githubSettingsPatchSchema,
     output: z.object({ ok: z.literal(true) }),
   },
-  githubFolderPrContext: {
+  /** Warms the GitHub Folder plugin's PR cache before its page opens. */
+  githubFolderPrefetch: {
     input: z.object({ url: z.string().min(1).max(400) }).strict(),
-    output: z.object({ prompt: z.string(), projectId: z.string().nullable() }),
+    output: z.object({ ok: z.literal(true) }),
   },
   githubFolderSnooze: {
     input: z.object({ key: z.string().min(1).max(400), snoozed: z.boolean() }).strict(),
@@ -89,8 +90,10 @@ export default async function plugin(bb: BbPluginApi) {
     },
     githubFolderUpdate: (patch) => callGithubFolder("updateSettings", patch, ok),
     githubFolderSnooze: (input) => callGithubFolder("snooze", input, ok),
-    githubFolderPrContext: (input) =>
-      callGithubFolder("prContext", input, z.object({ prompt: z.string(), projectId: z.string().nullable() })),
+    githubFolderPrefetch: async (input) => {
+      await callGithubFolder("prContext", input, z.object({ context: z.string() })).catch(() => undefined);
+      return { ok: true as const };
+    },
     automations: async () => {
       try {
         const overview = await bb.sdk.plugins.callRpc({
