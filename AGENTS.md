@@ -12,6 +12,8 @@ subfolder, so nothing at the root may become a dependency of a plugin.
   live app), how a release is cut, and how a plugin is added or split out.
 - [docs/gotchas.md](docs/gotchas.md): SDK and tooling traps that have already cost time. Add one
   whenever you hit a new trap.
+- [docs/publication.md](docs/publication.md): which plugins are released, queued, or submitted.
+  Update it with every tag, catalog entry or submission.
 - Load the `bb-plugin-authoring` skill before touching plugin code. It routes to the SDK references
   for the installed bb version, and those references are the API contract. Don't write SDK calls
   from memory.
