@@ -19,14 +19,12 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **What:** replaces the sidebar thread list with a tree of child threads nested under their parent.
   It also shows automations, recent activity, the archived toggle, and provider subagents as a
   counter on the parent's row. CLI: `bb thread-tree list`.
-- **GitHub folder:** the top section lists open PRs that need Dmitrii, like Arc's GitHub live folder.
-  The server runs one GraphQL search (review-requested, user-review-requested, author, assignee,
-  mentions) per gh login, default first and then each `~/.config/gh-*` profile, deduplicated by
-  login, cached for a minute. Filters, org choices and snoozes are per client in localStorage;
-  the pure logic is `src/github.ts`.
+- **GitHub folder:** when the `github-folder` plugin is installed, the top section draws its folder
+  in thread-tree's row style. The server proxies `githubFolder`, `githubFolderUpdate` and
+  `githubFolderSnooze` to that plugin's RPC, like Automations; without it the section is hidden.
 - **Agent skills:** `skills/thread-tree/` and `skills/delegate-to-threads/`. The second one is how
   agents spawn child threads with `bb thread spawn --parent-self`.
-- **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations, github). Run
+- **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations). Run
   `npm run typecheck` too. Components live in `src/`.
 - The thread list slot is exclusive: with several list plugins installed, only one is shown.
 - MIT. Tag: `thread-tree/v0.1.0`.
@@ -77,6 +75,24 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Tests:** `npm test` covers `test/links.test.ts` (URL extraction, classification, check rollup,
   PR chips). Run `npm run typecheck`.
 - Not in `marketplace.json` yet: it needs a first `thread-links/v0.1.0` tag.
+
+## github-folder — `plugins/github-folder/`
+
+- **What:** a folder of the open GitHub PRs that need Dmitrii, like Arc's GitHub live folder: review
+  requests, his PRs with changes requested, failing checks, conflicts or ready to merge, optionally
+  assigned and mentions. A header button customizes sources, drafts and orgs; rows snooze until
+  the PR changes. CLI: `bb github-folder list [--json]`.
+- **How:** the server runs one GraphQL search per gh login (default, then each `~/.config/gh-*`
+  profile, deduplicated by login) on a background loop, keeps settings and snoozes in `bb.storage.kv`,
+  and invalidates the `folder` RPC tag on change. The frontend is an `experimental_appOverlay` that
+  portals the folder above bb's own list (`[data-sidebar="content"] > [data-bb-plugin="thread-list"]`)
+  with that list's classes. thread-tree draws its own copy through the RPC instead.
+- **Fragile:** the selector above depends on bb's sidebar DOM; check it first if the folder
+  disappears from bb's list after an upgrade.
+- **Agent skill:** `skills/github-folder/`.
+- **Tests:** `npm test` covers `test/github.test.ts` (query, parsing, filters, settings). Run
+  `npm run typecheck`.
+- Not in `marketplace.json` yet: it needs a first `github-folder/v0.1.0` tag.
 
 ## Retired repos
 
