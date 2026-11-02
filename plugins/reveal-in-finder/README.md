@@ -16,5 +16,5 @@ on the Mac that runs the bb server.
 
 From a shell: `bb reveal-in-finder show <absolute-path>`.
 
-Install: `bb plugin install ~/Projects/bb-plugins/bb-plugin-reveal-in-finder`; after a change,
+Install: `bb plugin install ~/Projects/bb/bb-plugin-reveal-in-finder`; after a change,
 `npm test && bb plugin build && bb plugin reload reveal-in-finder`.
