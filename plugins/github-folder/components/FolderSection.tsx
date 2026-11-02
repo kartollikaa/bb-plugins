@@ -92,7 +92,10 @@ export function FolderSection() {
             aria-expanded={!isCollapsed}
             aria-label={isCollapsed ? "Expand GitHub section" : "Collapse GitHub section"}
             onClick={toggleCollapsed}
-            className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-subtle-foreground outline-none hover:bg-state-hover hover:text-muted-foreground"
+            className={cn(
+              "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-subtle-foreground outline-none hover:bg-state-hover hover:text-muted-foreground focus-visible:opacity-100",
+              !isCollapsed && "opacity-0 group-hover/gh-header:opacity-100",
+            )}
           >
             <Icon name="ChevronRight" aria-hidden className={cn("size-3 transition-transform duration-150", !isCollapsed && "rotate-90")} />
           </button>
