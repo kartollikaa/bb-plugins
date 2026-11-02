@@ -26,3 +26,12 @@ can find it by the error text.
 - **Headless screenshots of bb chat** came out black. Text that is still streaming sits in collapsed
   groups and may not be in the DOM.
 - **zsh** has no `timeout` command. Don't wrap commands in it.
+
+## Installs and catalogs
+
+- **`marketplace.json` entries need `icon`.** Without it, `bb marketplace add` fails with
+  `HTTP 422: invalid marketplace manifest: plugins.0.icon: Invalid input`. To validate the catalog
+  locally: `bb marketplace add path:~/Projects/bb`, then `bb marketplace remove kartollikaa`.
+- **Switching a git-installed plugin to a path install** fails with `plugin id "<id>" is already
+  installed from git:…; remove it first`. Run `bb plugin remove <id> --yes`, then install the path.
+  A path-to-path move needs no removal.
