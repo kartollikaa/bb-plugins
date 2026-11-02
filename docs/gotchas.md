@@ -30,6 +30,13 @@ can find it by the error text.
   application/vnd.github.full+json`) has `private-user-images.githubusercontent.com` URLs signed for
   five minutes; github-folder redirects to them from a plugin route instead of embedding them.
 
+- **Icon names outside bb's set render as a Zap.** `experimental_Icon` falls back silently for an
+  unknown Lucide name (`Sparkles`, `RefreshCw` did). Declare the glyph under
+  `bb.branding.experimental_icons` and reference it as `"<plugin-id>/<name>"`.
+- **Claude's frames API answers 404 without Claude Code's headers.** `GET /api/frame/frames` with a
+  valid OAuth token still needs `X-Frame-CP`, `X-Frame-Surface`, `X-Frame-Platform`,
+  `X-Frame-Client-Version` and the `application/vnd.ant.frame-refusal+json` Accept type.
+
 ## Tooling
 
 - **DevBrowser** (`bb browser-automation`) has no `page.waitForTimeout` and no `locator().first`.

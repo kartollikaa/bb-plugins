@@ -8,6 +8,7 @@
     { "name": "reveal-in-finder", "source": "./plugins/reveal-in-finder" },
     { "name": "battery", "source": "./plugins/battery" },
     { "name": "thread-links", "source": "./plugins/thread-links" },
-    { "name": "github-folder", "source": "./plugins/github-folder" }
+    { "name": "github-folder", "source": "./plugins/github-folder" },
+    { "name": "artifacts", "source": "./plugins/artifacts" }
   ]
 }

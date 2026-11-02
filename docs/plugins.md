@@ -94,6 +94,25 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   `npm run typecheck`.
 - MIT. Not in `marketplace.json` yet: it needs a first `github-folder/v0.1.0` tag.
 
+## artifacts — `plugins/artifacts/`
+
+- **What:** an Artifacts nav panel with Dmitrii's published Claude Code artifacts and Codex Sites
+  as a grid of preview cards; a click opens the item through `useBbNavigate().openUrl`. The
+  `::artifact{url="…"}` message directive draws the same card in chat. CLI: `bb artifacts list [--json]`.
+- **How:** the server reads the Claude Code OAuth token from the keychain item
+  `Claude Code-credentials` and calls `GET api.anthropic.com/api/frame/frames` with Claude Code's
+  `X-Frame-*` headers. Codex: `~/.codex/auth.json` → MCP over HTTP at
+  `chatgpt.com/backend-api/wham/apps`, tool `sites_list_sites`. The list is cached in memory; the
+  `list` RPC tag is invalidated after each fetch. The page and the directive share
+  `components/ArtifactCard.tsx` and the same `list` query.
+- **Fragile:** both endpoints are private. If Claude answers 404, compare the `X-Frame-*` headers
+  with what the current Claude Code binary sends. Shared-with-me artifacts (`/frames/external`)
+  need a browser session, so they are not listed.
+- **Agent skill:** `skills/artifacts/`.
+- **Tests:** `npm test` covers `test/sources.test.ts` (credentials, parsing, paging, errors, URL
+  lookup). Run `npm run typecheck`.
+- MIT. Not in `marketplace.json` yet: it needs a first `artifacts/v0.1.0` tag.
+
 ## Retired repos
 
 Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on
