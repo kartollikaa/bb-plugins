@@ -9,6 +9,7 @@
     { "name": "battery", "source": "./plugins/battery" },
     { "name": "thread-links", "source": "./plugins/thread-links" },
     { "name": "github-folder", "source": "./plugins/github-folder" },
-    { "name": "artifacts", "source": "./plugins/artifacts" }
+    { "name": "artifacts", "source": "./plugins/artifacts" },
+    { "name": "mouse-pet", "source": "./plugins/mouse-pet" }
   ]
 }

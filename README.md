@@ -10,6 +10,7 @@ Plugins for [bb](https://getbb.app), each in its own folder with its own README.
 | [battery](plugins/battery) | The laptop's battery charge as an icon and percentage at the right end of the sidebar footer. |
 | [thread-links](plugins/thread-links) | The PRs, Kaiten cards, docs and other links a thread mentions, in its context card, with each PR's review, checks and merge status. |
 | [artifacts](plugins/artifacts) | Your published Claude Code artifacts and Codex Sites as a grid of previews, opened in bb's browser, and as cards in chat. |
+| [mouse-pet](plugins/mouse-pet) | A pet mouse that runs, sits, grooms and sleeps along the bottom of the bb window. |
 | [github-folder](plugins/github-folder) | A sidebar folder of the open GitHub PRs that need you, like Arc's GitHub live folder, with a menu to pick what it lists. |
 
 ## Install

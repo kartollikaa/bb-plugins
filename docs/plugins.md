@@ -113,6 +113,22 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   lookup). Run `npm run typecheck`.
 - MIT. Released as `artifacts/v0.1.0` and listed in `marketplace.json`.
 
+## mouse-pet — `plugins/mouse-pet/`
+
+- **What:** a small mouse that lives along the bottom edge of the bb window. It walks, runs, sits,
+  grooms and sleeps (with a floating "z"), turns at both window edges, and on a click hops, squeaks
+  "Pi!" and bolts the other way. Only the mouse takes clicks; the strip it moves in does not.
+- **How:** a content script (`lib/mouse-pet.ts`) appends a fixed `[data-mouse-pet]` layer to `body`
+  and moves the sprite with a `requestAnimationFrame` loop. Legs, tail, blink and poses are CSS
+  keyframes keyed on `data-mode`. The movement rules (modes, weights, durations, edge bounce) are pure
+  functions in `lib/pet.ts`. With `prefers-reduced-motion` it sits still and animations are off.
+- **No commands or settings:** the server entry is empty because bb requires one. Turn the pet off by
+  disabling the plugin.
+- **Agent skill:** `skills/mouse-pet/`.
+- **Tests:** `npm test` covers `test/pet.test.ts` (movement, bounce, mode choice, startle). Run
+  `npm run typecheck`. The sprite and animations are checked by eye in the app.
+- MIT. Not released and not in `marketplace.json` yet: it needs a first `mouse-pet/v0.1.0` tag.
+
 ## Retired repos
 
 Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on
