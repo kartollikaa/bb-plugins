@@ -22,8 +22,9 @@ this one under Settings → Appearance → Sidebar, or run
 
 ## Layout
 
-- `server.ts`: RPC `subagents` and the `bb thread-tree` command.
+- `server.ts`: RPCs `subagents`, `automations`, `githubPrs` and the `bb thread-tree` command.
+- `src/github.ts`: the GitHub folder's query, parsing and filters; `src/gh.ts` runs it per gh login.
 - `src/subagents.ts`: folds a thread's event log into its subagents.
 - `src/tree.ts`: pure tree, grouping and subagent state logic.
-- `src/ThreadTreeList.tsx`, `src/SubagentBadge.tsx`: the sidebar UI.
-- `test/`: `node --test` suites for the two pure modules.
+- `src/ThreadTreeList.tsx`, `src/SubagentBadge.tsx`, `src/GithubSection.tsx`: the sidebar UI.
+- `test/`: `node --test` suites for the pure modules.

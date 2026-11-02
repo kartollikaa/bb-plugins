@@ -22,6 +22,7 @@ import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader } from "./GroupHeader";
 import { ROW_HOVER_SOLID_BG } from "./rowStyles";
 import { AutomationsSection } from "./AutomationsSection";
+import { GithubSection } from "./GithubSection";
 import { StatusDot } from "./StatusDot";
 import { formatAge } from "./time";
 import {
@@ -188,6 +189,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   return (
     <div className="flex flex-col gap-3 px-1.5 pb-3 pt-1">
+      <GithubSection isCollapsed={collapsedGroups.has("github")} onToggle={() => collapsedGroups.toggle("github")} />
+
       <AutomationsSection
         isCollapsed={collapsedGroups.has("automations")}
         onToggle={() => collapsedGroups.toggle("automations")}

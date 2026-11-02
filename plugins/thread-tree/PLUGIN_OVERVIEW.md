@@ -3,7 +3,19 @@ under it, and the subagents it runs inside its own session show on its row.
 
 ## What you get
 
-- Automations at the very top: each scheduled automation with its status dot
+- A GitHub folder at the top: open pull requests that need you, most urgent
+  first. Review requests come first, then your own PRs with changes requested,
+  failing checks, conflicts, or an approval and nothing blocking the merge,
+  then PRs assigned to you or mentioning you. Each row shows the title and a
+  short reason; a click opens the PR. Hover a row for its `repo#number` and a
+  snooze button that hides it until the PR changes. The customize button in
+  the folder header picks the sources (review requests with or without team
+  requests, your PRs only when they need you or all of them, assigned,
+  mentions), drafts and organizations, and refreshes. The arrow opens
+  GitHub's pull requests page. It reads every gh login on the bb server
+  machine, `~/.config/gh-*` profiles included; without gh it says it can't
+  reach GitHub.
+- Automations below it: each scheduled automation with its status dot
   and next run; hover to run it now or pause and resume it. Clicking one opens
   its last run's thread. Paused ones fold under an "N paused" toggle. It reads
   bb's own Automations plugin and hides itself when that plugin is off.
@@ -39,6 +51,12 @@ under it, and the subagents it runs inside its own session show on its row.
 ## How it works
 
 The list reads bb's own thread data. Subagents come from each thread's event
-log, read incrementally on the bb server; nothing leaves the machine. Collapse
-state, grouping, project order, the Archived toggle, and the Recent Activity length are kept per
-client.
+log, read incrementally on the bb server; nothing leaves the machine. The
+GitHub folder runs one GraphQL search per gh login through the `gh` CLI on the
+bb server, so only GitHub sees those requests. Collapse state, grouping,
+project order, the Archived toggle, the Recent Activity length, and the GitHub
+folder's filters and snoozes are kept per client.
+
+## Requirements
+
+The GitHub folder needs the `gh` CLI signed in on the bb server machine.

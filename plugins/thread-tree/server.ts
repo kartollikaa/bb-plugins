@@ -1,6 +1,5 @@
-// bb-plugin-thread-tree backend: folds each thread's provider delegations
-// (Claude Code `Agent` calls, Codex subagents) into a per-thread subagent list
-// that the sidebar draws as a counter and a status dot.
+// bb-plugin-thread-tree backend: per-thread subagent lists, the automations
+// summary, and the GitHub folder's PR search through the local gh logins.
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { createSubagentFolder, subagentSchema } from "./src/subagents";
@@ -11,6 +10,8 @@ import {
   overviewSchema,
   summarizeOverview,
 } from "./src/automations";
+import { createGithubFolder } from "./src/gh";
+import { githubPrSchema } from "./src/github";
 
 const MAX_THREADS_PER_CALL = 200;
 
@@ -30,6 +31,15 @@ export const rpcContract = defineRpcContract({
       action: z.enum(["run", "pause", "resume"]),
     }),
     output: z.object({ ok: z.literal(true) }),
+  },
+  githubPrs: {
+    input: z.object({ force: z.boolean() }),
+    output: z.object({
+      accounts: z.array(z.string()),
+      prs: z.array(githubPrSchema),
+      error: z.string().nullable(),
+      fetchedAt: z.number(),
+    }),
   },
   subagents: {
     input: z.object({
@@ -53,7 +63,10 @@ export default async function plugin(bb: BbPluginApi) {
     log: (message) => bb.log.warn(message),
   });
 
+  const github = createGithubFolder();
+
   bb.rpc.register(rpcContract, {
+    githubPrs: ({ force }) => github.read(force),
     automations: async () => {
       try {
         const overview = await bb.sdk.plugins.callRpc({

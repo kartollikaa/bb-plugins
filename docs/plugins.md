@@ -19,9 +19,14 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **What:** replaces the sidebar thread list with a tree of child threads nested under their parent.
   It also shows automations, recent activity, the archived toggle, and provider subagents as a
   counter on the parent's row. CLI: `bb thread-tree list`.
+- **GitHub folder:** the top section lists open PRs that need Dmitrii, like Arc's GitHub live folder.
+  The server runs one GraphQL search (review-requested, user-review-requested, author, assignee,
+  mentions) per gh login, default first and then each `~/.config/gh-*` profile, deduplicated by
+  login, cached for a minute. Filters, org choices and snoozes are per client in localStorage;
+  the pure logic is `src/github.ts`.
 - **Agent skills:** `skills/thread-tree/` and `skills/delegate-to-threads/`. The second one is how
   agents spawn child threads with `bb thread spawn --parent-self`.
-- **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations). Run
+- **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations, github). Run
   `npm run typecheck` too. Components live in `src/`.
 - The thread list slot is exclusive: with several list plugins installed, only one is shown.
 - MIT. Tag: `thread-tree/v0.1.0`.

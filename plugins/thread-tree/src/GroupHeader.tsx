@@ -7,6 +7,7 @@ export function GroupHeader({
   isCollapsed,
   count,
   onToggle,
+  extra,
   action,
 }: {
   title: string;
@@ -14,6 +15,8 @@ export function GroupHeader({
   isCollapsed: boolean;
   count: number;
   onToggle: () => void;
+  /** Controls drawn before `action`, such as a menu trigger. */
+  extra?: React.ReactNode;
   /** A hover button at the end of the header. */
   action?: { label: string; icon: string; onClick: () => void };
 }) {
@@ -37,6 +40,7 @@ export function GroupHeader({
           )}
         />
       </button>
+      {extra}
       {action ? (
         <button
           type="button"
