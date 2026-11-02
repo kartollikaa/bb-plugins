@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 import {
   definePluginApp,
+  experimental_Icon as BbIcon,
   experimental_THREAD_INFO_SECTION_GROUPS as SECTION_GROUPS,
   experimental_ThreadContextCardRow as ThreadContextCardRow,
   experimental_useRpcQuery as useRpcQuery,
@@ -9,7 +10,17 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { rpcContract, type GithubStatus } from "./lib/contract.ts";
 import type { LinkKind, ThreadLink } from "./lib/links.ts";
-import { headline, statusChips, type StatusChip, type Tone } from "./lib/pull-request.ts";
+import {
+  badge,
+  ciState,
+  reviewVerdict,
+  type CheckJob,
+  type CiState,
+  type JobState,
+  type PullRequestBadge,
+  type PullRequestStatus,
+} from "./lib/pull-request.ts";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 const VISIBLE_LINKS = 8;
@@ -26,17 +37,40 @@ const KIND_ICON: Record<LinkKind, string> = {
   web: "Link",
 };
 
-const TONE_CLASS: Record<Tone, string> = {
-  success: "text-green-600 dark:text-green-400",
-  danger: "text-destructive",
-  warning: "text-amber-600 dark:text-amber-400",
-  info: "text-sky-600 dark:text-sky-400",
-  merged: "text-violet-600 dark:text-violet-400",
-  neutral: "text-muted-foreground",
+const GREEN = "text-green-600 dark:text-green-400";
+const RED = "text-red-600 dark:text-red-400";
+const VIOLET = "text-violet-600 dark:text-violet-400";
+
+const BADGE: Record<PullRequestBadge, { icon: string; className: string; title: string }> = {
+  draft: { icon: "GitPullRequestDraft", className: "text-muted-foreground", title: "Draft" },
+  open: { icon: "GitPullRequest", className: GREEN, title: "Open" },
+  conflicts: { icon: "GitPullRequest", className: RED, title: "Open, has conflicts" },
+  merged: { icon: "GitMerge", className: VIOLET, title: "Merged" },
+  closed: { icon: "GitPullRequestClosed", className: RED, title: "Closed" },
 };
 
-function chipTitle(chips: StatusChip[]): string {
-  return chips.map((chip) => (chip.detail ? `${chip.text}: ${chip.detail}` : chip.text)).join("\n");
+const DOT: Record<JobState, string> = {
+  passed: "bg-green-500",
+  failed: "bg-red-500",
+  pending: "bg-amber-500",
+  skipped: "bg-muted-foreground/40",
+};
+
+const CI_TITLE: Record<CiState, string> = {
+  passed: "Checks passed",
+  failed: "Checks failed",
+  pending: "Checks running",
+};
+
+function stop(event: SyntheticEvent) {
+  event.stopPropagation();
+}
+
+function useOpenUrl() {
+  const navigate = useBbNavigate();
+  return (url: string) => {
+    if (!navigate.openUrl(url)) window.open(url, "_blank", "noopener");
+  };
 }
 
 function useGithubStatus(link: ThreadLink) {
@@ -52,80 +86,130 @@ function useGithubStatus(link: ThreadLink) {
   return query.data;
 }
 
-function prIcon(status: GithubStatus | undefined): string {
-  if (status?.kind !== "pull-request") return "GitPullRequest";
-  const state = status.pullRequest.state;
-  return state === "merged" ? "GitMerge" : state === "closed" ? "GitPullRequestClosed" : state === "draft" ? "GitPullRequestDraft" : "GitPullRequest";
+function Dot({ state, pulse = false }: { state: JobState; pulse?: boolean }) {
+  return (
+    <span className="relative flex size-2 shrink-0">
+      {pulse ? <span className={cn("absolute inline-flex size-full animate-ping rounded-full opacity-75", DOT[state])} /> : null}
+      <span className={cn("relative inline-flex size-2 rounded-full", DOT[state])} />
+    </span>
+  );
 }
 
-function Chips({ chips }: { chips: StatusChip[] }) {
+function JobRow({ job }: { job: CheckJob }) {
+  const openUrl = useOpenUrl();
   return (
-    <div className="flex flex-wrap gap-x-2 gap-y-0.5 pb-1 pl-6 text-xs">
-      {chips.map((chip) => (
-        <span key={chip.text} className={TONE_CLASS[chip.tone]} title={chip.detail}>
-          {chip.text}
-          {chip.detail ? <span className="text-muted-foreground"> · {chip.detail}</span> : null}
-        </span>
-      ))}
+    <button
+      type="button"
+      className="flex w-full min-w-0 items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-accent disabled:hover:bg-transparent"
+      disabled={job.url === ""}
+      onClick={() => openUrl(job.url)}
+      title={job.workflow === "" ? job.name : `${job.workflow} / ${job.name}`}
+    >
+      <Dot state={job.state} />
+      <span className="min-w-0 flex-1 truncate">{job.name}</span>
+      {job.workflow === "" ? null : <span className="max-w-[40%] truncate text-muted-foreground">{job.workflow}</span>}
+    </button>
+  );
+}
+
+function CiDot({ jobs }: { jobs: CheckJob[] }) {
+  const state = ciState(jobs);
+  if (state === null) return null;
+  const shown = jobs.filter((job) => job.state !== "skipped");
+  const skipped = jobs.length - shown.length;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex size-4 items-center justify-center rounded-full hover:bg-accent"
+          aria-label={CI_TITLE[state]}
+          title={CI_TITLE[state]}
+          onClick={stop}
+          onPointerDown={stop}
+        >
+          <Dot state={state} pulse={state === "pending"} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-1" onClick={stop} onPointerDown={stop}>
+        <div className="max-h-80 overflow-y-auto">
+          {shown.map((job) => (
+            <JobRow key={`${job.workflow}/${job.name}`} job={job} />
+          ))}
+        </div>
+        {skipped > 0 ? <p className="px-2 pb-1 pt-1.5 text-xs text-muted-foreground">{skipped} skipped</p> : null}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ReviewIcon({ pr }: { pr: PullRequestStatus }) {
+  const verdict = reviewVerdict(pr);
+  if (verdict === null) return null;
+  const approved = verdict === "approved";
+  const who = approved ? pr.approvedBy : pr.changesRequestedBy;
+  const title = `${approved ? "Approved" : "Changes requested"}${who.length > 0 ? ` by ${who.join(", ")}` : ""}`;
+  return (
+    <span title={title} aria-label={title} className="flex">
+      <BbIcon name={approved ? "Check" : "FileDiff"} className={cn("size-3.5", approved ? GREEN : RED)} />
+    </span>
+  );
+}
+
+function PullRequestRow({ link, pr }: { link: ThreadLink; pr: PullRequestStatus }) {
+  const openUrl = useOpenUrl();
+  const look = BADGE[badge(pr)];
+  return (
+    <div>
+      <ThreadContextCardRow
+        leading={
+          <span title={look.title} className="flex">
+            <BbIcon name={look.icon} className={cn("size-4", look.className)} />
+          </span>
+        }
+        label={`#${pr.number} ${pr.title}`}
+        trailing={
+          <span className="flex items-center gap-1.5">
+            <ReviewIcon pr={pr} />
+            <CiDot jobs={pr.jobs} />
+          </span>
+        }
+        title={`${link.label}: ${pr.head} → ${pr.base}`}
+        onClick={() => openUrl(link.url)}
+      />
+      <p className="pb-1 pl-6 text-xs text-muted-foreground">
+        <span className={GREEN}>+{pr.additions}</span> <span className={RED}>−{pr.deletions}</span>
+        {pr.changedFiles > 0 ? ` · ${pr.changedFiles} file${pr.changedFiles === 1 ? "" : "s"}` : null}
+      </p>
     </div>
   );
 }
 
-function LinkRow({ link }: { link: ThreadLink }) {
-  const navigate = useBbNavigate();
-  const status = useGithubStatus(link);
-  const open = () => {
-    if (!navigate.openUrl(link.url)) window.open(link.url, "_blank", "noopener");
-  };
-  if (status?.kind === "pull-request") {
-    const pr = status.pullRequest;
-    const chips = statusChips(pr);
-    const lead = headline(pr);
-    return (
-      <div>
-        <ThreadContextCardRow
-          icon={prIcon(status)}
-          label={`#${pr.number} ${pr.title}`}
-          trailing={<span className={cn("text-xs", TONE_CLASS[lead.tone])}>{lead.text}</span>}
-          title={`${link.label} · ${pr.head} → ${pr.base}\n${chipTitle(chips)}`}
-          onClick={open}
-        />
-        <Chips chips={chips} />
-      </div>
-    );
-  }
-  if (status?.kind === "issue") {
-    const { state, title } = status.issue;
-    const closed = state !== "open";
-    return (
-      <ThreadContextCardRow
-        icon={closed ? "CircleCheck" : "CircleDot"}
-        label={`#${link.github?.number} ${title}`}
-        trailing={
-          <span className={cn("text-xs", TONE_CLASS[closed ? "merged" : "success"])}>
-            {state === "open" ? "Open" : state === "not_planned" ? "Not planned" : "Closed"}
-          </span>
-        }
-        title={link.url}
-        onClick={open}
+function issueLeading(status: GithubStatus | undefined) {
+  if (status?.kind !== "issue") return undefined;
+  const open = status.issue.state === "open";
+  return (
+    <span title={open ? "Open" : status.issue.state === "not_planned" ? "Not planned" : "Closed"} className="flex">
+      <BbIcon
+        name={open ? "CircleDot" : "CircleCheck"}
+        className={cn("size-4", open ? GREEN : status.issue.state === "not_planned" ? "text-muted-foreground" : VIOLET)}
       />
-    );
-  }
+    </span>
+  );
+}
+
+function LinkRow({ link }: { link: ThreadLink }) {
+  const openUrl = useOpenUrl();
+  const status = useGithubStatus(link);
+  if (status?.kind === "pull-request") return <PullRequestRow link={link} pr={status.pullRequest} />;
+  const label = status?.kind === "issue" ? `#${link.github?.number} ${status.issue.title}` : link.label;
   return (
     <ThreadContextCardRow
       icon={KIND_ICON[link.kind]}
-      label={link.label}
-      trailing={
-        status?.kind === "unavailable" ? (
-          <span className="text-xs text-muted-foreground" title={status.message}>
-            No access
-          </span>
-        ) : link.kind === "web" ? undefined : (
-          <span className="text-xs text-muted-foreground">{link.host}</span>
-        )
-      }
-      title={link.url}
-      onClick={open}
+      leading={issueLeading(status)}
+      label={label}
+      title={status?.kind === "unavailable" ? `${link.url}\n${status.message}` : link.url}
+      onClick={() => openUrl(link.url)}
     />
   );
 }

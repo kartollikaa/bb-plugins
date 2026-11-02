@@ -11,10 +11,9 @@ link only shows up once someone writes it in a message.
 
 - Write full URLs (`https://github.com/<owner>/<repo>/pull/<n>`), not `#123` or a bare branch name.
   A markdown link's text becomes the row label for ordinary sites.
-- A GitHub PR row shows its title and most urgent status (conflicts, checks failed, changes
-  requested, checks running, draft, needs review, ready to merge, merged, closed), plus a line of
-  chips: approvals and change requests by reviewer, awaited reviewers, failed checks by name,
-  running checks, conflicts / behind / blocked, auto-merge, size. Issues show open or closed.
+- A GitHub PR row shows its state as a coloured icon (draft, open, conflicts, merged, closed), a
+  review icon (approved or changes requested), a CI dot (pulsing while jobs run; a click lists the
+  jobs) and its size on a second line. Issues show open or closed.
 - PR status comes from `gh` on the bb server, so it needs a `gh` login that can see the repo.
 
 From a shell:

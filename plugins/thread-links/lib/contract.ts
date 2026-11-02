@@ -20,18 +20,18 @@ const pullRequestSchema = z.object({
   review: z.enum(["approved", "changes_requested", "review_required", "none"]),
   approvedBy: z.array(z.string()),
   changesRequestedBy: z.array(z.string()),
-  awaitingReviewers: z.array(z.string()),
-  checks: z.object({
-    passed: z.number(),
-    failed: z.number(),
-    pending: z.number(),
-    skipped: z.number(),
-    failedNames: z.array(z.string()),
-  }),
-  merge: z.enum(["clean", "conflicts", "behind", "blocked", "unstable", "unknown"]).nullable(),
-  autoMerge: z.boolean(),
+  conflicts: z.boolean(),
+  jobs: z.array(
+    z.object({
+      name: z.string(),
+      workflow: z.string(),
+      state: z.enum(["passed", "failed", "pending", "skipped"]),
+      url: z.string(),
+    }),
+  ),
   additions: z.number(),
   deletions: z.number(),
+  changedFiles: z.number(),
   base: z.string(),
   head: z.string(),
 });

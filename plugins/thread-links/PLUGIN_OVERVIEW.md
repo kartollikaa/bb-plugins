@@ -4,8 +4,8 @@ See every link a thread talks about in its context card, with the live status of
 
 - A "Links" section listing the PRs, issues, Kaiten cards, Buildin pages, Figma files and other sites
   mentioned in the thread's messages, one row per page, PRs first.
-- For each GitHub PR: the most urgent status beside the title, and chips for review, reviewers,
-  checks (failed ones by name), conflicts, auto-merge and size.
+- For each GitHub PR: a coloured state icon, a review icon, a CI dot that pulses while jobs run and
+  lists them on click, and the size on a second line.
 - Clicking a row opens the link.
 - `bb thread-links list <thread-id> [--json]` for terminals and agents.
 

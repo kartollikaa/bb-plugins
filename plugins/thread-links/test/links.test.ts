@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { canonicalUrl, classify, collectLinks, extractUrls, sortLinks, trimUrl } from "../lib/links.ts";
-import { headline, parsePullRequest, statusChips, summarizeChecks } from "../lib/pull-request.ts";
+import { badge, checkJobs, ciState, parsePullRequest, reviewVerdict } from "../lib/pull-request.ts";
 import { ghConfigDirs, messageText } from "../server.ts";
 
 const PR = "https://github.com/dodobrands/drinkit-mobile-android/pull/6977";
@@ -96,16 +96,24 @@ const run = (name: string, status: string, conclusion: string, startedAt: string
   startedAt,
 });
 
-test("a rerun replaces the older attempt of the same check", () => {
-  const checks = summarizeChecks([
+test("a rerun replaces the older attempt, and failed jobs lead", () => {
+  const jobs = checkJobs([
     run("tests", "COMPLETED", "FAILURE", "2026-11-02T10:00:00Z"),
     run("tests", "COMPLETED", "SUCCESS", "2026-11-02T11:00:00Z"),
     run("lint", "IN_PROGRESS", "", "2026-11-02T11:00:00Z"),
     run("ui", "COMPLETED", "CANCELLED", "2026-11-02T11:00:00Z"),
     run("detect", "COMPLETED", "SKIPPED", "2026-11-02T11:00:00Z"),
-    { __typename: "StatusContext", context: "sonar", state: "SUCCESS", startedAt: "" },
+    { __typename: "StatusContext", context: "sonar", state: "SUCCESS", targetUrl: "https://sonar", startedAt: "" },
   ]);
-  assert.deepEqual(checks, { passed: 2, failed: 1, pending: 1, skipped: 1, failedNames: ["ui"] });
+  assert.deepEqual(
+    jobs.map((job) => `${job.state} ${job.name}`),
+    ["failed ui", "pending lint", "passed sonar", "passed tests", "skipped detect"],
+  );
+  assert.equal(jobs.find((job) => job.name === "sonar")!.url, "https://sonar");
+  assert.equal(ciState(jobs), "failed");
+  assert.equal(ciState(jobs.filter((job) => job.state !== "failed")), "pending");
+  assert.equal(ciState(jobs.filter((job) => job.state === "passed")), "passed");
+  assert.equal(ciState(jobs.filter((job) => job.state === "skipped")), null);
 });
 
 const raw = {
@@ -114,58 +122,41 @@ const raw = {
   url: PR,
   state: "OPEN",
   isDraft: false,
-  reviewDecision: "CHANGES_REQUESTED",
+  reviewDecision: "APPROVED",
   latestReviews: [
     { author: { login: "makzimi" }, state: "APPROVED" },
-    { author: { login: "dodo-mobile" }, state: "CHANGES_REQUESTED" },
+    { author: { login: "bot" }, state: "COMMENTED" },
   ],
-  reviewRequests: [{ login: "alice" }, { slug: "android-team" }],
   mergeable: "MERGEABLE",
   mergeStateStatus: "BLOCKED",
-  autoMergeRequest: { enabledAt: "2026-11-02T11:00:00Z" },
-  statusCheckRollup: [run("tests", "COMPLETED", "FAILURE", "2026-11-02T11:00:00Z")],
+  statusCheckRollup: [],
   additions: 116,
-  deletions: 20,
+  deletions: 13,
+  changedFiles: 4,
   baseRefName: "develop",
   headRefName: "feature/x",
 };
 
-test("every status a person acts on becomes a chip, in reading order", () => {
-  const pr = parsePullRequest(raw);
-  assert.deepEqual(
-    statusChips(pr).map((chip) => chip.detail ? `${chip.text}: ${chip.detail}` : chip.text),
-    [
-      "Open",
-      "Changes requested: dodo-mobile",
-      "Approved: makzimi",
-      "Awaiting review: alice, android-team",
-      "1 check failed: tests",
-      "Merge blocked",
-      "Auto-merge on",
-      "+116 −20",
-    ],
-  );
-  assert.equal(headline(pr).text, "Checks failed");
+test("the badge tells draft, open, conflicts, merged and closed apart", () => {
+  assert.equal(badge(parsePullRequest(raw)), "open");
+  assert.equal(badge(parsePullRequest({ ...raw, isDraft: true })), "draft");
+  assert.equal(badge(parsePullRequest({ ...raw, mergeable: "CONFLICTING" })), "conflicts");
+  assert.equal(badge(parsePullRequest({ ...raw, isDraft: true, mergeStateStatus: "DIRTY" })), "conflicts");
+  assert.equal(badge(parsePullRequest({ ...raw, state: "MERGED", mergeable: "CONFLICTING" })), "merged");
+  assert.equal(badge(parsePullRequest({ ...raw, state: "CLOSED" })), "closed");
 });
 
-test("the headline names what the PR waits on most urgently", () => {
-  const conflicted = parsePullRequest({ ...raw, mergeable: "CONFLICTING" });
-  assert.equal(headline(conflicted).text, "Conflicts");
-  const merged = parsePullRequest({ ...raw, state: "MERGED" });
-  assert.equal(headline(merged).text, "Merged");
-  assert.equal(merged.merge, null);
-  assert.deepEqual(statusChips(merged).map((chip) => chip.text), ["Merged", "1 check failed", "+116 −20"]);
-  const ready = parsePullRequest({
+test("a change request outweighs approvals, and finished PRs show no verdict", () => {
+  const approved = parsePullRequest(raw);
+  assert.equal(reviewVerdict(approved), "approved");
+  assert.deepEqual(approved.approvedBy, ["makzimi"]);
+  const disputed = parsePullRequest({
     ...raw,
-    reviewDecision: "APPROVED",
-    latestReviews: [],
-    reviewRequests: [],
-    mergeStateStatus: "CLEAN",
-    autoMergeRequest: null,
-    statusCheckRollup: [],
+    reviewDecision: "CHANGES_REQUESTED",
+    latestReviews: [...raw.latestReviews, { author: { login: "alice" }, state: "CHANGES_REQUESTED" }],
   });
-  assert.equal(headline(ready).text, "Ready to merge");
-  const draft = parsePullRequest({ ...raw, isDraft: true, statusCheckRollup: [], reviewDecision: "", latestReviews: [] });
-  assert.equal(draft.state, "draft");
-  assert.equal(headline(draft).text, "Draft");
+  assert.equal(reviewVerdict(disputed), "changes_requested");
+  assert.deepEqual(disputed.changesRequestedBy, ["alice"]);
+  assert.equal(reviewVerdict(parsePullRequest({ ...raw, reviewDecision: "REVIEW_REQUIRED", latestReviews: [] })), null);
+  assert.equal(reviewVerdict(parsePullRequest({ ...raw, state: "MERGED" })), null);
 });

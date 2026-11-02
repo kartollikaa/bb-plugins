@@ -5,11 +5,17 @@ page, Figma file and other site the thread's prompts and agent replies mention, 
 Pull requests come first, then trackers and docs; inside a kind the latest mention leads. Eight rows
 show, the rest sit behind "N more".
 
-A GitHub pull request row shows its title and the one status it waits on most (conflicts, checks
-failed, changes requested, checks running, draft, behind base, needs review, auto-merge on, ready to
-merge, merged, closed). A line of chips under it lists the rest: state, approvals and change requests
-by reviewer, awaited reviewers, failed checks by name, running checks, mergeability, auto-merge and
-size. The tooltip has the branches. Open pull requests refresh every minute while the card is shown.
+A GitHub pull request row is one line plus a size line under it:
+
+- the leading icon is the PR's state in colour: draft (grey), open (green), open with conflicts
+  (red), merged (violet), closed (red);
+- after the title, a check (approved) or a diff icon (changes requested), with the reviewers in its
+  tooltip;
+- a CI dot: green passed, red failed, amber and pulsing while jobs run. Clicking it opens a popup
+  with every job, failed first; a job opens its run;
+- the line under it: `+additions −deletions · N files`.
+
+Open pull requests refresh every minute while the card is shown.
 
 `bb thread-links list <thread-id> [--json]` prints the same list.
 

@@ -58,10 +58,9 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 - **What:** a "Links" section in the thread context card listing every URL the thread's prompts and
   agent replies mention (tool output is skipped), one row per page: PRs first, then issues, Kaiten,
-  Buildin, Figma, commits, repos and other sites, latest mention first. A GitHub PR row shows its
-  title, the most urgent status beside it, and a chip line under it: state, approvals and change
-  requests by reviewer, awaited reviewers, failed checks by name, running checks, conflicts / behind
-  / blocked / ready to merge, auto-merge, size. CLI: `bb thread-links list <thread-id> [--json]`.
+  Buildin, Figma, commits, repos and other sites, latest mention first. A GitHub PR row: a state icon in colour (draft, open, conflicts, merged, closed),
+  a review icon (approved / changes requested), a CI dot that pulses while jobs run and opens a popup
+  of jobs on click, and `+added −removed · N files` on the line under it. CLI: `bb thread-links list <thread-id> [--json]`.
 - **How:** the server reads `client/turn/requested` and `item/completed` events with
   `bb.sdk.threads.events.list`, incrementally per thread, and invalidates the `links:<thread>` RPC
   tag on `experimental_thread.events`. PR and issue status comes from `gh pr view` / `gh issue view`
