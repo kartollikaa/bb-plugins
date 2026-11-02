@@ -25,6 +25,10 @@ can find it by the error text.
 - **bb's own composer has no submit hook**: a customization can't add hidden input to what it
   sends. To send `agent-only` context with a new thread, render `NewThreadComposer` in your own
   page and call `threads.spawn` from its `onSubmit`.
+- **GitHub attachment images** (`github.com/user-attachments/assets/<id>`) don't load outside a
+  signed-in github.com session. The REST API's `body_html` (`Accept:
+  application/vnd.github.full+json`) has `private-user-images.githubusercontent.com` URLs signed for
+  five minutes; github-folder redirects to them from a plugin route instead of embedding them.
 
 ## Tooling
 

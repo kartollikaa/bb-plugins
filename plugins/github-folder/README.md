@@ -26,6 +26,9 @@ bb plugin dev
   The card draws at once from the folder data, the description arrives from `prContext`, and the
   composer is bb's `NewThreadComposer`; on submit the plugin spawns the thread with the context
   as an `agent-only` input. A row hover warms the cache.
+- `GET /pr-image?pr=<url>&asset=<id>` (plugin HTTP route): images attached to a PR live at
+  `github.com/user-attachments/assets/<id>` and need a GitHub session, so the card points at this
+  route, which redirects to the short-lived signed URL from the PR's rendered `body_html`.
 - `lib/contract.ts`: the RPC contract. `folder` is the view both sidebars draw; `updateSettings`,
   `snooze` and `refresh` change it and invalidate the `folder` tag. `prContext` returns a PR's
   details and agent context; `prProject` the matching bb project.
