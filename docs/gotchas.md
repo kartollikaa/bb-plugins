@@ -18,6 +18,13 @@ can find it by the error text.
 - **Overlays anchored to chat elements** lose their position when the chat auto-scrolls. Render
   inline through a slot instead of positioning over the transcript. Dmitrii also found the hover
   button "not neat", and the inline card replaced it.
+- **Another plugin's nav panel can't be opened with `toPluginPanel`**: it only reaches the calling
+  plugin's panels, and `useSidebarNavigation().activate` takes no subPath. thread-tree opens
+  github-folder's PR page with `history.pushState` plus a `popstate` event; bb's router follows it.
+  If that row stops navigating after a bb upgrade, check this first.
+- **bb's own composer has no submit hook**: a customization can't add hidden input to what it
+  sends. To send `agent-only` context with a new thread, render `NewThreadComposer` in your own
+  page and call `threads.spawn` from its `onSubmit`.
 
 ## Tooling
 
