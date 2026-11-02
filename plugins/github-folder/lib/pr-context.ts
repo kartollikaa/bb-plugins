@@ -208,10 +208,10 @@ export function prUrlFromSubPath(subPath: string): string | null {
 
 const PR_CACHE_MS = 120_000;
 
-/** `viewPr` with one read in flight per PR and answers reused for two minutes, so a hover can warm it. */
-export function createPrReader(read: (url: string) => Promise<PrDetails>) {
-  const cache = new Map<string, { at: number; value: Promise<PrDetails> }>();
-  return (url: string): Promise<PrDetails> => {
+/** One read in flight per PR, answers reused for two minutes: a hover warms it, and signed image URLs (five minutes) stay valid. */
+export function createPrReader<T>(read: (url: string) => Promise<T>) {
+  const cache = new Map<string, { at: number; value: Promise<T> }>();
+  return (url: string): Promise<T> => {
     const hit = cache.get(url);
     if (hit && Date.now() - hit.at < PR_CACHE_MS) return hit.value;
     for (const [key, entry] of cache) if (Date.now() - entry.at >= PR_CACHE_MS) cache.delete(key);
@@ -222,4 +222,37 @@ export function createPrReader(read: (url: string) => Promise<PrDetails>) {
     });
     return value;
   };
+}
+
+const ASSET_URL = /^https:\/\/github\.com\/user-attachments\/assets\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+export const ASSET_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** Asset id → signed image URL, from the `body_html` GitHub renders for a PR. */
+export function signedImages(html: string): Record<string, string> {
+  const images: Record<string, string> = {};
+  for (const match of html.matchAll(/<img\s[^>]*?src="(https:\/\/private-user-images\.githubusercontent\.com\/[^"]+)"/g)) {
+    const url = match[1]!.replace(/&amp;/g, "&");
+    const id = /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.[a-z0-9]+\?/i.exec(url)?.[1];
+    if (id) images[id.toLowerCase()] = url;
+  }
+  return images;
+}
+
+/**
+ * The description as the card renders it: HTML `<img>` tags become Markdown images, and images
+ * hosted on `github.com/user-attachments`, which need a GitHub session, go through `proxy`.
+ */
+export function displayDescription(body: string, proxy: (assetId: string) => string): string {
+  const viaProxy = (url: string) => {
+    const id = ASSET_URL.exec(url)?.[1];
+    return id ? proxy(id) : url;
+  };
+  return cleanDescription(body)
+    .replace(/<img\s[^>]*>/gi, (tag) => {
+      const src = /\ssrc\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+      if (!src) return "";
+      const alt = /\salt\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] ?? "";
+      return `![${alt.replace(/[[\]]/g, "")}](${viaProxy(src)})`;
+    })
+    .replace(/(!\[[^\]]*\]\()([^)\s]+)/g, (_, prefix: string, url: string) => `${prefix}${viaProxy(url)}`);
 }

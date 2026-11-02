@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Markdown,
   experimental_NewThreadComposer as NewThreadComposer,
+  experimental_usePluginId as usePluginId,
   experimental_useRpcQuery as useRpcQuery,
   useBbNavigate,
   useRpc,
@@ -14,7 +15,7 @@ import { rpcContract } from "@/lib/contract";
 import type { GithubPr } from "@/lib/github";
 import {
   PR_PANEL_PATH,
-  cleanDescription,
+  displayDescription,
   detailParts,
   parsePrUrl,
   prSubPath,
@@ -103,7 +104,13 @@ function PrCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const target = parsePrUrl(url)!;
   const status = details ? statusParts(details) : summary ? summaryStatus(summary) : [];
-  const description = details ? cleanDescription(details.body) : "";
+  const pluginId = usePluginId();
+  const description = details
+    ? displayDescription(
+        details.body,
+        (asset) => `/api/v1/plugins/${encodeURIComponent(pluginId)}/http/pr-image?pr=${encodeURIComponent(url)}&asset=${asset}`,
+      )
+    : "";
   return (
     <section aria-label="Pull request context" className="rounded-lg border border-border bg-card text-card-foreground">
       <div className="flex items-start gap-2 px-3 pt-2.5">

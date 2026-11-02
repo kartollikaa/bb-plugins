@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { GITHUB_QUERY, mergeAccounts, parseSearch, type GithubPr } from "./github";
-import { PR_VIEW_FIELDS, parsePrView, type PrDetails } from "./pr-context";
+import { PR_VIEW_FIELDS, parsePrUrl, parsePrView, signedImages, type PrDetails } from "./pr-context";
 
 const GH_TIMEOUT_MS = 20_000;
 const CACHE_MS = 60_000;
@@ -84,6 +84,22 @@ export function createGithubFolder() {
       return value;
     },
   };
+}
+
+/** Asset id → signed URL of the images in a PR's description; GitHub signs them for five minutes. */
+export async function viewPrImages(url: string): Promise<Record<string, string>> {
+  const target = parsePrUrl(url);
+  if (target === null) return {};
+  let lastError: unknown = new Error("gh is not signed in");
+  for (const dir of ghConfigDirs()) {
+    try {
+      const path = `repos/${target.repo}/pulls/${target.number}`;
+      return signedImages(await runGh(["api", path, "-H", "Accept: application/vnd.github.full+json", "-q", ".body_html"], dir));
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
 }
 
 /** One PR's details, read with the first gh login that can see it. */

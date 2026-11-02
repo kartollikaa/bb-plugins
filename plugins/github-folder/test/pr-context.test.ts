@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   agentContext,
   createPrReader,
+  displayDescription,
+  signedImages,
   detailParts,
   githubRepoOfRemote,
   parsePrUrl,
@@ -131,4 +133,35 @@ test("projectForRepo picks the single matching project", () => {
   assert.equal(projectForRepo(projects, "Acme/App"), "p1");
   assert.equal(projectForRepo(projects, "acme/none"), null);
   assert.equal(projectForRepo([...projects, { id: "p4", gitRemoteUrl: "https://github.com/acme/app" }], "acme/app"), null);
+});
+
+const ASSET = "c8c10762-e522-4843-9e3d-94cd3a0d2f35";
+
+test("signedImages maps each attachment to its signed URL", () => {
+  const html = `<p><a href="x"><img src="https://private-user-images.githubusercontent.com/1/690198539-${ASSET}.png?jwt=abc&amp;b=1" alt="a"></a>
+<img src="https://example.com/x.png">`;
+  assert.deepEqual(signedImages(html), {
+    [ASSET]: `https://private-user-images.githubusercontent.com/1/690198539-${ASSET}.png?jwt=abc&b=1`,
+  });
+  assert.deepEqual(signedImages("<p>no images</p>"), {});
+});
+
+test("displayDescription proxies attachment images and turns <img> tags into Markdown", () => {
+  const proxy = (id: string) => `/proxy/${id}`;
+  const asset = `https://github.com/user-attachments/assets/${ASSET}`;
+  const body = [
+    `| A | B |`,
+    `| ![Light](${asset}) | <img width="300" alt="Dark [x]" src="${asset}" /> |`,
+    `![public](https://example.com/a.png)`,
+    asset,
+    `<img src='https://example.com/b.png'>`,
+    `<img alt="no src">`,
+  ].join("\n");
+  const out = displayDescription(body, proxy);
+  assert.match(out, new RegExp(`!\\[Light\\]\\(/proxy/${ASSET}\\)`));
+  assert.match(out, new RegExp(`!\\[Dark x\\]\\(/proxy/${ASSET}\\)`));
+  assert.match(out, /!\[public\]\(https:\/\/example\.com\/a\.png\)/);
+  assert.match(out, new RegExp(`\\n${asset}\\n`), "a bare video link stays a link");
+  assert.match(out, /!\[\]\(https:\/\/example\.com\/b\.png\)/);
+  assert.doesNotMatch(out, /<img/);
 });

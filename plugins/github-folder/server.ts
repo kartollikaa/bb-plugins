@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { FOLDER_TAG, rpcContract, type FolderView } from "./lib/contract";
-import { createGithubFolder, viewPr, type GithubSnapshot } from "./lib/gh";
-import { agentContext, createPrReader, parsePrUrl, projectForRepo } from "./lib/pr-context";
+import { createGithubFolder, viewPr, viewPrImages, type GithubSnapshot } from "./lib/gh";
+import { ASSET_ID, agentContext, createPrReader, parsePrUrl, projectForRepo } from "./lib/pr-context";
 import {
   ATTENTION_LABEL,
   applyPatch,
@@ -28,6 +28,16 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 export default async function plugin(bb: BbPluginApi) {
   const github = createGithubFolder();
   const readPr = createPrReader(viewPr);
+  const readPrImages = createPrReader(viewPrImages);
+
+  bb.http.route("GET", "/pr-image", async (context) => {
+    const pr = context.req.query("pr") ?? "";
+    const asset = (context.req.query("asset") ?? "").toLowerCase();
+    if (parsePrUrl(pr) === null || !ASSET_ID.test(asset)) return context.text("Bad request", 400);
+    const signed = (await readPrImages(pr).catch(() => ({}) as Record<string, string>))[asset];
+    context.header("Cache-Control", "no-store");
+    return context.redirect(signed ?? `https://github.com/user-attachments/assets/${asset}`, 302);
+  });
   let snapshot: GithubSnapshot | null = null;
 
   const loadSettings = async () => readSettings(await bb.storage.kv.get(SETTINGS_KEY));
