@@ -9,6 +9,9 @@
       "id": "inline-terminal",
       "displayName": "Inline Terminal",
       "description": "Adds a Run button to shell code blocks in agent replies, opens an interactive terminal under the block, and sends the result back to the chat.",
+      "icon": {
+        "url": "./icons/inline-terminal.svg"
+      },
       "tags": [
         "terminal",
         "shell",
@@ -31,6 +34,9 @@
       "id": "thread-tree",
       "displayName": "Thread Tree",
       "description": "A sidebar thread list that shows automations, recent activity and archived threads, nests child threads under their parent and shows each thread's provider subagents as a counter with a status dot.",
+      "icon": {
+        "url": "./icons/thread-tree.svg"
+      },
       "tags": [
         "sidebar",
         "threads",
@@ -53,6 +59,9 @@
       "id": "reveal-in-finder",
       "displayName": "Reveal In Finder",
       "description": "Shows files an agent hands over as cards in chat, with Open in Finder, the default app or bb's preview.",
+      "icon": {
+        "url": "./icons/reveal-in-finder.svg"
+      },
       "tags": [
         "files",
         "finder",

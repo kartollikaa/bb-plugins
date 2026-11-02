@@ -21,13 +21,14 @@ subfolder, so nothing at the root may become a dependency of a plugin.
 ```
 .bb/plugins.json   index: plugin name → ./plugins/<id>   (bb install --plugin <id>)
 marketplace.json   catalog for bb's store: one entry per plugin, git source + tag range
+icons/<id>.svg     each plugin's store icon (required by the catalog)
 plugins/<id>/      one plugin
 docs/              these guides
 test-all.sh        every plugin's tests
 ```
 
 A new or renamed plugin goes into all three: `plugins/`, `.bb/plugins.json` and
-`marketplace.json`, plus the table in `README.md` and `docs/plugins.md`.
+`marketplace.json` with an icon in `icons/`, plus the table in `README.md` and `docs/plugins.md`.
 
 ## Rules
 

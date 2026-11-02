@@ -59,7 +59,7 @@ absolute path; after a move, install the new path. That keeps the plugin id. Che
 cd ~/Projects/bb/plugins && bb plugin new <id> && mv bb-plugin-<id> <id>
 ```
 
-Then add it to `.bb/plugins.json`, `marketplace.json`, the table in `README.md` and
+Then add it to `.bb/plugins.json`, `marketplace.json` (with `icons/<id>.svg`; bb rejects an entry without an icon), the table in `README.md` and
 `docs/plugins.md`, and install it with `--plugin <id>`.
 
 ## Splitting a plugin out
