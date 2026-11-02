@@ -1,0 +1,75 @@
+{
+  "$schema": "https://getbb.app/schemas/marketplace.schema.json",
+  "schemaVersion": 1,
+  "name": "kartollikaa",
+  "displayName": "kartollikaa's bb plugins",
+  "description": "Plugins Dmitrii Maksimov builds for bb.",
+  "plugins": [
+    {
+      "id": "inline-terminal",
+      "displayName": "Inline Terminal",
+      "description": "Adds a Run button to shell code blocks in agent replies, opens an interactive terminal under the block, and sends the result back to the chat.",
+      "tags": [
+        "terminal",
+        "shell",
+        "chat"
+      ],
+      "author": {
+        "name": "Dmitrii Maksimov",
+        "github": "kartollikaa"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/kartollikaa/bb-plugins.git",
+          "subdir": "plugins/inline-terminal",
+          "range": "^0.1.0",
+          "tagPrefix": "inline-terminal/"
+        }
+      }
+    },
+    {
+      "id": "thread-tree",
+      "displayName": "Thread Tree",
+      "description": "A sidebar thread list that shows automations, recent activity and archived threads, nests child threads under their parent and shows each thread's provider subagents as a counter with a status dot.",
+      "tags": [
+        "sidebar",
+        "threads",
+        "subagents"
+      ],
+      "author": {
+        "name": "Dmitrii Maksimov",
+        "github": "kartollikaa"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/kartollikaa/bb-plugins.git",
+          "subdir": "plugins/thread-tree",
+          "range": "^0.1.0",
+          "tagPrefix": "thread-tree/"
+        }
+      }
+    },
+    {
+      "id": "reveal-in-finder",
+      "displayName": "Reveal In Finder",
+      "description": "Shows files an agent hands over as cards in chat, with Open in Finder, the default app or bb's preview.",
+      "tags": [
+        "files",
+        "finder",
+        "chat"
+      ],
+      "author": {
+        "name": "Dmitrii Maksimov",
+        "github": "kartollikaa"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/kartollikaa/bb-plugins.git",
+          "subdir": "plugins/reveal-in-finder",
+          "range": "^0.1.0",
+          "tagPrefix": "reveal-in-finder/"
+        }
+      }
+    }
+  ]
+}

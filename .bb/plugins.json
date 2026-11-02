@@ -1,0 +1,10 @@
+{
+  "$schema": "https://getbb.app/schemas/plugins.schema.json",
+  "schemaVersion": 1,
+  "name": "kartollikaa-bb-plugins",
+  "plugins": [
+    { "name": "inline-terminal", "source": "./plugins/inline-terminal" },
+    { "name": "thread-tree", "source": "./plugins/thread-tree" },
+    { "name": "reveal-in-finder", "source": "./plugins/reveal-in-finder" }
+  ]
+}
