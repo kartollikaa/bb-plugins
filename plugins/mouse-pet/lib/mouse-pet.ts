@@ -4,6 +4,11 @@ const ROOT_ATTR = "data-mouse-pet";
 const SQUEAK_MS = 700;
 const HOP_MS = 420;
 
+const FUR = "#c9c9d6";
+const FUR_FAR = "#a3a3b3";
+const PINK = "#f3a2b6";
+const INK = "#2b2b36";
+
 const STYLE = `
 [${ROOT_ATTR}] {
   position: fixed; left: 0; right: 0; bottom: 0; height: 40px; z-index: 40;
@@ -34,10 +39,10 @@ const STYLE = `
 [${ROOT_ATTR}] [data-mode="run"] .mp-tail { animation-duration: .25s; }
 [${ROOT_ATTR}] [data-mode="walk"] .mp-tail { animation-duration: .8s; }
 
-[${ROOT_ATTR}] [data-mode="groom"] .mp-paw { animation: mp-wash .3s ease-in-out infinite alternate; animation-play-state: running; }
+[${ROOT_ATTR}] [data-mode="groom"] .mp-paw { stroke: ${FUR_FAR}; animation: mp-wash .3s ease-in-out infinite alternate; animation-play-state: running; }
 [${ROOT_ATTR}] [data-mode="groom"] .mp-tail, [${ROOT_ATTR}] [data-mode="sit"] .mp-tail { animation-duration: 2.4s; }
 
-[${ROOT_ATTR}] [data-mode="sleep"] .mp-legs, [${ROOT_ATTR}] [data-mode="sleep"] .mp-eye { display: none; }
+[${ROOT_ATTR}] [data-mode="sleep"] .mp-legs, [${ROOT_ATTR}] [data-mode="sleep"] .mp-paw, [${ROOT_ATTR}] [data-mode="sleep"] .mp-eye { display: none; }
 [${ROOT_ATTR}] [data-mode="sleep"] .mp-eye-closed { display: inline; }
 [${ROOT_ATTR}] [data-mode="sleep"] .mp-figure { transform: translateY(3px) scaleY(.88); }
 [${ROOT_ATTR}] [data-mode="sleep"] .mp-tail { animation-duration: 3.6s; }
@@ -68,11 +73,6 @@ const STYLE = `
 }
 `;
 
-const FUR = "#c9c9d6";
-const FUR_FAR = "#a3a3b3";
-const PINK = "#f3a2b6";
-const INK = "#2b2b36";
-
 const SPRITE = `
 <svg viewBox="0 0 48 29" aria-hidden="true" focusable="false">
   <g class="mp-tail"><path d="M12 19C5 20 2 14 6 9" fill="none" stroke="${PINK}" stroke-width="1.8" stroke-linecap="round"/></g>
@@ -81,12 +81,12 @@ const SPRITE = `
       <path class="mp-leg" data-phase="a" d="M16 21v6.5" stroke="${FUR_FAR}" style="transform-origin:16px 21px"/>
       <path class="mp-leg" data-phase="b" d="M31 21v6.5" stroke="${FUR_FAR}" style="transform-origin:31px 21px"/>
       <path class="mp-leg" data-phase="b" d="M20 21v6.5" stroke="${FUR}" style="transform-origin:20px 21px"/>
-      <path class="mp-leg mp-paw" data-phase="a" d="M35 21v6.5" stroke="${FUR}" style="transform-origin:35px 21px"/>
     </g>
     <ellipse cx="23" cy="17" rx="14.5" ry="7.5" fill="${FUR}"/>
     <ellipse cx="38" cy="16" rx="7.5" ry="5.4" fill="${FUR}"/>
     <circle cx="33.5" cy="9.6" r="4.3" fill="${FUR}"/>
     <circle cx="33.5" cy="9.6" r="2.6" fill="${PINK}"/>
+    <path class="mp-leg mp-paw" data-phase="a" d="M35 21v6.5" stroke="${FUR}" stroke-width="2.6" stroke-linecap="round" style="transform-origin:35px 21px"/>
     <circle cx="45" cy="17" r="1.6" fill="${PINK}"/>
     <g stroke="${FUR_FAR}" stroke-width=".6" stroke-linecap="round">
       <path d="M42 18.4 47.5 17.2M42 19.2 47.5 20.6"/>
