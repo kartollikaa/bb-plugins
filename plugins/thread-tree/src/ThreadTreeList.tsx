@@ -82,7 +82,7 @@ const STATUS_GROUP_TITLE: Record<string, string> = {
   done: "Done",
 };
 
-export function SubagentTreeList({ activeThreadId, isCompactViewport, onNavigate }: PluginThreadListProps) {
+export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }: PluginThreadListProps) {
   const { status, threads, projects } = useSidebarThreads();
   const navigate = useBbNavigate();
   const collapsedThreads = usePersistentSet("collapsed-threads");

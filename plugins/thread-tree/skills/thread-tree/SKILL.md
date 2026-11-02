@@ -1,18 +1,18 @@
 ---
-name: subagent-tree
-description: List the provider subagents (Claude Code Agent calls, Codex subagents) a bb thread has run, with their state, using `bb subagent-tree list`.
+name: thread-tree
+description: List the provider subagents (Claude Code Agent calls, Codex subagents) a bb thread has run, with their state, using `bb thread-tree list`.
 ---
 
-# Subagent Tree
+# Thread Tree
 
-The Subagent Tree plugin replaces the sidebar thread list. Child threads nest
+The Thread Tree plugin replaces the sidebar thread list. Child threads nest
 under the thread that spawned them; provider subagents, which are not threads
 and cannot be messaged, show as a counter with a status dot on the parent's row.
 
 ## Command
 
 ```sh
-bb subagent-tree list [thread-id] [--json]
+bb thread-tree list [thread-id] [--json]
 ```
 
 Without a thread id it reads the thread the command runs in. Text output is one

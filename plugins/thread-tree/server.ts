@@ -1,4 +1,4 @@
-// bb-plugin-subagent-tree backend: folds each thread's provider delegations
+// bb-plugin-thread-tree backend: folds each thread's provider delegations
 // (Claude Code `Agent` calls, Codex subagents) into a per-thread subagent list
 // that the sidebar draws as a counter and a status dot.
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
@@ -90,13 +90,13 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.deleted", ({ thread }) => folder.forget(thread.id));
 
   bb.cli.register({
-    name: "subagent-tree",
+    name: "thread-tree",
     summary: "List the provider subagents a thread has run",
     commands: [
       {
         name: "list",
         summary: "List a thread's subagents, newest first",
-        usage: "bb subagent-tree list [thread-id] [--json]",
+        usage: "bb thread-tree list [thread-id] [--json]",
       },
     ],
     async run(argv, ctx) {
@@ -105,7 +105,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (command !== "list") {
         return {
           exitCode: command === undefined || command === "help" || command === "--help" ? 0 : 1,
-          stdout: "Usage: bb subagent-tree list [thread-id] [--json]",
+          stdout: "Usage: bb thread-tree list [thread-id] [--json]",
         };
       }
       const threadId = threadArg ?? ctx.threadId;

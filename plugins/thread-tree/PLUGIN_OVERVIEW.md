@@ -30,7 +30,7 @@ under it, and the subagents it runs inside its own session show on its row.
   turn failed (an app exit, a daemon disconnect) is red and gets a Retry button.
 - Dot colors: blue (pulsing) running, green done, yellow needs your input, red
   error, gray stopped.
-- `bb subagent-tree list` prints the same list from a terminal.
+- `bb thread-tree list` prints the same list from a terminal.
 
 ## How it works
 

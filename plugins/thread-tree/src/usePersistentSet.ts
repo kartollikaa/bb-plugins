@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 
-const PREFIX = "bb-plugin-subagent-tree:";
+const PREFIX = "bb-plugin-thread-tree:";
 
 function read(key: string): Set<string> {
   try {

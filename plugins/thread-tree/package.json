@@ -1,5 +1,5 @@
 {
-  "name": "bb-plugin-subagent-tree",
+  "name": "bb-plugin-thread-tree",
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
@@ -8,8 +8,8 @@
     "bbPluginSdk": ">=0.6.104"
   },
   "bb": {
-    "name": "Subagent Tree",
-    "description": "A sidebar thread list that nests child threads under their parent and shows each thread's provider subagents as a counter with a status dot.",
+    "name": "Thread Tree",
+    "description": "A sidebar thread list that shows automations, recent activity and archived threads, nests child threads under their parent and shows each thread's provider subagents as a counter with a status dot.",
     "branding": {
       "icon": "Network"
     },
