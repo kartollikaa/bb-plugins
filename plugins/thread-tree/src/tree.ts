@@ -86,9 +86,10 @@ const byPinOrder = (a: TreeThread, b: TreeThread) =>
 /**
  * Cycle-safe forest. A pinned thread detaches to the Pinned group with its
  * subtree; a parent cycle is broken by drawing its newest member as a root.
+ * Takes one lifecycle at a time: archived threads form their own forest.
  */
 export function buildForest<T extends TreeThread>(threads: readonly T[]): Forest<T> {
-  const visible = threads.filter((thread) => !thread.isHidden && !thread.isArchived);
+  const visible = threads.filter((thread) => !thread.isHidden);
   const byId = new Map(visible.map((thread) => [thread.id, thread]));
   const buckets = new Map<string, T[]>();
   const candidateRoots: T[] = [];

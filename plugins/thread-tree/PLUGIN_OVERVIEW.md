@@ -15,6 +15,10 @@ under it, and the subagents it runs inside its own session show on its row.
   subtree), or None, with Pinned on top. Pick it from the Group by menu.
   Projects keep a fixed order you set by dragging their headers, or follow
   recent activity (Project order in the same menu).
+- The Archived toggle next to Group by switches Threads to archived threads,
+  in the same grouping and nesting; Show more loads older pages. Hovering an
+  archived row offers bb's own Unarchive. Automations and Recent Activity stay
+  on active threads.
 - Each child thread sits under the thread that spawned it, at any depth, even
   when it lives in another project. Collapse a parent to fold its subtree; the
   dot on the fold shows the most urgent state inside it.
@@ -36,5 +40,5 @@ under it, and the subagents it runs inside its own session show on its row.
 
 The list reads bb's own thread data. Subagents come from each thread's event
 log, read incrementally on the bb server; nothing leaves the machine. Collapse
-state, grouping, project order, and the Recent Activity length are kept per
+state, grouping, project order, the Archived toggle, and the Recent Activity length are kept per
 client.

@@ -70,6 +70,14 @@ const GROUP_MODES: readonly { id: GroupMode; label: string; icon: React.ReactNod
 
 type ProjectOrderMode = "fixed" | "activity";
 
+type Lifecycle = "active" | "archived";
+
+/** Stable options objects, so the host query is not re-subscribed on every render. */
+const LIFECYCLE_QUERY: Record<Lifecycle, { experimental_lifecycles: readonly Lifecycle[] }> = {
+  active: { experimental_lifecycles: ["active"] },
+  archived: { experimental_lifecycles: ["archived"] },
+};
+
 const PROJECT_ORDER_MODES: readonly { id: ProjectOrderMode; label: string; icon: string }[] = [
   { id: "fixed", label: "Fixed", icon: "Pin" },
   { id: "activity", label: "Recent activity", icon: "Clock" },
@@ -95,10 +103,15 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     "fixed",
   );
   const [savedProjectOrder, setSavedProjectOrder] = usePersistentList("project-order");
+  const [lifecycle, setLifecycle] = usePersistentChoice<Lifecycle>("lifecycle", ["active", "archived"], "active");
+  const listed = useSidebarThreads(LIFECYCLE_QUERY[lifecycle]);
+  const showArchived = lifecycle === "archived";
+  const archivedPages = showArchived ? listed.experimental_archived : null;
+  const treeThreads = showArchived ? listed.threads : threads;
   const [drag, setDrag] = useState<{ projectId: string; overId: string | null } | null>(null);
   const now = useNow(30_000);
 
-  const forest = useMemo(() => buildForest(threads), [threads]);
+  const forest = useMemo(() => buildForest(treeThreads), [treeThreads]);
 
   // Opening a nested thread from anywhere reveals it in the tree.
   useEffect(() => {
@@ -147,9 +160,16 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   if (status === "error" && threads.length === 0) {
     return <div className="px-3 py-2 text-xs text-destructive">Threads failed to load.</div>;
   }
-  if (groups.length === 0) {
-    return <div className="px-3 py-2 text-xs text-muted-foreground">No threads yet.</div>;
-  }
+  const treePlaceholder =
+    groups.length > 0
+      ? null
+      : !showArchived
+        ? "No threads yet."
+        : archivedPages?.status === "error"
+          ? "Archived threads failed to load."
+          : archivedPages?.status === "ready"
+            ? "No archived threads."
+            : "Loading archived threads…";
 
   const renderRow = (row: TreeRow<PluginSidebarThread>, variant: "tree" | "recent") => (
     <ThreadRowView
@@ -194,7 +214,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                   thread,
                   depth: 0,
                   descendantCount: 0,
-                  hasChildren: (forest.children.get(thread.id)?.length ?? 0) > 0,
+                  hasChildren: false,
                   isExpanded: false,
                   hiddenState: null,
                   guides: [],
@@ -218,16 +238,33 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       <div className="mx-1.5 border-t border-sidebar-border" />
 
       <div className="-mb-1 flex h-6 items-center justify-between px-1.5">
-        <span className="text-xs font-medium text-sidebar-foreground/45">Threads</span>
-        <GroupByMenu
-          mode={groupMode}
-          onChange={setGroupMode}
-          projectOrderMode={projectOrderMode}
-          onProjectOrderChange={setProjectOrderMode}
-        />
+        <span className="text-xs font-medium text-sidebar-foreground/45">{showArchived ? "Archived threads" : "Threads"}</span>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            aria-pressed={showArchived}
+            title={showArchived ? "Back to active threads" : "Show archived threads"}
+            onClick={() => setLifecycle(showArchived ? "active" : "archived")}
+            className={cn(
+              "flex h-5 items-center gap-1 rounded-md px-1.5 text-2xs outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent",
+              showArchived ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/50",
+            )}
+          >
+            <Icon name="Archive" aria-hidden className="size-3" />
+            Archived
+          </button>
+          <GroupByMenu
+            mode={groupMode}
+            onChange={setGroupMode}
+            projectOrderMode={projectOrderMode}
+            onProjectOrderChange={setProjectOrderMode}
+          />
+        </div>
       </div>
 
-      <div role="tree" aria-label="Threads" className="flex flex-col gap-3">
+      {treePlaceholder ? <div className="px-3 text-xs text-muted-foreground">{treePlaceholder}</div> : null}
+
+      <div role="tree" aria-label={showArchived ? "Archived threads" : "Threads"} className="flex flex-col gap-3">
         {groups.map((group) => {
           const isCollapsed = collapsedGroups.has(group.key);
           const project = group.projectId ? projectById.get(group.projectId) : undefined;
@@ -286,6 +323,21 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           );
         })}
       </div>
+
+      {archivedPages?.hasNextPage ? (
+        <button
+          type="button"
+          disabled={archivedPages.isFetchingNextPage}
+          onClick={() => void archivedPages.fetchNextPage()}
+          className="ml-[26px] h-6 self-start rounded-md px-1 text-xs text-sidebar-foreground/45 hover:text-sidebar-foreground disabled:opacity-60"
+        >
+          {archivedPages.isFetchingNextPage
+            ? "Loading…"
+            : archivedPages.isFetchNextPageError
+              ? "Couldn't load more. Retry"
+              : "Show more"}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -488,7 +540,7 @@ function ThreadRowView({
             menuOpen && SLIDE_NOW,
           )}
         >
-          {thread.status === "error" ? <RetryButton threadId={thread.id} /> : null}
+          {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
           <SubagentBadge thread={thread} data={subagents} />
         </span>
         <span

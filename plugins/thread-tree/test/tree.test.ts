@@ -49,13 +49,17 @@ test("lifecycle owner is the fallback parent", () => {
   assert.deepEqual(ids(groupRows(buildForest(threads), new Set(), new Set())[0]!.rows), ["owner", "-worker"]);
 });
 
-test("hidden and archived threads drop out; orphans become roots", () => {
-  const threads = [
-    thread("gone", { isArchived: true }),
-    thread("orphan", { parentThreadId: "gone" }),
-    thread("ghost", { isHidden: true }),
-  ];
+test("hidden threads drop out; orphans become roots", () => {
+  const threads = [thread("orphan", { parentThreadId: "gone" }), thread("ghost", { isHidden: true })];
   assert.deepEqual(ids(groupRows(buildForest(threads), new Set(), new Set())[0]!.rows), ["orphan"]);
+});
+
+test("archived threads nest like active ones, for the archived view", () => {
+  const threads = [
+    thread("parent", { isArchived: true, updatedAt: 2 }),
+    thread("kid", { isArchived: true, parentThreadId: "parent", updatedAt: 1 }),
+  ];
+  assert.deepEqual(ids(groupRows(buildForest(threads), new Set(), new Set())[0]!.rows), ["parent", "-kid"]);
 });
 
 test("a parent cycle still draws every thread exactly once", () => {
