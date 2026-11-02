@@ -1,7 +1,7 @@
 # Plugins
 
 Check the live state with `bb plugin list` and `bb plugin source <id>`. This page records what the
-plugins are for and how each one is wired. All three are installed on Dmitrii's Mac from the local
+plugins are for and how each one is wired. All of them are installed on Dmitrii's Mac from the local
 checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 ## inline-terminal — `plugins/inline-terminal/`
@@ -38,6 +38,19 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - No license file and no `PLUGIN_OVERVIEW.md` yet. Both are needed before a bb-community
   submission. Tag: `reveal-in-finder/v0.1.0`.
 - **Not verified yet:** how the card looks in the real chat. Headless screenshots came out black.
+
+## battery — `plugins/battery/`
+
+- **What:** a button at the right end of the sidebar footer row with a battery icon and the server
+  machine's charge. Tooltip: state and time left; a click refreshes; red at 20% or less on battery.
+  CLI: `bb battery status [--json]`. Reads `pmset -g batt`, so macOS only.
+- **How:** a content script (`lib/footer-percent.ts`) adds its own `<li>` to
+  `[data-sidebar="footer"] > ul` and polls the plugin's `GET /status` HTTP route. It is deliberately
+  not an `experimental_sidebarFooter` item: those are icon-only and live in the footer's item list.
+  The selector depends on bb's footer DOM; if the button disappears after a bb upgrade, check it first.
+- **Agent skill:** `skills/battery/`.
+- **Tests:** `npm test` covers `test/battery.test.ts` (pmset parsing, labels). Run `npm run typecheck`.
+- Not in `marketplace.json` yet: it needs a first `battery/v0.1.0` tag and a store icon.
 
 ## Retired repos
 

@@ -7,6 +7,7 @@ Plugins for [bb](https://getbb.app), each in its own folder with its own README.
 | [inline-terminal](plugins/inline-terminal) | Run shell code blocks from agent replies in an interactive terminal under the block. The result goes back to the agent. |
 | [thread-tree](plugins/thread-tree) | A sidebar thread list that nests child threads under their parent and shows each thread's subagents. |
 | [reveal-in-finder](plugins/reveal-in-finder) | Files an agent hands over show as cards in chat, with Open in Finder, the default app or bb's preview. |
+| [battery](plugins/battery) | The laptop's battery charge as an icon and percentage at the right end of the sidebar footer. |
 
 ## Install
 

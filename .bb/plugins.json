@@ -5,6 +5,7 @@
   "plugins": [
     { "name": "inline-terminal", "source": "./plugins/inline-terminal" },
     { "name": "thread-tree", "source": "./plugins/thread-tree" },
-    { "name": "reveal-in-finder", "source": "./plugins/reveal-in-finder" }
+    { "name": "reveal-in-finder", "source": "./plugins/reveal-in-finder" },
+    { "name": "battery", "source": "./plugins/battery" }
   ]
 }
