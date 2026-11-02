@@ -10,9 +10,9 @@ installable with `bb marketplace add`) → **bb-community** (an entry in
 
 | Plugin | Self-hosted | bb-community | Next step |
 |---|---|---|---|
-| inline-terminal | yes (`v0.1.2`) | PR [#796](https://github.com/get-bb/marketplace/pull/796), open | Push the monorepo source fix, then wait for merge |
-| reveal-in-finder | yes (`v0.1.1`) | entry ready, PR not opened | Open PR from `submit-reveal-in-finder` |
-| battery | yes (`v0.1.0`) | entry ready, PR not opened | Open PR from `submit-battery` |
+| inline-terminal | yes (`v0.1.2`) | PR [#796](https://github.com/get-bb/marketplace/pull/796), open | Wait for merge |
+| reveal-in-finder | yes (`v0.1.1`) | PR [#804](https://github.com/get-bb/marketplace/pull/804), open | Wait for merge |
+| battery | yes (`v0.1.0`) | PR [#803](https://github.com/get-bb/marketplace/pull/803), open | Wait for merge |
 | thread-tree | yes | not submitted | Release the GitHub folder work, then submit |
 | github-folder | no tag | not submitted | Tag `v0.1.0`, add to `marketplace.json` |
 | thread-links | no tag | not submitted | Add LICENSE, tag `v0.1.0`, add to `marketplace.json` |
