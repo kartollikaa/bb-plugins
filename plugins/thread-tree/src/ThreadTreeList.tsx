@@ -391,21 +391,25 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
 const FOLDER_BACK = "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z";
 const FOLDER_FLAP = "M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z";
+const FOLDER_PAPER = "M6.5 11.5V9.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v2";
 
-/** Opening tips the back panel away and lets the front flap fall forward, both hinged on the bottom edge. */
+/**
+ * Opening tips the back panel away, lets the front flap fall forward on its bottom hinge and raises a sheet from inside.
+ * The mask keeps every line single: the icon colour is translucent, so overlapping strokes would show doubled.
+ */
 function FolderIcon({ isOpen }: { isOpen: boolean }) {
   const still = useStill();
   const maskId = `folder-flap-${useId()}`;
-  const hinge = cn(
-    "[transform-box:view-box] origin-[2px_20px]",
-    !still && "transition-transform duration-200 ease-[cubic-bezier(0.3,1.35,0.6,1)] motion-reduce:transition-none",
+  const motion = cn(
+    "[transform-box:view-box]",
+    !still && "transition-[transform,fill-opacity] duration-200 ease-[cubic-bezier(0.3,1.35,0.6,1)] motion-reduce:transition-none",
   );
-  const flap = cn(hinge, isOpen && "[transform:skewX(-24deg)_scaleY(0.72)]");
+  const flap = cn(motion, "origin-[2px_20px]", isOpen && "[transform:skewX(-20deg)_scaleY(0.62)]");
   return (
     <svg
       aria-hidden
       viewBox="0 0 24 24"
-      fill="none"
+      fill="currentColor"
       stroke="currentColor"
       strokeWidth={2}
       strokeLinecap="round"
@@ -413,11 +417,14 @@ function FolderIcon({ isOpen }: { isOpen: boolean }) {
       className="size-3.5 shrink-0 overflow-visible"
     >
       <mask id={maskId} maskUnits="userSpaceOnUse" x="-6" y="-6" width="36" height="36">
-        <rect x="-6" y="-6" width="36" height="36" fill="white" />
-        <path d={FOLDER_FLAP} fill="black" stroke="none" className={flap} />
+        <rect x="-6" y="-6" width="36" height="36" fill="white" stroke="none" />
+        <path d={FOLDER_FLAP} fill="black" stroke="black" className={flap} />
       </mask>
-      <path d={FOLDER_BACK} mask={`url(#${maskId})`} className={cn(hinge, isOpen && "[transform:skewX(10deg)]")} />
-      <path d={FOLDER_FLAP} className={flap} />
+      <g mask={`url(#${maskId})`}>
+        <path d={FOLDER_BACK} fillOpacity={0} className={cn(motion, "origin-[2px_20px]", isOpen && "[transform:skewX(4deg)]")} />
+        <path d={FOLDER_PAPER} fillOpacity={0} className={cn(motion, !isOpen && "[transform:translateY(4px)]")} />
+      </g>
+      <path d={FOLDER_FLAP} className={cn(flap, isOpen ? "[fill-opacity:0.3]" : "[fill-opacity:0.14]")} />
     </svg>
   );
 }
