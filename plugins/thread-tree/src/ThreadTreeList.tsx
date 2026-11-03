@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { toast } from "sonner";
 import {
@@ -389,21 +389,18 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   );
 }
 
-/** Lucide's Folder and FolderOpen, redrawn with matching commands so CSS can morph one into the other. */
-const FOLDER_PATHS = {
-  back: {
-    closed: "M4 20a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.69.9H20a2 2 0 0 1 2 2v10",
-    open: "M4 20a2 2 0 0 1-2-1.79V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2",
-  },
-  front: {
-    closed: "M12.1 6l0 0A2 2 0 0 1 12.1 6H20a2 2 0 0 1 2 2l0 10a2 2 0 0 1-2 2H4",
-    open: "M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4",
-  },
-} as const;
+const FOLDER_BACK = "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z";
+const FOLDER_FLAP = "M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z";
 
+/** Opening tips the back panel away and lets the front flap fall forward, both hinged on the bottom edge. */
 function FolderIcon({ isOpen }: { isOpen: boolean }) {
   const still = useStill();
-  const state = isOpen ? "open" : "closed";
+  const maskId = `folder-flap-${useId()}`;
+  const hinge = cn(
+    "[transform-box:view-box] origin-[2px_20px]",
+    !still && "transition-transform duration-200 ease-[cubic-bezier(0.3,1.35,0.6,1)] motion-reduce:transition-none",
+  );
+  const flap = cn(hinge, isOpen && "[transform:skewX(-24deg)_scaleY(0.72)]");
   return (
     <svg
       aria-hidden
@@ -413,16 +410,14 @@ function FolderIcon({ isOpen }: { isOpen: boolean }) {
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="size-3.5 shrink-0"
+      className="size-3.5 shrink-0 overflow-visible"
     >
-      {(["back", "front"] as const).map((part) => (
-        <path
-          key={part}
-          d={FOLDER_PATHS[part][state]}
-          style={{ d: `path("${FOLDER_PATHS[part][state]}")` } as React.CSSProperties}
-          className={cn(!still && "transition-[d] duration-200 ease-out motion-reduce:transition-none")}
-        />
-      ))}
+      <mask id={maskId} maskUnits="userSpaceOnUse" x="-6" y="-6" width="36" height="36">
+        <rect x="-6" y="-6" width="36" height="36" fill="white" />
+        <path d={FOLDER_FLAP} fill="black" stroke="none" className={flap} />
+      </mask>
+      <path d={FOLDER_BACK} mask={`url(#${maskId})`} className={cn(hinge, isOpen && "[transform:skewX(10deg)]")} />
+      <path d={FOLDER_FLAP} className={flap} />
     </svg>
   );
 }
