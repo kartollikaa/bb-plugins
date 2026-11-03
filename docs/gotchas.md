@@ -36,11 +36,24 @@ can find it by the error text.
 - **Claude's frames API answers 404 without Claude Code's headers.** `GET /api/frame/frames` with a
   valid OAuth token still needs `X-Frame-CP`, `X-Frame-Surface`, `X-Frame-Platform`,
   `X-Frame-Client-Version` and the `application/vnd.ant.frame-refusal+json` Accept type.
+- **Timeline tool rows for MCP calls**: `toolName` is `"<server>:<tool>"` and `presentation.title`
+  is the server, so a label built from the title reads `plugin_context-mode_…`. Use the part after
+  `:` or `presentation.label.pending` ("Running ctx_execute").
+- **Timeline approval rows carry no text**, only `target.itemId`. Look that id up among the other
+  rows to get the command or file being approved.
+- **`useSidebarThreads()` is the cheap source of thread state**; `sdk.threads.timeline` is a request
+  per thread. Prefetch timelines in the background and cache them by `updatedAt`, or an overlay
+  that opens on a keypress shows empty cards first.
 
 ## Tooling
 
 - **DevBrowser** (`bb browser-automation`) has no `page.waitForTimeout` and no `locator().first`.
-  Use `await new Promise(r => setTimeout(r, ms))` and `page.evaluate`.
+  Use `await new Promise(r => setTimeout(r, ms))` and `page.evaluate`. It has no
+  `setViewportSize` either. `page.shot()` files live in the session's tmp dir and are deleted by
+  `browser-automation close`: read them before closing.
+- **Holding a modifier in DevBrowser**: `keyboard.down("Control")`, then `press("Tab")`, then
+  `up("Control")` fires the real keyup the thread-switcher commits on. `press("Control+Tab")`
+  releases at once.
 - **Headless screenshots of bb chat** came out black. Text that is still streaming sits in collapsed
   groups and may not be in the DOM.
 - **zsh** has no `timeout` command. Don't wrap commands in it.
