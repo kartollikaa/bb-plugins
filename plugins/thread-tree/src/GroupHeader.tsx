@@ -23,7 +23,7 @@ export function GroupHeader({
   /** A hover button at the end of the header. */
   action?: { label: string; icon: string; onClick: () => void };
   /** Right-click menu on the header. */
-  menu?: readonly { label: string; icon: string; onSelect: () => void }[];
+  menu?: readonly HeaderMenuItem[];
 }) {
   const header = (
     <div className="group/header flex h-7 items-center gap-1 px-1.5">
@@ -62,11 +62,13 @@ export function GroupHeader({
   return menu && menu.length > 0 ? <HeaderMenu items={menu}>{header}</HeaderMenu> : header;
 }
 
+export type HeaderMenuItem = { label: string; icon: string; onSelect: () => void };
+
 function HeaderMenu({
   items,
   children,
 }: {
-  items: readonly { label: string; icon: string; onSelect: () => void }[];
+  items: readonly HeaderMenuItem[];
   children: React.ReactNode;
 }) {
   const portalProps = usePortalScopeProps();

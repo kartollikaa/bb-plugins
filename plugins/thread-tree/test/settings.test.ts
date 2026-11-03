@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readViewSettings, SETTINGS } from "../src/settings.ts";
+import { moveSection, readViewSettings, resolveSectionOrder, SETTINGS } from "../src/settings.ts";
 
 test("missing values fall back to every descriptor's default", () => {
   const view = readViewSettings(undefined);
@@ -27,4 +27,17 @@ test("wrong types and out-of-range counts are replaced by defaults", () => {
 
 test("Show more never shows fewer rows than the first page", () => {
   assert.equal(readViewSettings({ recentLimit: 20, recentMoreLimit: 10 }).recentMoreLimit, 20);
+});
+
+test("a saved section order drops unknown and repeated ids and appends the rest", () => {
+  assert.deepEqual(resolveSectionOrder([]), ["github", "automations", "recent"]);
+  assert.deepEqual(resolveSectionOrder(["recent", "bogus", "recent", "github"]), ["recent", "github", "automations"]);
+});
+
+test("moving a section steps over the next shown one and stops at the ends", () => {
+  const order = ["github", "automations", "recent"] as const;
+  assert.deepEqual(moveSection(order, order, "recent", -1), ["github", "recent", "automations"]);
+  assert.deepEqual(moveSection(order, order, "github", -1), ["github", "automations", "recent"]);
+  assert.deepEqual(moveSection(order, ["github", "recent"], "github", 1), ["recent", "automations", "github"]);
+  assert.deepEqual(moveSection(order, ["github", "recent"], "automations", 1), ["github", "automations", "recent"]);
 });

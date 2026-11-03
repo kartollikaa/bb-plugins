@@ -51,7 +51,8 @@ under it, and the subagents it runs inside its own session show on its row.
 
 Right-click the GitHub, Automations or Recent Activity header and choose
 Remove from sidebar; Sections at the top of the list brings any of them back
-or hides them. The same switches live in Settings → Installed plugins →
+or hides them. Drag a section's header, or use Move up and Move down in its
+right-click menu, to reorder them; the order is kept per client. The same switches live in Settings → Installed plugins →
 Thread Tree, which also sets how many Recent Activity rows show before and
 after Show more, and turns off the provider icon, the subagent counters or the
 age label on each row.

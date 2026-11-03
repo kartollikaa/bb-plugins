@@ -9,7 +9,7 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import type { rpcContract } from "../server";
 import { automationDot, sortAutomations, type AutomationAction, type AutomationSummary } from "./automations";
-import { GroupHeader } from "./GroupHeader";
+import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { ROW_HOVER_SOLID_BG } from "./rowStyles";
 import { StatusDot } from "./StatusDot";
 import { formatUntil } from "./time";
@@ -38,7 +38,7 @@ function useAutomations() {
 export function AutomationsSection({
   isCollapsed,
   onToggle,
-  onRemove,
+  menu,
   showPaused,
   onTogglePaused,
   activeThreadId,
@@ -47,8 +47,8 @@ export function AutomationsSection({
 }: {
   isCollapsed: boolean;
   onToggle: () => void;
-  /** Hides the section from the sidebar; its header's right-click menu offers it. */
-  onRemove?: () => void;
+  /** The header's right-click menu. */
+  menu?: readonly HeaderMenuItem[];
   showPaused: boolean;
   onTogglePaused: () => void;
   activeThreadId: string | null;
@@ -90,7 +90,7 @@ export function AutomationsSection({
         isCollapsed={isCollapsed}
         count={active.length}
         onToggle={onToggle}
-        menu={onRemove ? [{ label: "Remove from sidebar", icon: "EyeOff", onSelect: onRemove }] : undefined}
+        menu={menu}
         action={{ label: "Open Automations", icon: "ArrowUpRight", onClick: openAutomationsPage }}
       />
       {isCollapsed ? null : (

@@ -14,7 +14,7 @@ import {
   type GithubSettings,
   type GithubSettingsPatch,
 } from "./githubFolder";
-import { GroupHeader } from "./GroupHeader";
+import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { ROW_HOVER_SOLID_BG } from "./rowStyles";
 import { formatAge } from "./time";
 
@@ -81,14 +81,14 @@ const ATTENTION_STYLE: Record<Attention | "none", { short: string; className: st
 export function GithubSection({
   isCollapsed,
   onToggle,
-  onRemove,
+  menu,
   showSnoozed,
   onToggleSnoozed,
 }: {
   isCollapsed: boolean;
   onToggle: () => void;
-  /** Hides the section from the sidebar; its header's right-click menu offers it. */
-  onRemove?: () => void;
+  /** The header's right-click menu. */
+  menu?: readonly HeaderMenuItem[];
   showSnoozed: boolean;
   onToggleSnoozed: () => void;
 }) {
@@ -118,7 +118,7 @@ export function GithubSection({
             onRefresh={refresh}
           />
         }
-        menu={onRemove ? [{ label: "Remove from sidebar", icon: "EyeOff", onSelect: onRemove }] : undefined}
+        menu={menu}
         action={{ label: "Open pull requests on GitHub", icon: "ArrowUpRight", onClick: () => navigate.openUrl(PULLS_URL) }}
       />
       {isCollapsed ? null : (

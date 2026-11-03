@@ -23,12 +23,20 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import { SubagentBadge } from "./SubagentBadge";
-import { GroupHeader } from "./GroupHeader";
+import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { AutomationsSection } from "./AutomationsSection";
 import { GithubSection } from "./GithubSection";
 import { StatusDot } from "./StatusDot";
 import type { rpcContract } from "../server";
-import { readViewSettings, SIDEBAR_SECTIONS, type SectionKey, type ViewSettings } from "./settings";
+import {
+  moveSection,
+  readViewSettings,
+  resolveSectionOrder,
+  SIDEBAR_SECTIONS,
+  type SectionId,
+  type SectionKey,
+  type ViewSettings,
+} from "./settings";
 import { formatAge } from "./time";
 import {
   buildForest,
@@ -109,6 +117,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const archivedPages = showArchived ? listed.experimental_archived : null;
   const treeThreads = showArchived ? listed.threads : threads;
   const [drag, setDrag] = useState<{ projectId: string; overId: string | null } | null>(null);
+  const [savedSectionOrder, setSavedSectionOrder] = usePersistentList("section-order");
+  const [sectionDrag, setSectionDrag] = useState<{ id: SectionId; overId: SectionId | null } | null>(null);
   const now = useNow(30_000);
   const settingValues = useSettings().values;
   const [view, setSection] = useSectionToggles(useMemo(() => readViewSettings(settingValues), [settingValues]));
@@ -140,6 +150,9 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   }, [groups, recent, recentHidden, view.showSubagents]);
   const subagents = useSubagents(visibleThreads);
   const overview = useMemo(() => countStates(threads), [threads]);
+  const sectionOrder = useMemo(() => resolveSectionOrder(savedSectionOrder), [savedSectionOrder]);
+  const shownSections = sectionOrder.filter((id) => view[SECTION_BY_ID[id].key]);
+  const moveSectionBy = (id: SectionId, step: -1 | 1) => setSavedSectionOrder(moveSection(sectionOrder, shownSections, id, step));
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const { providers } = useProviders();
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
@@ -202,72 +215,92 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     <div className="flex flex-col gap-3 px-1.5 pb-3 pt-1">
       <div className="-mb-2 flex h-5 items-center justify-between gap-2 px-1.5">
         <ActivityOverview counts={overview} />
-        <SectionsMenu view={view} onChange={setSection} />
+        <SectionsMenu view={view} order={sectionOrder} onChange={setSection} />
       </div>
-      {view.showGithub ? (
-        <GithubSection
-          isCollapsed={collapsedGroups.has("github")}
-          onToggle={() => collapsedGroups.toggle("github")}
-          showSnoozed={flags.has("github-snoozed")}
-          onToggleSnoozed={() => flags.toggle("github-snoozed")}
-          onRemove={() => setSection("showGithub", false)}
-        />
-      ) : null}
-
-      {view.showAutomations ? (
-        <AutomationsSection
-          isCollapsed={collapsedGroups.has("automations")}
-          onToggle={() => collapsedGroups.toggle("automations")}
-          showPaused={flags.has("automations-paused")}
-          onTogglePaused={() => flags.toggle("automations-paused")}
-          onRemove={() => setSection("showAutomations", false)}
-          activeThreadId={activeThreadId}
-          now={now}
-          onNavigate={onNavigate}
-        />
-      ) : null}
-
-      {view.showRecent ? (
-        <section aria-label="Recent activity">
-          <GroupHeader
-            title="Recent Activity"
-            icon={<Icon name="Clock" aria-hidden className="size-3.5" />}
-            isCollapsed={recentCollapsed}
-            count={recent.length}
-            onToggle={() => collapsedGroups.toggle("recent")}
-            menu={[{ label: "Remove from sidebar", icon: "EyeOff", onSelect: () => setSection("showRecent", false) }]}
-          />
-          {recentCollapsed ? null : (
-            <div role="list" className="mt-0.5 flex flex-col gap-0.5">
-              {recent.map((thread) =>
-                renderRow(
-                  {
-                    thread,
-                    depth: 0,
-                    descendantCount: 0,
-                    hasChildren: false,
-                    isExpanded: false,
-                    foldCounts: null,
-                  isPeek: false,
-                  hasVisibleChildren: false,
-                    guides: [],
-                  },
-                  "recent",
-                ),
-              )}
-              {threads.length > view.recentLimit ? (
-                <button
-                  type="button"
-                  onClick={() => flags.toggle("recent-more")}
-                  className="ml-[26px] h-6 self-start rounded-md px-1 text-xs text-sidebar-foreground/45 hover:text-sidebar-foreground"
-                >
-                  {showMoreRecent ? "Show less" : "Show more"}
-                </button>
-            ) : null}
+      {shownSections.map((id, index) => {
+        const section = SECTION_BY_ID[id];
+        const menu: HeaderMenuItem[] = [
+          ...(index > 0 ? [{ label: "Move up", icon: "ArrowUp", onSelect: () => moveSectionBy(id, -1) }] : []),
+          ...(index < shownSections.length - 1 ? [{ label: "Move down", icon: "ArrowDown", onSelect: () => moveSectionBy(id, 1) }] : []),
+          { label: "Remove from sidebar", icon: "EyeOff", onSelect: () => setSection(section.key, false) },
+        ];
+        return (
+          <div
+            key={id}
+            draggable
+            onDragStart={(event) => {
+              // Links inside are draggable too; only a drag that starts on the section moves it.
+              if (event.target !== event.currentTarget) return;
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", section.label);
+              setSectionDrag({ id, overId: null });
+            }}
+            onDragOver={(event) => {
+              if (!sectionDrag) return;
+              event.preventDefault();
+              if (sectionDrag.overId !== id) setSectionDrag({ ...sectionDrag, overId: id });
+            }}
+            onDrop={(event) => {
+              if (!sectionDrag) return;
+              event.preventDefault();
+              setSavedSectionOrder(moveBefore(sectionOrder, sectionDrag.id, id));
+              setSectionDrag(null);
+            }}
+            onDragEnd={() => setSectionDrag(null)}
+            className={cn(
+              "rounded-md empty:hidden",
+              sectionDrag?.overId === id && sectionDrag.id !== id && "shadow-[inset_0_2px_0_0_var(--color-blue-500)]",
+              sectionDrag?.id === id && "opacity-50",
+            )}
+          >
+            {id === "github" ? (
+              <GithubSection
+                isCollapsed={collapsedGroups.has("github")}
+                onToggle={() => collapsedGroups.toggle("github")}
+                showSnoozed={flags.has("github-snoozed")}
+                onToggleSnoozed={() => flags.toggle("github-snoozed")}
+                menu={menu}
+              />
+            ) : id === "automations" ? (
+              <AutomationsSection
+                isCollapsed={collapsedGroups.has("automations")}
+                onToggle={() => collapsedGroups.toggle("automations")}
+                showPaused={flags.has("automations-paused")}
+                onTogglePaused={() => flags.toggle("automations-paused")}
+                menu={menu}
+                activeThreadId={activeThreadId}
+                now={now}
+                onNavigate={onNavigate}
+              />
+            ) : (
+              <section aria-label="Recent activity">
+                <GroupHeader
+                  title="Recent Activity"
+                  icon={<Icon name="Clock" aria-hidden className="size-3.5" />}
+                  isCollapsed={recentCollapsed}
+                  count={recent.length}
+                  onToggle={() => collapsedGroups.toggle("recent")}
+                  menu={menu}
+                />
+                {recentCollapsed ? null : (
+                  <div role="list" className="mt-0.5 flex flex-col gap-0.5">
+                    {recent.map((thread) => renderRow(flatRow(thread), "recent"))}
+                    {threads.length > view.recentLimit ? (
+                      <button
+                        type="button"
+                        onClick={() => flags.toggle("recent-more")}
+                        className="ml-[26px] h-6 self-start rounded-md px-1 text-xs text-sidebar-foreground/45 hover:text-sidebar-foreground"
+                      >
+                        {showMoreRecent ? "Show less" : "Show more"}
+                      </button>
+                    ) : null}
+                  </div>
+                )}
+              </section>
+            )}
           </div>
-        )}
-      </section>
-      ) : null}
+        );
+      })}
 
       <div className="mx-1.5 border-t border-sidebar-border" />
 
@@ -400,6 +433,25 @@ function groupLook(
   };
 }
 
+const SECTION_BY_ID = Object.fromEntries(SIDEBAR_SECTIONS.map((section) => [section.id, section])) as {
+  [Id in SectionId]: Extract<(typeof SIDEBAR_SECTIONS)[number], { id: Id }>;
+};
+
+/** A Recent Activity row: flat, outside the tree. */
+function flatRow(thread: PluginSidebarThread): TreeRow<PluginSidebarThread> {
+  return {
+    thread,
+    depth: 0,
+    descendantCount: 0,
+    hasChildren: false,
+    isExpanded: false,
+    foldCounts: null,
+    isPeek: false,
+    hasVisibleChildren: false,
+    guides: [],
+  };
+}
+
 const OVERVIEW_STATES: readonly { state: DotState; label: string }[] = [
   { state: "input", label: "need input" },
   { state: "error", label: "failed" },
@@ -446,7 +498,15 @@ function useSectionToggles(saved: ViewSettings): [ViewSettings, (key: SectionKey
   return [view, setSection];
 }
 
-function SectionsMenu({ view, onChange }: { view: ViewSettings; onChange: (key: SectionKey, shown: boolean) => void }) {
+function SectionsMenu({
+  view,
+  order,
+  onChange,
+}: {
+  view: ViewSettings;
+  order: readonly SectionId[];
+  onChange: (key: SectionKey, shown: boolean) => void;
+}) {
   const portalProps = usePortalScopeProps();
   const hidden = SIDEBAR_SECTIONS.filter(({ key }) => !view[key]).length;
   return (
@@ -470,7 +530,7 @@ function SectionsMenu({ view, onChange }: { view: ViewSettings; onChange: (key: 
           className="z-50 min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
         >
           <DropdownMenu.Label className="px-2 py-1 text-xs text-muted-foreground">Show in sidebar</DropdownMenu.Label>
-          {SIDEBAR_SECTIONS.map(({ key, label, icon }) => (
+          {order.map((id) => SECTION_BY_ID[id]).map(({ key, label, icon }) => (
             <DropdownMenu.CheckboxItem
               key={key}
               checked={view[key]}
@@ -485,6 +545,7 @@ function SectionsMenu({ view, onChange }: { view: ViewSettings; onChange: (key: 
               </DropdownMenu.ItemIndicator>
             </DropdownMenu.CheckboxItem>
           ))}
+          <div className="px-2 pb-1 pt-0.5 text-xs text-muted-foreground">Drag a header to move it.</div>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
