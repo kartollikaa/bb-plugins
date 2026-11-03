@@ -4,7 +4,8 @@ Switch between recent bb threads from the keyboard, with a preview of each chat.
 
 - Control+Tab opens a row of cards for your most recently opened threads. Each card shows the
   latest messages of that chat, its title, project, branch, last activity and a status dot. Threads waiting for your answer get an
-  amber outline and show the question or approval they are waiting on.
+  amber outline and show the question or approval they are waiting on. Working threads show the step
+  they are on, such as "Running npm test".
 - Threads that need you (waiting for input, then failed) come right after the current one.
 - Keep holding Control and press Tab to move on (Shift+Tab goes back), then let go to open the
   selected thread. A quick tap jumps back to the previous thread; Esc cancels.

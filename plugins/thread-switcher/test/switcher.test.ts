@@ -142,9 +142,10 @@ test("extracts the last conversation messages from nested timeline rows", () => 
       { id: "a1", role: "assistant", text: "done see docs" },
     ],
     pending: null,
+    activity: null,
   });
-  assert.deepEqual(previewFromTimeline(null), { messages: [], pending: null });
-  assert.deepEqual(previewFromTimeline({ rows: "nope" }), { messages: [], pending: null });
+  assert.deepEqual(previewFromTimeline(null), { messages: [], pending: null, activity: null });
+  assert.deepEqual(previewFromTimeline({ rows: "nope" }), { messages: [], pending: null, activity: null });
   const many = { rows: Array.from({ length: 10 }, (_, i) => ({ kind: "conversation", role: "assistant", id: `m${i}`, text: `m${i}` })) };
   assert.deepEqual(previewFromTimeline(many).messages.map((m) => m.id)[0], "m4");
 });
@@ -166,6 +167,29 @@ test("reports what a thread is waiting on, ignoring answered requests", () => {
   assert.equal(previewFromTimeline(turn([orphan])).pending, "Approve: Edit");
   const form = { kind: "work", workKind: "form", lifecycle: "pending", title: "Pick a model" };
   assert.equal(previewFromTimeline(turn([form])).pending, "Pick a model");
+});
+
+test("describes the step a running thread is on", async () => {
+  const { describeActivity } = await import("../lib/switcher.ts");
+  const running = (row: object) => describeActivity({ kind: "work", status: "pending", ...row });
+  assert.equal(running({ workKind: "command", command: "cd /repo/x && npm test\nmore" }), "Running npm test");
+  assert.equal(running({ workKind: "file-change", change: { path: "/a/b/app.tsx" } }), "Editing app.tsx");
+  assert.equal(running({ workKind: "file-read", path: "lib/status.ts" }), "Reading status.ts");
+  assert.equal(running({ workKind: "search", query: "threadDotState" }), "Searching for threadDotState");
+  assert.equal(running({ workKind: "web-search", queries: ["bb sdk"] }), "Searching the web for bb sdk");
+  assert.equal(running({ workKind: "web-fetch", url: "https://getbb.app/docs" }), "Reading getbb.app");
+  assert.equal(running({ workKind: "delegation", description: "Review the diff" }), "Subagent: Review the diff");
+  assert.equal(running({ workKind: "tool", toolName: "Monitor", toolArgs: {} }), "Running Monitor");
+  assert.equal(running({ workKind: "tool", toolName: "mcp__plugin_ctx__ctx_execute" }), "Running ctx_execute");
+  assert.equal(running({ workKind: "question" }), null);
+  assert.equal(describeActivity({ kind: "work", status: "completed", workKind: "command", command: "ls" }), null);
+  const timeline = {
+    rows: [
+      { kind: "work", status: "completed", workKind: "command", command: "ls" },
+      { kind: "turn", children: [{ kind: "work", status: "pending", workKind: "file-read", path: "a.ts" }] },
+    ],
+  };
+  assert.equal(previewFromTimeline(timeline).activity, "Reading a.ts");
 });
 
 test("cleans markdown and code blocks for the small preview", () => {

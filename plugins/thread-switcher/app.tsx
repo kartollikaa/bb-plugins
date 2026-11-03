@@ -22,6 +22,7 @@ import {
 } from "./lib/hotkey.ts";
 import {
   clampThreadCount,
+  EMPTY_PREVIEW,
   formatAge,
   initialIndex,
   orderThreads,
@@ -246,7 +247,7 @@ function ThreadCard({
           needsInput ? "border-attention ring-2 ring-attention/50" : selected ? "border-ring" : "border-border"
         }`}
       >
-        <ChatPreview threadId={thread.id} version={thread.updatedAt} needsInput={needsInput} />
+        <ChatPreview threadId={thread.id} version={thread.updatedAt} dot={dot} />
       </div>
       <div className="flex min-w-0 gap-1.5 px-0.5" title={thread.displayTitle}>
         <span className="flex h-4 w-3.5 shrink-0 items-center justify-center" title={DOT_LABEL[dot]}>
@@ -288,16 +289,16 @@ const previewCache = new Map<string, CachedPreview>();
 const inflight = new Map<string, Promise<void>>();
 const previewListeners = new Set<() => void>();
 
-function loadPreview(sdk: Sdk, threadId: string, version: number): Promise<void> {
+function loadPreview(sdk: Sdk, threadId: string, version: number, fresh = false): Promise<void> {
   const cached = previewCache.get(threadId);
-  if (cached && cached.version >= version) return Promise.resolve();
-  const key = `${threadId}:${version}`;
+  if (!fresh && cached && cached.version >= version) return Promise.resolve();
+  const key = `${threadId}:${version}:${fresh}`;
   const running = inflight.get(key);
   if (running) return running;
   const request = sdk.threads
     .timeline({ threadId, segmentLimit: "4" })
     .then((timeline) => previewFromTimeline(timeline))
-    .catch(() => cached?.preview ?? { messages: [], pending: null })
+    .catch(() => cached?.preview ?? EMPTY_PREVIEW)
     .then((preview) => {
       previewCache.set(threadId, { version, preview });
       previewListeners.forEach((listener) => listener());
@@ -308,25 +309,44 @@ function loadPreview(sdk: Sdk, threadId: string, version: number): Promise<void>
 }
 
 /** Shows the last known preview at once and swaps in a fresh one when it arrives. */
-function usePreview(threadId: string, version: number): ThreadPreview | null {
+function usePreview(threadId: string, version: number, fresh: boolean): ThreadPreview | null {
   const sdk = useSdk();
   const [, rerender] = useState(0);
   useEffect(() => {
     const listener = () => rerender((value) => value + 1);
     previewListeners.add(listener);
-    void loadPreview(sdk, threadId, version);
+    void loadPreview(sdk, threadId, version, fresh);
     return () => {
       previewListeners.delete(listener);
     };
-  }, [sdk, threadId, version]);
+  }, [sdk, threadId, version, fresh]);
   return previewCache.get(threadId)?.preview ?? null;
 }
 
-function ChatPreview({ threadId, version, needsInput }: { threadId: string; version: number; needsInput: boolean }) {
-  const preview = usePreview(threadId, version);
+function ChatPreview({ threadId, version, dot }: { threadId: string; version: number; dot: DotState }) {
+  const preview = usePreview(threadId, version, dot === "running");
   if (preview === null) {
     return <div className="h-full animate-pulse bg-muted/40" />;
   }
+  const activity = dot === "running" ? preview.activity : null;
+  return (
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1">
+        <PreviewBody preview={preview} needsInput={dot === "input"} />
+      </div>
+      {activity && (
+        <div
+          title={activity}
+          className="shrink-0 truncate border-t border-blue-500/30 bg-blue-500/10 px-2 py-1 text-[9.5px] font-medium leading-tight text-blue-600 dark:text-blue-400"
+        >
+          {activity}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PreviewBody({ preview, needsInput }: { preview: ThreadPreview; needsInput: boolean }) {
   if (needsInput && preview.pending) {
     return (
       <div className="flex h-full flex-col gap-1 overflow-hidden bg-attention/10 p-2">

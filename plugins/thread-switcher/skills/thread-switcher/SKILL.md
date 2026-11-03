@@ -17,7 +17,10 @@ Under each preview: the title (up to two lines), the project with the time since
 the branch. Each card has a status dot: amber needs input (a pending question or approval), red failed, blue
 pulsing working, green done — the same rules and colors as Thread Tree's sidebar. A card whose thread
 needs input also has an amber outline, and its preview shows the pending question prompts, the
-command or tool waiting for approval, or the form title instead of the latest messages.
+command or tool waiting for approval, or the form title instead of the latest messages. A running card shows its current step in a blue line
+under the preview ("Running npm test", "Editing app.tsx", "Subagent: …"), taken from the timeline's
+work row that is still in progress; with no such row (the agent is thinking or writing) the line is
+absent.
 
 ## Settings
 
