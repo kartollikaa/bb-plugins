@@ -12,7 +12,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   results come back as `[inline-terminal]` messages.
 - **Tests:** `npm test` covers `lib/command.test.ts`; `test/wrapper_pty.py` runs the launcher in a
   real PTY. Run `npm run typecheck` too.
-- MIT. Tags: `inline-terminal/v0.1.0` through `v0.1.2`.
+- MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## thread-tree — `plugins/thread-tree/`
 
@@ -31,7 +31,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations, settings, archive undo, no `:has()` in classes). Run
   `npm run typecheck` too. Components live in `src/`.
 - The thread list slot is exclusive: with several list plugins installed, only one is shown.
-- MIT. Tags: `thread-tree/v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`.
+- MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## reveal-in-finder — `plugins/reveal-in-finder/`
 
@@ -42,7 +42,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   line for deliverables, never inside code.
 - **Tests:** `npm test` covers `test/reveal.test.ts` (path resolution, open args, card labels).
   There is no `typecheck` script. Run `npx tsc -p .` when touching types.
-- MIT. Tags: `reveal-in-finder/v0.1.0`, `v0.1.1`.
+- MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## battery — `plugins/battery/`
 
@@ -57,7 +57,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   The selector depends on bb's footer DOM; if the button disappears after a bb upgrade, check it first.
 - **Agent skill:** `skills/battery/`.
 - **Tests:** `npm test` covers `test/battery.test.ts` (pmset parsing, labels). Run `npm run typecheck`.
-- MIT. Tag: `battery/v0.1.0`.
+- MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## thread-links — `plugins/thread-links/`
 
@@ -76,7 +76,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Agent skill:** `skills/thread-links/`.
 - **Tests:** `npm test` covers `test/links.test.ts` (URL extraction, classification, check rollup,
   PR chips). Run `npm run typecheck`.
-- MIT. Not in `marketplace.json` yet: it needs a first `thread-links/v0.1.0` tag.
+- MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## github-folder — `plugins/github-folder/`
 
@@ -96,7 +96,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Agent skill:** `skills/github-folder/`.
 - **Tests:** `npm test` covers `test/github.test.ts` (query, parsing, filters, settings). Run
   `npm run typecheck`.
-- MIT. Not in `marketplace.json` yet: it needs a first `github-folder/v0.1.0` tag.
+- MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## artifacts — `plugins/artifacts/`
 
@@ -116,7 +116,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Tests:** `npm test` covers `test/sources.test.ts` (credentials, parsing, paging, errors, URL
   lookup) and builds an isolated copy with production dependencies. `npm run test:production`
   runs that build alone. Run `npm run typecheck` too.
-- MIT. Released as `artifacts/v0.1.1` and listed in `marketplace.json`.
+- MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## mouse-pet — `plugins/mouse-pet/`
 
@@ -132,7 +132,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Agent skill:** `skills/mouse-pet/`.
 - **Tests:** `npm test` covers `test/pet.test.ts` (movement, bounce, mode choice, startle). Run
   `npm run typecheck`. The sprite and animations are checked by eye in the app.
-- MIT. Not released and not in `marketplace.json` yet: it needs a first `mouse-pet/v0.1.0` tag.
+- MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## power-pill — `plugins/power-pill/`
 
@@ -149,7 +149,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Agent skill:** `skills/power-pill/`.
 - **Tests:** `npm test` covers `test/pill.test.ts` (pmset parsing, request validation, stop rules,
   durations, labels, setup command). Run `npm run typecheck`. The popup was checked in the live app.
-- MIT. Not released and not in `marketplace.json` yet: it needs a first `power-pill/v0.1.0` tag.
+- MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## thread-switcher — `plugins/thread-switcher/`
 
@@ -177,7 +177,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   ages). Run `npm run typecheck`. Opening, stepping, release, tap-back, Esc, the one-row layout, the
   subthread recap and the recorder were checked in the live app; the pending-request card was not, as no
   thread was waiting at the time.
-- MIT. Not released and not in `marketplace.json` yet: it needs a first `thread-switcher/v0.1.0` tag.
+- MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## Retired repos
 

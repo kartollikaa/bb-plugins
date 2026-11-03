@@ -12,8 +12,8 @@ subfolder, so nothing at the root may become a dependency of a plugin.
   live app), how a release is cut, and how a plugin is added or split out.
 - [docs/gotchas.md](docs/gotchas.md): SDK and tooling traps that have already cost time. Add one
   whenever you hit a new trap.
-- [docs/publication.md](docs/publication.md): which plugins are released, queued, or submitted.
-  Update it with every tag, catalog entry or submission.
+- [docs/publication.md](docs/publication.md): every plugin's marketplace listing, release and
+  submission/update PRs. Verify its live status before deciding whether to release an update.
 - Load the `bb-plugin-authoring` skill before touching plugin code. It routes to the SDK references
   for the installed bb version, and those references are the API contract. Don't write SDK calls
   from memory.
@@ -50,9 +50,19 @@ A new or renamed plugin goes into all three: `plugins/`, `.bb/plugins.json` and
 - **Done means seen working:** tests and a typecheck pass, the bundle builds, the plugin is reloaded,
   and the changed behaviour was checked in the running bb. A green build alone doesn't count; see
   `docs/workflow.md`. If you can't check something visually, say so instead of claiming it works.
-- **Ask Dmitrii before:** tagging a release, submitting to the bb-community marketplace, or
-  disabling or uninstalling a plugin he uses. The repo is public, so never commit anything private.
-  Commits and pushes to `main` are fine once tests pass. There is no PR flow.
+- **Keep published plugins current.** Dmitrii's standing instruction is to release each completed
+  change to a plugin already published in bb-community and update its marketplace metadata when
+  needed. Follow [docs/workflow.md](docs/workflow.md#marketplace-maintenance) before calling the
+  change done. This covers routine compatible releases and marketplace update PRs; an open first
+  submission PR or a self-hosted catalog entry alone does not qualify.
+- **Record marketplace PRs immediately.** Add each new submission or update PR to
+  [docs/publication.md](docs/publication.md) when it is created. Keep pending, merged, closed and
+  published states distinct, and refresh the record after review or merge.
+- **Ask Dmitrii before:** a first marketplace publication, releasing an unpublished plugin,
+  breaking changes or changes to release source/ownership, or disabling or uninstalling a plugin
+  he uses. Routine updates to published plugins follow the standing instruction above. The repo is
+  public, so never commit anything private. Commits and pushes to `main` are fine once checks pass.
+  There is no PR flow in this repo; marketplace metadata changes use get-bb/marketplace PRs.
 - Commits end with the attribution trailer the harness gives.
 - Comments: none by default. Only a fact the code can't show, one line.
 

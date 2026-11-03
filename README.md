@@ -15,6 +15,9 @@ Plugins for [bb](https://getbb.app), each in its own folder with its own README.
 | [power-pill](plugins/power-pill) | Keeps the Mac awake from a sidebar footer switch, with a timer and an optional closed-lid mode, so bb stays reachable while the Mac is locked. |
 | [thread-switcher](plugins/thread-switcher) | Control+Tab through recent threads in a row of cards that preview each chat, with status, project, branch and a subthread recap; threads that need you come first. The hotkey, card count and order are settings. |
 
+Marketplace listings, release tags and submission/update PRs for every plugin:
+[Publication status](docs/publication.md).
+
 ## Install
 
 Add the catalog once, then install the plugins you want from bb's plugin store:
