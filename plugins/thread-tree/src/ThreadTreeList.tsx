@@ -30,7 +30,6 @@ import { StatusDot } from "./StatusDot";
 import { readViewSettings, type ViewSettings } from "./settings";
 import { formatAge } from "./time";
 import {
-  ancestorsOf,
   buildForest,
   groupRows,
   moveBefore,
@@ -39,6 +38,7 @@ import {
   threadDotState,
   type DotState,
   type GroupMode,
+  type StateCounts,
   type TreeRow,
 } from "./tree";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
@@ -118,21 +118,14 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   const forest = useMemo(() => buildForest(treeThreads), [treeThreads]);
 
-  // Opening a nested thread from anywhere reveals it in the tree.
-  useEffect(() => {
-    if (!activeThreadId) return;
-    const hidden = ancestorsOf(forest, activeThreadId).filter((id) => collapsedThreads.has(id));
-    if (hidden.length > 0) collapsedThreads.remove(hidden);
-  }, [activeThreadId, forest, collapsedThreads]);
-
   const projectOrder = useMemo(
     () => (projectOrderMode === "fixed" ? resolveProjectOrder(savedProjectOrder, projects) : null),
     [projectOrderMode, savedProjectOrder, projects],
   );
   const canReorder = groupMode === "project" && projectOrder !== null;
   const groups = useMemo(
-    () => groupRows(forest, collapsedThreads.values, collapsedGroups.values, groupMode, projectOrder),
-    [forest, collapsedThreads.values, collapsedGroups.values, groupMode, projectOrder],
+    () => groupRows(forest, collapsedThreads.values, collapsedGroups.values, groupMode, projectOrder, activeThreadId ?? null),
+    [forest, collapsedThreads.values, collapsedGroups.values, groupMode, projectOrder, activeThreadId],
   );
   const showMoreRecent = flags.has("recent-more");
   const recentHidden = !view.showRecent || collapsedGroups.has("recent");
@@ -239,7 +232,9 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                     descendantCount: 0,
                     hasChildren: false,
                     isExpanded: false,
-                    hiddenState: null,
+                    hiddenCounts: null,
+                  isPeek: false,
+                  hasVisibleChildren: false,
                     guides: [],
                   },
                   "recent",
@@ -522,7 +517,7 @@ function ThreadRowView({
           onOpen(thread, event);
         }}
       >
-        {isTree ? <TreeGuides depth={depth} guides={row.guides} hasOpenChildren={row.isExpanded} /> : null}
+        {isTree ? <TreeGuides depth={depth} guides={row.guides} hasOpenChildren={row.hasVisibleChildren} isPeek={row.isPeek} /> : null}
         {isTree && row.hasChildren ? (
           <button
             type="button"
@@ -559,22 +554,9 @@ function ThreadRowView({
           <span className={cn("min-w-0 truncate", thread.isUnread && "font-semibold text-sidebar-foreground")}>
             <ThreadTitle threadId={thread.id} />
           </span>
-          {view.showProviderIcon ? (
-            <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
-              <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3" />
-            </span>
-          ) : null}
         </a>
         <span aria-hidden className="min-w-0 flex-1" />
-        {isTree && row.hasChildren && !row.isExpanded ? (
-          <span
-            className="flex shrink-0 items-center gap-1 text-2xs tabular-nums text-sidebar-foreground/50"
-            title={`${row.descendantCount} subthread${row.descendantCount === 1 ? "" : "s"}`}
-          >
-            {row.hiddenState ? <StatusDot state={row.hiddenState} /> : null}
-            {row.descendantCount}
-          </span>
-        ) : null}
+        {isTree && row.hiddenCounts ? <FoldSummary counts={row.hiddenCounts} /> : null}
         {/* On hover these slide left, clear of the action buttons, rather than being covered. */}
         <span
           style={{ "--slide": `${slidePx}px` } as React.CSSProperties}
@@ -585,6 +567,11 @@ function ThreadRowView({
           )}
         >
           {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
+          {view.showProviderIcon ? (
+            <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
+              <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3" />
+            </span>
+          ) : null}
           {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
         </span>
         {view.showAge ? (
@@ -680,14 +667,49 @@ function RetryButton({ threadId }: { threadId: string }) {
   );
 }
 
+const FOLD_STATES: readonly { state: DotState; label: string }[] = [
+  { state: "running", label: "running" },
+  { state: "error", label: "failed" },
+  { state: "done", label: "done" },
+];
+
+/** What a fold hides, by state; threads needing input never hide, so they are not counted. */
+function FoldSummary({ counts }: { counts: StateCounts }) {
+  const parts = FOLD_STATES.filter(({ state }) => (counts[state] ?? 0) > 0);
+  if (parts.length === 0) return null;
+  const description = parts.map(({ state, label }) => `${counts[state]} ${label}`).join(" · ");
+  return (
+    <span title={`Folded: ${description}`} aria-label={`Folded subthreads: ${description}`} className="flex shrink-0 items-center gap-1.5 text-2xs tabular-nums text-sidebar-foreground/50">
+      {parts.map(({ state }) => (
+        <span key={state} className="flex items-center gap-0.5">
+          <StatusDot state={state} className="animate-none" />
+          {counts[state]}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** Rows sit this far apart; continuing lines reach across the gap. */
 const ROW_GAP_PX = 2;
 const GLYPH_CENTER_PX = 8;
 
 /** Connector lines: straight through levels that continue, an elbow at the row's own level. */
-function TreeGuides({ depth, guides, hasOpenChildren }: { depth: number; guides: boolean[]; hasOpenChildren: boolean }) {
+function TreeGuides({
+  depth,
+  guides,
+  hasOpenChildren,
+  isPeek,
+}: {
+  depth: number;
+  guides: boolean[];
+  hasOpenChildren: boolean;
+  /** Dashed: the row shows through its parent's fold. */
+  isPeek: boolean;
+}) {
   const lineX = (level: number) => ROW_PAD_PX + level * INDENT_PX + GLYPH_CENTER_PX;
   const line = "pointer-events-none absolute border-sidebar-foreground/20";
+  const ownLine = cn(line, isPeek && "border-dashed");
   return (
     <>
       {guides.map((continues, level) => {
@@ -701,11 +723,11 @@ function TreeGuides({ depth, guides, hasOpenChildren }: { depth: number; guides:
           <span key={level}>
             <span
               aria-hidden
-              className={cn(line, "top-0 h-1/2 rounded-bl-md border-b border-l")}
+              className={cn(ownLine, "top-0 h-1/2 rounded-bl-md border-b border-l")}
               style={{ left: lineX(level), width: INDENT_PX - GLYPH_CENTER_PX - 2 }}
             />
             {continues ? (
-              <span aria-hidden className={cn(line, "top-1/2 border-l")} style={{ left: lineX(level), bottom: -ROW_GAP_PX }} />
+              <span aria-hidden className={cn(ownLine, "top-1/2 border-l")} style={{ left: lineX(level), bottom: -ROW_GAP_PX }} />
             ) : null}
           </span>
         );

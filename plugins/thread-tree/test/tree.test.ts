@@ -72,8 +72,9 @@ test("collapsing hides the subtree and flags live work inside it", () => {
   const threads = [thread("root"), thread("kid", { parentThreadId: "root", status: "active" })];
   const rows = groupRows(buildForest(threads), new Set(["root"]), new Set())[0]!.rows;
   assert.deepEqual(ids(rows), ["root"]);
-  assert.equal(rows[0]!.hiddenState, "running");
+  assert.deepEqual(rows[0]!.hiddenCounts, { running: 1 });
   assert.equal(rows[0]!.descendantCount, 1);
+  assert.equal(rows[0]!.hasVisibleChildren, false);
 });
 
 test("pinned threads detach into the Pinned group with their subtree", () => {
@@ -134,21 +135,48 @@ test("thread dot: input, then unread error, then running, else done", () => {
   assert.equal(threadDotState(thread("t")), "done");
 });
 
-test("a collapsed parent shows its most urgent descendant, at any depth", () => {
+test("a fold counts what it hides by state, at any depth, and lets input peek out", () => {
   const threads = [
     thread("root"),
-    thread("busy", { parentThreadId: "root", status: "active" }),
-    thread("mid", { parentThreadId: "root" }),
+    thread("busy", { parentThreadId: "root", status: "active", createdAt: 1 }),
+    thread("mid", { parentThreadId: "root", createdAt: 2 }),
     thread("asking", { parentThreadId: "mid", hasPendingInteraction: true }),
-    thread("broke", { parentThreadId: "root", indicator: "unread-error" }),
+    thread("broke", { parentThreadId: "root", indicator: "unread-error", createdAt: 3 }),
   ];
   const forest = buildForest(threads);
-  assert.equal(groupRows(forest, new Set(["root"]), new Set())[0]!.rows[0]!.hiddenState, "input");
-  const midCollapsed = groupRows(forest, new Set(["mid"]), new Set())[0]!.rows;
-  assert.equal(midCollapsed.find((r) => r.thread.id === "mid")!.hiddenState, "input");
-  assert.equal(midCollapsed.find((r) => r.thread.id === "root")!.hiddenState, null);
-  const calm = buildForest([thread("p"), thread("c", { parentThreadId: "p" })]);
-  assert.equal(groupRows(calm, new Set(["p"]), new Set())[0]!.rows[0]!.hiddenState, "done");
+  const rootFolded = groupRows(forest, new Set(["root"]), new Set())[0]!.rows;
+  assert.deepEqual(ids(rootFolded), ["root", "-asking"]);
+  assert.deepEqual(rootFolded[0]!.hiddenCounts, { running: 1, done: 1, error: 1 });
+  assert.equal(rootFolded[0]!.hasVisibleChildren, true);
+  assert.equal(rootFolded[1]!.isPeek, true);
+  assert.deepEqual(rootFolded[1]!.guides, [false]);
+
+  const midFolded = groupRows(forest, new Set(["mid"]), new Set())[0]!.rows;
+  assert.deepEqual(ids(midFolded), ["root", "-busy", "-mid", "--asking", "-broke"]);
+  assert.deepEqual(midFolded.find((r) => r.thread.id === "mid")!.hiddenCounts, {});
+  assert.equal(midFolded.find((r) => r.thread.id === "root")!.hiddenCounts, null);
+  assert.equal(midFolded.find((r) => r.thread.id === "busy")!.isPeek, false);
+});
+
+test("the open thread shows through its folded ancestors until it is left", () => {
+  const threads = [
+    thread("root"),
+    thread("mid", { parentThreadId: "root", createdAt: 1 }),
+    thread("open", { parentThreadId: "mid" }),
+    thread("open-kid", { parentThreadId: "open", status: "active" }),
+    thread("other", { parentThreadId: "root", createdAt: 2 }),
+  ];
+  const forest = buildForest(threads);
+  const folded = new Set(["root", "mid"]);
+  const whileOpen = groupRows(forest, folded, new Set(), "project", null, "open")[0]!.rows;
+  assert.deepEqual(ids(whileOpen), ["root", "-open", "--open-kid"]);
+  assert.deepEqual(whileOpen[0]!.hiddenCounts, { done: 2 });
+  assert.equal(whileOpen[1]!.isPeek, true);
+  assert.equal(whileOpen[2]!.isPeek, false);
+
+  const afterLeaving = groupRows(forest, folded, new Set(), "project", null, "elsewhere")[0]!.rows;
+  assert.deepEqual(ids(afterLeaving), ["root"]);
+  assert.deepEqual(afterLeaving[0]!.hiddenCounts, { done: 3, running: 1 });
 });
 
 test("status grouping files a root by its most urgent subtree state, urgent groups first", () => {

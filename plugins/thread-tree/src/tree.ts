@@ -26,8 +26,12 @@ export interface TreeRow<T extends TreeThread> {
   descendantCount: number;
   hasChildren: boolean;
   isExpanded: boolean;
-  /** The most urgent state among a collapsed thread's descendants. */
-  hiddenState: DotState | null;
+  /** A collapsed thread's folded-away descendants by state; null when expanded or childless. */
+  hiddenCounts: StateCounts | null;
+  /** Shown through a collapsed ancestor: the open thread, or one that needs input. */
+  isPeek: boolean;
+  /** Rows hang directly beneath it: its children, or descendants peeking out of the fold. */
+  hasVisibleChildren: boolean;
   /**
    * One entry per level above this row: whether that level's guide line runs
    * on past this row. The last entry is this row's own: false bends it into an
@@ -38,6 +42,8 @@ export interface TreeRow<T extends TreeThread> {
 
 /** Dot colors, shared by thread rollups and subagents. */
 export type DotState = "input" | "error" | "running" | "done" | "stopped";
+
+export type StateCounts = Partial<Record<DotState, number>>;
 
 /** Most urgent first: what needs the user, then what broke, then live work. */
 const THREAD_DOT_PRIORITY: readonly DotState[] = ["input", "error", "running", "done"];
@@ -150,45 +156,58 @@ export function isWorking(thread: TreeThread): boolean {
   return WORKING_INDICATORS.has(thread.indicator);
 }
 
-/** Depth-first rows under each root, skipping the subtrees of collapsed threads. */
+/**
+ * Depth-first rows under each root. A collapsed thread hides its subtree except
+ * the open thread and threads that need input, which peek out right beneath it.
+ */
 export function flattenRows<T extends TreeThread>(
   forest: Forest<T>,
   roots: readonly T[],
   collapsed: ReadonlySet<string>,
+  activeThreadId: string | null = null,
 ): TreeRow<T>[] {
   const rows: TreeRow<T>[] = [];
-  const stats = new Map<string, { count: number; state: DotState | null }>();
-  const statsOf = (thread: T): { count: number; state: DotState | null } => {
-    const cached = stats.get(thread.id);
-    if (cached) return cached;
-    let count = 0;
-    let state: DotState | null = null;
-    for (const kid of forest.children.get(thread.id) ?? []) {
-      const kidStats = statsOf(kid);
-      count += 1 + kidStats.count;
-      state = moreUrgent(state, threadDotState(kid));
-      if (kidStats.state) state = moreUrgent(state, kidStats.state);
-    }
-    const result = { count, state };
-    stats.set(thread.id, result);
-    return result;
+  const kidsOf = (thread: T) => forest.children.get(thread.id) ?? [];
+  const peeksOut = (thread: T) => thread.id === activeThreadId || threadDotState(thread) === "input";
+  const counts = new Map<string, number>();
+  const countOf = (thread: T): number => {
+    const cached = counts.get(thread.id);
+    if (cached !== undefined) return cached;
+    const count = kidsOf(thread).reduce((sum, kid) => sum + 1 + countOf(kid), 0);
+    counts.set(thread.id, count);
+    return count;
   };
-  const walk = (thread: T, depth: number, guides: boolean[]) => {
-    const kids = forest.children.get(thread.id) ?? [];
+  const fold = (thread: T) => {
+    const hidden: StateCounts = {};
+    const peeking: T[] = [];
+    const visit = (kid: T) => {
+      if (peeksOut(kid)) return void peeking.push(kid);
+      const state = threadDotState(kid);
+      hidden[state] = (hidden[state] ?? 0) + 1;
+      kidsOf(kid).forEach(visit);
+    };
+    kidsOf(thread).forEach(visit);
+    return { hidden, peeking };
+  };
+  const walk = (thread: T, depth: number, guides: boolean[], isPeek: boolean) => {
+    const kids = kidsOf(thread);
     const isExpanded = kids.length > 0 && !collapsed.has(thread.id);
-    const { count, state } = statsOf(thread);
+    const folded = kids.length > 0 && !isExpanded ? fold(thread) : null;
+    const below = folded ? folded.peeking : kids;
     rows.push({
       thread,
       depth,
-      descendantCount: count,
+      descendantCount: countOf(thread),
       hasChildren: kids.length > 0,
       isExpanded,
-      hiddenState: isExpanded ? null : state,
+      hiddenCounts: folded?.hidden ?? null,
+      isPeek,
+      hasVisibleChildren: below.length > 0,
       guides,
     });
-    if (isExpanded) kids.forEach((kid, index) => walk(kid, depth + 1, [...guides, index < kids.length - 1]));
+    below.forEach((kid, index) => walk(kid, depth + 1, [...guides, index < below.length - 1], folded !== null));
   };
-  for (const root of roots) walk(root, 0, []);
+  for (const root of roots) walk(root, 0, [], false);
   return rows;
 }
 
@@ -206,6 +225,7 @@ export function groupRows<T extends TreeThread>(
   mode: GroupMode = "project",
   /** Project ids in display order; null orders projects by latest activity. */
   projectOrder: readonly string[] | null = null,
+  activeThreadId: string | null = null,
 ): TreeGroup<T>[] {
   const pinned = forest.roots.filter((root) => root.isPinned).sort(byPinOrder);
   const buckets = new Map<string, { projectId: string | null; roots: T[] }>();
@@ -225,7 +245,7 @@ export function groupRows<T extends TreeThread>(
     projectId,
     rootCount: roots.length,
     latestActivityAt: Math.max(0, ...roots.map((root) => root.updatedAt)),
-    rows: collapsedGroups.has(key) ? [] : flattenRows(forest, roots, collapsed),
+    rows: collapsedGroups.has(key) ? [] : flattenRows(forest, roots, collapsed, activeThreadId),
   });
   const rest = [...buckets].map(([key, bucket]) => makeGroup(key, bucket.projectId, bucket.roots));
   if (mode === "status") {
