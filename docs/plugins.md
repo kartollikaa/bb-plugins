@@ -29,7 +29,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations, settings). Run
   `npm run typecheck` too. Components live in `src/`.
 - The thread list slot is exclusive: with several list plugins installed, only one is shown.
-- MIT. Tags: `thread-tree/v0.1.0`, `v0.2.0`.
+- MIT. Tags: `thread-tree/v0.1.0`, `v0.2.0`, `v0.2.1`.
 
 ## reveal-in-finder — `plugins/reveal-in-finder/`
 
