@@ -36,7 +36,6 @@ export function Collapse({ open, children }: { open: boolean; children: ReactNod
       { duration: Math.min(300, 160 + Math.abs(target - current) / 4), easing: EASING, fill: open ? "none" : "forwards" },
     );
     animation.onfinish = () => {
-      // Unclipped for even one frame, the rows' top margin pushes everything below down 2px.
       if (!open) setMounted(false);
       else element.style.overflow = "";
     };
@@ -45,5 +44,6 @@ export function Collapse({ open, children }: { open: boolean; children: ReactNod
     };
   }, [open]);
 
-  return mounted ? <div ref={box}>{children}</div> : null;
+  // flow-root keeps the children's margins inside, so clipping them never shifts the layout.
+  return mounted ? <div ref={box} className="flow-root">{children}</div> : null;
 }
