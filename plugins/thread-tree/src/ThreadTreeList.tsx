@@ -53,7 +53,7 @@ import {
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentSet } from "./usePersistentSet";
 import { useDragReorder, useFlipOrder } from "./useReorder";
-import { ReduceMotionContext } from "./motion";
+import { ReduceMotionContext, useStill } from "./motion";
 import { Collapse } from "./Collapse";
 
 const ROW_PAD_PX = 6;
@@ -133,8 +133,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const projectDrag = useDragReorder(projectOrder ?? [], setSavedProjectOrder);
   const shownProjectOrder = projectOrder && projectDrag.order;
   const groups = useMemo(
-    () => groupRows(forest, collapsedThreads.values, collapsedGroups.values, groupMode, shownProjectOrder, activeThreadId ?? null),
-    [forest, collapsedThreads.values, collapsedGroups.values, groupMode, shownProjectOrder, activeThreadId],
+    () => groupRows(forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId ?? null),
+    [forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId],
   );
   const showMoreRecent = flags.has("recent-more");
   const recentHidden = !view.showRecent || collapsedGroups.has("recent");
@@ -146,9 +146,12 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     const byId = new Map<string, PluginSidebarThread>();
     if (!view.showSubagents) return [];
     if (!recentHidden) for (const thread of recent) byId.set(thread.id, thread);
-    for (const group of groups) for (const row of group.rows) byId.set(row.thread.id, row.thread);
+    for (const group of groups) {
+      if (collapsedGroups.values.has(group.key)) continue;
+      for (const row of group.rows) byId.set(row.thread.id, row.thread);
+    }
     return [...byId.values()];
-  }, [groups, recent, recentHidden, view.showSubagents]);
+  }, [groups, recent, recentHidden, view.showSubagents, collapsedGroups.values]);
   const subagents = useSubagents(visibleThreads);
   const overview = useMemo(() => countStates(threads), [threads]);
   const sectionOrder = useMemo(() => resolveSectionOrder(savedSectionOrder), [savedSectionOrder]);
@@ -384,6 +387,17 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   );
 }
 
+/** Both icons stay mounted so opening and closing cross-fade with a small tilt instead of swapping. */
+function FolderIcon({ isOpen }: { isOpen: boolean }) {
+  const motion = cn("absolute inset-0", !useStill() && "transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none");
+  return (
+    <span aria-hidden className="relative size-3.5 shrink-0">
+      <Icon name="Folder" className={cn(motion, "size-3.5", isOpen ? "-rotate-6 scale-90 opacity-0" : "opacity-100")} />
+      <Icon name="FolderOpen" fallback="Folder" className={cn(motion, "size-3.5", isOpen ? "opacity-100" : "rotate-6 scale-90 opacity-0")} />
+    </span>
+  );
+}
+
 function groupLook(
   key: string,
   project: PluginSidebarProject | undefined,
@@ -404,7 +418,7 @@ function groupLook(
   }
   return {
     title: project?.name ?? "Unknown project",
-    icon: <Icon name={isCollapsed ? "Folder" : "FolderOpen"} fallback="Folder" aria-hidden className="size-3.5" />,
+    icon: <FolderIcon isOpen={!isCollapsed} />,
   };
 }
 

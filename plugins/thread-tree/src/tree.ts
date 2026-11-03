@@ -222,7 +222,6 @@ export type GroupMode = "project" | "status" | "none";
 export function groupRows<T extends TreeThread>(
   forest: Forest<T>,
   collapsed: ReadonlySet<string>,
-  collapsedGroups: ReadonlySet<string>,
   mode: GroupMode = "project",
   /** Project ids in display order; null orders projects by latest activity. */
   projectOrder: readonly string[] | null = null,
@@ -246,7 +245,7 @@ export function groupRows<T extends TreeThread>(
     projectId,
     rootCount: roots.length,
     latestActivityAt: Math.max(0, ...roots.map((root) => root.updatedAt)),
-    rows: collapsedGroups.has(key) ? [] : flattenRows(forest, roots, collapsed, activeThreadId),
+    rows: flattenRows(forest, roots, collapsed, activeThreadId),
   });
   const rest = [...buckets].map(([key, bucket]) => makeGroup(key, bucket.projectId, bucket.roots));
   if (mode === "status") {

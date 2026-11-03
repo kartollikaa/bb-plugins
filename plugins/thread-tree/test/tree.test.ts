@@ -32,26 +32,26 @@ test("children nest under their parent in spawn order, any depth", () => {
     thread("a1", { parentThreadId: "a", createdAt: 3 }),
     thread("other", { updatedAt: 5 }),
   ];
-  const [group] = groupRows(buildForest(threads), new Set(), new Set());
+  const [group] = groupRows(buildForest(threads), new Set());
   assert.deepEqual(ids(group!.rows), ["root", "-a", "--a1", "-b", "other"]);
   assert.equal(group!.rows[0]!.descendantCount, 3);
 });
 
 test("a child in another project still sits under its parent", () => {
   const threads = [thread("parent"), thread("child", { projectId: "p2", parentThreadId: "parent" })];
-  const groups = groupRows(buildForest(threads), new Set(), new Set());
+  const groups = groupRows(buildForest(threads), new Set());
   assert.equal(groups.length, 1);
   assert.deepEqual(ids(groups[0]!.rows), ["parent", "-child"]);
 });
 
 test("lifecycle owner is the fallback parent", () => {
   const threads = [thread("owner"), thread("worker", { lifecycleOwnerThreadId: "owner" })];
-  assert.deepEqual(ids(groupRows(buildForest(threads), new Set(), new Set())[0]!.rows), ["owner", "-worker"]);
+  assert.deepEqual(ids(groupRows(buildForest(threads), new Set())[0]!.rows), ["owner", "-worker"]);
 });
 
 test("hidden threads drop out; orphans become roots", () => {
   const threads = [thread("orphan", { parentThreadId: "gone" }), thread("ghost", { isHidden: true })];
-  assert.deepEqual(ids(groupRows(buildForest(threads), new Set(), new Set())[0]!.rows), ["orphan"]);
+  assert.deepEqual(ids(groupRows(buildForest(threads), new Set())[0]!.rows), ["orphan"]);
 });
 
 test("archived threads nest like active ones, for the archived view", () => {
@@ -59,18 +59,18 @@ test("archived threads nest like active ones, for the archived view", () => {
     thread("parent", { isArchived: true, updatedAt: 2 }),
     thread("kid", { isArchived: true, parentThreadId: "parent", updatedAt: 1 }),
   ];
-  assert.deepEqual(ids(groupRows(buildForest(threads), new Set(), new Set())[0]!.rows), ["parent", "-kid"]);
+  assert.deepEqual(ids(groupRows(buildForest(threads), new Set())[0]!.rows), ["parent", "-kid"]);
 });
 
 test("a parent cycle still draws every thread exactly once", () => {
   const threads = [thread("x", { parentThreadId: "y", updatedAt: 2 }), thread("y", { parentThreadId: "x", updatedAt: 1 })];
-  const rows = groupRows(buildForest(threads), new Set(), new Set())[0]!.rows;
+  const rows = groupRows(buildForest(threads), new Set())[0]!.rows;
   assert.deepEqual(ids(rows), ["x", "-y"]);
 });
 
 test("collapsing hides the subtree and flags live work inside it", () => {
   const threads = [thread("root"), thread("kid", { parentThreadId: "root", status: "active" })];
-  const rows = groupRows(buildForest(threads), new Set(["root"]), new Set())[0]!.rows;
+  const rows = groupRows(buildForest(threads), new Set(["root"]))[0]!.rows;
   assert.deepEqual(ids(rows), ["root"]);
   assert.deepEqual(rows[0]!.foldCounts, { running: 1 });
   assert.equal(rows[0]!.descendantCount, 1);
@@ -83,16 +83,16 @@ test("pinned threads detach into the Pinned group with their subtree", () => {
     thread("pinnedKid", { parentThreadId: "parent", isPinned: true, pinSortKey: "a" }),
     thread("grandkid", { parentThreadId: "pinnedKid" }),
   ];
-  const groups = groupRows(buildForest(threads), new Set(), new Set());
+  const groups = groupRows(buildForest(threads), new Set());
   assert.deepEqual(groups.map((g) => g.key), ["pinned", "project:p1"]);
   assert.deepEqual(ids(groups[0]!.rows), ["pinnedKid", "-grandkid"]);
   assert.deepEqual(ids(groups[1]!.rows), ["parent"]);
 });
 
-test("projects order by their latest activity; a collapsed group has no rows", () => {
+test("projects order by their latest activity", () => {
   const threads = [thread("old", { projectId: "a", updatedAt: 1 }), thread("new", { projectId: "b", updatedAt: 5 })];
-  const groups = groupRows(buildForest(threads), new Set(), new Set(["project:a"]));
-  assert.deepEqual(groups.map((g) => [g.key, g.rows.length]), [["project:b", 1], ["project:a", 0]]);
+  const groups = groupRows(buildForest(threads), new Set());
+  assert.deepEqual(groups.map((g) => [g.key, g.rows.length]), [["project:b", 1], ["project:a", 1]]);
 });
 
 test("ancestorsOf walks to the root", () => {
@@ -144,14 +144,14 @@ test("a fold counts its whole subtree by state, at any depth, and lets input pee
     thread("broke", { parentThreadId: "root", indicator: "unread-error", createdAt: 3 }),
   ];
   const forest = buildForest(threads);
-  const rootFolded = groupRows(forest, new Set(["root"]), new Set())[0]!.rows;
+  const rootFolded = groupRows(forest, new Set(["root"]))[0]!.rows;
   assert.deepEqual(ids(rootFolded), ["root", "-asking"]);
   assert.deepEqual(rootFolded[0]!.foldCounts, { running: 1, done: 1, input: 1, error: 1 });
   assert.equal(rootFolded[0]!.hasVisibleChildren, true);
   assert.equal(rootFolded[1]!.isPeek, true);
   assert.deepEqual(rootFolded[1]!.guides, [false]);
 
-  const midFolded = groupRows(forest, new Set(["mid"]), new Set())[0]!.rows;
+  const midFolded = groupRows(forest, new Set(["mid"]))[0]!.rows;
   assert.deepEqual(ids(midFolded), ["root", "-busy", "-mid", "--asking", "-broke"]);
   assert.deepEqual(midFolded.find((r) => r.thread.id === "mid")!.foldCounts, { input: 1 });
   assert.equal(midFolded.find((r) => r.thread.id === "root")!.foldCounts, null);
@@ -168,13 +168,13 @@ test("the open thread shows through its folded ancestors until it is left", () =
   ];
   const forest = buildForest(threads);
   const folded = new Set(["root", "mid"]);
-  const whileOpen = groupRows(forest, folded, new Set(), "project", null, "open")[0]!.rows;
+  const whileOpen = groupRows(forest, folded, "project", null, "open")[0]!.rows;
   assert.deepEqual(ids(whileOpen), ["root", "-open", "--open-kid"]);
   assert.deepEqual(whileOpen[0]!.foldCounts, { done: 3, running: 1 });
   assert.equal(whileOpen[1]!.isPeek, true);
   assert.equal(whileOpen[2]!.isPeek, false);
 
-  const afterLeaving = groupRows(forest, folded, new Set(), "project", null, "elsewhere")[0]!.rows;
+  const afterLeaving = groupRows(forest, folded, "project", null, "elsewhere")[0]!.rows;
   assert.deepEqual(ids(afterLeaving), ["root"]);
   assert.deepEqual(afterLeaving[0]!.foldCounts, { done: 3, running: 1 });
 });
@@ -188,7 +188,7 @@ test("status grouping files a root by its most urgent subtree state, urgent grou
     thread("broke", { indicator: "unread-error" }),
     thread("pin", { isPinned: true, status: "active" }),
   ];
-  const groups = groupRows(buildForest(threads), new Set(), new Set(), "status");
+  const groups = groupRows(buildForest(threads), new Set(), "status");
   assert.deepEqual(
     groups.map((g) => [g.key, ids(g.rows)]),
     [
@@ -203,7 +203,7 @@ test("status grouping files a root by its most urgent subtree state, urgent grou
 
 test("no grouping puts every unpinned root in one group by activity", () => {
   const threads = [thread("a", { projectId: "x", updatedAt: 1 }), thread("b", { projectId: "y", updatedAt: 2 })];
-  const groups = groupRows(buildForest(threads), new Set(), new Set(), "none");
+  const groups = groupRows(buildForest(threads), new Set(), "none");
   assert.deepEqual(groups.map((g) => [g.key, ids(g.rows)]), [["all", ["b", "a"]]]);
 });
 
@@ -235,7 +235,7 @@ test("guide lines run on past middle children and bend at the last one", () => {
     thread("a1", { parentThreadId: "a", createdAt: 2 }),
     thread("b", { parentThreadId: "root", createdAt: 3 }),
   ];
-  const rows = groupRows(buildForest(threads), new Set(), new Set())[0]!.rows;
+  const rows = groupRows(buildForest(threads), new Set())[0]!.rows;
   assert.deepEqual(
     rows.map((r) => [r.thread.id, r.guides]),
     [
@@ -250,9 +250,9 @@ test("guide lines run on past middle children and bend at the last one", () => {
 test("a fixed project order ignores activity", () => {
   const threads = [thread("a", { projectId: "pa", updatedAt: 1 }), thread("b", { projectId: "pb", updatedAt: 9 })];
   const forest = buildForest(threads);
-  assert.deepEqual(groupRows(forest, new Set(), new Set(), "project", ["pa", "pb"]).map((g) => g.key), ["project:pa", "project:pb"]);
-  assert.deepEqual(groupRows(forest, new Set(), new Set(), "project", null).map((g) => g.key), ["project:pb", "project:pa"]);
-  assert.deepEqual(groupRows(forest, new Set(), new Set(), "project", ["pb"]).map((g) => g.key), ["project:pb", "project:pa"]);
+  assert.deepEqual(groupRows(forest, new Set(), "project", ["pa", "pb"]).map((g) => g.key), ["project:pa", "project:pb"]);
+  assert.deepEqual(groupRows(forest, new Set(), "project", null).map((g) => g.key), ["project:pb", "project:pa"]);
+  assert.deepEqual(groupRows(forest, new Set(), "project", ["pb"]).map((g) => g.key), ["project:pb", "project:pa"]);
 });
 
 test("project order keeps the saved order, then bb's with personal first, and drops gone ids", () => {
