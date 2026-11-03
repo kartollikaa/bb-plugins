@@ -130,6 +130,32 @@
           "tagPrefix": "artifacts/"
         }
       }
+    },
+    {
+      "id": "thread-switcher",
+      "displayName": "Thread Switcher",
+      "description": "Switch between recent threads with a hotkey (Control+Tab by default) and see a preview of each chat.",
+      "icon": {
+        "url": "./icons/thread-switcher.svg"
+      },
+      "tags": [
+        "threads",
+        "navigation",
+        "keyboard",
+        "shortcut"
+      ],
+      "author": {
+        "name": "Dmitrii Maksimov",
+        "github": "kartollikaa"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/kartollikaa/bb-plugins.git",
+          "subdir": "plugins/thread-switcher",
+          "range": "^0.1.0",
+          "tagPrefix": "thread-switcher/"
+        }
+      }
     }
   ]
 }
