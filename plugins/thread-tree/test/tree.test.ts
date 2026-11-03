@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ancestorsOf, buildForest, effectiveState, groupRows, moveBefore, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
+import { ancestorsOf, buildForest, countStates, effectiveState, groupRows, moveBefore, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
@@ -276,4 +276,15 @@ test("a thread whose turn failed is red even once read, and outranks live backgr
   const busy = { backgroundAgents: 0, backgroundCommands: 1, workflows: 0 };
   assert.equal(threadDotState(thread("t", { status: "error" })), "error");
   assert.equal(threadDotState(thread("t", { status: "error", activity: busy, indicator: "runtime" })), "error");
+});
+
+test("the overview counts visible active threads by their own state", () => {
+  const counts = countStates([
+    thread("a", { status: "active" }),
+    thread("b", { hasPendingInteraction: true }),
+    thread("c", { status: "active", isArchived: true }),
+    thread("d", { isHidden: true, status: "active" }),
+    thread("e"),
+  ]);
+  assert.deepEqual(counts, { running: 1, input: 1, done: 1 });
 });

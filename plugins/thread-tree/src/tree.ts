@@ -274,6 +274,17 @@ function subtreeDotState<T extends TreeThread>(forest: Forest<T>, root: T): DotS
   return state;
 }
 
+/** Visible, unarchived threads counted by their own dot state. */
+export function countStates(threads: readonly TreeThread[]): StateCounts {
+  const counts: StateCounts = {};
+  for (const thread of threads) {
+    if (thread.isHidden || thread.isArchived) continue;
+    const state = threadDotState(thread);
+    counts[state] = (counts[state] ?? 0) + 1;
+  }
+  return counts;
+}
+
 /** The most recently active visible threads, children included, newest first. */
 export function recentThreads<T extends TreeThread>(threads: readonly T[], limit: number): T[] {
   return threads

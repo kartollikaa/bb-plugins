@@ -25,6 +25,7 @@ under it, and the subagents it runs inside its own session show on its row.
   in the same grouping and nesting; Show more loads older pages. Hovering an
   archived row offers bb's own Unarchive. Automations and Recent Activity stay
   on active threads.
+- The top line counts active threads that need input, failed or are running.
 - Each child thread sits under the thread that spawned it, at any depth, even
   when it lives in another project. A parent's status dot turns into a
   chevron on hover; click it to fold the subtree. A folded parent gets a line
@@ -48,8 +49,10 @@ under it, and the subagents it runs inside its own session show on its row.
 
 ## Settings
 
-Settings → Installed plugins → Thread Tree hides the GitHub, Automations and
-Recent Activity sections, sets how many Recent Activity rows show before and
+Right-click the GitHub, Automations or Recent Activity header and choose
+Remove from sidebar; Sections at the top of the list brings any of them back
+or hides them. The same switches live in Settings → Installed plugins →
+Thread Tree, which also sets how many Recent Activity rows show before and
 after Show more, and turns off the provider icon, the subagent counters or the
 age label on each row.
 

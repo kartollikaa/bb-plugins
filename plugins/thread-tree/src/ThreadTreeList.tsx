@@ -32,6 +32,7 @@ import { readViewSettings, SIDEBAR_SECTIONS, type SectionKey, type ViewSettings 
 import { formatAge } from "./time";
 import {
   buildForest,
+  countStates,
   groupRows,
   moveBefore,
   recentThreads,
@@ -138,6 +139,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     return [...byId.values()];
   }, [groups, recent, recentHidden, view.showSubagents]);
   const subagents = useSubagents(visibleThreads);
+  const overview = useMemo(() => countStates(threads), [threads]);
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const { providers } = useProviders();
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
@@ -198,7 +200,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   return (
     <div className="flex flex-col gap-3 px-1.5 pb-3 pt-1">
-      <div className="-mb-2 flex h-5 items-center justify-end px-1.5">
+      <div className="-mb-2 flex h-5 items-center justify-between gap-2 px-1.5">
+        <ActivityOverview counts={overview} />
         <SectionsMenu view={view} onChange={setSection} />
       </div>
       {view.showGithub ? (
@@ -395,6 +398,28 @@ function groupLook(
     title: project?.name ?? "Unknown project",
     icon: <Icon name={isCollapsed ? "Folder" : "FolderOpen"} fallback="Folder" aria-hidden className="size-3.5" />,
   };
+}
+
+const OVERVIEW_STATES: readonly { state: DotState; label: string }[] = [
+  { state: "input", label: "need input" },
+  { state: "error", label: "failed" },
+  { state: "running", label: "running" },
+];
+
+/** What needs attention across all active threads, at a glance. */
+function ActivityOverview({ counts }: { counts: StateCounts }) {
+  const parts = OVERVIEW_STATES.filter(({ state }) => (counts[state] ?? 0) > 0);
+  if (parts.length === 0) return <span className="truncate text-2xs text-sidebar-foreground/40">Nothing running</span>;
+  return (
+    <span role="status" className="flex min-w-0 items-center gap-2.5 overflow-hidden text-2xs tabular-nums text-sidebar-foreground/60">
+      {parts.map(({ state, label }) => (
+        <span key={state} className="flex shrink-0 items-center gap-1">
+          <StatusDot state={state} className="size-1.5" />
+          {counts[state]} {label}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 /** Section visibility lives in the plugin settings; a toggle applies at once and saves in the background. */
