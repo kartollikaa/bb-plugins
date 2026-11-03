@@ -3,7 +3,7 @@ import { placeNear } from "./tree";
 
 /**
  * Drag-to-reorder where the list itself reorders under the pointer while dragging.
- * Items must sit in a positioned container so `offsetTop` is measured from it.
+ * Items must be direct children of the element given `containerProps`, positioned so `offsetTop` is measured from it.
  */
 export function useDragReorder<Id extends string>(order: readonly Id[], commit: (next: Id[]) => void) {
   const [drag, setDrag] = useState<{ id: Id; preview: Id[] } | null>(null);
@@ -52,25 +52,28 @@ export function useDragReorder<Id extends string>(order: readonly Id[], commit: 
       // Chrome ends a drag at once if the DOM changes inside dragstart, and blocks fold to headers on drag.
       setTimeout(() => setDrag({ id, preview }), 0);
     },
-    onDragOver: (event: DragEvent<HTMLElement>) => {
-      if (!drag) return;
-      event.preventDefault();
-      if (id === drag.id) return;
-      const block = event.currentTarget;
-      const containerTop = (block.offsetParent as HTMLElement | null)?.getBoundingClientRect().top ?? 0;
-      const after = event.clientY - containerTop > block.offsetTop + block.offsetHeight / 2;
-      const next = placeNear(drag.preview, drag.id, id, after);
-      if (next.every((entry, index) => entry === drag.preview[index])) return;
-      pin.current?.stopHolding();
-      setDrag({ id: drag.id, preview: next });
-    },
+    "data-reorder-id": id,
     onDrop: drop,
     onDragEnd: () => setTimeout(() => setDrag(null), 0),
   });
 
   const containerProps = {
-    onDragOver: (event: DragEvent) => {
-      if (drag) event.preventDefault();
+    // The pointer's height alone picks the slot, so gaps and the pin's spacer are drop places too.
+    onDragOver: (event: DragEvent<HTMLElement>) => {
+      if (!drag) return;
+      event.preventDefault();
+      const container = event.currentTarget;
+      const y = event.clientY - container.getBoundingClientRect().top;
+      const others = Array.from(container.querySelectorAll<HTMLElement>(":scope > [data-reorder-id]")).filter(
+        (block) => block.dataset.reorderId !== drag.id,
+      );
+      if (others.length === 0) return;
+      const below = others.find((block) => y < block.offsetTop + block.offsetHeight / 2);
+      const target = (below ?? others[others.length - 1]!).dataset.reorderId as Id;
+      const next = placeNear(drag.preview, drag.id, target, below === undefined);
+      if (next.every((entry, index) => entry === drag.preview[index])) return;
+      pin.current?.stopHolding();
+      setDrag({ id: drag.id, preview: next });
     },
     onDrop: drop,
   };

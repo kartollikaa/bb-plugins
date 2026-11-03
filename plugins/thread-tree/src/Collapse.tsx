@@ -30,7 +30,8 @@ export function Collapse({ open, children }: { open: boolean; children: ReactNod
         { height: `${current}px`, opacity: open ? 0.4 : 1 },
         { height: `${target}px`, opacity: open ? 1 : 0 },
       ],
-      { duration: Math.min(300, 160 + Math.abs(target - current) / 4), easing: EASING },
+      // Closing holds its last frame: the contents would flash at full height before they unmount.
+      { duration: Math.min(300, 160 + Math.abs(target - current) / 4), easing: EASING, fill: open ? "none" : "forwards" },
     );
     animation.onfinish = () => {
       element.style.overflow = "";
