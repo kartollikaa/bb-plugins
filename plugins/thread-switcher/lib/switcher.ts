@@ -1,3 +1,5 @@
+import { emptyCounts, type DotState, type StateCounts } from "./status.ts";
+
 export const MAX_RECENT = 50;
 export const DEFAULT_THREAD_COUNT = 6;
 export const MIN_THREAD_COUNT = 2;
@@ -80,15 +82,13 @@ export interface ThreadPreview {
   messages: PreviewMessage[];
   /** What the thread is waiting on: a question, an approval or a form. */
   pending: string | null;
-  /** The step a running thread is on, such as "Running npm test". */
-  activity: string | null;
+  subagents: StateCounts;
 }
 
-export const EMPTY_PREVIEW: ThreadPreview = { messages: [], pending: null, activity: null };
+export const EMPTY_PREVIEW: ThreadPreview = { messages: [], pending: null, subagents: emptyCounts() };
 
 const MAX_PREVIEW_MESSAGES = 6;
 const MAX_MESSAGE_CHARS = 600;
-const MAX_ACTIVITY_CHARS = 160;
 
 interface RowLike {
   kind?: unknown;
@@ -106,12 +106,6 @@ interface RowLike {
   toolName?: unknown;
   toolArgs?: unknown;
   status?: unknown;
-  change?: unknown;
-  path?: unknown;
-  query?: unknown;
-  queries?: unknown;
-  url?: unknown;
-  description?: unknown;
 }
 
 function clip(text: string, max: number): string {
@@ -180,66 +174,11 @@ function describePending(row: RowLike, byId: Map<unknown, RowLike>): string | nu
   return null;
 }
 
-function fileName(path: string | null): string | null {
-  return path ? (path.split("/").filter(Boolean).pop() ?? path) : null;
-}
+const SUBAGENT_STATE: Record<string, DotState> = { pending: "running", completed: "done", interrupted: "done", error: "error" };
 
-function shortCommand(command: string): string {
-  return command.split("\n")[0]!.replace(/^(cd\s+\S+\s*&&\s*)+/, "").trim();
-}
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host || url;
-  } catch {
-    return url;
-  }
-}
-
-const INTERACTION_KINDS = new Set(["question", "approval", "form"]);
-
-export function describeActivity(row: RowLike): string | null {
-  if (row.kind !== "work" || row.status !== "pending" || INTERACTION_KINDS.has(row.workKind as string)) return null;
-  const args = row.toolArgs && typeof row.toolArgs === "object" ? (row.toolArgs as Record<string, unknown>) : {};
-  switch (row.workKind) {
-    case "command": {
-      const command = str(row.command);
-      return command ? `Running ${shortCommand(command)}` : "Running a command";
-    }
-    case "file-change": {
-      const name = fileName(str((row.change as { path?: unknown } | null)?.path));
-      return name ? `Editing ${name}` : "Editing files";
-    }
-    case "file-read": {
-      const name = fileName(str(row.path));
-      return name ? `Reading ${name}` : "Reading files";
-    }
-    case "search": {
-      const query = str(row.query);
-      return query ? `Searching for ${query}` : "Searching the code";
-    }
-    case "web-search": {
-      const query = Array.isArray(row.queries) ? str(row.queries[0]) : null;
-      return query ? `Searching the web for ${query}` : "Searching the web";
-    }
-    case "web-fetch": {
-      const url = str(row.url);
-      return url ? `Reading ${hostOf(url)}` : "Reading a web page";
-    }
-    case "delegation":
-      return `Subagent: ${str(row.description) ?? "working"}`;
-    case "workflow":
-      return str(row.description) ? `Workflow: ${str(row.description)}` : "Running a workflow";
-    case "image-generation":
-      return "Generating an image";
-    case "tool": {
-      const detail = str(args.description) ?? str(args.command);
-      const tool = str(row.toolName)?.split("__").pop() ?? "a tool";
-      return detail ? `${tool}: ${shortCommand(detail)}` : `Running ${tool}`;
-    }
-    default:
-      return null;
-  }
+function subagentState(row: RowLike): DotState | null {
+  if (row.kind !== "work" || row.workKind !== "delegation") return null;
+  return SUBAGENT_STATE[row.status as string] ?? null;
 }
 
 export function previewFromTimeline(timeline: unknown): ThreadPreview {
@@ -248,17 +187,18 @@ export function previewFromTimeline(timeline: unknown): ThreadPreview {
   const byId = new Map(rows.map((row) => [row.id, row]));
   const messages: PreviewMessage[] = [];
   let pending: string | null = null;
-  let activity: string | null = null;
+  const subagents = emptyCounts();
   rows.forEach((row, index) => {
     const message = toMessage(row, index);
     if (message) messages.push(message);
     pending = describePending(row, byId) ?? pending;
-    activity = describeActivity(row) ?? activity;
+    const state = subagentState(row);
+    if (state) subagents[state] += 1;
   });
   return {
     messages: messages.slice(-MAX_PREVIEW_MESSAGES),
     pending: pending && clip(pending, MAX_MESSAGE_CHARS),
-    activity: activity && clip(activity, MAX_ACTIVITY_CHARS),
+    subagents,
   };
 }
 

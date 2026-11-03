@@ -10,7 +10,15 @@ import {
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./server.ts";
-import { DOT_LABEL, threadDotState, threadUrgency, type DotState } from "./lib/status.ts";
+import {
+  countTotal,
+  DOT_LABEL,
+  subthreadCounts,
+  threadDotState,
+  threadUrgency,
+  type DotState,
+  type StateCounts,
+} from "./lib/status.ts";
 import {
   DEFAULT_HOTKEY,
   formatHotkey,
@@ -91,6 +99,7 @@ function usePrefetchPreviews(threads: readonly SidebarThread[]) {
 function ThreadSwitcher() {
   const hotkey = useHotkey();
   const { threads, projects } = useSidebarThreads();
+  const subthreads = useMemo(() => subthreadCounts(threads), [threads]);
   const projectNames = useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects]);
   const { threadId: currentId } = useBbContext();
   const recent = useRecentThreads(currentId);
@@ -191,6 +200,7 @@ function ThreadSwitcher() {
             key={thread.id}
             thread={thread}
             projectName={projectNames.get(thread.projectId) ?? null}
+            subthreads={subthreads.get(thread.id) ?? null}
             age={formatAge(thread.updatedAt, Date.now())}
             selected={index === state.index}
             onHover={() => setState((current) => (current ? { ...current, index } : current))}
@@ -208,6 +218,7 @@ function ThreadSwitcher() {
 function ThreadCard({
   thread,
   projectName,
+  subthreads,
   age,
   selected,
   onHover,
@@ -215,6 +226,7 @@ function ThreadCard({
 }: {
   thread: SidebarThread;
   projectName: string | null;
+  subthreads: StateCounts | null;
   age: string;
   selected: boolean;
   onHover: () => void;
@@ -247,7 +259,7 @@ function ThreadCard({
           needsInput ? "border-attention ring-2 ring-attention/50" : selected ? "border-ring" : "border-border"
         }`}
       >
-        <ChatPreview threadId={thread.id} version={thread.updatedAt} dot={dot} />
+        <ChatPreview threadId={thread.id} version={thread.updatedAt} dot={dot} subthreads={subthreads} />
       </div>
       <div className="flex min-w-0 gap-1.5 px-0.5" title={thread.displayTitle}>
         <span className="flex h-4 w-3.5 shrink-0 items-center justify-center" title={DOT_LABEL[dot]}>
@@ -278,8 +290,8 @@ const DOT_CLASS: Record<DotState, string> = {
   done: "bg-success",
 };
 
-function StatusDot({ state }: { state: DotState }) {
-  return <span aria-hidden className={`inline-block size-2 shrink-0 rounded-full ${DOT_CLASS[state]}`} />;
+function StatusDot({ state, className = "size-2" }: { state: DotState; className?: string }) {
+  return <span aria-hidden className={`inline-block shrink-0 rounded-full ${className} ${DOT_CLASS[state]}`} />;
 }
 
 type Sdk = ReturnType<typeof useSdk>;
@@ -323,25 +335,60 @@ function usePreview(threadId: string, version: number, fresh: boolean): ThreadPr
   return previewCache.get(threadId)?.preview ?? null;
 }
 
-function ChatPreview({ threadId, version, dot }: { threadId: string; version: number; dot: DotState }) {
+function ChatPreview({
+  threadId,
+  version,
+  dot,
+  subthreads,
+}: {
+  threadId: string;
+  version: number;
+  dot: DotState;
+  subthreads: StateCounts | null;
+}) {
   const preview = usePreview(threadId, version, dot === "running");
   if (preview === null) {
     return <div className="h-full animate-pulse bg-muted/40" />;
   }
-  const activity = dot === "running" ? preview.activity : null;
+  const recap = subthreads
+    ? { noun: "subthread", counts: subthreads }
+    : countTotal(preview.subagents) > 0
+      ? { noun: "subagent", counts: preview.subagents }
+      : null;
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1">
         <PreviewBody preview={preview} needsInput={dot === "input"} />
       </div>
-      {activity && (
-        <div
-          title={activity}
-          className="shrink-0 truncate border-t border-blue-500/30 bg-blue-500/10 px-2 py-1 text-[9.5px] font-medium leading-tight text-blue-600 dark:text-blue-400"
-        >
-          {activity}
-        </div>
-      )}
+      {recap && <RecapLine noun={recap.noun} counts={recap.counts} />}
+    </div>
+  );
+}
+
+const RECAP_STATES: readonly { state: DotState; label: string }[] = [
+  { state: "input", label: "needs input" },
+  { state: "error", label: "failed" },
+  { state: "running", label: "running" },
+  { state: "done", label: "done" },
+];
+
+function RecapLine({ noun, counts }: { noun: string; counts: StateCounts }) {
+  const total = countTotal(counts);
+  const parts = RECAP_STATES.filter(({ state }) => counts[state] > 0);
+  const shown = parts.filter(({ state }) => state !== "done");
+  const summary = `${total} ${noun}${total === 1 ? "" : "s"}`;
+  return (
+    <div
+      title={[summary, ...parts.map(({ state, label }) => `${counts[state]} ${label}`)].join(", ")}
+      className="flex shrink-0 items-center gap-1.5 overflow-hidden px-1.5 pb-1.5 pt-1 text-[10px] leading-tight tabular-nums text-muted-foreground"
+    >
+      <span className="shrink-0">{shown.length === 0 ? `${summary}, all done` : summary}</span>
+      {shown.map(({ state, label }) => (
+        <span key={state} className="flex shrink-0 items-center gap-0.5">
+          <StatusDot state={state} className="size-1.5 animate-none" />
+          {counts[state]} {label}
+        </span>
+      ))}
     </div>
   );
 }

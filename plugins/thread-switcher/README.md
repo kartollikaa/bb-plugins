@@ -6,8 +6,9 @@ Under the preview: the thread's title on up to two lines, its project and how lo
 active, and its branch. A dot next to the title shows the thread's status, in the same colors as Thread Tree: amber needs your
 input, red failed, blue (pulsing) working, green done. A thread waiting for your answer also gets an
 amber outline, and its card shows the question or the approval it is waiting on instead of the
-latest messages. A working thread's card has a blue line along the bottom of its preview with the
-step it is on, such as "Running npm test" or "Editing app.tsx".
+latest messages. A thread with subthreads has a line at the bottom of its preview
+counting them, as Thread Tree does: "8 subthreads ● 3 running". Without subthreads, the line counts the
+subagents the thread started in its recent turns.
 
 - Press Tab again to move right, Shift+Tab to move left. Arrow keys work too.
 - Let go of Control to open the selected thread. Enter does the same, Esc closes without switching.

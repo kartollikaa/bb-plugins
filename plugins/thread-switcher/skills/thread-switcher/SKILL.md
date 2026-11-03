@@ -17,10 +17,11 @@ Under each preview: the title (up to two lines), the project with the time since
 the branch. Each card has a status dot: amber needs input (a pending question or approval), red failed, blue
 pulsing working, green done — the same rules and colors as Thread Tree's sidebar. A card whose thread
 needs input also has an amber outline, and its preview shows the pending question prompts, the
-command or tool waiting for approval, or the form title instead of the latest messages. A running card shows its current step in a blue line
-under the preview ("Running npm test", "Editing app.tsx", "Subagent: …"), taken from the timeline's
-work row that is still in progress; with no such row (the agent is thinking or writing) the line is
-absent.
+command or tool waiting for approval, or the form title instead of the latest messages. A card whose thread has subthreads (bb child threads,
+at any depth) ends its preview with a recap in Thread Tree's style, "8 subthreads ● 3 running": the
+total plus any that need input, failed or are running; the hover text adds the done count. Without
+subthreads, the same line counts the provider subagents in the thread's recent turns. The switcher
+deliberately doesn't show what a thread or subagent is doing.
 
 ## Settings
 
