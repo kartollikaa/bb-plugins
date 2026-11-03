@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { toast } from "sonner";
 import {
@@ -42,7 +42,6 @@ import {
   buildForest,
   countStates,
   groupRows,
-  moveBefore,
   recentThreads,
   resolveProjectOrder,
   threadDotState,
@@ -53,6 +52,7 @@ import {
 } from "./tree";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentSet } from "./usePersistentSet";
+import { useDragReorder, useFlipOrder } from "./useReorder";
 
 const ROW_PAD_PX = 6;
 /** One level puts a child's status icon under its parent's title. */
@@ -116,9 +116,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const showArchived = lifecycle === "archived";
   const archivedPages = showArchived ? listed.experimental_archived : null;
   const treeThreads = showArchived ? listed.threads : threads;
-  const [drag, setDrag] = useState<{ projectId: string; overId: string | null } | null>(null);
   const [savedSectionOrder, setSavedSectionOrder] = usePersistentList("section-order");
-  const [sectionDrag, setSectionDrag] = useState<{ id: SectionId; overId: SectionId | null } | null>(null);
   const now = useNow(30_000);
   const settingValues = useSettings().values;
   const [view, setSection] = useSectionToggles(useMemo(() => readViewSettings(settingValues), [settingValues]));
@@ -130,9 +128,11 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     [projectOrderMode, savedProjectOrder, projects],
   );
   const canReorder = groupMode === "project" && projectOrder !== null;
+  const projectDrag = useDragReorder(projectOrder ?? [], setSavedProjectOrder);
+  const shownProjectOrder = projectOrder && projectDrag.order;
   const groups = useMemo(
-    () => groupRows(forest, collapsedThreads.values, collapsedGroups.values, groupMode, projectOrder, activeThreadId ?? null),
-    [forest, collapsedThreads.values, collapsedGroups.values, groupMode, projectOrder, activeThreadId],
+    () => groupRows(forest, collapsedThreads.values, collapsedGroups.values, groupMode, shownProjectOrder, activeThreadId ?? null),
+    [forest, collapsedThreads.values, collapsedGroups.values, groupMode, shownProjectOrder, activeThreadId],
   );
   const showMoreRecent = flags.has("recent-more");
   const recentHidden = !view.showRecent || collapsedGroups.has("recent");
@@ -151,7 +151,12 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const subagents = useSubagents(visibleThreads);
   const overview = useMemo(() => countStates(threads), [threads]);
   const sectionOrder = useMemo(() => resolveSectionOrder(savedSectionOrder), [savedSectionOrder]);
-  const shownSections = sectionOrder.filter((id) => view[SECTION_BY_ID[id].key]);
+  const sectionDrag = useDragReorder(sectionOrder, setSavedSectionOrder);
+  const shownSections = sectionDrag.order.filter((id) => view[SECTION_BY_ID[id].key]);
+  const sectionsRef = useRef<HTMLDivElement>(null);
+  const treeRef = useRef<HTMLDivElement>(null);
+  useFlipOrder(sectionsRef, shownSections.join());
+  useFlipOrder(treeRef, groups.map((group) => group.key).join());
   const moveSectionBy = (id: SectionId, step: -1 | 1) => setSavedSectionOrder(moveSection(sectionOrder, shownSections, id, step));
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const { providers } = useProviders();
@@ -212,7 +217,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   );
 
   return (
-    <div className="flex flex-col gap-3 px-1.5 pb-3 pt-1">
+    <div ref={sectionsRef} className="relative flex flex-col gap-3 px-1.5 pb-3 pt-1" {...sectionDrag.containerProps}>
       <div className="-mb-2 flex h-5 items-center justify-between gap-2 px-1.5">
         <ActivityOverview counts={overview} />
         <SectionsMenu view={view} order={sectionOrder} onChange={setSection} />
@@ -227,31 +232,9 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         return (
           <div
             key={id}
-            draggable
-            onDragStart={(event) => {
-              // Links inside are draggable too; only a drag that starts on the section moves it.
-              if (event.target !== event.currentTarget) return;
-              event.dataTransfer.effectAllowed = "move";
-              event.dataTransfer.setData("text/plain", section.label);
-              setSectionDrag({ id, overId: null });
-            }}
-            onDragOver={(event) => {
-              if (!sectionDrag) return;
-              event.preventDefault();
-              if (sectionDrag.overId !== id) setSectionDrag({ ...sectionDrag, overId: id });
-            }}
-            onDrop={(event) => {
-              if (!sectionDrag) return;
-              event.preventDefault();
-              setSavedSectionOrder(moveBefore(sectionOrder, sectionDrag.id, id));
-              setSectionDrag(null);
-            }}
-            onDragEnd={() => setSectionDrag(null)}
-            className={cn(
-              "rounded-md empty:hidden",
-              sectionDrag?.overId === id && sectionDrag.id !== id && "shadow-[inset_0_2px_0_0_var(--color-blue-500)]",
-              sectionDrag?.id === id && "opacity-50",
-            )}
+            data-flip-key={id}
+            {...sectionDrag.itemProps(id)}
+            className={cn("rounded-md transition-opacity empty:hidden", sectionDrag.draggingId === id && "opacity-40")}
           >
             {id === "github" ? (
               <GithubSection
@@ -331,7 +314,13 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
       {treePlaceholder ? <div className="px-3 text-xs text-muted-foreground">{treePlaceholder}</div> : null}
 
-      <div role="tree" aria-label={showArchived ? "Archived threads" : "Threads"} className="flex flex-col gap-3">
+      <div
+        ref={treeRef}
+        role="tree"
+        aria-label={showArchived ? "Archived threads" : "Threads"}
+        className="relative flex flex-col gap-3"
+        {...(canReorder ? projectDrag.containerProps : {})}
+      >
         {groups.map((group) => {
           const isCollapsed = collapsedGroups.has(group.key);
           const project = group.projectId ? projectById.get(group.projectId) : undefined;
@@ -341,30 +330,9 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           return (
             <section
               key={group.key}
-              draggable={reorderable}
-              onDragStart={(event) => {
-                if (!reorderable) return;
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", title);
-                setDrag({ projectId, overId: null });
-              }}
-              onDragOver={(event) => {
-                if (!drag || !reorderable) return;
-                event.preventDefault();
-                if (drag.overId !== projectId) setDrag({ ...drag, overId: projectId });
-              }}
-              onDrop={(event) => {
-                if (!drag || !reorderable || !projectOrder) return;
-                event.preventDefault();
-                setSavedProjectOrder(moveBefore(projectOrder, drag.projectId, projectId));
-                setDrag(null);
-              }}
-              onDragEnd={() => setDrag(null)}
-              className={cn(
-                "rounded-md",
-                drag?.overId === projectId && drag.projectId !== projectId && "shadow-[inset_0_2px_0_0_var(--color-blue-500)]",
-                drag?.projectId === projectId && "opacity-50",
-              )}
+              data-flip-key={group.key}
+              {...(reorderable ? projectDrag.itemProps(projectId) : {})}
+              className={cn("rounded-md transition-opacity", reorderable && projectDrag.draggingId === projectId && "opacity-40")}
             >
               <GroupHeader
                 title={title}

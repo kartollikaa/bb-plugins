@@ -341,11 +341,13 @@ export function resolveProjectOrder(
   return [...kept, ...rest];
 }
 
-/** `order` with `moved` placed right before `target`. */
-export function moveBefore(order: readonly string[], moved: string, target: string): string[] {
+
+/** `order` with `moved` placed right before, or with `after` right after, `target`. */
+export function placeNear<Id extends string>(order: readonly Id[], moved: Id, target: Id, after: boolean): Id[] {
   if (moved === target) return [...order];
   const without = order.filter((id) => id !== moved);
   const index = without.indexOf(target);
-  if (index === -1) return [...without, moved];
-  return [...without.slice(0, index), moved, ...without.slice(index)];
+  if (index === -1) return [...order];
+  const at = after ? index + 1 : index;
+  return [...without.slice(0, at), moved, ...without.slice(at)];
 }

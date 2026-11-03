@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ancestorsOf, buildForest, countStates, effectiveState, groupRows, moveBefore, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
+import { ancestorsOf, buildForest, countStates, effectiveState, groupRows, placeNear, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
@@ -266,12 +266,6 @@ test("project order keeps the saved order, then bb's with personal first, and dr
   assert.deepEqual(resolveProjectOrder(["z", "gone", "x", "z"], projects), ["z", "x", "me", "y"]);
 });
 
-test("moveBefore places a project right before the drop target", () => {
-  assert.deepEqual(moveBefore(["a", "b", "c", "d"], "d", "b"), ["a", "d", "b", "c"]);
-  assert.deepEqual(moveBefore(["a", "b", "c"], "a", "c"), ["b", "a", "c"]);
-  assert.deepEqual(moveBefore(["a", "b"], "a", "a"), ["a", "b"]);
-});
-
 test("a thread whose turn failed is red even once read, and outranks live background work", () => {
   const busy = { backgroundAgents: 0, backgroundCommands: 1, workflows: 0 };
   assert.equal(threadDotState(thread("t", { status: "error" })), "error");
@@ -287,4 +281,12 @@ test("the overview counts visible active threads by their own state", () => {
     thread("e"),
   ]);
   assert.deepEqual(counts, { running: 1, input: 1, done: 1 });
+});
+
+test("placeNear drops a block before or after its target", () => {
+  assert.deepEqual(placeNear(["a", "b", "c"], "a", "c", true), ["b", "c", "a"]);
+  assert.deepEqual(placeNear(["a", "b", "c"], "a", "c", false), ["b", "a", "c"]);
+  assert.deepEqual(placeNear(["a", "b", "c"], "c", "a", false), ["c", "a", "b"]);
+  assert.deepEqual(placeNear(["a", "b", "c"], "b", "b", true), ["a", "b", "c"]);
+  assert.deepEqual(placeNear(["a", "b"], "a", "zz", true), ["a", "b"]);
 });
