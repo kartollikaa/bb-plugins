@@ -150,19 +150,24 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 - **What:** holding the hotkey (setting `hotkey`, `Control+Tab` by default) opens a row of cards for
   the most recently opened threads (setting `threadCount`, 6 by default), each with a preview of the
-  chat's latest messages, a two-line title, project, age and branch, a status dot and an amber outline when the thread needs input. The key moves on, Shift moves back, letting go of the modifier opens the
+  chat's latest messages, a two-line title, project, age and branch, a status dot and an amber outline when the thread needs input; such a card shows the pending
+  question or approval instead. A panel under the cards renders the selected thread's last ten
+  messages with the SDK `Markdown` component. Threads needing input, then failed ones, follow the
+  current thread (setting `attentionFirst`, on by default). The key moves on, Shift moves back, letting go of the modifier opens the
   selection; a tap returns to the previous thread. The settings page has a shortcut recorder.
 - **How:** an `experimental_appOverlay` with capture-phase `keydown`/`keyup` listeners on `window`.
   The visit order is in `localStorage` (`<pluginId>:recent`), updated from `useBbContext().threadId`;
-  threads come from `experimental_useSidebarThreads`. Previews are conversation rows from
-  `sdk.threads.timeline({ segmentLimit: "4" })`, prefetched for the candidate threads and cached per
+  threads come from `experimental_useSidebarThreads`. Previews are conversation rows and the pending
+  question, approval or form work row from `sdk.threads.timeline({ segmentLimit: "4" })`, prefetched for the candidate threads and cached per
   thread by `updatedAt`. `lib/status.ts` copies thread-tree's `threadDotState` and dot colors; change
   both together. The recorder saves through the `setHotkey` RPC. Hotkey parsing, ordering and
   preview extraction are pure functions in `lib/`.
 - **Agent skill:** `skills/thread-switcher/`.
 - **Tests:** `npm test` covers `test/switcher.test.ts` (hotkey parsing and matching, release, visit
-  order, ordering, count, preview extraction, status priority, ages). Run `npm run typecheck`. Opening, stepping, release,
-  tap-back, Esc, the one-row layout and the recorder were checked in the live app.
+  order, ordering, urgency order, count, preview and pending-request extraction, status priority,
+  ages). Run `npm run typecheck`. Opening, stepping, release, tap-back, Esc, the one-row layout, the
+  detail panel and the recorder were checked in the live app; the pending-request card was not, as no
+  thread was waiting at the time.
 - MIT. Not released and not in `marketplace.json` yet: it needs a first `thread-switcher/v0.1.0` tag.
 
 ## Retired repos
