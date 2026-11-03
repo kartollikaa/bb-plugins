@@ -35,6 +35,9 @@ a provider cannot report an end after its session is gone.
 `bb plugin config thread-tree` lists them; `bb plugin config thread-tree set <key> <value>` changes one.
 Booleans: `showGithub`, `showAutomations`, `showRecent`, `showProviderIcon`, `showSubagents`, `showAge`.
 Numbers (1–50): `recentLimit` (Recent Activity rows), `recentMoreLimit` (rows after Show more).
+The order of GitHub, Automations and Recent Activity, the project order, and which groups are
+folded are not settings: each browser client keeps them itself. The user changes them in the
+sidebar by dragging a header or from its right-click menu.
 
 ## Making a subagent you can talk to
 
