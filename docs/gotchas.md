@@ -51,6 +51,10 @@ can find it by the error text.
 - **A closing height animation flashes the content back** if it unmounts on `finish`: the browser
   drops the animation a frame before React removes the node. Give the closing animation
   `fill: "forwards"`.
+- **Toggling `overflow: hidden` for a height animation moves the layout** when a child has a top
+  margin: the margin collapses through the box when unclipped and stays inside when clipped. Make
+  the box `flow-root` and keep it clipped until it unmounts. Watch for it by sampling heights per
+  `requestAnimationFrame`; a 2px jump is invisible in screenshots and reads as a blink live.
 - **Test drags with the real mouse too** (`mouse.down`, stepped `mouse.move`, `mouse.up`). Synthetic
   `dragover` on a chosen element hid that empty space and gaps weren't drop places.
 - **A drag that starts on text inside a `draggable` block drags the page selection** (it can reach
