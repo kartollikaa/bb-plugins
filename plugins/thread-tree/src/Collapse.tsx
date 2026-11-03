@@ -36,8 +36,9 @@ export function Collapse({ open, children }: { open: boolean; children: ReactNod
       { duration: Math.min(300, 160 + Math.abs(target - current) / 4), easing: EASING, fill: open ? "none" : "forwards" },
     );
     animation.onfinish = () => {
-      element.style.overflow = "";
+      // Unclipped for even one frame, the rows' top margin pushes everything below down 2px.
       if (!open) setMounted(false);
+      else element.style.overflow = "";
     };
     animation.oncancel = () => {
       element.style.overflow = "";
