@@ -73,3 +73,6 @@ This applies to project folders, status groups, and All threads in both active
 and archived views. Child threads stay beneath their parent in spawn order.
 Pinned keeps its manual order; Recent Activity always follows last activity.
 Folder thread sorting is separate from project folder order in the grouping menu.
+
+Sorting and grouping menus stay open after a selection; click outside or press
+Escape to close them. Changes apply immediately.

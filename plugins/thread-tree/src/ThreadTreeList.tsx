@@ -622,7 +622,7 @@ function GroupByMenu({
           {GROUP_MODES.map((entry) => (
             <DropdownMenu.Item
               key={entry.id}
-              onSelect={() => onChange(entry.id)}
+              onSelect={(event) => { event.preventDefault(); onChange(entry.id); }}
               className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
             >
               <span className="flex text-muted-foreground">{entry.icon}</span>
@@ -637,7 +637,7 @@ function GroupByMenu({
               {PROJECT_ORDER_MODES.map((entry) => (
                 <DropdownMenu.Item
                   key={entry.id}
-                  onSelect={() => onProjectOrderChange(entry.id)}
+                  onSelect={(event) => { event.preventDefault(); onProjectOrderChange(entry.id); }}
                   className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
                 >
                   <span className="flex text-muted-foreground">
@@ -1035,6 +1035,7 @@ function ThreadSortMenu(props: {
           }}>
             {options.map((entry) => (
               <DropdownMenu.RadioItem key={entry.id} value={entry.id}
+                onSelect={(event) => event.preventDefault()}
                 className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground">
                 <span className="flex-1">{entry.label}</span>
                 <DropdownMenu.ItemIndicator><Icon name="Check" aria-hidden className="size-3.5" /></DropdownMenu.ItemIndicator>
