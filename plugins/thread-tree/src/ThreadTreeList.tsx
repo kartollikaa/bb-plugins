@@ -387,14 +387,41 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   );
 }
 
-/** Both icons stay mounted so opening and closing cross-fade with a small tilt instead of swapping. */
+/** Lucide's Folder and FolderOpen, redrawn with matching commands so CSS can morph one into the other. */
+const FOLDER_PATHS = {
+  back: {
+    closed: "M4 20a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.69.9H20a2 2 0 0 1 2 2v10",
+    open: "M4 20a2 2 0 0 1-2-1.79V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2",
+  },
+  front: {
+    closed: "M12.1 6l0 0A2 2 0 0 1 12.1 6H20a2 2 0 0 1 2 2l0 10a2 2 0 0 1-2 2H4",
+    open: "M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4",
+  },
+} as const;
+
 function FolderIcon({ isOpen }: { isOpen: boolean }) {
-  const motion = cn("absolute inset-0", !useStill() && "transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none");
+  const still = useStill();
+  const state = isOpen ? "open" : "closed";
   return (
-    <span aria-hidden className="relative size-3.5 shrink-0">
-      <Icon name="Folder" className={cn(motion, "size-3.5", isOpen ? "-rotate-6 scale-90 opacity-0" : "opacity-100")} />
-      <Icon name="FolderOpen" fallback="Folder" className={cn(motion, "size-3.5", isOpen ? "opacity-100" : "rotate-6 scale-90 opacity-0")} />
-    </span>
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-3.5 shrink-0"
+    >
+      {(["back", "front"] as const).map((part) => (
+        <path
+          key={part}
+          d={FOLDER_PATHS[part][state]}
+          style={{ d: `path("${FOLDER_PATHS[part][state]}")` } as React.CSSProperties}
+          className={cn(!still && "transition-[d] duration-200 ease-out motion-reduce:transition-none")}
+        />
+      ))}
+    </svg>
   );
 }
 
