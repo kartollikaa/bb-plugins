@@ -13,7 +13,7 @@ installable with `bb marketplace add`) → **bb-community** (an entry in
 | inline-terminal | yes (`v0.1.2`) | PR [#796](https://github.com/get-bb/marketplace/pull/796), open | Wait for merge |
 | reveal-in-finder | yes (`v0.1.1`) | PR [#804](https://github.com/get-bb/marketplace/pull/804), open | Wait for merge |
 | battery | yes (`v0.1.0`) | PR [#803](https://github.com/get-bb/marketplace/pull/803), open | Wait for merge |
-| thread-tree | yes | not submitted | Release the GitHub folder work, then submit |
+| thread-tree | yes (`v0.2.0`) | not submitted | Submit |
 | github-folder | no tag | not submitted | Tag `v0.1.0`, add to `marketplace.json` |
 | artifacts | yes (`v0.1.0`) | PR [#805](https://github.com/get-bb/marketplace/pull/805), open | Wait for merge |
 | thread-links | no tag | not submitted | Tag `v0.1.0`, add to `marketplace.json` |
