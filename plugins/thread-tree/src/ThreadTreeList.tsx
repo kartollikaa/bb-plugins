@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { toast } from "sonner";
 import {
@@ -167,20 +167,30 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             : "Loading archived threads…";
 
   const renderRow = (row: TreeRow<PluginSidebarThread>, variant: "tree" | "recent") => (
-    <ThreadRowView
-      key={row.thread.id}
-      row={row}
-      variant={variant}
-      context={variant === "recent" ? projectById.get(row.thread.projectId)?.name : undefined}
-      isActive={row.thread.id === activeThreadId}
-      isCompactViewport={isCompactViewport}
-      subagents={subagents.get(row.thread.id)}
-      provider={providerById.get(row.thread.providerId)}
-      view={view}
-      now={now}
-      onToggle={() => collapsedThreads.toggle(row.thread.id)}
-      onOpen={open}
-    />
+    <Fragment key={row.thread.id}>
+      <ThreadRowView
+        row={row}
+        variant={variant}
+        context={variant === "recent" ? projectById.get(row.thread.projectId)?.name : undefined}
+        isActive={row.thread.id === activeThreadId}
+        isCompactViewport={isCompactViewport}
+        subagents={subagents.get(row.thread.id)}
+        provider={providerById.get(row.thread.providerId)}
+        view={view}
+        now={now}
+        onToggle={() => collapsedThreads.toggle(row.thread.id)}
+        onOpen={open}
+      />
+      {variant === "tree" && row.foldCounts ? (
+        <FoldLine
+          depth={row.depth + 1}
+          guides={[...row.guides, row.hasVisibleChildren]}
+          counts={row.foldCounts}
+          total={row.descendantCount}
+          onExpand={() => collapsedThreads.toggle(row.thread.id)}
+        />
+      ) : null}
+    </Fragment>
   );
 
   return (
@@ -225,7 +235,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                     descendantCount: 0,
                     hasChildren: false,
                     isExpanded: false,
-                    hiddenCounts: null,
+                    foldCounts: null,
                   isPeek: false,
                   hasVisibleChildren: false,
                     guides: [],
@@ -505,7 +515,7 @@ function ThreadRowView({
           onOpen(thread, event);
         }}
       >
-        {isTree ? <TreeGuides depth={depth} guides={row.guides} hasOpenChildren={row.hasVisibleChildren} isPeek={row.isPeek} /> : null}
+        {isTree ? <TreeGuides depth={depth} guides={row.guides} hasOpenChildren={row.hasVisibleChildren || row.foldCounts !== null} isPeek={row.isPeek} /> : null}
         {isTree && row.hasChildren ? (
           <button
             type="button"
@@ -544,7 +554,6 @@ function ThreadRowView({
           </span>
         </a>
         <span aria-hidden className="min-w-0 flex-1" />
-        {isTree && row.hiddenCounts ? <FoldSummary counts={row.hiddenCounts} /> : null}
         {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
         {view.showProviderIcon ? (
           <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
@@ -649,30 +658,48 @@ function RetryButton({ threadId }: { threadId: string }) {
 }
 
 const FOLD_STATES: readonly { state: DotState; label: string }[] = [
-  { state: "running", label: "running" },
+  { state: "input", label: "needs input" },
   { state: "error", label: "failed" },
+  { state: "running", label: "running" },
   { state: "done", label: "done" },
 ];
 
-/** What a fold hides, by state; threads needing input never hide, so they are not counted. */
-function FoldSummary({ counts }: { counts: StateCounts }) {
+/** The line under a folded parent: its whole subtree by state. Clicking it unfolds. */
+function FoldLine({
+  depth,
+  guides,
+  counts,
+  total,
+  onExpand,
+}: {
+  depth: number;
+  guides: boolean[];
+  counts: StateCounts;
+  total: number;
+  onExpand: () => void;
+}) {
   const parts = FOLD_STATES.filter(({ state }) => (counts[state] ?? 0) > 0);
-  if (parts.length === 0) return null;
-  const description = parts.map(({ state, label }) => `${counts[state]} ${label}`).join(" · ");
+  const subthreads = `${total} subthread${total === 1 ? "" : "s"}`;
+  const description = [subthreads, ...parts.map(({ state, label }) => `${counts[state]} ${label}`)].join(", ");
   return (
-    <span
-      title={`Folded subthreads: ${description}`}
-      aria-label={`Folded subthreads: ${description}`}
-      className="flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-sidebar-foreground/[0.06] px-1.5 text-2xs leading-none tabular-nums text-sidebar-foreground/60"
-    >
-      <Icon name="ListTree" fallback="Network" aria-hidden className="size-3" />
-      {parts.map(({ state }) => (
-        <span key={state} className="flex items-center gap-0.5">
-          <StatusDot state={state} className="animate-none" />
-          {counts[state]}
-        </span>
-      ))}
-    </span>
+    <div role="none" className="relative flex h-6 items-center pr-2" style={{ paddingLeft: ROW_PAD_PX + depth * INDENT_PX }}>
+      <TreeGuides depth={depth} guides={guides} hasOpenChildren={false} isPeek />
+      <button
+        type="button"
+        onClick={onExpand}
+        title={`Expand: ${description}`}
+        aria-label={`Expand subthreads: ${description}`}
+        className="-ml-1 flex h-5 min-w-0 items-center gap-2 overflow-hidden rounded-md px-1 text-2xs tabular-nums text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+      >
+        <span className="shrink-0">{subthreads}</span>
+        {parts.map(({ state, label }) => (
+          <span key={state} className="flex shrink-0 items-center gap-1">
+            <StatusDot state={state} className="animate-none" />
+            {counts[state]} {label}
+          </span>
+        ))}
+      </button>
+    </div>
   );
 }
 

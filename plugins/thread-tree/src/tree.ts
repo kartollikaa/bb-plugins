@@ -26,11 +26,11 @@ export interface TreeRow<T extends TreeThread> {
   descendantCount: number;
   hasChildren: boolean;
   isExpanded: boolean;
-  /** A collapsed thread's folded-away descendants by state; null when expanded or childless. */
-  hiddenCounts: StateCounts | null;
+  /** A collapsed thread's whole subtree by state; null when expanded or childless. */
+  foldCounts: StateCounts | null;
   /** Shown through a collapsed ancestor: the open thread, or one that needs input. */
   isPeek: boolean;
-  /** Rows hang directly beneath it: its children, or descendants peeking out of the fold. */
+  /** Thread rows hang directly beneath it: its children, or descendants peeking out of the fold. */
   hasVisibleChildren: boolean;
   /**
    * One entry per level above this row: whether that level's guide line runs
@@ -178,16 +178,17 @@ export function flattenRows<T extends TreeThread>(
     return count;
   };
   const fold = (thread: T) => {
-    const hidden: StateCounts = {};
+    const counts: StateCounts = {};
     const peeking: T[] = [];
-    const visit = (kid: T) => {
-      if (peeksOut(kid)) return void peeking.push(kid);
+    const visit = (kid: T, underPeek: boolean) => {
+      const peeks = !underPeek && peeksOut(kid);
+      if (peeks) peeking.push(kid);
       const state = threadDotState(kid);
-      hidden[state] = (hidden[state] ?? 0) + 1;
-      kidsOf(kid).forEach(visit);
+      counts[state] = (counts[state] ?? 0) + 1;
+      for (const grandkid of kidsOf(kid)) visit(grandkid, underPeek || peeks);
     };
-    kidsOf(thread).forEach(visit);
-    return { hidden, peeking };
+    for (const kid of kidsOf(thread)) visit(kid, false);
+    return { counts, peeking };
   };
   const walk = (thread: T, depth: number, guides: boolean[], isPeek: boolean) => {
     const kids = kidsOf(thread);
@@ -200,7 +201,7 @@ export function flattenRows<T extends TreeThread>(
       descendantCount: countOf(thread),
       hasChildren: kids.length > 0,
       isExpanded,
-      hiddenCounts: folded?.hidden ?? null,
+      foldCounts: folded?.counts ?? null,
       isPeek,
       hasVisibleChildren: below.length > 0,
       guides,
