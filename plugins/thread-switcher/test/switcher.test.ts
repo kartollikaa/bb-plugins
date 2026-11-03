@@ -139,3 +139,20 @@ test("extracts the last conversation messages from nested timeline rows", () => 
 test("cleans markdown and code blocks for the small preview", () => {
   assert.equal(cleanText("## Title\n```ts\nconst a = 1;\n```\nok"), "Title\n[code]\nok");
 });
+
+test("status dot follows thread-tree's priority: input, error, running, done", async () => {
+  const { threadDotState } = await import("../lib/status.ts");
+  const base = {
+    status: "idle",
+    indicator: "none",
+    hasPendingInteraction: false,
+    activity: { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 },
+  };
+  assert.equal(threadDotState({ ...base, hasPendingInteraction: true, status: "active" }), "input");
+  assert.equal(threadDotState({ ...base, indicator: "waiting-for-input" }), "input");
+  assert.equal(threadDotState({ ...base, status: "error", indicator: "runtime" }), "error");
+  assert.equal(threadDotState({ ...base, indicator: "unread-error" }), "error");
+  assert.equal(threadDotState({ ...base, status: "active" }), "running");
+  assert.equal(threadDotState({ ...base, activity: { backgroundAgents: 1, backgroundCommands: 0, workflows: 0 } }), "running");
+  assert.equal(threadDotState({ ...base, indicator: "unread" }), "done");
+});

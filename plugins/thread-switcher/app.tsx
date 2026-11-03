@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   definePluginApp,
-  experimental_ThreadStatusGlyph as ThreadStatusGlyph,
   experimental_usePluginId as usePluginId,
   experimental_useSidebarThreads as useSidebarThreads,
   useBbContext,
@@ -11,6 +10,7 @@ import {
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./server.ts";
+import { DOT_LABEL, threadDotState, type DotState } from "./lib/status.ts";
 import {
   DEFAULT_HOTKEY,
   formatHotkey,
@@ -206,6 +206,8 @@ function ThreadCard({
   onPick: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const dot = threadDotState(thread);
+  const needsInput = dot === "input";
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [selected]);
@@ -215,6 +217,7 @@ function ThreadCard({
       ref={ref}
       role="option"
       aria-selected={selected}
+      aria-description={DOT_LABEL[dot]}
       onMouseMove={selected ? undefined : onHover}
       onMouseDown={(event) => {
         event.preventDefault();
@@ -226,19 +229,31 @@ function ThreadCard({
     >
       <div
         className={`aspect-[3/2] overflow-hidden rounded-lg border bg-background shadow-sm ${
-          selected ? "border-ring" : "border-border"
+          needsInput ? "border-attention ring-2 ring-attention/50" : selected ? "border-ring" : "border-border"
         }`}
       >
         <ChatPreview threadId={thread.id} version={thread.updatedAt} />
       </div>
       <div className="flex min-w-0 items-center gap-1.5 px-0.5">
-        <span className="flex size-3.5 shrink-0 items-center justify-center">
-          <ThreadStatusGlyph indicator={thread.indicator} size="compact" />
+        <span className="flex size-3.5 shrink-0 items-center justify-center" title={DOT_LABEL[dot]}>
+          <StatusDot state={dot} />
         </span>
         <span className="truncate text-xs font-medium text-foreground">{thread.displayTitle}</span>
       </div>
     </div>
   );
+}
+
+// bb's theme has no blue status token, so running uses Tailwind's palette, as thread-tree does.
+const DOT_CLASS: Record<DotState, string> = {
+  running: "bg-blue-500 animate-pulse",
+  input: "bg-attention",
+  error: "bg-destructive",
+  done: "bg-success",
+};
+
+function StatusDot({ state }: { state: DotState }) {
+  return <span aria-hidden className={`inline-block size-2 shrink-0 rounded-full ${DOT_CLASS[state]}`} />;
 }
 
 type Sdk = ReturnType<typeof useSdk>;

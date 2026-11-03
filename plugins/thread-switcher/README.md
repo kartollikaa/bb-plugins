@@ -2,6 +2,9 @@
 
 Switch between your recent bb threads from the keyboard. Hold Control and press Tab: a row of cards
 opens over the window, one per thread, each with a small preview of the latest messages in that chat.
+A dot under each card shows the thread's status, in the same colors as Thread Tree: amber needs your
+input, red failed, blue (pulsing) working, green done. A thread waiting for your answer also gets an
+amber outline around its preview.
 
 - Press Tab again to move right, Shift+Tab to move left. Arrow keys work too.
 - Let go of Control to open the selected thread. Enter does the same, Esc closes without switching.
