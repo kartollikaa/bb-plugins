@@ -48,6 +48,18 @@ export const SETTINGS = {
     label: "Show the time since the last update",
     default: true,
   },
+  foldOnDrag: {
+    type: "boolean",
+    label: "Fold folders while dragging",
+    description: "Dragging a section or project folds every block to its header and opens them again on drop.",
+    default: true,
+  },
+  reduceMotion: {
+    type: "boolean",
+    label: "Reduce motion",
+    description: "Folders open and close, blocks reorder and row actions appear without animation.",
+    default: false,
+  },
 } as const;
 
 /** In default display order. */
@@ -89,6 +101,8 @@ export type ViewSettings = {
   showProviderIcon: boolean;
   showSubagents: boolean;
   showAge: boolean;
+  foldOnDrag: boolean;
+  reduceMotion: boolean;
 };
 
 const DEFAULTS: ViewSettings = Object.fromEntries(
@@ -112,5 +126,7 @@ export function readViewSettings(values: Record<string, unknown> | undefined): V
     showProviderIcon: bool("showProviderIcon"),
     showSubagents: bool("showSubagents"),
     showAge: bool("showAge"),
+    foldOnDrag: bool("foldOnDrag"),
+    reduceMotion: bool("reduceMotion"),
   };
 }

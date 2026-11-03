@@ -53,6 +53,7 @@ import {
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentSet } from "./usePersistentSet";
 import { useDragReorder, useFlipOrder } from "./useReorder";
+import { ReduceMotionContext } from "./motion";
 import { Collapse } from "./Collapse";
 
 const ROW_PAD_PX = 6;
@@ -152,12 +153,13 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const overview = useMemo(() => countStates(threads), [threads]);
   const sectionOrder = useMemo(() => resolveSectionOrder(savedSectionOrder), [savedSectionOrder]);
   const sectionDrag = useDragReorder(sectionOrder, setSavedSectionOrder);
-  const recentCollapsed = sectionDrag.isDragging || collapsedGroups.has("recent");
+  const foldSections = view.foldOnDrag && sectionDrag.isDragging;
+  const recentCollapsed = foldSections || collapsedGroups.has("recent");
   const shownSections = sectionDrag.order.filter((id) => view[SECTION_BY_ID[id].key]);
   const sectionsRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
-  useFlipOrder(sectionsRef, shownSections.join());
-  useFlipOrder(treeRef, groups.map((group) => group.key).join());
+  useFlipOrder(sectionsRef, shownSections.join(), view.reduceMotion);
+  useFlipOrder(treeRef, groups.map((group) => group.key).join(), view.reduceMotion);
   const moveSectionBy = (id: SectionId, step: -1 | 1) => setSavedSectionOrder(moveSection(sectionOrder, shownSections, id, step));
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const { providers } = useProviders();
@@ -218,7 +220,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   );
 
   return (
-    <div ref={sectionsRef} className="relative flex flex-col gap-3 px-1.5 pb-3 pt-1" {...sectionDrag.containerProps}>
+    <ReduceMotionContext.Provider value={view.reduceMotion}>
+      <div ref={sectionsRef} className="relative flex flex-col gap-3 px-1.5 pb-3 pt-1" {...sectionDrag.containerProps}>
       <div className="-mb-2 flex h-5 items-center justify-between gap-2 px-1.5">
         <ActivityOverview counts={overview} />
         <SectionsMenu view={view} order={sectionOrder} onChange={setSection} />
@@ -239,7 +242,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           >
             {id === "github" ? (
               <GithubSection
-                isCollapsed={sectionDrag.isDragging || collapsedGroups.has("github")}
+                isCollapsed={foldSections || collapsedGroups.has("github")}
                 onToggle={() => collapsedGroups.toggle("github")}
                 showSnoozed={flags.has("github-snoozed")}
                 onToggleSnoozed={() => flags.toggle("github-snoozed")}
@@ -247,7 +250,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
               />
             ) : id === "automations" ? (
               <AutomationsSection
-                isCollapsed={sectionDrag.isDragging || collapsedGroups.has("automations")}
+                isCollapsed={foldSections || collapsedGroups.has("automations")}
                 onToggle={() => collapsedGroups.toggle("automations")}
                 showPaused={flags.has("automations-paused")}
                 onTogglePaused={() => flags.toggle("automations-paused")}
@@ -323,7 +326,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         {...(canReorder ? projectDrag.containerProps : {})}
       >
         {groups.map((group) => {
-          const isCollapsed = (canReorder && projectDrag.isDragging) || collapsedGroups.has(group.key);
+          const isCollapsed = (view.foldOnDrag && canReorder && projectDrag.isDragging) || collapsedGroups.has(group.key);
           const project = group.projectId ? projectById.get(group.projectId) : undefined;
           const { title, icon } = groupLook(group.key, project, isCollapsed);
           const projectId = group.projectId;
@@ -376,7 +379,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
               : "Show more"}
         </button>
       ) : null}
-    </div>
+      </div>
+    </ReduceMotionContext.Provider>
   );
 }
 
@@ -703,7 +707,7 @@ function ThreadRowView({
             <span
               className={cn(
                 "overflow-hidden whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45",
-                !isCompactViewport && [SWAP_TRANSITION, "max-w-10 group-hover/row:max-w-0 group-hover/row:opacity-0 group-has-[:focus-visible]/row:max-w-0 group-has-[:focus-visible]/row:opacity-0"],
+                !isCompactViewport && [!view.reduceMotion && SWAP_TRANSITION, "max-w-10 group-hover/row:max-w-0 group-hover/row:opacity-0 group-has-[:focus-visible]/row:max-w-0 group-has-[:focus-visible]/row:opacity-0"],
                 menuOpen && "max-w-0 opacity-0",
               )}
             >
@@ -714,7 +718,7 @@ function ThreadRowView({
             <span
               className={cn(
                 "flex items-center gap-0.5 overflow-hidden",
-                SWAP_TRANSITION,
+                !view.reduceMotion && SWAP_TRANSITION,
                 menuOpen
                   ? "max-w-12 opacity-100"
                   : "max-w-0 opacity-0 group-hover/row:max-w-12 group-hover/row:opacity-100 group-has-[:focus-visible]/row:max-w-12 group-has-[:focus-visible]/row:opacity-100",

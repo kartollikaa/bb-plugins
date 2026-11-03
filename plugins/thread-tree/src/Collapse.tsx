@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { isStill, useStill } from "./motion";
 
 const EASING = "cubic-bezier(0.2, 0, 0, 1)";
 
@@ -8,6 +9,7 @@ export function Collapse({ open, children }: { open: boolean; children: ReactNod
   if (open && !mounted) setMounted(true);
   const box = useRef<HTMLDivElement>(null);
   const isFirstRender = useRef(true);
+  const reduceMotion = useStill();
 
   useLayoutEffect(() => {
     if (isFirstRender.current) {
@@ -16,7 +18,7 @@ export function Collapse({ open, children }: { open: boolean; children: ReactNod
     }
     const element = box.current;
     if (!element) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (isStill(reduceMotion)) {
       if (!open) setMounted(false);
       return;
     }

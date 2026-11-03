@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type RefObject } from "react";
+import { isStill } from "./motion";
 import { placeNear } from "./tree";
 
 /**
@@ -187,7 +188,7 @@ const FLIP_MS = 220;
  * Slides the container's `[data-flip-key]` children from their old place to the new one
  * whenever their order changes; height changes alone do not animate.
  */
-export function useFlipOrder(container: RefObject<HTMLElement | null>, orderKey: string) {
+export function useFlipOrder(container: RefObject<HTMLElement | null>, orderKey: string, reduceMotion: boolean) {
   const tops = useRef(new Map<string, number>());
   const lastOrder = useRef(orderKey);
   const resizes = useRef<ResizeObserver | null>(null);
@@ -205,7 +206,7 @@ export function useFlipOrder(container: RefObject<HTMLElement | null>, orderKey:
     for (const block of blocksOf(root)) resizes.current?.observe(block);
     const reordered = lastOrder.current !== orderKey;
     lastOrder.current = orderKey;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still = isStill(reduceMotion);
     for (const block of blocksOf(root)) {
       const key = block.dataset.flipKey!;
       const top = block.offsetTop;

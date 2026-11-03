@@ -3,67 +3,54 @@ under it, and the subagents it runs inside its own session show on its row.
 
 ## What you get
 
-- With the GitHub Folder plugin installed, its folder of pull requests that
-  need you sits at the top, drawn like the rest of this list: review requests,
-  your PRs with changes requested, failing checks, conflicts or ready to
-  merge. The header's customize button and the snooze button on each row
-  change the same settings GitHub Folder uses everywhere. Without that plugin
-  the section is not shown.
-- Automations below it: each scheduled automation with its status dot
-  and next run; hover to run it now or pause and resume it. Clicking one opens
-  its last run's thread. Paused ones fold under an "N paused" toggle. It reads
-  bb's own Automations plugin and hides itself when that plugin is off.
-- Recent Activity below it: the most recently active threads, child threads
-  included, newest first, whatever grouping the list below uses. Show more
-  extends it; the project is in each row's tooltip.
-- Below it, Threads grouped by Project (folder icons), by Status (needs input,
-  error, working, done; a parent files under the most urgent state in its
-  subtree), or None, with Pinned on top. Pick it from the Group by menu.
-  Projects keep a fixed order you set by dragging their headers, or follow
-  recent activity (Project order in the same menu).
-- The Archived toggle next to Group by switches Threads to archived threads,
-  in the same grouping and nesting; Show more loads older pages. Hovering an
-  archived row offers bb's own Unarchive. Automations and Recent Activity stay
-  on active threads.
-- The top line counts active threads that need input, failed or are running.
+- With the GitHub Folder plugin installed, its pull requests that need you sit
+  at the top: review requests, changes requested, failing checks, conflicts,
+  ready to merge. Snooze and customize change GitHub Folder's own settings.
+  Without that plugin the section is not shown.
+- Automations: each scheduled automation with its status dot and next run.
+  Hover to run, pause or resume it; click to open its last run. It reads bb's
+  own Automations plugin and hides itself when that plugin is off.
+- Recent Activity: the most recently active threads, child threads included,
+  newest first. Show more extends it.
+- Threads grouped by Project, by Status (needs input, error, working, done) or
+  not at all, with Pinned on top. Projects keep a fixed order you set by
+  dragging their headers, or follow recent activity.
+- The Archived toggle shows archived threads in the same grouping and nesting.
+- The top line counts threads that need input, failed or are running.
 - Each child thread sits under the thread that spawned it, at any depth, even
-  when it lives in another project. A parent's status dot turns into a
-  chevron on hover; click it to fold the subtree. A folded parent gets a line
-  beneath it counting its whole subtree by state; click it to unfold. The
-  thread you have open and threads waiting for your input stay visible under
-  the fold on a dashed line; the open one folds away once you leave it.
+  in another project. A parent's status dot turns into a chevron on hover;
+  click it to fold the subtree. A folded parent gets a line counting its whole
+  subtree by state. The thread you have open and threads waiting for your
+  input stay visible under the fold.
 - A small icon on each row shows the agent provider the thread runs on.
-- Child threads are ordinary threads: open one, message it, pin, archive or
-  split it with bb's own menu. Hovering a row swaps its age for Archive and
-  the thread menu; Archive is bb's own, with its confirmation for threads that
-  have children.
+- Child threads are ordinary threads: open, message, pin, archive or split them
+  with bb's own menu. Hovering a row swaps its age for Archive and the menu.
 - Provider subagents (Claude Code `Agent` calls, Codex subagents) are not
   threads and cannot be messaged. They show as a counter with a status dot on
-  the right of the parent's row; hover it to list each one with its type,
-  state, duration and tokens.
-- Every thread shows its own state as a dot before its title; a thread whose
-  turn failed (an app exit, a daemon disconnect) is red and gets a Retry button.
-- Dot colors: blue (pulsing) running, green done, yellow needs your input, red
-  error, gray stopped.
-- `bb thread-tree list` prints the same list from a terminal.
+  the parent's row; hover it for each one's type, state, duration and tokens.
+- A dot before each title shows the thread's state: blue running, green done,
+  yellow needs input, red error with a Retry button, gray stopped.
+- `bb thread-tree list` prints a thread's subagents from a terminal.
+
+## Arranging the sidebar
+
+Right-click the GitHub, Automations or Recent Activity header to remove it;
+Sections at the top of the list brings it back. Drag a header, or use Move up
+and Move down in its menu, to reorder sections. While you drag a section or a
+project, the blocks fold to their headers, the others slide aside to show
+where it will land, the list scrolls near its edges, and everything opens back
+the way it was on drop.
 
 ## Settings
 
-Right-click the GitHub, Automations or Recent Activity header and choose
-Remove from sidebar; Sections at the top of the list brings any of them back
-or hides them. Drag a section's header, or use Move up and Move down in its
-right-click menu, to reorder them; the order is kept per client. While you drag
-a section or a project, every block folds to its header, the others slide
-aside to show where it will land, the list scrolls near its edges, and each
-block opens back the way it was once you drop. The same switches live in Settings → Installed plugins →
-Thread Tree, which also sets how many Recent Activity rows show before and
-after Show more, and turns off the provider icon, the subagent counters or the
-age label on each row.
+Settings → Installed plugins → Thread Tree holds the section switches, how many
+Recent Activity rows show before and after Show more, and switches for the
+provider icon, the subagent counters and the age label. Fold folders while
+dragging can be turned off, and Reduce motion stops the folder, reorder and
+hover animations.
 
 ## How it works
 
 The list reads bb's own thread data. Subagents come from each thread's event
-log, read incrementally on the bb server; nothing leaves the machine. The
-GitHub section reads the GitHub Folder plugin on the bb server. Collapse state,
-grouping, project order, the Archived toggle and Show more are kept per
-client; the settings above apply to every client of the bb server.
+log, read on the bb server; nothing leaves the machine. Folds, grouping and
+order are kept per client; the settings apply to every client of the bb server.
