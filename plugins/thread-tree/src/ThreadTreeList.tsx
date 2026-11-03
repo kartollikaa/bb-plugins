@@ -649,7 +649,12 @@ function FoldSummary({ counts }: { counts: StateCounts }) {
   if (parts.length === 0) return null;
   const description = parts.map(({ state, label }) => `${counts[state]} ${label}`).join(" · ");
   return (
-    <span title={`Folded: ${description}`} aria-label={`Folded subthreads: ${description}`} className="flex shrink-0 items-center gap-1.5 text-2xs tabular-nums text-sidebar-foreground/50">
+    <span
+      title={`Folded subthreads: ${description}`}
+      aria-label={`Folded subthreads: ${description}`}
+      className="flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-sidebar-foreground/[0.06] px-1.5 text-2xs leading-none tabular-nums text-sidebar-foreground/60"
+    >
+      <Icon name="ListTree" fallback="Network" aria-hidden className="size-3" />
       {parts.map(({ state }) => (
         <span key={state} className="flex items-center gap-0.5">
           <StatusDot state={state} className="animate-none" />
