@@ -146,6 +146,24 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   durations, labels, setup command). Run `npm run typecheck`. The popup was checked in the live app.
 - MIT. Not released and not in `marketplace.json` yet: it needs a first `power-pill/v0.1.0` tag.
 
+## thread-switcher — `plugins/thread-switcher/`
+
+- **What:** holding the hotkey (setting `hotkey`, `Control+Tab` by default) opens a row of cards for
+  the most recently opened threads (setting `threadCount`, 6 by default), each with a preview of the
+  chat's latest messages. The key moves on, Shift moves back, letting go of the modifier opens the
+  selection; a tap returns to the previous thread. The settings page has a shortcut recorder.
+- **How:** an `experimental_appOverlay` with capture-phase `keydown`/`keyup` listeners on `window`.
+  The visit order is in `localStorage` (`<pluginId>:recent`), updated from `useBbContext().threadId`;
+  threads come from `experimental_useSidebarThreads`. Previews are conversation rows from
+  `sdk.threads.timeline({ segmentLimit: "4" })`, prefetched for the candidate threads and cached per
+  thread by `updatedAt`. The recorder saves through the `setHotkey` RPC. Hotkey parsing, ordering and
+  preview extraction are pure functions in `lib/`.
+- **Agent skill:** `skills/thread-switcher/`.
+- **Tests:** `npm test` covers `test/switcher.test.ts` (hotkey parsing and matching, release, visit
+  order, ordering, count, preview extraction). Run `npm run typecheck`. Opening, stepping, release,
+  tap-back, Esc, the one-row layout and the recorder were checked in the live app.
+- MIT. Not released and not in `marketplace.json` yet: it needs a first `thread-switcher/v0.1.0` tag.
+
 ## Retired repos
 
 Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on

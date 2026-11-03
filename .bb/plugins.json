@@ -11,6 +11,7 @@
     { "name": "github-folder", "source": "./plugins/github-folder" },
     { "name": "artifacts", "source": "./plugins/artifacts" },
     { "name": "mouse-pet", "source": "./plugins/mouse-pet" },
-    { "name": "power-pill", "source": "./plugins/power-pill" }
+    { "name": "power-pill", "source": "./plugins/power-pill" },
+    { "name": "thread-switcher", "source": "./plugins/thread-switcher" }
   ]
 }
