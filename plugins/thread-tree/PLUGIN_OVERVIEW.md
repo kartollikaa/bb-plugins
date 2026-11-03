@@ -26,8 +26,10 @@ under it, and the subagents it runs inside its own session show on its row.
   archived row offers bb's own Unarchive. Automations and Recent Activity stay
   on active threads.
 - Each child thread sits under the thread that spawned it, at any depth, even
-  when it lives in another project. Collapse a parent to fold its subtree; the
-  dot on the fold shows the most urgent state inside it.
+  when it lives in another project. A parent's status dot turns into a
+  chevron on hover; click it to fold the subtree. The dot on the fold shows
+  the most urgent state inside it.
+- A small icon after each title shows the agent provider the thread runs on.
 - Child threads are ordinary threads: open one, message it, pin, archive or
   split it with bb's own menu. Hovering a row shows Archive and the thread
   menu over the end of the row; Archive is bb's own, with its confirmation

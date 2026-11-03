@@ -5,6 +5,8 @@ import {
   ThreadTitle,
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
   experimental_ThreadActionsMenu as ThreadActionsMenu,
+  experimental_ProviderIcon as ProviderIcon,
+  experimental_useProviders as useProviders,
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
   experimental_useSidebarThreads as useSidebarThreads,
   experimental_useThreadActions as useThreadActions,
@@ -144,6 +146,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   }, [groups, recent, recentCollapsed]);
   const subagents = useSubagents(visibleThreads);
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
+  const { providers } = useProviders();
+  const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
 
   const open = useCallback(
     (thread: PluginSidebarThread, event: MouseEvent) => {
@@ -181,6 +185,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       isActive={row.thread.id === activeThreadId}
       isCompactViewport={isCompactViewport}
       subagents={subagents.get(row.thread.id)}
+      provider={providerById.get(row.thread.providerId)}
       now={now}
       onToggle={() => collapsedThreads.toggle(row.thread.id)}
       onOpen={open}
@@ -453,6 +458,7 @@ function ThreadRowView({
   isActive,
   isCompactViewport,
   subagents,
+  provider,
   now,
   onToggle,
   onOpen,
@@ -464,6 +470,7 @@ function ThreadRowView({
   isActive: boolean;
   isCompactViewport: boolean;
   subagents: ThreadSubagents | undefined;
+  provider: RowProvider | undefined;
   now: number;
   onToggle: () => void;
   onOpen: (thread: PluginSidebarThread, event: MouseEvent) => void;
@@ -479,7 +486,8 @@ function ThreadRowView({
   }, [age]);
   const target = useMemo(() => toActionTarget(thread), [thread]);
   const isTree = variant === "tree";
-  const leading = <StatusDot state={threadDotState(thread)} className="size-2" />;
+  const dot = <StatusDot state={threadDotState(thread)} className="size-2" />;
+  const providerName = provider?.displayName ?? thread.providerId;
 
   return (
     <ThreadActionsContextMenu thread={target}>
@@ -502,20 +510,6 @@ function ThreadRowView({
         }}
       >
         {isTree ? <TreeGuides depth={depth} guides={row.guides} hasOpenChildren={row.isExpanded} /> : null}
-        <a
-          href={thread.href}
-          {...(isTree ? { "data-sidebar-thread-shortcut-target": "", "data-sidebar-thread-id": thread.id } : {})}
-          aria-current={isActive ? "page" : undefined}
-          aria-label={thread.displayTitle}
-          {...splitProps}
-          onClick={(event) => onOpen(thread, event)}
-          className="flex min-w-0 items-center gap-2 self-stretch outline-none"
-        >
-          <span className="flex size-4 shrink-0 items-center justify-center">{leading}</span>
-          <span className={cn("min-w-0 truncate", thread.isUnread && "font-semibold text-sidebar-foreground")}>
-            <ThreadTitle threadId={thread.id} />
-          </span>
-        </a>
         {isTree && row.hasChildren ? (
           <button
             type="button"
@@ -524,11 +518,38 @@ function ThreadRowView({
               onToggle();
             }}
             aria-label={row.isExpanded ? "Collapse subthreads" : "Expand subthreads"}
-            className="-ml-1 flex size-5 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/45 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            title={row.isExpanded ? "Collapse subthreads" : "Expand subthreads"}
+            className="group/toggle relative flex size-4 shrink-0 items-center justify-center rounded text-sidebar-foreground/60 outline-none hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring"
           >
-            <Icon name="ChevronRight" aria-hidden className={cn("size-3.5 transition-transform", row.isExpanded && "rotate-90")} />
+            <span className="flex group-hover/row:hidden group-focus-visible/toggle:hidden">{dot}</span>
+            <Icon
+              name="ChevronRight"
+              aria-hidden
+              className={cn(
+                "hidden size-3.5 transition-transform group-hover/row:block group-focus-visible/toggle:block",
+                row.isExpanded && "rotate-90",
+              )}
+            />
           </button>
-        ) : null}
+        ) : (
+          <span className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
+        )}
+        <a
+          href={thread.href}
+          {...(isTree ? { "data-sidebar-thread-shortcut-target": "", "data-sidebar-thread-id": thread.id } : {})}
+          aria-current={isActive ? "page" : undefined}
+          aria-label={thread.displayTitle}
+          {...splitProps}
+          onClick={(event) => onOpen(thread, event)}
+          className="flex min-w-0 items-center gap-1.5 self-stretch outline-none"
+        >
+          <span className={cn("min-w-0 truncate", thread.isUnread && "font-semibold text-sidebar-foreground")}>
+            <ThreadTitle threadId={thread.id} />
+          </span>
+          <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
+            <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3" />
+          </span>
+        </a>
         <span aria-hidden className="min-w-0 flex-1" />
         {isTree && row.hasChildren && !row.isExpanded ? (
           <span
@@ -678,6 +699,8 @@ function TreeGuides({ depth, guides, hasOpenChildren }: { depth: number; guides:
     </>
   );
 }
+
+type RowProvider = ReturnType<typeof useProviders>["providers"][number];
 
 function toActionTarget(thread: PluginSidebarThread): PluginThreadActionTarget {
   const environmentId = thread.environment?.id ?? null;
