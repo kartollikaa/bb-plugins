@@ -48,6 +48,11 @@ can find it by the error text.
 - **Changing the DOM inside `dragstart` ends the drag in Chrome** (dragend fires at once). Defer
   the state change with `setTimeout(…, 0)`. Call `setDragImage` in the handler itself, before
   the DOM changes.
+- **A closing height animation flashes the content back** if it unmounts on `finish`: the browser
+  drops the animation a frame before React removes the node. Give the closing animation
+  `fill: "forwards"`.
+- **Test drags with the real mouse too** (`mouse.down`, stepped `mouse.move`, `mouse.up`). Synthetic
+  `dragover` on a chosen element hid that empty space and gaps weren't drop places.
 - **A drag that starts on text inside a `draggable` block drags the page selection** (it can reach
   bb's title bar). Give the block `select-none` and cancel `dragstart` when its target isn't the
   block or a link.
