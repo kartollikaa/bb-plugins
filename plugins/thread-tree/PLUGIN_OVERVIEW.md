@@ -27,13 +27,15 @@ under it, and the subagents it runs inside its own session show on its row.
   on active threads.
 - Each child thread sits under the thread that spawned it, at any depth, even
   when it lives in another project. A parent's status dot turns into a
-  chevron on hover; click it to fold the subtree. The dot on the fold shows
-  the most urgent state inside it.
-- A small icon after each title shows the agent provider the thread runs on.
+  chevron on hover; click it to fold the subtree. A folded parent gets a line
+  beneath it counting its whole subtree by state; click it to unfold. The
+  thread you have open and threads waiting for your input stay visible under
+  the fold on a dashed line; the open one folds away once you leave it.
+- A small icon on each row shows the agent provider the thread runs on.
 - Child threads are ordinary threads: open one, message it, pin, archive or
-  split it with bb's own menu. Hovering a row shows Archive and the thread
-  menu over the end of the row; Archive is bb's own, with its confirmation
-  for threads that have children.
+  split it with bb's own menu. Hovering a row swaps its age for Archive and
+  the thread menu; Archive is bb's own, with its confirmation for threads that
+  have children.
 - Provider subagents (Claude Code `Agent` calls, Codex subagents) are not
   threads and cannot be messaged. They show as a counter with a status dot on
   the right of the parent's row; hover it to list each one with its type,
