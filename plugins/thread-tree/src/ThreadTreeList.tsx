@@ -43,6 +43,8 @@ import {
   countStates,
   groupRows,
   recentThreads,
+  readFolderSorts,
+  type ThreadSort,
   resolveProjectOrder,
   threadDotState,
   type DotState,
@@ -51,7 +53,7 @@ import {
   type TreeRow,
 } from "./tree";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
-import { usePersistentChoice, usePersistentList, usePersistentSet } from "./usePersistentSet";
+import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
 import { useDragReorder, useFlipOrder } from "./useReorder";
 import { ReduceMotionContext, useStill } from "./motion";
 import { Collapse } from "./Collapse";
@@ -107,6 +109,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const collapsedThreads = usePersistentSet("collapsed-threads");
   const collapsedGroups = usePersistentSet("collapsed-groups");
   const flags = usePersistentSet("flags");
+  const [threadSort, setThreadSort] = usePersistentChoice<ThreadSort>("thread-sort", ["activity", "status", "created"], "activity");
+  const [folderSorts, setFolderSort] = usePersistentRecord("folder-thread-sorts", readFolderSorts);
   const [groupMode, setGroupMode] = usePersistentChoice<GroupMode>("group-mode", ["project", "status", "none"], "project");
   const [projectOrderMode, setProjectOrderMode] = usePersistentChoice<ProjectOrderMode>(
     "project-order-mode",
@@ -136,8 +140,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const projectDrag = useDragReorder(projectOrder ?? [], setSavedProjectOrder);
   const shownProjectOrder = projectOrder && projectDrag.order;
   const groups = useMemo(
-    () => groupRows(forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId ?? null),
-    [forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId],
+    () => groupRows(forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId ?? null, folderSorts, threadSort),
+    [forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId, folderSorts, threadSort],
   );
   const showMoreRecent = flags.has("recent-more");
   const recentHidden = !view.showRecent || collapsedGroups.has("recent");
@@ -313,6 +317,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             <Icon name="Archive" aria-hidden className="size-3" />
             Archived
           </button>
+          <ThreadSortMenu value={threadSort} onChange={setThreadSort} />
           <GroupByMenu
             mode={groupMode}
             onChange={setGroupMode}
@@ -348,6 +353,14 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                 title={title}
                 icon={icon}
                 isCollapsed={isCollapsed}
+                extra={group.key !== "pinned" ? (
+                  <ThreadSortMenu
+                    title={title}
+                    value={folderSorts[group.key] ?? "inherit"}
+                    defaultSort={threadSort}
+                    onChange={(sort) => setFolderSort(group.key, sort === "inherit" ? undefined : sort)}
+                  />
+                ) : undefined}
                 count={group.rootCount}
                 onToggle={() => collapsedGroups.toggle(group.key)}
                 action={
@@ -592,11 +605,10 @@ function GroupByMenu({
         <button
           type="button"
           aria-label={`Change grouping, now ${current.chip}`}
-          title="Change how threads are grouped"
-          className="flex h-5 items-center gap-1 rounded-md px-1.5 text-2xs text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
+          title={`Group threads: ${current.label}`}
+          className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
         >
-          <Icon name="SlidersHorizontal" aria-hidden className="size-3" />
-          {current.chip}
+          <Icon name="Layers" aria-hidden className="size-3" />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -971,4 +983,71 @@ function useNow(intervalMs: number): number {
     return () => window.clearInterval(timer);
   }, [intervalMs]);
   return now;
+}
+
+const THREAD_SORTS: readonly { id: ThreadSort; label: string }[] = [
+  { id: "activity", label: "Last activity" },
+  { id: "status", label: "Status" },
+  { id: "created", label: "Creation date" },
+];
+
+function ThreadSortMenu(props: {
+  title: string;
+  value: ThreadSort | "inherit";
+  defaultSort: ThreadSort;
+  onChange: (sort: ThreadSort | "inherit") => void;
+} | {
+  title?: undefined;
+  value: ThreadSort;
+  defaultSort?: undefined;
+  onChange: (sort: ThreadSort) => void;
+}) {
+  const { title, value, onChange } = props;
+  const options: readonly { id: ThreadSort | "inherit"; label: string }[] = title !== undefined
+    ? [{ id: "inherit", label: `Use global setting (${THREAD_SORTS.find((entry) => entry.id === props.defaultSort)!.label})` }, ...THREAD_SORTS]
+    : THREAD_SORTS;
+  const effectiveSort = value === "inherit" ? props.defaultSort : value;
+  const portalProps = usePortalScopeProps();
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          aria-label={title !== undefined ? `Thread settings for ${title}` : "Sort threads"}
+          title={title !== undefined ? "Thread settings" : "Sort threads"}
+          className={title !== undefined
+            ? "flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 opacity-0 outline-none hover:bg-sidebar-accent focus-visible:opacity-100 group-hover/header:opacity-100 data-[state=open]:opacity-100"
+            : "flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"}
+        >
+          <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3">
+            <path d="M3 4h18l-7 8v8l-4-2v-6Z" />
+          </svg>
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content {...portalProps} align="end" sideOffset={4}
+          className="z-50 min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md">
+          <DropdownMenu.Label className="px-2 py-1 text-xs text-muted-foreground">Sort threads by</DropdownMenu.Label>
+          <DropdownMenu.RadioGroup value={value} onValueChange={(next) => {
+            const sort = THREAD_SORTS.find((entry) => entry.id === next);
+            if (sort) onChange(sort.id);
+            else if (next === "inherit" && props.title !== undefined) props.onChange("inherit");
+          }}>
+            {options.map((entry) => (
+              <DropdownMenu.RadioItem key={entry.id} value={entry.id}
+                className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground">
+                <span className="flex-1">{entry.label}</span>
+                <DropdownMenu.ItemIndicator><Icon name="Check" aria-hidden className="size-3.5" /></DropdownMenu.ItemIndicator>
+              </DropdownMenu.RadioItem>
+            ))}
+          </DropdownMenu.RadioGroup>
+          <div className="max-w-56 px-2 pb-1 pt-1 text-xs text-muted-foreground">
+            {effectiveSort === "created" ? "Newest first. Message activity keeps this order." : effectiveSort === "status"
+              ? "Needs input, errors, working, then done. Newest first within each status."
+              : "Most recently active first."}
+          </div>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
 }

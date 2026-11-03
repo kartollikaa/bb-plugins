@@ -83,3 +83,26 @@ export function usePersistentList(key: string) {
   );
   return [values, save] as const;
 }
+
+export function usePersistentRecord<T>(key: string, parse: (raw: unknown) => Readonly<Record<string, T>>) {
+  const [values, setValues] = useState(() => {
+    try {
+      return parse(JSON.parse(window.localStorage.getItem(PREFIX + key) ?? "null"));
+    } catch {
+      return parse(null);
+    }
+  });
+  const save = useCallback((entry: string, value: T | undefined) => {
+    setValues((previous) => {
+      const { [entry]: _removed, ...rest } = previous;
+      const next = value === undefined ? rest : { ...previous, [entry]: value };
+      try {
+        window.localStorage.setItem(PREFIX + key, JSON.stringify(next));
+      } catch {
+        // Storage full or blocked: the choice still applies for this session.
+      }
+      return next;
+    });
+  }, [key]);
+  return [values, save] as const;
+}

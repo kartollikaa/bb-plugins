@@ -56,3 +56,20 @@ A provider subagent cannot be messaged. To get one that can, spawn a child
 thread instead: `bb thread spawn --parent-self ...` from inside the parent, or
 `--parent-thread <id>` from elsewhere. It appears nested under the parent in
 the sidebar and accepts messages like any thread.
+
+## Sorting threads in a folder
+
+Open the funnel icon beside Archived and the Group layers icon in the Threads
+heading to choose the global thread order. Each folder follows it unless you
+open its Thread settings and choose an override. Use global setting clears that override. The global choice
+and folder overrides persist in this browser, including after a reload:
+
+- Last activity (default): most recently active first.
+- Creation date: newest first; message activity keeps rows in place.
+- Status: needs input, errors, working, then done, using the most urgent state
+  in each thread's subtree. Within a status, newest threads come first.
+
+This applies to project folders, status groups, and All threads in both active
+and archived views. Child threads stay beneath their parent in spawn order.
+Pinned keeps its manual order; Recent Activity always follows last activity.
+Folder thread sorting is separate from project folder order in the grouping menu.

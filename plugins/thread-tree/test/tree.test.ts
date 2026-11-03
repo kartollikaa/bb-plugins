@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ancestorsOf, buildForest, countStates, effectiveState, groupRows, placeNear, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
+import { ancestorsOf, buildForest, countStates, effectiveState, groupRows, placeNear, readFolderSorts, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
@@ -289,4 +289,65 @@ test("placeNear drops a block before or after its target", () => {
   assert.deepEqual(placeNear(["a", "b", "c"], "c", "a", false), ["c", "a", "b"]);
   assert.deepEqual(placeNear(["a", "b", "c"], "b", "b", true), ["a", "b", "c"]);
   assert.deepEqual(placeNear(["a", "b"], "a", "zz", true), ["a", "b"]);
+});
+
+test("folder creation order stays fixed when activity changes, with nested children intact", () => {
+  const threads = [
+    thread("old", { createdAt: 1, updatedAt: 30 }),
+    thread("new", { createdAt: 2, updatedAt: 10 }),
+    thread("kid", { parentThreadId: "new", createdAt: 3 }),
+  ];
+  const rows = (sort: "activity" | "created") => ids(groupRows(buildForest(threads), new Set(), "project", null, null, { "project:p1": sort })[0]!.rows);
+  assert.deepEqual(rows("activity"), ["old", "new", "-kid"]);
+  assert.deepEqual(rows("created"), ["new", "-kid", "old"]);
+  threads[0]!.updatedAt = 100;
+  threads[1]!.updatedAt = 200;
+  assert.deepEqual(rows("activity"), ["new", "-kid", "old"]);
+  assert.deepEqual(rows("created"), ["new", "-kid", "old"]);
+});
+
+test("status sort uses the subtree priority and stable creation order within a status", () => {
+  const threads = [
+    thread("done", { updatedAt: 100 }),
+    thread("busy", { status: "active" }),
+    thread("error", { status: "error" }),
+    thread("parent"),
+    thread("input", { parentThreadId: "parent", hasPendingInteraction: true }),
+    thread("new-busy", { status: "active", createdAt: 10 }),
+  ];
+  const rows = () => ids(groupRows(buildForest(threads), new Set(), "none", null, null, { all: "status" })[0]!.rows);
+  assert.deepEqual(rows(), ["parent", "-input", "error", "new-busy", "busy", "done"]);
+  threads[1]!.updatedAt = 1000;
+  assert.deepEqual(rows(), ["parent", "-input", "error", "new-busy", "busy", "done"]);
+});
+
+test("folder sorts are independent and pinned roots retain their manual order", () => {
+  const threads = [
+    thread("a-old", { projectId: "a", createdAt: 1, updatedAt: 20 }),
+    thread("a-new", { projectId: "a", createdAt: 2, updatedAt: 10 }),
+    thread("b-old", { projectId: "b", createdAt: 1, updatedAt: 20 }),
+    thread("b-new", { projectId: "b", createdAt: 2, updatedAt: 10 }),
+    thread("pin-first", { isPinned: true, pinSortKey: "a", createdAt: 1 }),
+    thread("pin-last", { isPinned: true, pinSortKey: "b", createdAt: 2 }),
+  ];
+  const groups = groupRows(buildForest(threads), new Set(), "project", ["a", "b"], null, { "project:a": "created", pinned: "created" });
+  assert.deepEqual(groups.map((g) => ids(g.rows)), [["pin-first", "pin-last"], ["a-new", "a-old"], ["b-old", "b-new"]]);
+});
+
+test("folder sorts reject malformed storage and keep only known modes", () => {
+  assert.deepEqual(readFolderSorts({ a: "created", b: "status", c: "activity", d: "bogus", e: null }), { a: "created", b: "status", c: "activity" });
+  for (const raw of [null, [], "created", 5]) assert.deepEqual(readFolderSorts(raw), {});
+});
+
+test("global sort applies across folders while local overrides take precedence", () => {
+  const threads = [
+    thread("a-old", { projectId: "a", createdAt: 1, updatedAt: 20 }),
+    thread("a-new", { projectId: "a", createdAt: 2, updatedAt: 10 }),
+    thread("b-old", { projectId: "b", createdAt: 1, updatedAt: 20 }),
+    thread("b-new", { projectId: "b", createdAt: 2, updatedAt: 10 }),
+  ];
+  const rows = (overrides: Record<string, "activity">) => groupRows(buildForest(threads), new Set(), "project", ["a", "b"], null, overrides, "created").map((g) => ids(g.rows));
+  assert.deepEqual(rows({}), [["a-new", "a-old"], ["b-new", "b-old"]]);
+  assert.deepEqual(rows({ "project:a": "activity" }), [["a-old", "a-new"], ["b-new", "b-old"]]);
+  assert.deepEqual(rows({}), [["a-new", "a-old"], ["b-new", "b-old"]]);
 });

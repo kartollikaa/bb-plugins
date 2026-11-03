@@ -213,6 +213,25 @@ export function flattenRows<T extends TreeThread>(
 }
 
 export type GroupMode = "project" | "status" | "none";
+export type ThreadSort = "activity" | "created" | "status";
+export type FolderSorts = Readonly<Record<string, ThreadSort>>;
+
+export function readFolderSorts(raw: unknown): FolderSorts {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw).filter(([, value]) =>
+    value === "activity" || value === "created" || value === "status",
+  ));
+}
+
+function sortRoots<T extends TreeThread>(forest: Forest<T>, roots: readonly T[], sort: ThreadSort): T[] {
+  const byCreated = (a: T, b: T) => b.createdAt - a.createdAt || a.id.localeCompare(b.id);
+  if (sort === "created") return [...roots].sort(byCreated);
+  if (sort === "status") {
+    const rank = new Map(roots.map((root) => [root.id, THREAD_DOT_PRIORITY.indexOf(subtreeDotState(forest, root))]));
+    return [...roots].sort((a, b) => rank.get(a.id)! - rank.get(b.id)! || byCreated(a, b));
+  }
+  return [...roots].sort(byActivity);
+}
 
 /**
  * Pinned first, then the mode's groups. Project groups order by latest
@@ -226,6 +245,8 @@ export function groupRows<T extends TreeThread>(
   /** Project ids in display order; null orders projects by latest activity. */
   projectOrder: readonly string[] | null = null,
   activeThreadId: string | null = null,
+  folderSorts: FolderSorts = {},
+  defaultSort: ThreadSort = "activity",
 ): TreeGroup<T>[] {
   const pinned = forest.roots.filter((root) => root.isPinned).sort(byPinOrder);
   const buckets = new Map<string, { projectId: string | null; roots: T[] }>();
@@ -245,7 +266,7 @@ export function groupRows<T extends TreeThread>(
     projectId,
     rootCount: roots.length,
     latestActivityAt: Math.max(0, ...roots.map((root) => root.updatedAt)),
-    rows: flattenRows(forest, roots, collapsed, activeThreadId),
+    rows: flattenRows(forest, key === "pinned" ? roots : sortRoots(forest, roots, folderSorts[key] ?? defaultSort), collapsed, activeThreadId),
   });
   const rest = [...buckets].map(([key, bucket]) => makeGroup(key, bucket.projectId, bucket.roots));
   if (mode === "status") {
