@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, type DragEvent, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type RefObject } from "react";
 import { placeNear } from "./tree";
 
 /**
@@ -8,6 +8,9 @@ import { placeNear } from "./tree";
 export function useDragReorder<Id extends string>(order: readonly Id[], commit: (next: Id[]) => void) {
   const [drag, setDrag] = useState<{ id: Id; preview: Id[] } | null>(null);
   const preview = drag?.preview ?? order;
+  const draggedBlock = useRef<HTMLElement | null>(null);
+  const isDragging = drag !== null;
+  useEffect(() => (isDragging ? autoScrollNearEdges(draggedBlock.current) : undefined), [isDragging]);
 
   const drop = useCallback(
     (event: DragEvent) => {
@@ -22,11 +25,23 @@ export function useDragReorder<Id extends string>(order: readonly Id[], commit: 
   const itemProps = (id: Id) => ({
     draggable: true,
     onDragStart: (event: DragEvent<HTMLElement>) => {
-      // Links inside are draggable too; only a drag that starts on the block itself moves it.
-      if (event.target !== event.currentTarget) return;
+      const block = event.currentTarget;
+      if (event.target !== block) {
+        // A thread link keeps its own drag; anything else here is a text selection, which would drag page text.
+        if (!(event.target instanceof HTMLAnchorElement)) event.preventDefault();
+        return;
+      }
+      window.getSelection()?.removeAllRanges();
+      draggedBlock.current = block;
+      const image = block.querySelector<HTMLElement>("[data-drag-image]") ?? block;
+      const box = image.getBoundingClientRect();
+      const clamp = (value: number, size: number) => Math.min(Math.max(value, 0), size);
+      event.dataTransfer.setDragImage(image, clamp(event.clientX - box.left, box.width), clamp(event.clientY - box.top, box.height));
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", id);
-      setDrag({ id, preview: [...order] });
+      const preview = [...order];
+      // Chrome ends a drag at once if the DOM changes inside dragstart, and blocks fold to headers on drag.
+      setTimeout(() => setDrag({ id, preview }), 0);
     },
     onDragOver: (event: DragEvent<HTMLElement>) => {
       if (!drag) return;
@@ -39,7 +54,7 @@ export function useDragReorder<Id extends string>(order: readonly Id[], commit: 
       if (next.some((entry, index) => entry !== drag.preview[index])) setDrag({ id: drag.id, preview: next });
     },
     onDrop: drop,
-    onDragEnd: () => setDrag(null),
+    onDragEnd: () => setTimeout(() => setDrag(null), 0),
   });
 
   const containerProps = {
@@ -49,7 +64,45 @@ export function useDragReorder<Id extends string>(order: readonly Id[], commit: 
     onDrop: drop,
   };
 
-  return { order: preview, draggingId: drag?.id ?? null, itemProps, containerProps };
+  return { order: preview, draggingId: drag?.id ?? null, isDragging, itemProps, containerProps };
+}
+
+const EDGE_PX = 48;
+const MAX_SCROLL_PX_PER_FRAME = 14;
+
+function scrollParent(element: HTMLElement | null): HTMLElement | null {
+  for (let node = element?.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node;
+  }
+  return null;
+}
+
+/** Scrolls the block's scroll container while the dragging pointer is near its top or bottom edge. */
+function autoScrollNearEdges(block: HTMLElement | null): (() => void) | undefined {
+  const scroller = scrollParent(block);
+  if (!scroller) return undefined;
+  let pointer: { x: number; y: number } | null = null;
+  let frame = 0;
+  const track = (event: globalThis.DragEvent) => {
+    pointer = { x: event.clientX, y: event.clientY };
+  };
+  const tick = () => {
+    const box = scroller.getBoundingClientRect();
+    if (pointer && pointer.x >= box.left && pointer.x <= box.right) {
+      const edge = Math.min(EDGE_PX, box.height / 4);
+      const depth = pointer.y < box.top + edge ? pointer.y - box.top - edge : pointer.y > box.bottom - edge ? pointer.y - box.bottom + edge : 0;
+      const strength = Math.max(-1, Math.min(1, depth / edge));
+      if (strength !== 0) scroller.scrollTop += Math.round(strength * MAX_SCROLL_PX_PER_FRAME) || Math.sign(strength);
+    }
+    frame = requestAnimationFrame(tick);
+  };
+  document.addEventListener("dragover", track);
+  frame = requestAnimationFrame(tick);
+  return () => {
+    document.removeEventListener("dragover", track);
+    cancelAnimationFrame(frame);
+  };
 }
 
 const FLIP_MS = 220;

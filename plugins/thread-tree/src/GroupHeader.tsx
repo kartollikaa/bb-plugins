@@ -26,7 +26,7 @@ export function GroupHeader({
   menu?: readonly HeaderMenuItem[];
 }) {
   const header = (
-    <div className="group/header flex h-7 items-center gap-1 px-1.5">
+    <div data-drag-image className="group/header flex h-7 items-center gap-1 px-1.5">
       <button
         type="button"
         onClick={onToggle}

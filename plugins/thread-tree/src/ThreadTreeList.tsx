@@ -136,7 +136,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   );
   const showMoreRecent = flags.has("recent-more");
   const recentHidden = !view.showRecent || collapsedGroups.has("recent");
-  const recentCollapsed = collapsedGroups.has("recent");
   const recent = useMemo(
     () => recentThreads(threads, showMoreRecent ? view.recentMoreLimit : view.recentLimit),
     [threads, showMoreRecent, view.recentLimit, view.recentMoreLimit],
@@ -152,6 +151,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const overview = useMemo(() => countStates(threads), [threads]);
   const sectionOrder = useMemo(() => resolveSectionOrder(savedSectionOrder), [savedSectionOrder]);
   const sectionDrag = useDragReorder(sectionOrder, setSavedSectionOrder);
+  const recentCollapsed = sectionDrag.isDragging || collapsedGroups.has("recent");
   const shownSections = sectionDrag.order.filter((id) => view[SECTION_BY_ID[id].key]);
   const sectionsRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
@@ -234,11 +234,11 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             key={id}
             data-flip-key={id}
             {...sectionDrag.itemProps(id)}
-            className={cn("rounded-md transition-opacity empty:hidden", sectionDrag.draggingId === id && "opacity-40")}
+            className={cn("select-none rounded-md transition-opacity empty:hidden", sectionDrag.draggingId === id && "opacity-40")}
           >
             {id === "github" ? (
               <GithubSection
-                isCollapsed={collapsedGroups.has("github")}
+                isCollapsed={sectionDrag.isDragging || collapsedGroups.has("github")}
                 onToggle={() => collapsedGroups.toggle("github")}
                 showSnoozed={flags.has("github-snoozed")}
                 onToggleSnoozed={() => flags.toggle("github-snoozed")}
@@ -246,7 +246,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
               />
             ) : id === "automations" ? (
               <AutomationsSection
-                isCollapsed={collapsedGroups.has("automations")}
+                isCollapsed={sectionDrag.isDragging || collapsedGroups.has("automations")}
                 onToggle={() => collapsedGroups.toggle("automations")}
                 showPaused={flags.has("automations-paused")}
                 onTogglePaused={() => flags.toggle("automations-paused")}
@@ -322,7 +322,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         {...(canReorder ? projectDrag.containerProps : {})}
       >
         {groups.map((group) => {
-          const isCollapsed = collapsedGroups.has(group.key);
+          const isCollapsed = (canReorder && projectDrag.isDragging) || collapsedGroups.has(group.key);
           const project = group.projectId ? projectById.get(group.projectId) : undefined;
           const { title, icon } = groupLook(group.key, project, isCollapsed);
           const projectId = group.projectId;
@@ -332,7 +332,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
               key={group.key}
               data-flip-key={group.key}
               {...(reorderable ? projectDrag.itemProps(projectId) : {})}
-              className={cn("rounded-md transition-opacity", reorderable && projectDrag.draggingId === projectId && "opacity-40")}
+              className={cn("rounded-md transition-opacity", reorderable && "select-none", reorderable && projectDrag.draggingId === projectId && "opacity-40")}
             >
               <GroupHeader
                 title={title}
