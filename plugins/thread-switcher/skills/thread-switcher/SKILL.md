@@ -19,9 +19,6 @@ pulsing working, green done — the same rules and colors as Thread Tree's sideb
 needs input also has an amber outline, and its preview shows the pending question prompts, the
 command or tool waiting for approval, or the form title instead of the latest messages.
 
-A panel under the cards shows the selected thread's last ten messages rendered as chat markdown,
-scrolled to the newest, plus the pending request when there is one.
-
 ## Settings
 
 ```sh

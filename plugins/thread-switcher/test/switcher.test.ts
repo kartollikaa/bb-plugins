@@ -138,14 +138,14 @@ test("extracts the last conversation messages from nested timeline rows", () => 
   };
   assert.deepEqual(previewFromTimeline(timeline), {
     messages: [
-      { id: "u1", role: "user", text: "first", markdown: "first" },
-      { id: "a1", role: "assistant", text: "done see docs", markdown: "**done** see [docs](http://x)" },
+      { id: "u1", role: "user", text: "first" },
+      { id: "a1", role: "assistant", text: "done see docs" },
     ],
     pending: null,
   });
   assert.deepEqual(previewFromTimeline(null), { messages: [], pending: null });
   assert.deepEqual(previewFromTimeline({ rows: "nope" }), { messages: [], pending: null });
-  const many = { rows: Array.from({ length: 14 }, (_, i) => ({ kind: "conversation", role: "assistant", id: `m${i}`, text: `m${i}` })) };
+  const many = { rows: Array.from({ length: 10 }, (_, i) => ({ kind: "conversation", role: "assistant", id: `m${i}`, text: `m${i}` })) };
   assert.deepEqual(previewFromTimeline(many).messages.map((m) => m.id)[0], "m4");
 });
 

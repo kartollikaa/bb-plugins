@@ -8,9 +8,6 @@ input, red failed, blue (pulsing) working, green done. A thread waiting for your
 amber outline, and its card shows the question or the approval it is waiting on instead of the
 latest messages.
 
-Under the cards, a larger panel shows the selected thread's last ten messages, formatted like the
-chat itself: code blocks, lists and links included.
-
 - Press Tab again to move right, Shift+Tab to move left. Arrow keys work too.
 - Let go of Control to open the selected thread. Enter does the same, Esc closes without switching.
 - A quick Control+Tab tap jumps straight back to the previous thread.

@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   definePluginApp,
-  Markdown,
   experimental_usePluginId as usePluginId,
   experimental_useSidebarThreads as useSidebarThreads,
   useBbContext,
@@ -25,7 +24,6 @@ import {
   clampThreadCount,
   formatAge,
   initialIndex,
-  MAX_CARD_MESSAGES,
   orderThreads,
   parseRecent,
   previewFromTimeline,
@@ -173,7 +171,6 @@ function ThreadSwitcher() {
   }, [close]);
 
   if (!state) return null;
-  const selectedThread = state.threads[state.index];
 
   return (
     <div
@@ -182,29 +179,26 @@ function ThreadSwitcher() {
         if (event.target === event.currentTarget) close(false);
       }}
     >
-      <div className="flex max-w-[94vw] flex-col gap-3 rounded-2xl border border-border bg-popover/90 p-3 shadow-2xl backdrop-blur-xl">
-        <div
-          role="listbox"
-          aria-label="Switch thread"
-          style={{ gridTemplateColumns: `repeat(${Math.min(state.threads.length, CARDS_PER_ROW)}, minmax(0, 13rem))` }}
-          className="grid justify-center gap-2"
-        >
-          {state.threads.map((thread, index) => (
-            <ThreadCard
-              key={thread.id}
-              thread={thread}
-              projectName={projectNames.get(thread.projectId) ?? null}
-              age={formatAge(thread.updatedAt, Date.now())}
-              selected={index === state.index}
-              onHover={() => setState((current) => (current ? { ...current, index } : current))}
-              onPick={() => {
-                latest.current.state = { ...state, index };
-                close(true);
-              }}
-            />
-          ))}
-        </div>
-        {selectedThread && <DetailPanel thread={selectedThread} />}
+      <div
+        role="listbox"
+        aria-label="Switch thread"
+        style={{ gridTemplateColumns: `repeat(${Math.min(state.threads.length, CARDS_PER_ROW)}, minmax(0, 13rem))` }}
+        className="grid max-w-[94vw] justify-center gap-2 rounded-2xl border border-border bg-popover/90 p-3 shadow-2xl backdrop-blur-xl"
+      >
+        {state.threads.map((thread, index) => (
+          <ThreadCard
+            key={thread.id}
+            thread={thread}
+            projectName={projectNames.get(thread.projectId) ?? null}
+            age={formatAge(thread.updatedAt, Date.now())}
+            selected={index === state.index}
+            onHover={() => setState((current) => (current ? { ...current, index } : current))}
+            onPick={() => {
+              latest.current.state = { ...state, index };
+              close(true);
+            }}
+          />
+        ))}
       </div>
     </div>
   );
@@ -343,7 +337,7 @@ function ChatPreview({ threadId, version, needsInput }: { threadId: string; vers
       </div>
     );
   }
-  const messages = preview.messages.slice(-MAX_CARD_MESSAGES);
+  const { messages } = preview;
   if (messages.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
@@ -372,48 +366,6 @@ function ChatPreview({ threadId, version, needsInput }: { threadId: string; vers
             {message.text}
           </div>
         ),
-      )}
-    </div>
-  );
-}
-
-function DetailPanel({ thread }: { thread: SidebarThread }) {
-  const preview = usePreview(thread.id, thread.updatedAt);
-  const scroller = useRef<HTMLDivElement>(null);
-  const pending = threadDotState(thread) === "input" ? preview?.pending : null;
-  useLayoutEffect(() => {
-    const element = scroller.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [thread.id, preview]);
-
-  return (
-    <div
-      ref={scroller}
-      aria-label={`Recent messages in ${thread.displayTitle}`}
-      className="h-[min(22rem,38vh)] min-w-[min(40rem,90vw)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-background px-4 py-3 text-[13px]"
-    >
-      {preview === null ? (
-        <div className="h-full animate-pulse rounded-lg bg-muted/40" />
-      ) : preview.messages.length === 0 && !pending ? (
-        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No messages yet</div>
-      ) : (
-        <div className="flex min-h-full flex-col justify-end gap-3">
-          {preview.messages.map((message) =>
-            message.role === "user" ? (
-              <div key={message.id} className="ml-16 self-end rounded-xl bg-muted px-3 py-2">
-                <Markdown content={message.markdown} />
-              </div>
-            ) : (
-              <Markdown key={message.id} content={message.markdown} />
-            ),
-          )}
-          {pending && (
-            <div className="rounded-xl border border-attention bg-attention/10 px-3 py-2">
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-attention">Waiting for you</div>
-              <Markdown content={pending} />
-            </div>
-          )}
-        </div>
       )}
     </div>
   );

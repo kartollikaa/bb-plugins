@@ -74,7 +74,6 @@ export interface PreviewMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
-  markdown: string;
 }
 
 export interface ThreadPreview {
@@ -83,10 +82,8 @@ export interface ThreadPreview {
   pending: string | null;
 }
 
-export const MAX_PREVIEW_MESSAGES = 10;
-export const MAX_CARD_MESSAGES = 6;
+const MAX_PREVIEW_MESSAGES = 6;
 const MAX_MESSAGE_CHARS = 600;
-const MAX_MARKDOWN_CHARS = 4000;
 
 interface RowLike {
   kind?: unknown;
@@ -123,14 +120,12 @@ function flatten(rows: unknown, out: RowLike[]): RowLike[] {
 function toMessage(row: RowLike, index: number): PreviewMessage | null {
   if (row.kind !== "conversation" || (row.role !== "user" && row.role !== "assistant")) return null;
   if (row.role === "user" && row.initiator === "system") return null;
-  const markdown = typeof row.text === "string" ? row.text.trim() : "";
-  const text = cleanText(markdown);
+  const text = typeof row.text === "string" ? cleanText(row.text) : "";
   if (text === "") return null;
   return {
     id: typeof row.id === "string" ? row.id : String(index),
     role: row.role,
     text: clip(text, MAX_MESSAGE_CHARS),
-    markdown: clip(markdown, MAX_MARKDOWN_CHARS),
   };
 }
 
