@@ -1,4 +1,6 @@
+import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Icon } from "@/components/ui/icon";
+import { usePortalScopeProps } from "@/lib/portal-scope";
 import { cn } from "@/lib/utils";
 
 export function GroupHeader({
@@ -9,6 +11,7 @@ export function GroupHeader({
   onToggle,
   extra,
   action,
+  menu,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -19,8 +22,10 @@ export function GroupHeader({
   extra?: React.ReactNode;
   /** A hover button at the end of the header. */
   action?: { label: string; icon: string; onClick: () => void };
+  /** Right-click menu on the header. */
+  menu?: readonly { label: string; icon: string; onSelect: () => void }[];
 }) {
-  return (
+  const header = (
     <div className="group/header flex h-7 items-center gap-1 px-1.5">
       <button
         type="button"
@@ -53,5 +58,38 @@ export function GroupHeader({
         </button>
       ) : null}
     </div>
+  );
+  return menu && menu.length > 0 ? <HeaderMenu items={menu}>{header}</HeaderMenu> : header;
+}
+
+function HeaderMenu({
+  items,
+  children,
+}: {
+  items: readonly { label: string; icon: string; onSelect: () => void }[];
+  children: React.ReactNode;
+}) {
+  const portalProps = usePortalScopeProps();
+  return (
+    <ContextMenu.Root>
+      <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content
+          {...portalProps}
+          className="z-50 min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          {items.map((item) => (
+            <ContextMenu.Item
+              key={item.label}
+              onSelect={item.onSelect}
+              className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+            >
+              <Icon name={item.icon} aria-hidden className="size-3.5 text-muted-foreground" />
+              {item.label}
+            </ContextMenu.Item>
+          ))}
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
   );
 }

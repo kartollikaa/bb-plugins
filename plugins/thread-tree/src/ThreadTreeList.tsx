@@ -11,6 +11,7 @@ import {
   experimental_useSidebarThreads as useSidebarThreads,
   experimental_useThreadActions as useThreadActions,
   useBbNavigate,
+  useRpc,
   useSdk,
   useSettings,
   type PluginSidebarProject,
@@ -26,7 +27,8 @@ import { GroupHeader } from "./GroupHeader";
 import { AutomationsSection } from "./AutomationsSection";
 import { GithubSection } from "./GithubSection";
 import { StatusDot } from "./StatusDot";
-import { readViewSettings, type ViewSettings } from "./settings";
+import type { rpcContract } from "../server";
+import { readViewSettings, SIDEBAR_SECTIONS, type SectionKey, type ViewSettings } from "./settings";
 import { formatAge } from "./time";
 import {
   buildForest,
@@ -107,7 +109,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const [drag, setDrag] = useState<{ projectId: string; overId: string | null } | null>(null);
   const now = useNow(30_000);
   const settingValues = useSettings().values;
-  const view = useMemo(() => readViewSettings(settingValues), [settingValues]);
+  const [view, setSection] = useSectionToggles(useMemo(() => readViewSettings(settingValues), [settingValues]));
 
   const forest = useMemo(() => buildForest(treeThreads), [treeThreads]);
 
@@ -201,6 +203,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           onToggle={() => collapsedGroups.toggle("github")}
           showSnoozed={flags.has("github-snoozed")}
           onToggleSnoozed={() => flags.toggle("github-snoozed")}
+          onRemove={() => setSection("showGithub", false)}
         />
       ) : null}
 
@@ -210,6 +213,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           onToggle={() => collapsedGroups.toggle("automations")}
           showPaused={flags.has("automations-paused")}
           onTogglePaused={() => flags.toggle("automations-paused")}
+          onRemove={() => setSection("showAutomations", false)}
           activeThreadId={activeThreadId}
           now={now}
           onNavigate={onNavigate}
@@ -224,6 +228,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             isCollapsed={recentCollapsed}
             count={recent.length}
             onToggle={() => collapsedGroups.toggle("recent")}
+            menu={[{ label: "Remove from sidebar", icon: "EyeOff", onSelect: () => setSection("showRecent", false) }]}
           />
           {recentCollapsed ? null : (
             <div role="list" className="mt-0.5 flex flex-col gap-0.5">
@@ -275,6 +280,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             <Icon name="Archive" aria-hidden className="size-3" />
             Archived
           </button>
+          <SectionsMenu view={view} onChange={setSection} />
           <GroupByMenu
             mode={groupMode}
             onChange={setGroupMode}
@@ -386,6 +392,75 @@ function groupLook(
     title: project?.name ?? "Unknown project",
     icon: <Icon name={isCollapsed ? "Folder" : "FolderOpen"} fallback="Folder" aria-hidden className="size-3.5" />,
   };
+}
+
+/** Section visibility lives in the plugin settings; a toggle applies at once and saves in the background. */
+function useSectionToggles(saved: ViewSettings): [ViewSettings, (key: SectionKey, shown: boolean) => void] {
+  const rpc = useRpc<typeof rpcContract>();
+  const [pending, setPending] = useState<Partial<Record<SectionKey, boolean>>>({});
+  useEffect(() => {
+    setPending((previous) => {
+      const left = Object.fromEntries(Object.entries(previous).filter(([key, shown]) => saved[key as SectionKey] !== shown));
+      return Object.keys(left).length === Object.keys(previous).length ? previous : left;
+    });
+  }, [saved]);
+  const view = useMemo(() => ({ ...saved, ...pending }), [saved, pending]);
+  const setSection = useCallback(
+    (key: SectionKey, shown: boolean) => {
+      setPending((previous) => ({ ...previous, [key]: shown }));
+      rpc.call("setSections", { [key]: shown }).catch((error: unknown) => {
+        setPending(({ [key]: _dropped, ...rest }) => rest);
+        toast.error("Couldn't save the sidebar sections", { description: error instanceof Error ? error.message : String(error) });
+      });
+    },
+    [rpc],
+  );
+  return [view, setSection];
+}
+
+function SectionsMenu({ view, onChange }: { view: ViewSettings; onChange: (key: SectionKey, shown: boolean) => void }) {
+  const portalProps = usePortalScopeProps();
+  const hidden = SIDEBAR_SECTIONS.filter(({ key }) => !view[key]).length;
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Sidebar sections"
+          title="Sidebar sections"
+          className="flex h-5 items-center gap-1 rounded-md px-1.5 text-2xs text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
+        >
+          <Icon name="LayoutList" fallback="Layers" aria-hidden className="size-3" />
+          {hidden > 0 ? <span className="tabular-nums">+{hidden}</span> : null}
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          {...portalProps}
+          align="end"
+          sideOffset={4}
+          className="z-50 min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          <DropdownMenu.Label className="px-2 py-1 text-xs text-muted-foreground">Show in sidebar</DropdownMenu.Label>
+          {SIDEBAR_SECTIONS.map(({ key, label, icon }) => (
+            <DropdownMenu.CheckboxItem
+              key={key}
+              checked={view[key]}
+              onCheckedChange={(checked) => onChange(key, checked === true)}
+              onSelect={(event) => event.preventDefault()}
+              className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+            >
+              <Icon name={icon} aria-hidden className="size-3.5 text-muted-foreground" />
+              <span className="flex-1">{label}</span>
+              <DropdownMenu.ItemIndicator>
+                <Icon name="Check" aria-hidden className="size-3.5" />
+              </DropdownMenu.ItemIndicator>
+            </DropdownMenu.CheckboxItem>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
 }
 
 function GroupByMenu({

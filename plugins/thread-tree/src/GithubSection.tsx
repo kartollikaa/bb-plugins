@@ -81,11 +81,14 @@ const ATTENTION_STYLE: Record<Attention | "none", { short: string; className: st
 export function GithubSection({
   isCollapsed,
   onToggle,
+  onRemove,
   showSnoozed,
   onToggleSnoozed,
 }: {
   isCollapsed: boolean;
   onToggle: () => void;
+  /** Hides the section from the sidebar; its header's right-click menu offers it. */
+  onRemove?: () => void;
   showSnoozed: boolean;
   onToggleSnoozed: () => void;
 }) {
@@ -115,6 +118,7 @@ export function GithubSection({
             onRefresh={refresh}
           />
         }
+        menu={onRemove ? [{ label: "Remove from sidebar", icon: "EyeOff", onSelect: onRemove }] : undefined}
         action={{ label: "Open pull requests on GitHub", icon: "ArrowUpRight", onClick: () => navigate.openUrl(PULLS_URL) }}
       />
       {isCollapsed ? null : (

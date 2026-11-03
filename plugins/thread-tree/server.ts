@@ -15,7 +15,7 @@ import {
   githubFolderViewSchema,
   githubSettingsPatchSchema,
 } from "./src/githubFolder";
-import { SETTINGS } from "./src/settings";
+import { sectionPatchSchema, SETTINGS } from "./src/settings";
 
 const MAX_THREADS_PER_CALL = 200;
 
@@ -54,6 +54,11 @@ export const rpcContract = defineRpcContract({
     input: z.object({ key: z.string().min(1).max(400), snoozed: z.boolean() }).strict(),
     output: z.object({ ok: z.literal(true) }),
   },
+  /** Shows or hides sidebar sections from the sidebar itself. */
+  setSections: {
+    input: sectionPatchSchema,
+    output: z.object({ ok: z.literal(true) }),
+  },
   subagents: {
     input: z.object({
       threadIds: z.array(z.string().trim().min(1)).max(MAX_THREADS_PER_CALL),
@@ -71,7 +76,7 @@ export const rpcContract = defineRpcContract({
 });
 
 export default async function plugin(bb: BbPluginApi) {
-  bb.settings.define(SETTINGS);
+  const settings = bb.settings.define(SETTINGS);
   const folder = createSubagentFolder({
     listEvents: (args) => bb.sdk.threads.events.list(args),
     log: (message) => bb.log.warn(message),
@@ -83,6 +88,10 @@ export default async function plugin(bb: BbPluginApi) {
   const ok = z.object({ ok: z.literal(true) });
 
   bb.rpc.register(rpcContract, {
+    setSections: async (patch) => {
+      await settings.experimental_set(patch);
+      return { ok: true as const };
+    },
     githubFolder: async ({ refresh }) => {
       try {
         return { view: await callGithubFolder(refresh ? "refresh" : "folder", null, githubFolderViewSchema) };

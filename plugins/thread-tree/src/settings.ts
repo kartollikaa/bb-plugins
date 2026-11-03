@@ -50,6 +50,19 @@ export const SETTINGS = {
   },
 } as const;
 
+export const SIDEBAR_SECTIONS = [
+  { key: "showGithub", label: "GitHub", icon: "Github" },
+  { key: "showAutomations", label: "Automations", icon: "Zap" },
+  { key: "showRecent", label: "Recent Activity", icon: "Clock" },
+] as const;
+
+export type SectionKey = (typeof SIDEBAR_SECTIONS)[number]["key"];
+
+export const sectionPatchSchema = z
+  .object({ showGithub: z.boolean(), showAutomations: z.boolean(), showRecent: z.boolean() })
+  .partial()
+  .strict();
+
 export type ViewSettings = {
   showGithub: boolean;
   showAutomations: boolean;

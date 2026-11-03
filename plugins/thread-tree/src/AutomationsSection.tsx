@@ -38,6 +38,7 @@ function useAutomations() {
 export function AutomationsSection({
   isCollapsed,
   onToggle,
+  onRemove,
   showPaused,
   onTogglePaused,
   activeThreadId,
@@ -46,6 +47,8 @@ export function AutomationsSection({
 }: {
   isCollapsed: boolean;
   onToggle: () => void;
+  /** Hides the section from the sidebar; its header's right-click menu offers it. */
+  onRemove?: () => void;
   showPaused: boolean;
   onTogglePaused: () => void;
   activeThreadId: string | null;
@@ -87,6 +90,7 @@ export function AutomationsSection({
         isCollapsed={isCollapsed}
         count={active.length}
         onToggle={onToggle}
+        menu={onRemove ? [{ label: "Remove from sidebar", icon: "EyeOff", onSelect: onRemove }] : undefined}
         action={{ label: "Open Automations", icon: "ArrowUpRight", onClick: openAutomationsPage }}
       />
       {isCollapsed ? null : (
