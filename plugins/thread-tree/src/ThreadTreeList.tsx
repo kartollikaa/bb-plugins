@@ -52,18 +52,19 @@ const INDENT_PX = 24;
 const ARCHIVE_ACTION_KEY = "bb--core/archive";
 const SWAP_TRANSITION = "transition-[max-width,opacity] duration-200 ease-out motion-reduce:transition-none";
 
-const GROUP_MODES: readonly { id: GroupMode; label: string; icon: React.ReactNode }[] = [
-  { id: "project", label: "Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },
+const GROUP_MODES: readonly { id: GroupMode; label: string; chip: string; icon: React.ReactNode }[] = [
+  { id: "project", label: "Project", chip: "Group: Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },
   {
     id: "status",
     label: "Status",
+    chip: "Group: Status",
     icon: (
       <span className="flex size-3.5 items-center justify-center">
         <StatusDot state="running" className="size-2 animate-none" />
       </span>
     ),
   },
-  { id: "none", label: "None", icon: <Icon name="Layers" aria-hidden className="size-3.5" /> },
+  { id: "none", label: "None", chip: "No grouping", icon: <Icon name="Layers" aria-hidden className="size-3.5" /> },
 ];
 
 type ProjectOrderMode = "fixed" | "activity";
@@ -197,6 +198,9 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   return (
     <div className="flex flex-col gap-3 px-1.5 pb-3 pt-1">
+      <div className="-mb-2 flex h-5 items-center justify-end px-1.5">
+        <SectionsMenu view={view} onChange={setSection} />
+      </div>
       {view.showGithub ? (
         <GithubSection
           isCollapsed={collapsedGroups.has("github")}
@@ -280,7 +284,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             <Icon name="Archive" aria-hidden className="size-3" />
             Archived
           </button>
-          <SectionsMenu view={view} onChange={setSection} />
           <GroupByMenu
             mode={groupMode}
             onChange={setGroupMode}
@@ -426,12 +429,12 @@ function SectionsMenu({ view, onChange }: { view: ViewSettings; onChange: (key: 
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          aria-label="Sidebar sections"
-          title="Sidebar sections"
+          title="Choose the sections shown in the sidebar"
           className="flex h-5 items-center gap-1 rounded-md px-1.5 text-2xs text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
         >
           <Icon name="LayoutList" fallback="Layers" aria-hidden className="size-3" />
-          {hidden > 0 ? <span className="tabular-nums">+{hidden}</span> : null}
+          Sections
+          {hidden > 0 ? <span className="tabular-nums text-sidebar-foreground/40">· {hidden} hidden</span> : null}
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -481,11 +484,12 @@ function GroupByMenu({
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          aria-label={`Group threads by ${current.label}`}
+          aria-label={`Change grouping, now ${current.chip}`}
+          title="Change how threads are grouped"
           className="flex h-5 items-center gap-1 rounded-md px-1.5 text-2xs text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
         >
           <Icon name="SlidersHorizontal" aria-hidden className="size-3" />
-          {current.label}
+          {current.chip}
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
