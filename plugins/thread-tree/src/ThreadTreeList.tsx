@@ -22,6 +22,7 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
+import { ThreadPullRequestBadge } from "./ThreadPullRequestBadge";
 import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { AutomationsSection } from "./AutomationsSection";
@@ -780,6 +781,7 @@ function ThreadRowView({
               {age}
             </span>
           ) : null}
+          <ThreadPullRequestBadge thread={thread} />
           {isCompactViewport ? null : (
             <span
               className={cn(

@@ -100,3 +100,7 @@ can find it by the error text.
 - **Switching a git-installed plugin to a path install** fails with `plugin id "<id>" is already
   installed from git:…; remove it first`. Run `bb plugin remove <id> --yes`, then install the path.
   A path-to-path move needs no removal.
+
+- **Frontend RPC contracts:** use a schema object directly or a type-only contract import.
+  Importing `defineRpcContract` from the backend SDK in a frontend bundle can pass a dev
+  build and fail a production-only install, where the SDK is not a runtime dependency.
