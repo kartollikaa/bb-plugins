@@ -8,6 +8,8 @@ description: List the provider subagents (Claude Code Agent calls, Codex subagen
 The Thread Tree plugin replaces the sidebar thread list. Child threads nest
 under the thread that spawned them; provider subagents, which are not threads
 and cannot be messaged, show as a counter with a status dot on the parent's row.
+The counter's card fits the available screen space on mobile and desktop;
+longer lists scroll inside it while the summary stays visible.
 
 When the GitHub Folder plugin is installed, the list's top section is its
 folder of pull requests that need the user. Use that plugin's

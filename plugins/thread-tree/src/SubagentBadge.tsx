@@ -43,10 +43,10 @@ export function SubagentBadge({ thread, data }: { thread: TreeThread; data: Thre
           align="start"
           sideOffset={8}
           collisionPadding={8}
-          className="z-50 w-80 rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-md"
+          className="z-50 flex max-h-[var(--radix-hover-card-content-available-height)] w-80 max-w-[var(--radix-hover-card-content-available-width)] flex-col rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-md"
         >
-          <div className="px-1.5 pb-1.5 text-xs font-medium text-muted-foreground">{label}</div>
-          <ul className="max-h-80 overflow-y-auto">
+          <div className="shrink-0 px-1.5 pb-1.5 text-xs font-medium text-muted-foreground">{label}</div>
+          <ul className="min-h-0 max-h-80 overflow-y-auto">
             {data.subagents.map((agent) => {
               const state = effectiveState(agent, thread);
               const duration = formatDuration((agent.endedAt ?? now) - agent.startedAt);
@@ -71,7 +71,7 @@ export function SubagentBadge({ thread, data }: { thread: TreeThread; data: Thre
             })}
           </ul>
           {data.total > data.subagents.length ? (
-            <div className="px-1.5 pt-1 text-xs text-muted-foreground">
+            <div className="shrink-0 px-1.5 pt-1 text-xs text-muted-foreground">
               {data.total - data.subagents.length} older not shown
             </div>
           ) : null}
