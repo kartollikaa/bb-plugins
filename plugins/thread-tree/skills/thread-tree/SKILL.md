@@ -32,12 +32,13 @@ a provider cannot report an end after its session is gone.
 
 ## Undoing an archive
 
-In the sidebar, Cmd+Z or Ctrl+Z outside a text field unarchives the latest
+Cmd+Z or Ctrl+Z unarchives the latest
 archive batch: threads archived moments apart, as a
 parent and its children are. Each press steps one batch further back, within
 the last few minutes. The plugin remembers archives in its server process, so a
 plugin reload or bb restart forgets them; an agent restores older ones with
-`bb thread unarchive`, or the user does it from the Archived view.
+`bb thread unarchive`, or the user does it from the Archived view. In a text field
+the keystroke stays a text undo once the user has typed there since the archive.
 
 ## Settings
 

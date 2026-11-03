@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import type { rpcContract } from "../server";
-import { isUndoKey } from "./archiveUndo";
+import { ARCHIVE_BATCH_GAP_MS, ARCHIVE_UNDO_WINDOW_MS, archiveIsNewerThanTyping, isUndoKey, removedThreadIds } from "./archiveUndo";
 
 function isTextEditing(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -11,15 +11,36 @@ function isTextEditing(target: EventTarget | null): boolean {
   return target instanceof HTMLInputElement && !["checkbox", "radio", "button", "submit", "reset", "range", "color"].includes(target.type);
 }
 
-/** Cmd/Ctrl+Z outside a text field brings back the threads of the latest archive. */
-export function useArchiveUndo() {
+/** Cmd/Ctrl+Z brings back the threads of the latest archive, unless text typed after it is there to undo. */
+export function useArchiveUndo(threadIds: readonly string[], isLoaded: boolean) {
   const rpc = useRpc<typeof rpcContract>();
   const pending = useRef(false);
+  const shownIds = useRef<ReadonlySet<string> | null>(null);
+  const archiveTimes = useRef<number[]>([]);
+  const lastTypedAt = useRef(0);
 
   useEffect(() => {
+    if (!isLoaded) return;
+    const previous = shownIds.current;
+    shownIds.current = new Set(threadIds);
+    if (!previous || removedThreadIds(previous, threadIds).length === 0) return;
+    const now = Date.now();
+    const times = archiveTimes.current.filter((at) => at >= now - ARCHIVE_UNDO_WINDOW_MS);
+    if (times.length > 0 && now - times[times.length - 1]! <= ARCHIVE_BATCH_GAP_MS) times.pop();
+    archiveTimes.current = [...times, now];
+  }, [threadIds, isLoaded]);
+
+  useEffect(() => {
+    const onInput = () => {
+      lastTypedAt.current = Date.now();
+    };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat || !isUndoKey(event) || isTextEditing(event.target)) return;
+      if (event.repeat || !isUndoKey(event)) return;
+      const times = archiveTimes.current;
+      if (isTextEditing(event.target) && !archiveIsNewerThanTyping(times[times.length - 1], lastTypedAt.current)) return;
       event.preventDefault();
+      event.stopPropagation();
+      times.pop();
       if (pending.current) return;
       pending.current = true;
       rpc
@@ -36,7 +57,11 @@ export function useArchiveUndo() {
           pending.current = false;
         });
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("input", onInput, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      window.removeEventListener("input", onInput, true);
+      window.removeEventListener("keydown", onKeyDown, true);
+    };
   }, [rpc]);
 }

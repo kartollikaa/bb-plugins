@@ -54,3 +54,17 @@ export function createArchiveHistory(now: () => number = Date.now): ArchiveHisto
 export function isUndoKey(event: { key: string; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean }): boolean {
   return event.key.toLowerCase() === "z" && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey;
 }
+
+/** Threads that left the active list since the last render: archived, deleted or hidden. */
+export function removedThreadIds(previous: ReadonlySet<string>, current: readonly string[]): string[] {
+  const now = new Set(current);
+  return [...previous].filter((id) => !now.has(id));
+}
+
+/**
+ * Inside a text field Cmd+Z goes to the archive only when nothing was typed since it, so undo follows
+ * the order things happened: archiving the open chat focuses its composer, which holds no newer edit.
+ */
+export function archiveIsNewerThanTyping(latestArchiveAt: number | undefined, lastTypedAt: number): boolean {
+  return latestArchiveAt !== undefined && latestArchiveAt > lastTypedAt;
+}

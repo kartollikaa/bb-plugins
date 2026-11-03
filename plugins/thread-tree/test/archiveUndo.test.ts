@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ARCHIVE_BATCH_GAP_MS, ARCHIVE_UNDO_WINDOW_MS, createArchiveHistory, isUndoKey } from "../src/archiveUndo.ts";
+import {
+  ARCHIVE_BATCH_GAP_MS,
+  ARCHIVE_UNDO_WINDOW_MS,
+  archiveIsNewerThanTyping,
+  createArchiveHistory,
+  isUndoKey,
+  removedThreadIds,
+} from "../src/archiveUndo.ts";
 
 function clock(start = 1_000_000) {
   let time = start;
@@ -76,4 +83,15 @@ test("undo key is Cmd+Z or Ctrl+Z, not redo", () => {
   assert.equal(isUndoKey({ ...key, ctrlKey: true, altKey: true }), false);
   assert.equal(isUndoKey(key), false);
   assert.equal(isUndoKey({ ...key, key: "y", ctrlKey: true }), false);
+});
+
+test("threads that left the active list are reported, new ones are not", () => {
+  assert.deepEqual(removedThreadIds(new Set(["a", "b", "c"]), ["a", "c", "d"]), ["b"]);
+  assert.deepEqual(removedThreadIds(new Set(), ["a"]), []);
+});
+
+test("in a text field the archive wins only when nothing was typed after it", () => {
+  assert.equal(archiveIsNewerThanTyping(undefined, 0), false);
+  assert.equal(archiveIsNewerThanTyping(200, 100), true);
+  assert.equal(archiveIsNewerThanTyping(100, 200), false);
 });

@@ -104,7 +104,6 @@ const STATUS_GROUP_TITLE: Record<string, string> = {
 export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }: PluginThreadListProps) {
   const { status, threads, projects } = useSidebarThreads();
   const navigate = useBbNavigate();
-  useArchiveUndo();
   const collapsedThreads = usePersistentSet("collapsed-threads");
   const collapsedGroups = usePersistentSet("collapsed-groups");
   const flags = usePersistentSet("flags");
@@ -125,6 +124,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const settingValues = useSettings().values;
   const [view, setSection] = useSectionToggles(useMemo(() => readViewSettings(settingValues), [settingValues]));
 
+  const activeThreadIds = useMemo(() => threads.map((thread) => thread.id), [threads]);
+  useArchiveUndo(activeThreadIds, status === "ready");
   const forest = useMemo(() => buildForest(treeThreads), [treeThreads]);
 
   const projectOrder = useMemo(
