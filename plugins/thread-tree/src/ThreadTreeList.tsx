@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { toast } from "sonner";
 import {
@@ -23,7 +23,6 @@ import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader } from "./GroupHeader";
-import { ROW_HOVER_SOLID_BG } from "./rowStyles";
 import { AutomationsSection } from "./AutomationsSection";
 import { GithubSection } from "./GithubSection";
 import { StatusDot } from "./StatusDot";
@@ -49,13 +48,6 @@ const ROW_PAD_PX = 6;
 const INDENT_PX = 24;
 
 const ARCHIVE_ACTION_KEY = "bb--core/archive";
-/** How far the hover actions reach in from the row's right edge, plus breathing room. */
-const HOVER_ACTIONS_REACH_PX = 58;
-/** The row's right padding plus the gap before the age label. */
-const ROW_END_PAD_PX = 16;
-const SLIDE_ON_HOVER = "group-hover/row:[transform:translateX(calc(var(--slide)*-1))]";
-const SLIDE_NOW = "[transform:translateX(calc(var(--slide)*-1))]";
-const ROW_HOVER_SOLID_BG_ON_HOVER = "group-hover/row:bg-[color-mix(in_oklab,var(--sidebar-accent)_60%,var(--sidebar))]";
 
 const GROUP_MODES: readonly { id: GroupMode; label: string; icon: React.ReactNode }[] = [
   { id: "project", label: "Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },
@@ -487,11 +479,6 @@ function ThreadRowView({
   const { splitProps } = useSidebarThreadSplit(thread.id);
   const [menuOpen, setMenuOpen] = useState(false);
   const age = formatAge(thread.updatedAt, now);
-  const ageRef = useRef<HTMLSpanElement>(null);
-  const [slidePx, setSlidePx] = useState(0);
-  useLayoutEffect(() => {
-    setSlidePx(Math.max(0, HOVER_ACTIONS_REACH_PX - ROW_END_PAD_PX - (ageRef.current?.offsetWidth ?? 0)));
-  }, [age]);
   const target = useMemo(() => toActionTarget(thread), [thread]);
   const isTree = variant === "tree";
   const dot = <StatusDot state={threadDotState(thread)} className="size-2" />;
@@ -557,44 +544,27 @@ function ThreadRowView({
         </a>
         <span aria-hidden className="min-w-0 flex-1" />
         {isTree && row.hiddenCounts ? <FoldSummary counts={row.hiddenCounts} /> : null}
-        {/* On hover these slide left, clear of the action buttons, rather than being covered. */}
-        <span
-          style={{ "--slide": `${slidePx}px` } as React.CSSProperties}
-          className={cn(
-            "flex shrink-0 items-center gap-2 rounded-md transition-transform duration-150 ease-out",
-            !isCompactViewport && [SLIDE_ON_HOVER, ROW_HOVER_SOLID_BG_ON_HOVER],
-            menuOpen && SLIDE_NOW,
-          )}
-        >
-          {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
-          {view.showProviderIcon ? (
-            <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
-              <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3" />
-            </span>
-          ) : null}
-          {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
-        </span>
+        {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
+        {view.showProviderIcon ? (
+          <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
+            <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3" />
+          </span>
+        ) : null}
+        {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
         {view.showAge ? (
           <span
-            ref={ageRef}
             className={cn(
               "shrink-0 text-right text-2xs tabular-nums text-sidebar-foreground/45",
-              !isCompactViewport && "group-hover/row:invisible",
-              menuOpen && "invisible",
+              !isCompactViewport && "group-hover/row:hidden",
+              menuOpen && "hidden",
             )}
           >
             {age}
           </span>
         ) : null}
         {isCompactViewport ? null : (
-          // Hover actions overlay the row's end instead of reserving width, so nothing reflows.
-          <span
-            className={cn(
-              "absolute inset-y-0 right-1 items-center gap-0.5 pl-2",
-              isActive ? "bg-sidebar-accent" : ROW_HOVER_SOLID_BG,
-              menuOpen ? "flex" : "hidden group-hover/row:flex",
-            )}
-          >
+          // Hover actions take the age label's place, so the title truncates instead of being covered.
+          <span className={cn("-mr-1 shrink-0 items-center gap-0.5", menuOpen ? "flex" : "hidden group-hover/row:flex")}>
             <ArchiveButton thread={target} />
             <ThreadActionsMenu
               thread={target}
