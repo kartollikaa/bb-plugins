@@ -13,6 +13,7 @@ import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { ROW_HOVER_SOLID_BG } from "./rowStyles";
 import { StatusDot } from "./StatusDot";
 import { formatUntil } from "./time";
+import { Collapse } from "./Collapse";
 
 const POLL_MS = 30_000;
 const AUTOMATIONS_NAV_ITEM = "__bb__/automations";
@@ -93,7 +94,7 @@ export function AutomationsSection({
         menu={menu}
         action={{ label: "Open Automations", icon: "ArrowUpRight", onClick: openAutomationsPage }}
       />
-      {isCollapsed ? null : (
+      <Collapse open={!isCollapsed}>
         <div role="list" className="mt-0.5 flex flex-col gap-0.5">
           {shown.map((automation) => (
             <AutomationRow
@@ -122,7 +123,7 @@ export function AutomationsSection({
             </button>
           ) : null}
         </div>
-      )}
+      </Collapse>
     </section>
   );
 }

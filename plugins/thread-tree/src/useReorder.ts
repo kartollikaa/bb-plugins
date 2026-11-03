@@ -114,13 +114,23 @@ const FLIP_MS = 220;
 export function useFlipOrder(container: RefObject<HTMLElement | null>, orderKey: string) {
   const tops = useRef(new Map<string, number>());
   const lastOrder = useRef(orderKey);
+  const resizes = useRef<ResizeObserver | null>(null);
+  useLayoutEffect(() => {
+    // Blocks also move when a neighbour's height animates; keep their last known place current.
+    const observer = new ResizeObserver(() => {
+      for (const block of blocksOf(container.current)) tops.current.set(block.dataset.flipKey!, block.offsetTop);
+    });
+    resizes.current = observer;
+    return () => observer.disconnect();
+  }, [container]);
   useLayoutEffect(() => {
     const root = container.current;
     if (!root) return;
+    for (const block of blocksOf(root)) resizes.current?.observe(block);
     const reordered = lastOrder.current !== orderKey;
     lastOrder.current = orderKey;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    for (const block of Array.from(root.querySelectorAll<HTMLElement>(":scope > [data-flip-key]"))) {
+    for (const block of blocksOf(root)) {
       const key = block.dataset.flipKey!;
       const top = block.offsetTop;
       const previous = tops.current.get(key);
@@ -137,4 +147,8 @@ export function useFlipOrder(container: RefObject<HTMLElement | null>, orderKey:
       });
     }
   });
+}
+
+function blocksOf(root: HTMLElement | null): HTMLElement[] {
+  return root ? Array.from(root.querySelectorAll<HTMLElement>(":scope > [data-flip-key]")) : [];
 }

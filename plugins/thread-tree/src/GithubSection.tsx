@@ -17,6 +17,7 @@ import {
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { ROW_HOVER_SOLID_BG } from "./rowStyles";
 import { formatAge } from "./time";
+import { Collapse } from "./Collapse";
 
 const POLL_MS = 60_000;
 
@@ -121,7 +122,7 @@ export function GithubSection({
         menu={menu}
         action={{ label: "Open pull requests on GitHub", icon: "ArrowUpRight", onClick: () => navigate.openUrl(PULLS_URL) }}
       />
-      {isCollapsed ? null : (
+      <Collapse open={!isCollapsed}>
         <div role="list" className="mt-0.5 flex flex-col gap-0.5">
           {rows.map((item) => (
             <PullRequestRow
@@ -152,7 +153,7 @@ export function GithubSection({
             </button>
           ) : null}
         </div>
-      )}
+      </Collapse>
     </section>
   );
 }

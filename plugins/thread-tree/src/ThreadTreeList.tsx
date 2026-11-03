@@ -53,6 +53,7 @@ import {
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentSet } from "./usePersistentSet";
 import { useDragReorder, useFlipOrder } from "./useReorder";
+import { Collapse } from "./Collapse";
 
 const ROW_PAD_PX = 6;
 /** One level puts a child's status icon under its parent's title. */
@@ -265,7 +266,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                   onToggle={() => collapsedGroups.toggle("recent")}
                   menu={menu}
                 />
-                {recentCollapsed ? null : (
+                <Collapse open={!recentCollapsed}>
                   <div role="list" className="mt-0.5 flex flex-col gap-0.5">
                     {recent.map((thread) => renderRow(flatRow(thread), "recent"))}
                     {threads.length > view.recentLimit ? (
@@ -278,7 +279,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                       </button>
                     ) : null}
                   </div>
-                )}
+                </Collapse>
               </section>
             )}
           </div>
@@ -353,7 +354,9 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                     : undefined
                 }
               />
-              {isCollapsed ? null : <div role="group" className="mt-0.5 flex flex-col gap-0.5">{group.rows.map((row) => renderRow(row, "tree"))}</div>}
+              <Collapse open={!isCollapsed}>
+                <div role="group" className="mt-0.5 flex flex-col gap-0.5">{group.rows.map((row) => renderRow(row, "tree"))}</div>
+              </Collapse>
             </section>
           );
         })}
