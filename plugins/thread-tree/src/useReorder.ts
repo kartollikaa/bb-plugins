@@ -95,14 +95,16 @@ const HOLD_MS = 450;
 
 /**
  * Keeps the grabbed header where it was while the blocks fold for a drag: the scroll container
- * absorbs the shift, and a top spacer covers what scrolling cannot, until `release`.
+ * absorbs the shift, and spacers above and below cover what scrolling cannot, until `release`.
  */
 function pinWhileFolding(block: HTMLElement, anchor: HTMLElement): Pin {
   const container = block.parentElement;
   const scroller = scrollParent(block);
   const anchorTop = anchor.getBoundingClientRect().top;
-  const basePadding = container ? parseFloat(getComputedStyle(container).paddingTop) || 0 : 0;
+  const style = container ? getComputedStyle(container) : null;
+  const basePadding = { top: parseFloat(style?.paddingTop ?? "") || 0, bottom: parseFloat(style?.paddingBottom ?? "") || 0 };
   let spacer = 0;
+  let bottomSpacer = 0;
   let holding = true;
   const hold = () => {
     if (!holding || !container) return;
@@ -119,7 +121,13 @@ function pinWhileFolding(block: HTMLElement, anchor: HTMLElement): Pin {
       drift -= scroller.scrollTop - before;
     }
     if (drift < 0) spacer -= drift;
-    container.style.paddingTop = spacer > 0 ? `${basePadding + spacer}px` : "";
+    container.style.paddingTop = spacer > 0 ? `${basePadding.top + spacer}px` : "";
+    if (drift > 0 && scroller) {
+      // Folding shortened the list below a scrolled view; room underneath lets the scroll follow.
+      bottomSpacer += drift;
+      container.style.paddingBottom = `${basePadding.bottom + bottomSpacer}px`;
+      scroller.scrollTop += drift;
+    }
   };
   // Fires after layout and before paint, so the header never shows in its shifted place.
   const observer = new ResizeObserver(hold);
@@ -135,7 +143,10 @@ function pinWhileFolding(block: HTMLElement, anchor: HTMLElement): Pin {
     stopHolding,
     release: () => {
       stopHolding();
-      if (container) container.style.paddingTop = "";
+      if (container) {
+        container.style.paddingTop = "";
+        container.style.paddingBottom = "";
+      }
     },
   };
 }
