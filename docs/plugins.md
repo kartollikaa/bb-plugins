@@ -18,13 +18,15 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 - **What:** replaces the sidebar thread list with a tree of child threads nested under their parent.
   It also shows automations, recent activity, the archived toggle, and provider subagents as a
-  counter on the parent's row. CLI: `bb thread-tree list`.
+  counter on the parent's row. CLI: `bb thread-tree list`. Section and project order, folds and
+  flags are per-client localStorage (`src/usePersistentSet.ts`); `src/useReorder.ts` drives drag
+  reordering (live preview, sliding, the grabbed block pinned while the others fold).
 - **GitHub folder:** when the `github-folder` plugin is installed, the top section draws its folder
   in thread-tree's row style. The server proxies `githubFolder`, `githubFolderUpdate`,
   `githubFolderSnooze` and `githubFolderPrefetch` to that plugin's RPC, like Automations; without it the section is hidden.
 - **Agent skills:** `skills/thread-tree/` and `skills/delegate-to-threads/`. The second one is how
   agents spawn child threads with `bb thread spawn --parent-self`.
-- **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations). Run
+- **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations, settings). Run
   `npm run typecheck` too. Components live in `src/`.
 - The thread list slot is exclusive: with several list plugins installed, only one is shown.
 - MIT. Tag: `thread-tree/v0.1.0`.

@@ -45,6 +45,13 @@ can find it by the error text.
   per thread. Prefetch timelines in the background and cache them by `updatedAt`, or an overlay
   that opens on a keypress shows empty cards first.
 
+- **Changing the DOM inside `dragstart` ends the drag in Chrome** (dragend fires at once). Defer
+  the state change with `setTimeout(…, 0)`. Call `setDragImage` in the handler itself, before
+  the DOM changes.
+- **A drag that starts on text inside a `draggable` block drags the page selection** (it can reach
+  bb's title bar). Give the block `select-none` and cancel `dragstart` when its target isn't the
+  block or a link.
+
 ## Tooling
 
 - **DevBrowser** (`bb browser-automation`) has no `page.waitForTimeout` and no `locator().first`.
@@ -56,6 +63,12 @@ can find it by the error text.
   releases at once.
 - **Headless screenshots of bb chat** came out black. Text that is still streaming sits in collapsed
   groups and may not be in the DOM.
+- **Headless captures ignore a scrolled sidebar.** After `scrollTop` or `mouse.wheel`, the DOM
+  reports the new offset but the screenshot still shows the top of the list. Check positions with
+  `getBoundingClientRect()`, or fold the sections above (that profile's localStorage only) to bring
+  a block into frame.
+- **Synthetic drags:** dispatch `DragEvent`s with one shared `new DataTransfer()` from
+  `page.evaluate`. They exercise the handlers but not the drag ghost or real pointer motion.
 - **zsh** has no `timeout` command. Don't wrap commands in it.
 
 ## Installs and catalogs
