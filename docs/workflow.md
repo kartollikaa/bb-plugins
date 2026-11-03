@@ -45,6 +45,9 @@ absolute path; after a move, install the new path. That keeps the plugin id. Che
 
 1. In `plugins/<id>`: bump `version` in `package.json`, run `npm install` so the lockfile follows,
    and commit `<id>: release vX.Y.Z — <what the user gets>`.
+   Before committing, also build an isolated copy with `npm ci --omit=dev --omit=optional
+   --ignore-scripts` and `bb plugin build`; use `npm run test:production` when provided. A build
+   with development dependencies can hide a Git installation failure.
 2. Tag `<id>/vX.Y.Z` (annotated; the prefix is what keeps plugins' releases apart) and push the
    commit and the tag. Never move a published tag: bb refuses a tag that points somewhere new.
 3. Marketplace users get it from `bb plugin update <id>`, within the range `marketplace.json` lists.

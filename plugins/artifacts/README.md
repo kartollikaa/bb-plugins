@@ -30,3 +30,8 @@ npm install
 npm test && npm run typecheck && npm run build
 bb plugin install path:../.. --plugin artifacts
 ```
+
+`npm test` also builds an isolated copy after installing only production dependencies, matching
+Git installs. It needs npm registry access and the bb CLI. Run `npm run test:production` to check
+that build on its own. Shared RPC contracts must stay usable by the frontend without importing
+the server SDK at runtime.

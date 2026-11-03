@@ -1,4 +1,3 @@
-import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
 export const LIST_TAG = "artifacts";
@@ -32,7 +31,7 @@ export const listViewSchema = z.object({
 });
 export type ListView = z.infer<typeof listViewSchema>;
 
-export const rpcContract = defineRpcContract({
+export const rpcContract = {
   list: {
     input: z.null(),
     output: listViewSchema,
@@ -42,4 +41,4 @@ export const rpcContract = defineRpcContract({
     input: z.null(),
     output: listViewSchema,
   },
-});
+} as const;

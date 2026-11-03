@@ -32,3 +32,9 @@ A source's `error` says why its list is empty:
 - "Couldn't read the Claude Code login from the keychain": the keychain prompt was denied or timed
   out, or the bb server isn't a Mac.
 - "ChatGPT refused the Codex login" or a missing `auth.json`: run `codex login`.
+
+## Development
+
+Before releasing this plugin, run `npm test`, `npm run typecheck` and `bb plugin build` in its
+directory. The test command includes an isolated build with production dependencies; a working
+path install with development dependencies does not verify a Git installation.

@@ -114,8 +114,9 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   need a browser session, so they are not listed.
 - **Agent skill:** `skills/artifacts/`.
 - **Tests:** `npm test` covers `test/sources.test.ts` (credentials, parsing, paging, errors, URL
-  lookup). Run `npm run typecheck`.
-- MIT. Released as `artifacts/v0.1.0` and listed in `marketplace.json`.
+  lookup) and builds an isolated copy with production dependencies. `npm run test:production`
+  runs that build alone. Run `npm run typecheck` too.
+- MIT. Released as `artifacts/v0.1.1` and listed in `marketplace.json`.
 
 ## mouse-pet — `plugins/mouse-pet/`
 

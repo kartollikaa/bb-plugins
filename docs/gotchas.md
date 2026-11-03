@@ -5,6 +5,9 @@ can find it by the error text.
 
 ## SDK
 
+- **A frontend import from the server SDK can pass a local build and fail Git installation.**
+  Git installs omit dev dependencies. Keep shared RPC contracts as plain schema objects and use
+  type-only SDK imports; verify with an isolated production dependency build.
 - **CLI subcommand names** must match `[a-z0-9-]+`. Otherwise install fails with
   `cli command commands[0] must be { name: [a-z0-9-]+ ... }`.
 - **Message directives** (`app.slots.messageDirective({ id, component })`): the component gets

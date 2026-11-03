@@ -15,7 +15,7 @@ installable with `bb marketplace add`) → **bb-community** (an entry in
 | battery | yes (`v0.1.0`) | PR [#803](https://github.com/get-bb/marketplace/pull/803), merged | Listed |
 | thread-tree | yes (`v0.2.5`) | PR [#823](https://github.com/get-bb/marketplace/pull/823), open | Wait for merge |
 | github-folder | no tag | not submitted | Tag `v0.1.0`, add to `marketplace.json` |
-| artifacts | yes (`v0.1.0`) | PR [#805](https://github.com/get-bb/marketplace/pull/805), open | Wait for merge |
+| artifacts | yes (`v0.1.1`) | PR [#805](https://github.com/get-bb/marketplace/pull/805), changes requested | Request re-review of the production build fix |
 | thread-links | no tag | not submitted | Tag `v0.1.0`, add to `marketplace.json` |
 | power-pill | no tag | not submitted | Tag `v0.1.0`, add to `marketplace.json` |
 | thread-switcher | yes (`v0.1.0`) | PR [#822](https://github.com/get-bb/marketplace/pull/822), open | Wait for merge |

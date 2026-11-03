@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-artifacts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -62,6 +62,7 @@
   "scripts": {
     "build": "bb plugin build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types test/*.test.ts"
+    "test": "node --test --experimental-strip-types test/*.test.ts && npm run test:production",
+    "test:production": "node test/production-build.mjs"
   }
 }
