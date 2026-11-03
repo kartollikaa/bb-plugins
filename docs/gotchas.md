@@ -61,8 +61,17 @@ can find it by the error text.
   bb's title bar). Give the block `select-none` and cancel `dragstart` when its target isn't the
   block or a link.
 
+- **No `:has()` in plugin CSS** (`group-has-[…]`, `peer-has-[…]`, `has-[…]`). Plugin styles load
+  into bb's page, and thread-tree's `group-has-[:focus-visible]/row:*` made every DOM change in
+  the chat restyle the page: inline terminals measuring glyphs froze thread entry for seconds. Track
+  the state in a `data-*` attribute and use `group-data-[…]`; thread-tree's `test/styles.test.ts`
+  guards it.
+
 ## Tooling
 
+- **Profiling the bb page:** a DevBrowser page has `createCDPSession()`, so `Profiler.*` and
+  `Performance.getMetrics` (`RecalcStyleDuration` vs `LayoutDuration`) work on the headless bb at
+  `serverUrl` from `~/.bb/bb-app-runtime.json`.
 - **DevBrowser** (`bb browser-automation`) has no `page.waitForTimeout` and no `locator().first`.
   Use `await new Promise(r => setTimeout(r, ms))` and `page.evaluate`. It has no
   `setViewportSize` either. `page.shot()` files live in the session's tmp dir and are deleted by
