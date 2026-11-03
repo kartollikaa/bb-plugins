@@ -643,6 +643,7 @@ function ThreadRowView({
   const { thread, depth } = row;
   const { splitProps } = useSidebarThreadSplit(thread.id);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [keyboardFocus, setKeyboardFocus] = useState(false);
   const age = formatAge(thread.updatedAt, now);
   const target = useMemo(() => toActionTarget(thread), [thread]);
   const isTree = variant === "tree";
@@ -661,7 +662,14 @@ function ThreadRowView({
           "group/row relative flex h-8 items-center gap-2 rounded-md pr-2 text-sm text-sidebar-foreground/90",
           isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60",
         )}
+        data-keyboard-focus={keyboardFocus || undefined}
         style={{ paddingLeft: ROW_PAD_PX + depth * INDENT_PX }}
+        onFocus={(event) => {
+          if (event.currentTarget.contains(event.target)) setKeyboardFocus(event.target.matches(":focus-visible"));
+        }}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocus(false);
+        }}
         onClick={(event) => {
           const target = event.target as HTMLElement;
           // Portalled menus bubble through React; only clicks on the row itself open it.
@@ -721,7 +729,7 @@ function ThreadRowView({
             <span
               className={cn(
                 "overflow-hidden whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45",
-                !isCompactViewport && [!view.reduceMotion && SWAP_TRANSITION, "max-w-10 group-hover/row:max-w-0 group-hover/row:opacity-0 group-has-[:focus-visible]/row:max-w-0 group-has-[:focus-visible]/row:opacity-0"],
+                !isCompactViewport && [!view.reduceMotion && SWAP_TRANSITION, "max-w-10 group-hover/row:max-w-0 group-hover/row:opacity-0 group-data-[keyboard-focus]/row:max-w-0 group-data-[keyboard-focus]/row:opacity-0"],
                 menuOpen && "max-w-0 opacity-0",
               )}
             >
@@ -735,7 +743,7 @@ function ThreadRowView({
                 !view.reduceMotion && SWAP_TRANSITION,
                 menuOpen
                   ? "max-w-12 opacity-100"
-                  : "max-w-0 opacity-0 group-hover/row:max-w-12 group-hover/row:opacity-100 group-has-[:focus-visible]/row:max-w-12 group-has-[:focus-visible]/row:opacity-100",
+                  : "max-w-0 opacity-0 group-hover/row:max-w-12 group-hover/row:opacity-100 group-data-[keyboard-focus]/row:max-w-12 group-data-[keyboard-focus]/row:opacity-100",
               )}
             >
               <ArchiveButton thread={target} />
