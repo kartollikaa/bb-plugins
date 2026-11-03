@@ -22,6 +22,7 @@ import {
 } from "./lib/hotkey.ts";
 import {
   clampThreadCount,
+  formatAge,
   initialIndex,
   orderThreads,
   parseRecent,
@@ -83,7 +84,8 @@ function usePrefetchPreviews(threads: readonly SidebarThread[]) {
 
 function ThreadSwitcher() {
   const hotkey = useHotkey();
-  const { threads } = useSidebarThreads();
+  const { threads, projects } = useSidebarThreads();
+  const projectNames = useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects]);
   const { threadId: currentId } = useBbContext();
   const recent = useRecentThreads(currentId);
   const count = useThreadCount();
@@ -181,6 +183,8 @@ function ThreadSwitcher() {
           <ThreadCard
             key={thread.id}
             thread={thread}
+            projectName={projectNames.get(thread.projectId) ?? null}
+            age={formatAge(thread.updatedAt, Date.now())}
             selected={index === state.index}
             onHover={() => setState((current) => (current ? { ...current, index } : current))}
             onPick={() => {
@@ -196,11 +200,15 @@ function ThreadSwitcher() {
 
 function ThreadCard({
   thread,
+  projectName,
+  age,
   selected,
   onHover,
   onPick,
 }: {
   thread: SidebarThread;
+  projectName: string | null;
+  age: string;
   selected: boolean;
   onHover: () => void;
   onPick: () => void;
@@ -234,11 +242,22 @@ function ThreadCard({
       >
         <ChatPreview threadId={thread.id} version={thread.updatedAt} />
       </div>
-      <div className="flex min-w-0 items-center gap-1.5 px-0.5">
-        <span className="flex size-3.5 shrink-0 items-center justify-center" title={DOT_LABEL[dot]}>
+      <div className="flex min-w-0 gap-1.5 px-0.5" title={thread.displayTitle}>
+        <span className="flex h-4 w-3.5 shrink-0 items-center justify-center" title={DOT_LABEL[dot]}>
           <StatusDot state={dot} />
         </span>
-        <span className="truncate text-xs font-medium text-foreground">{thread.displayTitle}</span>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="line-clamp-2 h-8 break-words text-xs font-medium leading-4 text-foreground">
+            {thread.displayTitle}
+          </span>
+          <span className="flex min-w-0 gap-1.5 text-[11px] leading-4 text-muted-foreground">
+            <span className="min-w-0 flex-1 truncate font-medium text-foreground/70">{projectName ?? "No project"}</span>
+            <span className="shrink-0 tabular-nums">{age}</span>
+          </span>
+          <span className="truncate font-mono text-[10px] leading-4 text-muted-foreground/80">
+            {thread.environment?.branchName ?? "\u00a0"}
+          </span>
+        </div>
       </div>
     </div>
   );

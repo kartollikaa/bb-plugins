@@ -156,3 +156,13 @@ test("status dot follows thread-tree's priority: input, error, running, done", a
   assert.equal(threadDotState({ ...base, activity: { backgroundAgents: 1, backgroundCommands: 0, workflows: 0 } }), "running");
   assert.equal(threadDotState({ ...base, indicator: "unread" }), "done");
 });
+
+test("ages read like the sidebar's", async () => {
+  const { formatAge } = await import("../lib/switcher.ts");
+  const now = 10_000_000_000;
+  assert.equal(formatAge(now - 30_000, now), "now");
+  assert.equal(formatAge(now - 5 * 60_000, now), "5m");
+  assert.equal(formatAge(now - 3 * 3_600_000, now), "3h");
+  assert.equal(formatAge(now - 3 * 86_400_000, now), "3d");
+  assert.equal(formatAge(now - 21 * 86_400_000, now), "3w");
+});

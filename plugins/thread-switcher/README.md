@@ -2,7 +2,8 @@
 
 Switch between your recent bb threads from the keyboard. Hold Control and press Tab: a row of cards
 opens over the window, one per thread, each with a small preview of the latest messages in that chat.
-A dot under each card shows the thread's status, in the same colors as Thread Tree: amber needs your
+Under the preview: the thread's title on up to two lines, its project and how long ago it was
+active, and its branch. A dot next to the title shows the thread's status, in the same colors as Thread Tree: amber needs your
 input, red failed, blue (pulsing) working, green done. A thread waiting for your answer also gets an
 amber outline around its preview.
 

@@ -12,7 +12,8 @@ does the same and Esc cancels. A quick tap goes back to the previous thread. Car
 the user last opened each thread in this browser, then by latest activity; archived and hidden
 threads are skipped.
 
-Each card has a status dot: amber needs input (a pending question or approval), red failed, blue
+Under each preview: the title (up to two lines), the project with the time since last activity, and
+the branch. Each card has a status dot: amber needs input (a pending question or approval), red failed, blue
 pulsing working, green done — the same rules and colors as Thread Tree's sidebar. A card whose thread
 needs input also has an amber outline.
 
