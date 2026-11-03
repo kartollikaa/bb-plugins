@@ -48,6 +48,7 @@ const ROW_PAD_PX = 6;
 const INDENT_PX = 24;
 
 const ARCHIVE_ACTION_KEY = "bb--core/archive";
+const SWAP_TRANSITION = "transition-[max-width,opacity] duration-200 ease-out motion-reduce:transition-none";
 
 const GROUP_MODES: readonly { id: GroupMode; label: string; icon: React.ReactNode }[] = [
   { id: "project", label: "Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },
@@ -551,38 +552,48 @@ function ThreadRowView({
           </span>
         ) : null}
         {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
-        {view.showAge ? (
-          <span
-            className={cn(
-              "shrink-0 text-right text-2xs tabular-nums text-sidebar-foreground/45",
-              !isCompactViewport && "group-hover/row:hidden",
-              menuOpen && "hidden",
-            )}
-          >
-            {age}
-          </span>
-        ) : null}
-        {isCompactViewport ? null : (
-          // Hover actions take the age label's place, so the title truncates instead of being covered.
-          <span className={cn("-mr-1 shrink-0 items-center gap-0.5", menuOpen ? "flex" : "hidden group-hover/row:flex")}>
-            <ArchiveButton thread={target} />
-            <ThreadActionsMenu
-              thread={target}
-              onOpenChange={setMenuOpen}
-              align="start"
-              trigger={(props) => (
-                <button
-                  type="button"
-                  aria-label="Thread actions"
-                  {...props}
-                  className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                >
-                  <Icon name="MoreHorizontal" fallback="Ellipsis" aria-hidden className="size-3.5" />
-                </button>
+        {/* Age shrinks away as the actions grow in, so the row's icons glide left and the title truncates. */}
+        <span className="-mr-1 flex shrink-0 items-center">
+          {view.showAge ? (
+            <span
+              className={cn(
+                "overflow-hidden whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45",
+                !isCompactViewport && [SWAP_TRANSITION, "max-w-10 group-hover/row:max-w-0 group-hover/row:opacity-0 group-focus-within/row:max-w-0 group-focus-within/row:opacity-0"],
+                menuOpen && "max-w-0 opacity-0",
               )}
-            />
-          </span>
-        )}
+            >
+              {age}
+            </span>
+          ) : null}
+          {isCompactViewport ? null : (
+            <span
+              className={cn(
+                "flex items-center gap-0.5 overflow-hidden",
+                SWAP_TRANSITION,
+                menuOpen
+                  ? "max-w-12 opacity-100"
+                  : "max-w-0 opacity-0 group-hover/row:max-w-12 group-hover/row:opacity-100 group-focus-within/row:max-w-12 group-focus-within/row:opacity-100",
+              )}
+            >
+              <ArchiveButton thread={target} />
+              <ThreadActionsMenu
+                thread={target}
+                onOpenChange={setMenuOpen}
+                align="start"
+                trigger={(props) => (
+                  <button
+                    type="button"
+                    aria-label="Thread actions"
+                    {...props}
+                    className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  >
+                    <Icon name="MoreHorizontal" fallback="Ellipsis" aria-hidden className="size-3.5" />
+                  </button>
+                )}
+              />
+              </span>
+          )}
+        </span>
       </div>
     </ThreadActionsContextMenu>
   );
