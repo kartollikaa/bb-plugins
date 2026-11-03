@@ -44,10 +44,17 @@ under it, and the subagents it runs inside its own session show on its row.
   error, gray stopped.
 - `bb thread-tree list` prints the same list from a terminal.
 
+## Settings
+
+Settings → Installed plugins → Thread Tree hides the GitHub, Automations and
+Recent Activity sections, sets how many Recent Activity rows show before and
+after Show more, and turns off the provider icon, the subagent counters or the
+age label on each row.
+
 ## How it works
 
 The list reads bb's own thread data. Subagents come from each thread's event
 log, read incrementally on the bb server; nothing leaves the machine. The
 GitHub section reads the GitHub Folder plugin on the bb server. Collapse state,
-grouping, project order, the Archived toggle and the Recent Activity length are
-kept per client.
+grouping, project order, the Archived toggle and Show more are kept per
+client; the settings above apply to every client of the bb server.

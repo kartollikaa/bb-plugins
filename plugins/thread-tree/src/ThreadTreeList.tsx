@@ -12,6 +12,7 @@ import {
   experimental_useThreadActions as useThreadActions,
   useBbNavigate,
   useSdk,
+  useSettings,
   type PluginSidebarProject,
   type PluginSidebarThread,
   type PluginThreadActionTarget,
@@ -26,6 +27,7 @@ import { ROW_HOVER_SOLID_BG } from "./rowStyles";
 import { AutomationsSection } from "./AutomationsSection";
 import { GithubSection } from "./GithubSection";
 import { StatusDot } from "./StatusDot";
+import { readViewSettings, type ViewSettings } from "./settings";
 import { formatAge } from "./time";
 import {
   ancestorsOf,
@@ -54,8 +56,6 @@ const ROW_END_PAD_PX = 16;
 const SLIDE_ON_HOVER = "group-hover/row:[transform:translateX(calc(var(--slide)*-1))]";
 const SLIDE_NOW = "[transform:translateX(calc(var(--slide)*-1))]";
 const ROW_HOVER_SOLID_BG_ON_HOVER = "group-hover/row:bg-[color-mix(in_oklab,var(--sidebar-accent)_60%,var(--sidebar))]";
-const RECENT_LIMIT = 5;
-const RECENT_MORE_LIMIT = 15;
 
 const GROUP_MODES: readonly { id: GroupMode; label: string; icon: React.ReactNode }[] = [
   { id: "project", label: "Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },
@@ -113,6 +113,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const treeThreads = showArchived ? listed.threads : threads;
   const [drag, setDrag] = useState<{ projectId: string; overId: string | null } | null>(null);
   const now = useNow(30_000);
+  const settingValues = useSettings().values;
+  const view = useMemo(() => readViewSettings(settingValues), [settingValues]);
 
   const forest = useMemo(() => buildForest(treeThreads), [treeThreads]);
 
@@ -133,17 +135,19 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     [forest, collapsedThreads.values, collapsedGroups.values, groupMode, projectOrder],
   );
   const showMoreRecent = flags.has("recent-more");
+  const recentHidden = !view.showRecent || collapsedGroups.has("recent");
   const recentCollapsed = collapsedGroups.has("recent");
   const recent = useMemo(
-    () => recentThreads(threads, showMoreRecent ? RECENT_MORE_LIMIT : RECENT_LIMIT),
-    [threads, showMoreRecent],
+    () => recentThreads(threads, showMoreRecent ? view.recentMoreLimit : view.recentLimit),
+    [threads, showMoreRecent, view.recentLimit, view.recentMoreLimit],
   );
   const visibleThreads = useMemo(() => {
     const byId = new Map<string, PluginSidebarThread>();
-    if (!recentCollapsed) for (const thread of recent) byId.set(thread.id, thread);
+    if (!view.showSubagents) return [];
+    if (!recentHidden) for (const thread of recent) byId.set(thread.id, thread);
     for (const group of groups) for (const row of group.rows) byId.set(row.thread.id, row.thread);
     return [...byId.values()];
-  }, [groups, recent, recentCollapsed]);
+  }, [groups, recent, recentHidden, view.showSubagents]);
   const subagents = useSubagents(visibleThreads);
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const { providers } = useProviders();
@@ -186,6 +190,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       isCompactViewport={isCompactViewport}
       subagents={subagents.get(row.thread.id)}
       provider={providerById.get(row.thread.providerId)}
+      view={view}
       now={now}
       onToggle={() => collapsedThreads.toggle(row.thread.id)}
       onOpen={open}
@@ -194,59 +199,65 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   return (
     <div className="flex flex-col gap-3 px-1.5 pb-3 pt-1">
-      <GithubSection
-        isCollapsed={collapsedGroups.has("github")}
-        onToggle={() => collapsedGroups.toggle("github")}
-        showSnoozed={flags.has("github-snoozed")}
-        onToggleSnoozed={() => flags.toggle("github-snoozed")}
-      />
-
-      <AutomationsSection
-        isCollapsed={collapsedGroups.has("automations")}
-        onToggle={() => collapsedGroups.toggle("automations")}
-        showPaused={flags.has("automations-paused")}
-        onTogglePaused={() => flags.toggle("automations-paused")}
-        activeThreadId={activeThreadId}
-        now={now}
-        onNavigate={onNavigate}
-      />
-
-      <section aria-label="Recent activity">
-        <GroupHeader
-          title="Recent Activity"
-          icon={<Icon name="Clock" aria-hidden className="size-3.5" />}
-          isCollapsed={recentCollapsed}
-          count={recent.length}
-          onToggle={() => collapsedGroups.toggle("recent")}
+      {view.showGithub ? (
+        <GithubSection
+          isCollapsed={collapsedGroups.has("github")}
+          onToggle={() => collapsedGroups.toggle("github")}
+          showSnoozed={flags.has("github-snoozed")}
+          onToggleSnoozed={() => flags.toggle("github-snoozed")}
         />
-        {recentCollapsed ? null : (
-          <div role="list" className="mt-0.5 flex flex-col gap-0.5">
-            {recent.map((thread) =>
-              renderRow(
-                {
-                  thread,
-                  depth: 0,
-                  descendantCount: 0,
-                  hasChildren: false,
-                  isExpanded: false,
-                  hiddenState: null,
-                  guides: [],
-                },
-                "recent",
-              ),
-            )}
-            {threads.length > RECENT_LIMIT ? (
-              <button
-                type="button"
-                onClick={() => flags.toggle("recent-more")}
-                className="ml-[26px] h-6 self-start rounded-md px-1 text-xs text-sidebar-foreground/45 hover:text-sidebar-foreground"
-              >
-                {showMoreRecent ? "Show less" : "Show more"}
-              </button>
+      ) : null}
+
+      {view.showAutomations ? (
+        <AutomationsSection
+          isCollapsed={collapsedGroups.has("automations")}
+          onToggle={() => collapsedGroups.toggle("automations")}
+          showPaused={flags.has("automations-paused")}
+          onTogglePaused={() => flags.toggle("automations-paused")}
+          activeThreadId={activeThreadId}
+          now={now}
+          onNavigate={onNavigate}
+        />
+      ) : null}
+
+      {view.showRecent ? (
+        <section aria-label="Recent activity">
+          <GroupHeader
+            title="Recent Activity"
+            icon={<Icon name="Clock" aria-hidden className="size-3.5" />}
+            isCollapsed={recentCollapsed}
+            count={recent.length}
+            onToggle={() => collapsedGroups.toggle("recent")}
+          />
+          {recentCollapsed ? null : (
+            <div role="list" className="mt-0.5 flex flex-col gap-0.5">
+              {recent.map((thread) =>
+                renderRow(
+                  {
+                    thread,
+                    depth: 0,
+                    descendantCount: 0,
+                    hasChildren: false,
+                    isExpanded: false,
+                    hiddenState: null,
+                    guides: [],
+                  },
+                  "recent",
+                ),
+              )}
+              {threads.length > view.recentLimit ? (
+                <button
+                  type="button"
+                  onClick={() => flags.toggle("recent-more")}
+                  className="ml-[26px] h-6 self-start rounded-md px-1 text-xs text-sidebar-foreground/45 hover:text-sidebar-foreground"
+                >
+                  {showMoreRecent ? "Show less" : "Show more"}
+                </button>
             ) : null}
           </div>
         )}
       </section>
+      ) : null}
 
       <div className="mx-1.5 border-t border-sidebar-border" />
 
@@ -459,6 +470,7 @@ function ThreadRowView({
   isCompactViewport,
   subagents,
   provider,
+  view,
   now,
   onToggle,
   onOpen,
@@ -471,6 +483,7 @@ function ThreadRowView({
   isCompactViewport: boolean;
   subagents: ThreadSubagents | undefined;
   provider: RowProvider | undefined;
+  view: ViewSettings;
   now: number;
   onToggle: () => void;
   onOpen: (thread: PluginSidebarThread, event: MouseEvent) => void;
@@ -546,9 +559,11 @@ function ThreadRowView({
           <span className={cn("min-w-0 truncate", thread.isUnread && "font-semibold text-sidebar-foreground")}>
             <ThreadTitle threadId={thread.id} />
           </span>
-          <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
-            <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3" />
-          </span>
+          {view.showProviderIcon ? (
+            <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
+              <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3" />
+            </span>
+          ) : null}
         </a>
         <span aria-hidden className="min-w-0 flex-1" />
         {isTree && row.hasChildren && !row.isExpanded ? (
@@ -570,18 +585,20 @@ function ThreadRowView({
           )}
         >
           {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
-          <SubagentBadge thread={thread} data={subagents} />
+          {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
         </span>
-        <span
-          ref={ageRef}
-          className={cn(
-            "shrink-0 text-right text-2xs tabular-nums text-sidebar-foreground/45",
-            !isCompactViewport && "group-hover/row:invisible",
-            menuOpen && "invisible",
-          )}
-        >
-          {age}
-        </span>
+        {view.showAge ? (
+          <span
+            ref={ageRef}
+            className={cn(
+              "shrink-0 text-right text-2xs tabular-nums text-sidebar-foreground/45",
+              !isCompactViewport && "group-hover/row:invisible",
+              menuOpen && "invisible",
+            )}
+          >
+            {age}
+          </span>
+        ) : null}
         {isCompactViewport ? null : (
           // Hover actions overlay the row's end instead of reserving width, so nothing reflows.
           <span

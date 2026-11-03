@@ -30,6 +30,12 @@ The CLI reports `state` as the event log recorded it. The sidebar additionally
 shows a `running` subagent as stopped once its thread has no live work, because
 a provider cannot report an end after its session is gone.
 
+## Settings
+
+`bb plugin config thread-tree` lists them; `bb plugin config thread-tree set <key> <value>` changes one.
+Booleans: `showGithub`, `showAutomations`, `showRecent`, `showProviderIcon`, `showSubagents`, `showAge`.
+Numbers (1–50): `recentLimit` (Recent Activity rows), `recentMoreLimit` (rows after Show more).
+
 ## Making a subagent you can talk to
 
 A provider subagent cannot be messaged. To get one that can, spawn a child

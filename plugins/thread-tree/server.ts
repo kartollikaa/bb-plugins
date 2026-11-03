@@ -15,6 +15,7 @@ import {
   githubFolderViewSchema,
   githubSettingsPatchSchema,
 } from "./src/githubFolder";
+import { SETTINGS } from "./src/settings";
 
 const MAX_THREADS_PER_CALL = 200;
 
@@ -70,6 +71,7 @@ export const rpcContract = defineRpcContract({
 });
 
 export default async function plugin(bb: BbPluginApi) {
+  bb.settings.define(SETTINGS);
   const folder = createSubagentFolder({
     listEvents: (args) => bb.sdk.threads.events.list(args),
     log: (message) => bb.log.warn(message),
