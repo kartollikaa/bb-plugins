@@ -26,10 +26,10 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   `githubFolderSnooze` and `githubFolderPrefetch` to that plugin's RPC, like Automations; without it the section is hidden.
 - **Agent skills:** `skills/thread-tree/` and `skills/delegate-to-threads/`. The second one is how
   agents spawn child threads with `bb thread spawn --parent-self`.
-- **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations, settings). Run
+- **Tests:** `npm test` covers `test/*.test.ts` (tree, subagents, automations, settings, no `:has()` in classes). Run
   `npm run typecheck` too. Components live in `src/`.
 - The thread list slot is exclusive: with several list plugins installed, only one is shown.
-- MIT. Tags: `thread-tree/v0.1.0`, `v0.2.0`, `v0.2.1`.
+- MIT. Tags: `thread-tree/v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`.
 
 ## reveal-in-finder — `plugins/reveal-in-finder/`
 
