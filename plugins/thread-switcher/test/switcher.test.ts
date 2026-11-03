@@ -1,0 +1,141 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  formatHotkey,
+  hotkeyFromEvent,
+  hotkeyModifierReleased,
+  matchHotkey,
+  parseHotkey,
+  type KeyLike,
+} from "../lib/hotkey.ts";
+import {
+  clampThreadCount,
+  cleanText,
+  initialIndex,
+  orderThreads,
+  parseRecent,
+  previewFromTimeline,
+  recordVisit,
+  stepIndex,
+} from "../lib/switcher.ts";
+
+const key = (code: string, mods: Partial<KeyLike> = {}): KeyLike => ({
+  code,
+  key: "",
+  ctrlKey: false,
+  altKey: false,
+  shiftKey: false,
+  metaKey: false,
+  ...mods,
+});
+
+test("parses hotkeys with aliases and rejects ones without a holdable modifier", () => {
+  assert.deepEqual(parseHotkey("Control+Tab"), { ctrl: true, alt: false, shift: false, meta: false, key: "Tab" });
+  assert.equal(formatHotkey(parseHotkey("opt + cmd + k")!), "Option+Command+K");
+  assert.equal(formatHotkey(parseHotkey("Ctrl+`")!), "Control+`");
+  assert.equal(parseHotkey("Tab"), null);
+  assert.equal(parseHotkey("Shift+Tab"), null);
+  assert.equal(parseHotkey("Control+"), null);
+  assert.equal(parseHotkey("Hyper+Tab"), null);
+  assert.equal(parseHotkey("Control+Tab+K"), null);
+});
+
+test("matches forward, Shift backward, and ignores other modifiers", () => {
+  const hotkey = parseHotkey("Control+Tab")!;
+  assert.equal(matchHotkey(key("Tab", { ctrlKey: true }), hotkey), "forward");
+  assert.equal(matchHotkey(key("Tab", { ctrlKey: true, shiftKey: true }), hotkey), "backward");
+  assert.equal(matchHotkey(key("Tab", { ctrlKey: true, metaKey: true }), hotkey), null);
+  assert.equal(matchHotkey(key("Tab"), hotkey), null);
+  assert.equal(matchHotkey(key("KeyK", { ctrlKey: true }), hotkey), null);
+});
+
+test("a hotkey with Shift only moves forward", () => {
+  const hotkey = parseHotkey("Command+Shift+K")!;
+  assert.equal(matchHotkey(key("KeyK", { metaKey: true, shiftKey: true }), hotkey), "forward");
+  assert.equal(matchHotkey(key("KeyK", { metaKey: true }), hotkey), null);
+});
+
+test("reads the physical key so Option combos record as letters", () => {
+  assert.equal(formatHotkey(hotkeyFromEvent(key("KeyK", { altKey: true, key: "˚" }))!), "Option+K");
+  assert.equal(hotkeyFromEvent(key("ControlLeft", { ctrlKey: true })), null);
+  assert.equal(hotkeyFromEvent(key("KeyK")), null);
+});
+
+test("commits when any hotkey modifier is released", () => {
+  const hotkey = parseHotkey("Control+Option+Tab")!;
+  assert.equal(hotkeyModifierReleased({ ctrlKey: true, altKey: true, metaKey: false }, hotkey), false);
+  assert.equal(hotkeyModifierReleased({ ctrlKey: false, altKey: true, metaKey: false }, hotkey), true);
+  assert.equal(hotkeyModifierReleased({ ctrlKey: true, altKey: false, metaKey: true }, hotkey), true);
+});
+
+test("records visits most recent first without duplicates", () => {
+  assert.deepEqual(recordVisit(["a", "b", "c"], "c"), ["c", "a", "b"]);
+  assert.equal(recordVisit(Array.from({ length: 60 }, (_, i) => `t${i}`), "x").length, 50);
+  assert.deepEqual(parseRecent('["a", 3, "b"]'), ["a", "b"]);
+  assert.deepEqual(parseRecent("{"), []);
+  assert.deepEqual(parseRecent(null), []);
+});
+
+test("orders current, then visited, then recently updated, skipping archived and hidden", () => {
+  const thread = (id: string, updatedAt: number, extra = {}) => ({
+    id,
+    updatedAt,
+    isArchived: false,
+    isHidden: false,
+    ...extra,
+  });
+  const threads = [
+    thread("old", 1),
+    thread("new", 9),
+    thread("visited", 2),
+    thread("current", 3),
+    thread("archived", 10, { isArchived: true }),
+    thread("hidden", 10, { isHidden: true }),
+  ];
+  const ids = orderThreads(threads, ["visited", "archived"], "current", 6).map((t) => t.id);
+  assert.deepEqual(ids, ["current", "visited", "new", "old"]);
+  assert.equal(orderThreads(threads, [], null, 2).length, 2);
+});
+
+test("clamps the thread count setting", () => {
+  assert.equal(clampThreadCount(undefined), 6);
+  assert.equal(clampThreadCount(1), 2);
+  assert.equal(clampThreadCount(99), 20);
+  assert.equal(clampThreadCount(7.4), 7);
+});
+
+test("steps wrap around and the first press picks the previous thread", () => {
+  assert.equal(stepIndex(3, 1, 4), 0);
+  assert.equal(stepIndex(0, -1, 4), 3);
+  assert.equal(initialIndex("forward", 4, true), 1);
+  assert.equal(initialIndex("forward", 4, false), 0);
+  assert.equal(initialIndex("backward", 4, true), 3);
+  assert.equal(initialIndex("forward", 1, true), 0);
+});
+
+test("extracts the last conversation messages from nested timeline rows", () => {
+  const timeline = {
+    rows: [
+      { kind: "conversation", role: "user", id: "u1", text: "first", initiator: "user" },
+      {
+        kind: "turn",
+        children: [
+          { kind: "work", id: "w1" },
+          { kind: "conversation", role: "assistant", id: "a1", text: "**done** see [docs](http://x)" },
+        ],
+      },
+      { kind: "conversation", role: "user", id: "s1", text: "system note", initiator: "system" },
+      { kind: "conversation", role: "assistant", id: "a2", text: "   " },
+    ],
+  };
+  assert.deepEqual(previewFromTimeline(timeline), [
+    { id: "u1", role: "user", text: "first" },
+    { id: "a1", role: "assistant", text: "done see docs" },
+  ]);
+  assert.deepEqual(previewFromTimeline(null), []);
+  assert.deepEqual(previewFromTimeline({ rows: "nope" }), []);
+});
+
+test("cleans markdown and code blocks for the small preview", () => {
+  assert.equal(cleanText("## Title\n```ts\nconst a = 1;\n```\nok"), "Title\n[code]\nok");
+});
