@@ -1,20 +1,30 @@
-Switch between recent bb threads from the keyboard, with a preview of each chat.
+Hold the hotkey and a row of cards opens over bb, one for each thread you opened last. Let go, and
+you are in the selected thread.
 
 ## What you get
 
-- Control+Tab opens a row of cards for your most recently opened threads. Each card shows the
-  latest messages of that chat, its title, project, branch, last activity and a status dot. Threads waiting for your answer get an
-  amber outline and show the question or approval they are waiting on. Threads with subthreads or
-  subagents show how many there are and how many are still running.
-- Threads that need you (waiting for input, then failed) come right after the current one.
-- Keep holding Control and press Tab to move on (Shift+Tab goes back), then let go to open the
-  selected thread. A quick tap jumps back to the previous thread; Esc cancels.
-- The hotkey, the number of threads shown and the needs-you-first order are plugin settings. The hotkey can be typed or
-  recorded by pressing it.
+- A card for each recent thread: the latest messages of the chat, its title, project, branch, time
+  since the last activity and a status dot (needs input, failed, working, done).
+- A thread waiting for your answer gets an amber outline, and its card shows the question or
+  approval it is waiting on.
+- A thread with subthreads or subagents shows how many there are and how many are still running.
+- Threads that need you, those waiting for input and then failed ones, come right after the current
+  thread.
 
-## Requirements
+## How to use it
 
-A keyboard. The hotkey needs Control, Option or Command.
+- Hold Control and press Tab to open the switcher. Press Tab again to move on, Shift+Tab to go
+  back; the arrow keys work too.
+- Let go of Control to open the selected thread. Enter does the same, Esc closes without
+  switching, and a click opens any card.
+- A quick Control+Tab tap jumps back to the previous thread.
+
+## Settings
+
+- **Hotkey**: Control+Tab by default. Type a combination or record it by pressing the keys. It needs
+  Control, Option or Command, because the switcher stays open while you hold that key.
+- **Threads shown**: 2 to 20 cards, 6 by default.
+- **Threads that need you first**: on by default; turn it off to order cards by recency only.
 
 ## Privacy
 
