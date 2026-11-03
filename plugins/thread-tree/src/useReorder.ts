@@ -9,8 +9,15 @@ export function useDragReorder<Id extends string>(order: readonly Id[], commit: 
   const [drag, setDrag] = useState<{ id: Id; preview: Id[] } | null>(null);
   const preview = drag?.preview ?? order;
   const draggedBlock = useRef<HTMLElement | null>(null);
+  const pin = useRef<Pin | null>(null);
   const isDragging = drag !== null;
-  useEffect(() => (isDragging ? autoScrollNearEdges(draggedBlock.current) : undefined), [isDragging]);
+  useEffect(() => (isDragging ? autoScrollNearEdges(draggedBlock.current, () => pin.current?.isHolding() ?? false) : undefined), [isDragging]);
+  useLayoutEffect(() => {
+    if (isDragging) return undefined;
+    pin.current?.release();
+    pin.current = null;
+    return undefined;
+  }, [isDragging]);
 
   const drop = useCallback(
     (event: DragEvent) => {
@@ -39,6 +46,8 @@ export function useDragReorder<Id extends string>(order: readonly Id[], commit: 
       event.dataTransfer.setDragImage(image, clamp(event.clientX - box.left, box.width), clamp(event.clientY - box.top, box.height));
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", id);
+      pin.current?.release();
+      pin.current = pinWhileFolding(block, image);
       const preview = [...order];
       // Chrome ends a drag at once if the DOM changes inside dragstart, and blocks fold to headers on drag.
       setTimeout(() => setDrag({ id, preview }), 0);
@@ -51,7 +60,9 @@ export function useDragReorder<Id extends string>(order: readonly Id[], commit: 
       const containerTop = (block.offsetParent as HTMLElement | null)?.getBoundingClientRect().top ?? 0;
       const after = event.clientY - containerTop > block.offsetTop + block.offsetHeight / 2;
       const next = placeNear(drag.preview, drag.id, id, after);
-      if (next.some((entry, index) => entry !== drag.preview[index])) setDrag({ id: drag.id, preview: next });
+      if (next.every((entry, index) => entry === drag.preview[index])) return;
+      pin.current?.stopHolding();
+      setDrag({ id: drag.id, preview: next });
     },
     onDrop: drop,
     onDragEnd: () => setTimeout(() => setDrag(null), 0),
@@ -78,8 +89,59 @@ function scrollParent(element: HTMLElement | null): HTMLElement | null {
   return null;
 }
 
+type Pin = { isHolding: () => boolean; stopHolding: () => void; release: () => void };
+
+const HOLD_MS = 450;
+
+/**
+ * Keeps the grabbed header where it was while the blocks fold for a drag: the scroll container
+ * absorbs the shift, and a top spacer covers what scrolling cannot, until `release`.
+ */
+function pinWhileFolding(block: HTMLElement, anchor: HTMLElement): Pin {
+  const container = block.parentElement;
+  const scroller = scrollParent(block);
+  const anchorTop = anchor.getBoundingClientRect().top;
+  const basePadding = container ? parseFloat(getComputedStyle(container).paddingTop) || 0 : 0;
+  let spacer = 0;
+  let holding = true;
+  const hold = () => {
+    if (!holding || !container) return;
+    let drift = anchor.getBoundingClientRect().top - anchorTop;
+    if (Math.abs(drift) < 0.5) return;
+    if (drift > 0 && spacer > 0) {
+      const cut = Math.min(spacer, drift);
+      spacer -= cut;
+      drift -= cut;
+    }
+    if (scroller && drift !== 0) {
+      const before = scroller.scrollTop;
+      scroller.scrollTop = before + drift;
+      drift -= scroller.scrollTop - before;
+    }
+    if (drift < 0) spacer -= drift;
+    container.style.paddingTop = spacer > 0 ? `${basePadding + spacer}px` : "";
+  };
+  // Fires after layout and before paint, so the header never shows in its shifted place.
+  const observer = new ResizeObserver(hold);
+  for (const sibling of Array.from(container?.children ?? [])) observer.observe(sibling);
+  const stopHolding = () => {
+    holding = false;
+    observer.disconnect();
+    clearTimeout(timer);
+  };
+  const timer = setTimeout(stopHolding, HOLD_MS);
+  return {
+    isHolding: () => holding,
+    stopHolding,
+    release: () => {
+      stopHolding();
+      if (container) container.style.paddingTop = "";
+    },
+  };
+}
+
 /** Scrolls the block's scroll container while the dragging pointer is near its top or bottom edge. */
-function autoScrollNearEdges(block: HTMLElement | null): (() => void) | undefined {
+function autoScrollNearEdges(block: HTMLElement | null, isPaused: () => boolean): (() => void) | undefined {
   const scroller = scrollParent(block);
   if (!scroller) return undefined;
   let pointer: { x: number; y: number } | null = null;
@@ -89,7 +151,7 @@ function autoScrollNearEdges(block: HTMLElement | null): (() => void) | undefine
   };
   const tick = () => {
     const box = scroller.getBoundingClientRect();
-    if (pointer && pointer.x >= box.left && pointer.x <= box.right) {
+    if (pointer && !isPaused() && pointer.x >= box.left && pointer.x <= box.right) {
       const edge = Math.min(EDGE_PX, box.height / 4);
       const depth = pointer.y < box.top + edge ? pointer.y - box.top - edge : pointer.y > box.bottom - edge ? pointer.y - box.bottom + edge : 0;
       const strength = Math.max(-1, Math.min(1, depth / edge));
