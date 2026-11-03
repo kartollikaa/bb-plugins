@@ -151,8 +151,10 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **What:** holding the hotkey (setting `hotkey`, `Control+Tab` by default) opens a row of cards for
   the most recently opened threads (setting `threadCount`, 6 by default), each with a preview of the
   chat's latest messages, a two-line title, project, age and branch, a status dot and an amber outline when the thread needs input; such a card shows the pending
-  question or approval instead, and a running card shows its in-progress work row as a "doing now"
-  line (`describeActivity`; running threads refetch their timeline each time the switcher opens).
+  question or approval instead, and a card ends with a subthread recap in thread-tree's fold-line
+  style (`subthreadCounts` over `parentThreadId`), or a subagent recap from timeline delegation rows;
+  running threads refetch their timeline each time the switcher opens. It never shows commands or
+  steps, by Dmitrii's call: the switcher is for jumping, not reading.
   The switcher is for jumping fast, so it has no larger chat view.
   Threads needing input, then failed ones, follow the
   current thread (setting `attentionFirst`, on by default). The key moves on, Shift moves back, letting go of the modifier opens the
@@ -166,9 +168,9 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   preview extraction are pure functions in `lib/`.
 - **Agent skill:** `skills/thread-switcher/`.
 - **Tests:** `npm test` covers `test/switcher.test.ts` (hotkey parsing and matching, release, visit
-  order, ordering, urgency order, count, preview, pending-request and current-step extraction, status priority,
+  order, ordering, urgency order, count, preview and pending-request extraction, subagent and subthread counts, status priority,
   ages). Run `npm run typecheck`. Opening, stepping, release, tap-back, Esc, the one-row layout, the
-  "doing now" line and the recorder were checked in the live app; the pending-request card was not, as no
+  subthread recap and the recorder were checked in the live app; the pending-request card was not, as no
   thread was waiting at the time.
 - MIT. Not released and not in `marketplace.json` yet: it needs a first `thread-switcher/v0.1.0` tag.
 
