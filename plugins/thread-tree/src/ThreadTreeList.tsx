@@ -55,6 +55,7 @@ import { usePersistentChoice, usePersistentList, usePersistentSet } from "./useP
 import { useDragReorder, useFlipOrder } from "./useReorder";
 import { ReduceMotionContext, useStill } from "./motion";
 import { Collapse } from "./Collapse";
+import { useArchiveUndo } from "./useArchiveUndo";
 
 const ROW_PAD_PX = 6;
 /** One level puts a child's status icon under its parent's title. */
@@ -103,6 +104,7 @@ const STATUS_GROUP_TITLE: Record<string, string> = {
 export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }: PluginThreadListProps) {
   const { status, threads, projects } = useSidebarThreads();
   const navigate = useBbNavigate();
+  useArchiveUndo();
   const collapsedThreads = usePersistentSet("collapsed-threads");
   const collapsedGroups = usePersistentSet("collapsed-groups");
   const flags = usePersistentSet("flags");

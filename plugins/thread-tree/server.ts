@@ -16,6 +16,7 @@ import {
   githubSettingsPatchSchema,
 } from "./src/githubFolder";
 import { sectionPatchSchema, SETTINGS } from "./src/settings";
+import { createArchiveHistory } from "./src/archiveUndo";
 
 const MAX_THREADS_PER_CALL = 200;
 
@@ -54,6 +55,14 @@ export const rpcContract = defineRpcContract({
     input: z.object({ key: z.string().min(1).max(400), snoozed: z.boolean() }).strict(),
     output: z.object({ ok: z.literal(true) }),
   },
+  /** Brings back the most recent archive action's threads; empty when there is nothing to undo. */
+  undoArchive: {
+    input: z.null(),
+    output: z.object({
+      restored: z.array(z.object({ threadId: z.string(), title: z.string() })),
+      failed: z.array(z.object({ threadId: z.string(), title: z.string(), error: z.string() })),
+    }),
+  },
   /** Shows or hides sidebar sections from the sidebar itself. */
   setSections: {
     input: sectionPatchSchema,
@@ -87,7 +96,23 @@ export default async function plugin(bb: BbPluginApi) {
     bb.sdk.plugins.callRpc({ pluginId: GITHUB_FOLDER_PLUGIN_ID, method, input, outputSchema });
   const ok = z.object({ ok: z.literal(true) });
 
+  const archives = createArchiveHistory();
+
   bb.rpc.register(rpcContract, {
+    undoArchive: async () => {
+      const batch = archives.takeLatestBatch();
+      const restored: { threadId: string; title: string }[] = [];
+      const failed: { threadId: string; title: string; error: string }[] = [];
+      for (const thread of batch?.threads ?? []) {
+        try {
+          await bb.sdk.threads.unarchive({ threadId: thread.threadId });
+          restored.push(thread);
+        } catch (error) {
+          failed.push({ ...thread, error: error instanceof Error ? error.message : String(error) });
+        }
+      }
+      return { restored, failed };
+    },
     setSections: async (patch) => {
       await settings.experimental_set(patch);
       return { ok: true as const };
@@ -138,7 +163,12 @@ export default async function plugin(bb: BbPluginApi) {
     }),
   });
 
-  bb.events.on("thread.deleted", ({ thread }) => folder.forget(thread.id));
+  bb.events.on("thread.deleted", ({ thread }) => {
+    folder.forget(thread.id);
+    archives.forget(thread.id);
+  });
+  bb.events.on("thread.archived", ({ thread }) => archives.record(thread.id, thread.title ?? thread.titleFallback ?? "Untitled thread"));
+  bb.events.on("thread.unarchived", ({ thread }) => archives.forget(thread.id));
 
   bb.cli.register({
     name: "thread-tree",

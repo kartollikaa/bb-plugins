@@ -22,9 +22,10 @@ this one under Settings → Appearance → Sidebar, or run
 
 ## Layout
 
-- `server.ts`: RPC `subagents`, the Automations and GitHub Folder proxies, and the `bb thread-tree` command.
+- `server.ts`: RPC `subagents` and `undoArchive`, the Automations and GitHub Folder proxies, and the `bb thread-tree` command.
 - `src/githubFolder.ts`: the slice of the GitHub Folder plugin's view that the GitHub section draws.
 - `src/subagents.ts`: folds a thread's event log into its subagents.
 - `src/tree.ts`: pure tree, grouping and subagent state logic.
+- `src/archiveUndo.ts`: which recent archives one Cmd/Ctrl+Z brings back.
 - `src/ThreadTreeList.tsx`, `src/SubagentBadge.tsx`, `src/GithubSection.tsx`: the sidebar UI.
 - `test/`: `node --test` suites for the pure modules.

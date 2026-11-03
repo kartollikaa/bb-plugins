@@ -30,6 +30,15 @@ The CLI reports `state` as the event log recorded it. The sidebar additionally
 shows a `running` subagent as stopped once its thread has no live work, because
 a provider cannot report an end after its session is gone.
 
+## Undoing an archive
+
+In the sidebar, Cmd+Z or Ctrl+Z outside a text field unarchives the latest
+archive batch: threads archived moments apart, as a
+parent and its children are. Each press steps one batch further back, within
+the last few minutes. The plugin remembers archives in its server process, so a
+plugin reload or bb restart forgets them; an agent restores older ones with
+`bb thread unarchive`, or the user does it from the Archived view.
+
 ## Settings
 
 `bb plugin config thread-tree` lists them; `bb plugin config thread-tree set <key> <value>` changes one.
