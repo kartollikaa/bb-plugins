@@ -150,7 +150,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 - **What:** holding the hotkey (setting `hotkey`, `Control+Tab` by default) opens a row of cards for
   the most recently opened threads (setting `threadCount`, 6 by default), each with a preview of the
-  chat's latest messages, a status dot and an amber outline when the thread needs input. The key moves on, Shift moves back, letting go of the modifier opens the
+  chat's latest messages, a two-line title, project, age and branch, a status dot and an amber outline when the thread needs input. The key moves on, Shift moves back, letting go of the modifier opens the
   selection; a tap returns to the previous thread. The settings page has a shortcut recorder.
 - **How:** an `experimental_appOverlay` with capture-phase `keydown`/`keyup` listeners on `window`.
   The visit order is in `localStorage` (`<pluginId>:recent`), updated from `useBbContext().threadId`;
@@ -161,7 +161,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   preview extraction are pure functions in `lib/`.
 - **Agent skill:** `skills/thread-switcher/`.
 - **Tests:** `npm test` covers `test/switcher.test.ts` (hotkey parsing and matching, release, visit
-  order, ordering, count, preview extraction, status priority). Run `npm run typecheck`. Opening, stepping, release,
+  order, ordering, count, preview extraction, status priority, ages). Run `npm run typecheck`. Opening, stepping, release,
   tap-back, Esc, the one-row layout and the recorder were checked in the live app.
 - MIT. Not released and not in `marketplace.json` yet: it needs a first `thread-switcher/v0.1.0` tag.
 
