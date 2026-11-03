@@ -567,7 +567,7 @@ function ThreadRowView({
             <span
               className={cn(
                 "overflow-hidden whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45",
-                !isCompactViewport && [SWAP_TRANSITION, "max-w-10 group-hover/row:max-w-0 group-hover/row:opacity-0 group-focus-within/row:max-w-0 group-focus-within/row:opacity-0"],
+                !isCompactViewport && [SWAP_TRANSITION, "max-w-10 group-hover/row:max-w-0 group-hover/row:opacity-0 group-has-[:focus-visible]/row:max-w-0 group-has-[:focus-visible]/row:opacity-0"],
                 menuOpen && "max-w-0 opacity-0",
               )}
             >
@@ -581,7 +581,7 @@ function ThreadRowView({
                 SWAP_TRANSITION,
                 menuOpen
                   ? "max-w-12 opacity-100"
-                  : "max-w-0 opacity-0 group-hover/row:max-w-12 group-hover/row:opacity-100 group-focus-within/row:max-w-12 group-focus-within/row:opacity-100",
+                  : "max-w-0 opacity-0 group-hover/row:max-w-12 group-hover/row:opacity-100 group-has-[:focus-visible]/row:max-w-12 group-has-[:focus-visible]/row:opacity-100",
               )}
             >
               <ArchiveButton thread={target} />
