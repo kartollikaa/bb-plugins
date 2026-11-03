@@ -18,7 +18,7 @@ installable with `bb marketplace add`) → **bb-community** (an entry in
 | artifacts | yes (`v0.1.0`) | PR [#805](https://github.com/get-bb/marketplace/pull/805), open | Wait for merge |
 | thread-links | no tag | not submitted | Tag `v0.1.0`, add to `marketplace.json` |
 | power-pill | no tag | not submitted | Tag `v0.1.0`, add to `marketplace.json` |
-| thread-switcher | yes (`v0.1.0`) | not submitted | Submit to bb-community |
+| thread-switcher | yes (`v0.1.0`) | PR [#822](https://github.com/get-bb/marketplace/pull/822), open | Wait for merge |
 
 ## bb-community entries
 
