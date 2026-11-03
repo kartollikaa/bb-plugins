@@ -23,6 +23,12 @@ export default function plugin(bb: BbPluginApi) {
       experimental_schema: threadCountSchema,
       default: DEFAULT_THREAD_COUNT,
     },
+    attentionFirst: {
+      type: "boolean",
+      label: "Threads that need you first",
+      description: "Put threads waiting for your input, then failed ones, right after the current thread. The rest stay in recent order.",
+      default: true,
+    },
   });
 
   bb.rpc.register(rpcContract, {

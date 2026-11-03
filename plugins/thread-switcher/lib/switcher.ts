@@ -30,12 +30,13 @@ export interface SwitchableThread {
   isHidden: boolean;
 }
 
-/** Current thread first, then most recently visited, then most recently updated. */
+/** Current thread first, then by `urgency` if given, then most recently visited, then most recently updated. */
 export function orderThreads<T extends SwitchableThread>(
   threads: readonly T[],
   recent: readonly string[],
   currentId: string | null,
   limit: number,
+  urgency?: (thread: T) => number,
 ): T[] {
   const visible = threads.filter((thread) => !thread.isArchived && !thread.isHidden);
   const rank = new Map<string, number>();
@@ -43,6 +44,10 @@ export function orderThreads<T extends SwitchableThread>(
   if (currentId) rank.set(currentId, -1);
   return [...visible]
     .sort((a, b) => {
+      if (urgency && a.id !== currentId && b.id !== currentId) {
+        const difference = urgency(a) - urgency(b);
+        if (difference !== 0) return difference;
+      }
       const ra = rank.get(a.id);
       const rb = rank.get(b.id);
       if (ra !== undefined && rb !== undefined) return ra - rb;
@@ -69,10 +74,19 @@ export interface PreviewMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
+  markdown: string;
 }
 
-const MAX_PREVIEW_MESSAGES = 6;
+export interface ThreadPreview {
+  messages: PreviewMessage[];
+  /** What the thread is waiting on: a question, an approval or a form. */
+  pending: string | null;
+}
+
+export const MAX_PREVIEW_MESSAGES = 10;
+export const MAX_CARD_MESSAGES = 6;
 const MAX_MESSAGE_CHARS = 600;
+const MAX_MARKDOWN_CHARS = 4000;
 
 interface RowLike {
   kind?: unknown;
@@ -81,25 +95,43 @@ interface RowLike {
   text?: unknown;
   initiator?: unknown;
   children?: unknown;
+  workKind?: unknown;
+  lifecycle?: unknown;
+  questions?: unknown;
+  title?: unknown;
+  target?: unknown;
+  command?: unknown;
+  toolName?: unknown;
+  toolArgs?: unknown;
 }
 
-function collectConversation(rows: unknown, out: PreviewMessage[]): void {
-  if (!Array.isArray(rows)) return;
+function clip(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+function flatten(rows: unknown, out: RowLike[]): RowLike[] {
+  if (!Array.isArray(rows)) return out;
   for (const raw of rows) {
     if (!raw || typeof raw !== "object") continue;
     const row = raw as RowLike;
-    if (row.kind === "conversation" && (row.role === "user" || row.role === "assistant")) {
-      if (row.role === "user" && row.initiator === "system") continue;
-      const text = typeof row.text === "string" ? cleanText(row.text) : "";
-      if (text === "") continue;
-      out.push({
-        id: typeof row.id === "string" ? row.id : String(out.length),
-        role: row.role,
-        text: text.length > MAX_MESSAGE_CHARS ? `${text.slice(0, MAX_MESSAGE_CHARS)}…` : text,
-      });
-    }
-    collectConversation(row.children, out);
+    out.push(row);
+    flatten(row.children, out);
   }
+  return out;
+}
+
+function toMessage(row: RowLike, index: number): PreviewMessage | null {
+  if (row.kind !== "conversation" || (row.role !== "user" && row.role !== "assistant")) return null;
+  if (row.role === "user" && row.initiator === "system") return null;
+  const markdown = typeof row.text === "string" ? row.text.trim() : "";
+  const text = cleanText(markdown);
+  if (text === "") return null;
+  return {
+    id: typeof row.id === "string" ? row.id : String(index),
+    role: row.role,
+    text: clip(text, MAX_MESSAGE_CHARS),
+    markdown: clip(markdown, MAX_MARKDOWN_CHARS),
+  };
 }
 
 export function cleanText(text: string): string {
@@ -114,11 +146,45 @@ export function cleanText(text: string): string {
     .trim();
 }
 
-export function previewFromTimeline(timeline: unknown): PreviewMessage[] {
-  if (!timeline || typeof timeline !== "object") return [];
-  const out: PreviewMessage[] = [];
-  collectConversation((timeline as { rows?: unknown }).rows, out);
-  return out.slice(-MAX_PREVIEW_MESSAGES);
+function str(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
+function describeTarget(row: RowLike | undefined): string | null {
+  if (!row) return null;
+  const args = row.toolArgs && typeof row.toolArgs === "object" ? (row.toolArgs as Record<string, unknown>) : {};
+  return str(row.command) ?? str(args.command) ?? str(args.description) ?? str(args.file_path) ?? str(row.toolName);
+}
+
+function describePending(row: RowLike, byId: Map<unknown, RowLike>): string | null {
+  if (row.kind !== "work") return null;
+  if (row.workKind === "question" && (row.lifecycle === "pending" || row.lifecycle === "resolving")) {
+    const prompts = Array.isArray(row.questions)
+      ? row.questions.map((question) => str((question as { prompt?: unknown } | null)?.prompt)).filter(Boolean)
+      : [];
+    return prompts.length > 0 ? prompts.join("\n\n") : "Asks a question";
+  }
+  if (row.workKind === "form" && row.lifecycle === "pending") return str(row.title) ?? "Waits for a form";
+  if (row.workKind === "approval" && (row.lifecycle === "waiting" || row.lifecycle === "pending")) {
+    const target = row.target as { itemId?: unknown; toolName?: unknown } | null;
+    const what = describeTarget(byId.get(target?.itemId)) ?? str(target?.toolName);
+    return what ? `Approve: ${what}` : "Waits for an approval";
+  }
+  return null;
+}
+
+export function previewFromTimeline(timeline: unknown): ThreadPreview {
+  if (!timeline || typeof timeline !== "object") return { messages: [], pending: null };
+  const rows = flatten((timeline as { rows?: unknown }).rows, []);
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const messages: PreviewMessage[] = [];
+  let pending: string | null = null;
+  rows.forEach((row, index) => {
+    const message = toMessage(row, index);
+    if (message) messages.push(message);
+    pending = describePending(row, byId) ?? pending;
+  });
+  return { messages: messages.slice(-MAX_PREVIEW_MESSAGES), pending: pending && clip(pending, MAX_MESSAGE_CHARS) };
 }
 
 export function formatAge(timestamp: number, now: number): string {

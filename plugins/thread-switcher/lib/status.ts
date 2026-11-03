@@ -30,3 +30,9 @@ export const DOT_LABEL: Record<DotState, string> = {
   running: "Working",
   done: "Done",
 };
+
+const URGENCY: Record<DotState, number> = { input: 0, error: 1, running: 2, done: 2 };
+
+export function threadUrgency(thread: StatusThread): number {
+  return URGENCY[threadDotState(thread)];
+}

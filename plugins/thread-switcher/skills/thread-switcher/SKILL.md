@@ -1,6 +1,6 @@
 ---
 name: thread-switcher
-description: Explains the Thread Switcher plugin, the Control+Tab overlay that previews recent bb threads and switches between them, and its hotkey and thread-count settings. Use when the user asks how to switch threads from the keyboard, wants to change the switcher's shortcut or card count, or reports that Control+Tab does something unexpected.
+description: Explains the Thread Switcher plugin, the Control+Tab overlay that previews recent bb threads and switches between them, and its hotkey, thread-count and ordering settings. Use when the user asks how to switch threads from the keyboard, wants to change the switcher's shortcut or card count, or reports that Control+Tab does something unexpected.
 ---
 
 # Thread Switcher
@@ -8,14 +8,19 @@ description: Explains the Thread Switcher plugin, the Control+Tab overlay that p
 Holding the hotkey (Control+Tab by default) opens a row of cards over the bb window, one per recent
 thread, each with a preview of that chat's latest messages. Pressing the key again moves right,
 Shift moves left, arrow keys work too. Letting go of the modifier opens the selected thread; Enter
-does the same and Esc cancels. A quick tap goes back to the previous thread. Cards are ordered by when
-the user last opened each thread in this browser, then by latest activity; archived and hidden
-threads are skipped.
+does the same and Esc cancels. A quick tap goes back to the previous thread. The current thread comes
+first; with `attentionFirst` on (the default) threads waiting for input come next, then failed ones;
+the rest are ordered by when the user last opened each thread in this browser, then by latest
+activity. Archived and hidden threads are skipped.
 
 Under each preview: the title (up to two lines), the project with the time since last activity, and
 the branch. Each card has a status dot: amber needs input (a pending question or approval), red failed, blue
 pulsing working, green done — the same rules and colors as Thread Tree's sidebar. A card whose thread
-needs input also has an amber outline.
+needs input also has an amber outline, and its preview shows the pending question prompts, the
+command or tool waiting for approval, or the form title instead of the latest messages.
+
+A panel under the cards shows the selected thread's last ten messages rendered as chat markdown,
+scrolled to the newest, plus the pending request when there is one.
 
 ## Settings
 
@@ -23,6 +28,7 @@ needs input also has an amber outline.
 bb plugin config thread-switcher                       # show values
 bb plugin config thread-switcher set hotkey "Option+Tab"
 bb plugin config thread-switcher set threadCount 8     # 2–20, default 6
+bb plugin config thread-switcher set attentionFirst false   # recency only
 ```
 
 - `hotkey`: modifiers and one key joined by `+`. Modifiers: `Control`/`Ctrl`, `Option`/`Alt`,

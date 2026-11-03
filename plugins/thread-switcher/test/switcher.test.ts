@@ -97,6 +97,14 @@ test("orders current, then visited, then recently updated, skipping archived and
   assert.equal(orderThreads(threads, [], null, 2).length, 2);
 });
 
+test("puts urgent threads after the current one and keeps recency within a group", () => {
+  const thread = (id: string, updatedAt: number) => ({ id, updatedAt, isArchived: false, isHidden: false });
+  const threads = [thread("current", 1), thread("a", 9), thread("b", 8), thread("failed", 2), thread("waiting", 1)];
+  const urgency = (t: { id: string }) => (t.id === "waiting" || t.id === "current" ? 0 : t.id === "failed" ? 1 : 2);
+  const ids = orderThreads(threads, ["b"], "current", 4, urgency).map((t) => t.id);
+  assert.deepEqual(ids, ["current", "waiting", "failed", "b"]);
+});
+
 test("clamps the thread count setting", () => {
   assert.equal(clampThreadCount(undefined), 6);
   assert.equal(clampThreadCount(1), 2);
@@ -128,12 +136,36 @@ test("extracts the last conversation messages from nested timeline rows", () => 
       { kind: "conversation", role: "assistant", id: "a2", text: "   " },
     ],
   };
-  assert.deepEqual(previewFromTimeline(timeline), [
-    { id: "u1", role: "user", text: "first" },
-    { id: "a1", role: "assistant", text: "done see docs" },
-  ]);
-  assert.deepEqual(previewFromTimeline(null), []);
-  assert.deepEqual(previewFromTimeline({ rows: "nope" }), []);
+  assert.deepEqual(previewFromTimeline(timeline), {
+    messages: [
+      { id: "u1", role: "user", text: "first", markdown: "first" },
+      { id: "a1", role: "assistant", text: "done see docs", markdown: "**done** see [docs](http://x)" },
+    ],
+    pending: null,
+  });
+  assert.deepEqual(previewFromTimeline(null), { messages: [], pending: null });
+  assert.deepEqual(previewFromTimeline({ rows: "nope" }), { messages: [], pending: null });
+  const many = { rows: Array.from({ length: 14 }, (_, i) => ({ kind: "conversation", role: "assistant", id: `m${i}`, text: `m${i}` })) };
+  assert.deepEqual(previewFromTimeline(many).messages.map((m) => m.id)[0], "m4");
+});
+
+test("reports what a thread is waiting on, ignoring answered requests", () => {
+  const turn = (children: unknown[]) => ({ rows: [{ kind: "turn", children }] });
+  const question = (lifecycle: string) => ({
+    kind: "work",
+    workKind: "question",
+    lifecycle,
+    questions: [{ prompt: "Ship it?" }, { prompt: "Which branch?" }],
+  });
+  assert.equal(previewFromTimeline(turn([question("pending")])).pending, "Ship it?\n\nWhich branch?");
+  assert.equal(previewFromTimeline(turn([question("answered")])).pending, null);
+  const command = { kind: "work", workKind: "command", id: "c1", command: "rm -rf dist" };
+  const approval = { kind: "work", workKind: "approval", lifecycle: "pending", target: { itemId: "c1", toolName: "Bash" } };
+  assert.equal(previewFromTimeline(turn([command, approval])).pending, "Approve: rm -rf dist");
+  const orphan = { ...approval, target: { itemId: "gone", toolName: "Edit" } };
+  assert.equal(previewFromTimeline(turn([orphan])).pending, "Approve: Edit");
+  const form = { kind: "work", workKind: "form", lifecycle: "pending", title: "Pick a model" };
+  assert.equal(previewFromTimeline(turn([form])).pending, "Pick a model");
 });
 
 test("cleans markdown and code blocks for the small preview", () => {
@@ -155,6 +187,10 @@ test("status dot follows thread-tree's priority: input, error, running, done", a
   assert.equal(threadDotState({ ...base, status: "active" }), "running");
   assert.equal(threadDotState({ ...base, activity: { backgroundAgents: 1, backgroundCommands: 0, workflows: 0 } }), "running");
   assert.equal(threadDotState({ ...base, indicator: "unread" }), "done");
+  const { threadUrgency } = await import("../lib/status.ts");
+  assert.ok(threadUrgency({ ...base, hasPendingInteraction: true }) < threadUrgency({ ...base, status: "error" }));
+  assert.ok(threadUrgency({ ...base, status: "error" }) < threadUrgency({ ...base, status: "active" }));
+  assert.equal(threadUrgency({ ...base, status: "active" }), threadUrgency(base));
 });
 
 test("ages read like the sidebar's", async () => {

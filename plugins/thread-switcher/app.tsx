@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   definePluginApp,
+  Markdown,
   experimental_usePluginId as usePluginId,
   experimental_useSidebarThreads as useSidebarThreads,
   useBbContext,
@@ -10,7 +11,7 @@ import {
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./server.ts";
-import { DOT_LABEL, threadDotState, type DotState } from "./lib/status.ts";
+import { DOT_LABEL, threadDotState, threadUrgency, type DotState } from "./lib/status.ts";
 import {
   DEFAULT_HOTKEY,
   formatHotkey,
@@ -24,12 +25,13 @@ import {
   clampThreadCount,
   formatAge,
   initialIndex,
+  MAX_CARD_MESSAGES,
   orderThreads,
   parseRecent,
   previewFromTimeline,
   recordVisit,
   stepIndex,
-  type PreviewMessage,
+  type ThreadPreview,
 } from "./lib/switcher.ts";
 
 const PREFETCH_DEBOUNCE_MS = 800;
@@ -47,6 +49,11 @@ function useHotkey(): Hotkey {
 function useThreadCount(): number {
   const { values } = useSettings();
   return clampThreadCount(values?.threadCount);
+}
+
+function useAttentionFirst(): boolean {
+  const { values } = useSettings();
+  return values?.attentionFirst !== false;
 }
 
 function useRecentThreads(currentId: string | null): string[] {
@@ -89,11 +96,12 @@ function ThreadSwitcher() {
   const { threadId: currentId } = useBbContext();
   const recent = useRecentThreads(currentId);
   const count = useThreadCount();
+  const attentionFirst = useAttentionFirst();
   const navigate = useBbNavigate();
   const [state, setState] = useState<SwitcherState | null>(null);
   const candidates = useMemo(
-    () => orderThreads(threads, recent, currentId, count),
-    [threads, recent, currentId, count],
+    () => orderThreads(threads, recent, currentId, count, attentionFirst ? threadUrgency : undefined),
+    [threads, recent, currentId, count, attentionFirst],
   );
   usePrefetchPreviews(candidates);
 
@@ -165,6 +173,7 @@ function ThreadSwitcher() {
   }, [close]);
 
   if (!state) return null;
+  const selectedThread = state.threads[state.index];
 
   return (
     <div
@@ -173,26 +182,29 @@ function ThreadSwitcher() {
         if (event.target === event.currentTarget) close(false);
       }}
     >
-      <div
-        role="listbox"
-        aria-label="Switch thread"
-        style={{ gridTemplateColumns: `repeat(${Math.min(state.threads.length, CARDS_PER_ROW)}, minmax(0, 13rem))` }}
-        className="grid max-w-[94vw] justify-center gap-2 rounded-2xl border border-border bg-popover/90 p-3 shadow-2xl backdrop-blur-xl"
-      >
-        {state.threads.map((thread, index) => (
-          <ThreadCard
-            key={thread.id}
-            thread={thread}
-            projectName={projectNames.get(thread.projectId) ?? null}
-            age={formatAge(thread.updatedAt, Date.now())}
-            selected={index === state.index}
-            onHover={() => setState((current) => (current ? { ...current, index } : current))}
-            onPick={() => {
-              latest.current.state = { ...state, index };
-              close(true);
-            }}
-          />
-        ))}
+      <div className="flex max-w-[94vw] flex-col gap-3 rounded-2xl border border-border bg-popover/90 p-3 shadow-2xl backdrop-blur-xl">
+        <div
+          role="listbox"
+          aria-label="Switch thread"
+          style={{ gridTemplateColumns: `repeat(${Math.min(state.threads.length, CARDS_PER_ROW)}, minmax(0, 13rem))` }}
+          className="grid justify-center gap-2"
+        >
+          {state.threads.map((thread, index) => (
+            <ThreadCard
+              key={thread.id}
+              thread={thread}
+              projectName={projectNames.get(thread.projectId) ?? null}
+              age={formatAge(thread.updatedAt, Date.now())}
+              selected={index === state.index}
+              onHover={() => setState((current) => (current ? { ...current, index } : current))}
+              onPick={() => {
+                latest.current.state = { ...state, index };
+                close(true);
+              }}
+            />
+          ))}
+        </div>
+        {selectedThread && <DetailPanel thread={selectedThread} />}
       </div>
     </div>
   );
@@ -240,7 +252,7 @@ function ThreadCard({
           needsInput ? "border-attention ring-2 ring-attention/50" : selected ? "border-ring" : "border-border"
         }`}
       >
-        <ChatPreview threadId={thread.id} version={thread.updatedAt} />
+        <ChatPreview threadId={thread.id} version={thread.updatedAt} needsInput={needsInput} />
       </div>
       <div className="flex min-w-0 gap-1.5 px-0.5" title={thread.displayTitle}>
         <span className="flex h-4 w-3.5 shrink-0 items-center justify-center" title={DOT_LABEL[dot]}>
@@ -276,7 +288,7 @@ function StatusDot({ state }: { state: DotState }) {
 }
 
 type Sdk = ReturnType<typeof useSdk>;
-type CachedPreview = { version: number; messages: PreviewMessage[] };
+type CachedPreview = { version: number; preview: ThreadPreview };
 
 const previewCache = new Map<string, CachedPreview>();
 const inflight = new Map<string, Promise<void>>();
@@ -291,9 +303,9 @@ function loadPreview(sdk: Sdk, threadId: string, version: number): Promise<void>
   const request = sdk.threads
     .timeline({ threadId, segmentLimit: "4" })
     .then((timeline) => previewFromTimeline(timeline))
-    .catch(() => cached?.messages ?? [])
-    .then((messages) => {
-      previewCache.set(threadId, { version, messages });
+    .catch(() => cached?.preview ?? { messages: [], pending: null })
+    .then((preview) => {
+      previewCache.set(threadId, { version, preview });
       previewListeners.forEach((listener) => listener());
     })
     .finally(() => inflight.delete(key));
@@ -302,7 +314,7 @@ function loadPreview(sdk: Sdk, threadId: string, version: number): Promise<void>
 }
 
 /** Shows the last known preview at once and swaps in a fresh one when it arrives. */
-function usePreview(threadId: string, version: number): PreviewMessage[] | null {
+function usePreview(threadId: string, version: number): ThreadPreview | null {
   const sdk = useSdk();
   const [, rerender] = useState(0);
   useEffect(() => {
@@ -313,14 +325,25 @@ function usePreview(threadId: string, version: number): PreviewMessage[] | null 
       previewListeners.delete(listener);
     };
   }, [sdk, threadId, version]);
-  return previewCache.get(threadId)?.messages ?? null;
+  return previewCache.get(threadId)?.preview ?? null;
 }
 
-function ChatPreview({ threadId, version }: { threadId: string; version: number }) {
-  const messages = usePreview(threadId, version);
-  if (messages === null) {
+function ChatPreview({ threadId, version, needsInput }: { threadId: string; version: number; needsInput: boolean }) {
+  const preview = usePreview(threadId, version);
+  if (preview === null) {
     return <div className="h-full animate-pulse bg-muted/40" />;
   }
+  if (needsInput && preview.pending) {
+    return (
+      <div className="flex h-full flex-col gap-1 overflow-hidden bg-attention/10 p-2">
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-attention">Waiting for you</span>
+        <span className="line-clamp-[7] whitespace-pre-line break-words text-[9.5px] leading-[1.35] text-foreground">
+          {preview.pending}
+        </span>
+      </div>
+    );
+  }
+  const messages = preview.messages.slice(-MAX_CARD_MESSAGES);
   if (messages.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
@@ -349,6 +372,48 @@ function ChatPreview({ threadId, version }: { threadId: string; version: number 
             {message.text}
           </div>
         ),
+      )}
+    </div>
+  );
+}
+
+function DetailPanel({ thread }: { thread: SidebarThread }) {
+  const preview = usePreview(thread.id, thread.updatedAt);
+  const scroller = useRef<HTMLDivElement>(null);
+  const pending = threadDotState(thread) === "input" ? preview?.pending : null;
+  useLayoutEffect(() => {
+    const element = scroller.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [thread.id, preview]);
+
+  return (
+    <div
+      ref={scroller}
+      aria-label={`Recent messages in ${thread.displayTitle}`}
+      className="h-[min(22rem,38vh)] min-w-[min(40rem,90vw)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-background px-4 py-3 text-[13px]"
+    >
+      {preview === null ? (
+        <div className="h-full animate-pulse rounded-lg bg-muted/40" />
+      ) : preview.messages.length === 0 && !pending ? (
+        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No messages yet</div>
+      ) : (
+        <div className="flex min-h-full flex-col justify-end gap-3">
+          {preview.messages.map((message) =>
+            message.role === "user" ? (
+              <div key={message.id} className="ml-16 self-end rounded-xl bg-muted px-3 py-2">
+                <Markdown content={message.markdown} />
+              </div>
+            ) : (
+              <Markdown key={message.id} content={message.markdown} />
+            ),
+          )}
+          {pending && (
+            <div className="rounded-xl border border-attention bg-attention/10 px-3 py-2">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-attention">Waiting for you</div>
+              <Markdown content={pending} />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
