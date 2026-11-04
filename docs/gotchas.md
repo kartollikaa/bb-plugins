@@ -70,6 +70,11 @@ can find it by the error text.
   the state in a `data-*` attribute and use `group-data-[…]`; thread-tree's `test/styles.test.ts`
   guards it.
 
+- **Radix menu triggers open on `pointerdown`, touch included.** On mobile a swipe that starts on a
+  menu button (closing the sidebar sheet, scrolling) opened the menu. thread-tree's
+  `useTapToOpenMenu` cancels the touch `pointerdown` and opens on `click`, which a swipe never
+  fires. Use it for every `DropdownMenu` trigger.
+
 ## Tooling
 
 - **Profiling the bb page:** a DevBrowser page has `createCDPSession()`, so `Profiler.*` and
@@ -90,6 +95,10 @@ can find it by the error text.
   a block into frame.
 - **Synthetic drags:** dispatch `DragEvent`s with one shared `new DataTransfer()` from
   `page.evaluate`. They exercise the handlers but not the drag ghost or real pointer motion.
+- **Mobile bb in DevBrowser:** `setViewport({width: 390, height: 844, isMobile: true, hasTouch:
+  true})` and `page.touchscreen` (`touchStart`/`touchMove`/`touchEnd`, `tap`). The sidebar sits
+  under the chat at `z-0`, so a sidebar button can be laid out and still not take the tap. Tap
+  `Toggle sidebar` first and check `elementFromPoint` before every gesture.
 - **zsh** has no `timeout` command. Don't wrap commands in it.
 
 ## Installs and catalogs
