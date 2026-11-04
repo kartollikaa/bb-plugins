@@ -22,6 +22,7 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
+import { useTapToOpenMenu } from "./useTapToOpenMenu";
 import { ThreadPullRequestBadge } from "./ThreadPullRequestBadge";
 import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
@@ -543,10 +544,11 @@ function SectionsMenu({
   onChange: (key: SectionKey, shown: boolean) => void;
 }) {
   const portalProps = usePortalScopeProps();
+  const menu = useTapToOpenMenu();
   const hidden = SIDEBAR_SECTIONS.filter(({ key }) => !view[key]).length;
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
+    <DropdownMenu.Root {...menu.rootProps}>
+      <DropdownMenu.Trigger asChild {...menu.triggerProps}>
         <button
           type="button"
           title="Choose the sections shown in the sidebar"
@@ -599,10 +601,11 @@ function GroupByMenu({
   onProjectOrderChange: (mode: ProjectOrderMode) => void;
 }) {
   const portalProps = usePortalScopeProps();
+  const menu = useTapToOpenMenu();
   const current = GROUP_MODES.find((entry) => entry.id === mode) ?? GROUP_MODES[0]!;
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
+    <DropdownMenu.Root {...menu.rootProps}>
+      <DropdownMenu.Trigger asChild {...menu.triggerProps}>
         <button
           type="button"
           aria-label={`Change grouping, now ${current.chip}`}
@@ -1010,9 +1013,10 @@ function ThreadSortMenu(props: {
     : THREAD_SORTS;
   const effectiveSort = value === "inherit" ? props.defaultSort : value;
   const portalProps = usePortalScopeProps();
+  const menu = useTapToOpenMenu();
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
+    <DropdownMenu.Root {...menu.rootProps}>
+      <DropdownMenu.Trigger asChild {...menu.triggerProps}>
         <button
           type="button"
           aria-label={title !== undefined ? `Thread settings for ${title}` : "Sort threads"}

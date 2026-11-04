@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
+import { useTapToOpenMenu } from "./useTapToOpenMenu";
 import type { rpcContract } from "../server";
 import {
   ATTENTION_LABEL,
@@ -309,6 +310,7 @@ function CustomizeMenu({
   onRefresh: () => void;
 }) {
   const portalProps = usePortalScopeProps();
+  const menu = useTapToOpenMenu();
   const hiddenOrgs = new Set(settings.hiddenOrgs);
   const shownOrgs = orgs.filter((org) => !hiddenOrgs.has(org)).length;
   const toggleOrg = (org: string) =>
@@ -316,8 +318,8 @@ function CustomizeMenu({
       hiddenOrgs: hiddenOrgs.has(org) ? settings.hiddenOrgs.filter((hidden) => hidden !== org) : [...settings.hiddenOrgs, org],
     });
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
+    <DropdownMenu.Root {...menu.rootProps}>
+      <DropdownMenu.Trigger asChild {...menu.triggerProps}>
         <button
           type="button"
           aria-label="Customize the GitHub folder"
