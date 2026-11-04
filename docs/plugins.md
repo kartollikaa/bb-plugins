@@ -167,18 +167,22 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   Threads needing input, then failed ones, follow the
   current thread (setting `attentionFirst`, on by default). The key moves on, Shift moves back, letting go of the modifier opens the
   selection; a tap returns to the previous thread. The settings page has a shortcut recorder.
+  On touch screens a two-finger pinch-in (setting `pinchToOpen`, on by default) opens the same cards
+  as a full-screen grid: tap to open, spread two fingers, ✕ or a tap outside to close. It only
+  fires at page scale 1, so a zoomed-in page keeps the browser's zoom-out; the grid blocks page zoom.
 - **How:** an `experimental_appOverlay` with capture-phase `keydown`/`keyup` listeners on `window`.
   The visit order is in `localStorage` (`<pluginId>:recent`), updated from `useBbContext().threadId`;
   threads come from `experimental_useSidebarThreads`. Previews are conversation rows and the pending
   question, approval or form work row from `sdk.threads.timeline({ segmentLimit: "4" })`, prefetched for the candidate threads and cached per
   thread by `updatedAt`. `lib/status.ts` copies thread-tree's `threadDotState` and dot colors; change
-  both together. The recorder saves through the `setHotkey` RPC. Hotkey parsing, ordering and
-  preview extraction are pure functions in `lib/`.
+  both together. The recorder saves through the `setHotkey` RPC. Hotkey parsing, ordering,
+  preview extraction and the pinch tracker (`lib/pinch.ts`) are pure functions in `lib/`.
 - **Agent skill:** `skills/thread-switcher/`.
 - **Tests:** `npm test` covers `test/switcher.test.ts` (hotkey parsing and matching, release, visit
   order, ordering, urgency order, count, preview and pending-request extraction, subagent and subthread counts, status priority,
-  ages). Run `npm run typecheck`. Opening, stepping, release, tap-back, Esc, the one-row layout, the
-  subthread recap and the recorder were checked in the live app; the pending-request card was not, as no
+  ages) and `test/pinch.test.ts` (pinch direction and gesture tracking). Run `npm run typecheck`. Opening, stepping, release, tap-back, Esc, the one-row layout, the
+  subthread recap and the recorder were checked in the live app, and on a 390px touch viewport the
+  pinch open, tap to switch, spread and ✕ to close, no open while zoomed, and grid scrolling; the pending-request card was not, as no
   thread was waiting at the time.
 - MIT. Release and marketplace status: [publication.md](publication.md).
 

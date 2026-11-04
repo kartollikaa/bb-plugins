@@ -101,6 +101,10 @@ can find it by the error text.
   true})` and `page.touchscreen` (`touchStart`/`touchMove`/`touchEnd`, `tap`). The sidebar sits
   under the chat at `z-0`, so a sidebar button can be laid out and still not take the tap. Tap
   `Toggle sidebar` first and check `elementFromPoint` before every gesture.
+- **Multi-touch in DevBrowser:** `page.touchscreen` drives one finger. For a pinch, send
+  `Input.dispatchTouchEvent` (`touchStart`, stepped `touchMove`, `touchEnd`) with two `touchPoints`
+  through `p.createCDPSession()`. It zooms the page for real (`visualViewport.scale`), so it is a
+  usable positive control for zoom blocking; `Emulation.setPageScaleFactor` sets and resets zoom.
 - **zsh** has no `timeout` command. Don't wrap commands in it.
 
 ## Installs and catalogs
