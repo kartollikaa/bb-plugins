@@ -73,7 +73,9 @@ can find it by the error text.
 - **Radix menu triggers open on `pointerdown`, touch included.** On mobile a swipe that starts on a
   menu button (closing the sidebar sheet, scrolling) opened the menu. thread-tree's
   `useTapToOpenMenu` cancels the touch `pointerdown` and opens on `click`, which a swipe never
-  fires. Use it for every `DropdownMenu` trigger.
+  fires. Use it for every `DropdownMenu` trigger. It also closes an open menu on a touch over the
+  trigger from a capture listener: Radix dismisses from a bubbling `document` `pointerdown` or focus
+  loss, and on bb mobile a second tap on the trigger reached neither.
 
 ## Tooling
 
