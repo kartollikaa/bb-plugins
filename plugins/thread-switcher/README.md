@@ -15,9 +15,11 @@ subagents the thread started in its recent turns.
 - A quick Control+Tab tap jumps straight back to the previous thread.
 - Click a card to open it.
 
-On a phone or tablet, pinch two fingers together, as when zooming out of a photo. The same cards
-open as a full-screen grid; tap one to open it. Spread two fingers over the grid, tap ✕ or tap an
-empty spot to close it. If you have zoomed the page in, the pinch zooms it back out first.
+On a phone or tablet, pinch two fingers together in a chat or over the thread list, as when zooming
+out of a photo. The same cards open as a full-screen grid; tap one to open it. Spread two fingers
+over the grid, tap ✕ or tap an empty spot to close it. The pinch leaves everything else alone: a
+zoomed-in page zooms back out, an opened photo zooms as usual, and nothing opens on other screens
+or over the side panel.
 
 The current thread comes first. By default the threads that need you come next: those waiting for
 your input, then failed ones. The rest are ordered by when you last opened them, then by latest

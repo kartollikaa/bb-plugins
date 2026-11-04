@@ -25,11 +25,15 @@ deliberately doesn't show what a thread or subagent is doing.
 
 ## On a touch screen
 
-Pinching two fingers together anywhere in bb, as when zooming out of a photo, opens a full-screen
-grid of the same cards, two per row (three on a wide screen), with the current thread highlighted.
-Tap a card to open it. Spreading two fingers over the grid closes it, as do ✕, a tap on an empty
-spot, and Esc; the page doesn't zoom while the grid is open. The pinch only counts when the page is
-at its normal scale: if the user zoomed in, the pinch zooms back out as usual.
+Pinching two fingers together, as when zooming out of a photo, opens a full-screen grid of the same
+cards, two per row (three on a wide screen), with the current thread highlighted. Tap a card to open
+it. Spreading two fingers over the grid closes it, as do ✕, a tap on an empty spot, and Esc; the
+page doesn't zoom while the grid is open, and the keyboard hides when it opens.
+
+The pinch opens the grid only on a thread's chat or over the open thread list, and only when the
+page is at its normal zoom when the pinch starts. It does nothing on the new-thread screen, settings
+and other pages, with the right side panel open, under an opened photo, dialog or menu, or when the
+pinch is zooming a zoomed-in page back out.
 
 ## Settings
 

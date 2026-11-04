@@ -40,7 +40,8 @@ import {
   stepIndex,
   type ThreadPreview,
 } from "./lib/switcher.ts";
-import { MAX_FREE_SCALE, PinchTracker, type Point } from "./lib/pinch.ts";
+import { PinchTracker, type Pinch, type Point } from "./lib/pinch.ts";
+import { pinchCanOpen, type Screen } from "./lib/gate.ts";
 
 const PREFETCH_DEBOUNCE_MS = 800;
 const CARDS_PER_ROW = 6;
@@ -84,7 +85,7 @@ function useRecentThreads(currentId: string | null): string[] {
   return recent;
 }
 
-/** `row` follows the held hotkey; `grid` is the touch layout a pinch opens. */
+/** `grid` is the touch layout a pinch opens. */
 type SwitcherLayout = "row" | "grid";
 
 interface SwitcherState {
@@ -95,6 +96,72 @@ interface SwitcherState {
 
 function touchPoints(event: TouchEvent): Point[] {
   return Array.from(event.touches, (touch) => ({ x: touch.clientX, y: touch.clientY }));
+}
+
+// bb's own markup, not SDK: if the pinch stops opening after a bb upgrade, check these first.
+const THREAD_LIST = '[data-sidebar="panel"][data-state="open"]';
+const SIDE_PANEL = '[data-testid="secondary-panel-shelf"]';
+const OVERLAYS = '[role="dialog"], [role="alertdialog"], [role="menu"]';
+
+function overlayOpen(): boolean {
+  return Array.from(document.querySelectorAll(OVERLAYS)).some(
+    (element) =>
+      !element.matches('[data-sidebar="panel"], [data-state="closed"]') &&
+      !element.matches(SIDE_PANEL) &&
+      !element.closest("[inert]"),
+  );
+}
+
+function readScreen(startScale: number): Screen {
+  const panelState = document.querySelector(SIDE_PANEL)?.getAttribute("data-state");
+  return {
+    pathname: location.pathname,
+    threadListOpen: document.querySelector(THREAD_LIST) !== null,
+    sidePanelOpen: panelState != null && panelState !== "closed",
+    overlayOpen: overlayOpen(),
+    startScale,
+    scale: window.visualViewport?.scale ?? 1,
+  };
+}
+
+interface PinchOptions {
+  blockZoom?: boolean;
+  onGestureStart?: () => void;
+  onGestureEnd?: () => void;
+}
+
+function listenForPinch(
+  target: EventTarget,
+  signal: AbortSignal,
+  onPinch: (pinch: Pinch, event: TouchEvent) => void,
+  { blockZoom = false, onGestureStart, onGestureEnd }: PinchOptions = {},
+) {
+  const tracker = new PinchTracker();
+  const on = (type: string, listener: (event: TouchEvent) => void, passive = true) =>
+    target.addEventListener(type, listener as EventListener, { passive, signal });
+  const lift = (event: TouchEvent) => {
+    tracker.touch(touchPoints(event));
+    if (event.touches.length === 0) onGestureEnd?.();
+  };
+  on("touchstart", (event) => {
+    if (event.touches.length === 2) onGestureStart?.();
+    tracker.touch(touchPoints(event), event.touches.length === event.changedTouches.length);
+  });
+  on("touchend", lift);
+  on("touchcancel", lift);
+  on(
+    "touchmove",
+    (event) => {
+      if (blockZoom && event.touches.length > 1) event.preventDefault();
+      const pinch = tracker.move(touchPoints(event));
+      if (pinch) onPinch(pinch, event);
+    },
+    !blockZoom,
+  );
+  if (blockZoom) {
+    // Safari zooms on its own gesture events even when touchmove is cancelled.
+    for (const type of ["gesturestart", "gesturechange"]) on(type, (event) => event.preventDefault(), false);
+  }
 }
 
 function usePrefetchPreviews(threads: readonly SidebarThread[]) {
@@ -139,6 +206,15 @@ function ThreadSwitcher() {
     if (target && target.id !== activeId) nav.toThread(target.id);
   }, []);
 
+  const pick = useCallback(
+    (index: number) => {
+      const current = latest.current.state;
+      if (current) latest.current.state = { ...current, index };
+      close(true);
+    },
+    [close],
+  );
+
   useEffect(() => {
     const controller = new AbortController();
     const swallow = (event: KeyboardEvent) => {
@@ -151,6 +227,13 @@ function ThreadSwitcher() {
       (event) => {
         if (recorder.active || event.isComposing) return;
         const { hotkey: keys, candidates: list, currentId: activeId, state: current } = latest.current;
+        if (current?.layout === "grid") {
+          if (event.key === "Escape") {
+            swallow(event);
+            close(false);
+          }
+          return;
+        }
         const direction = matchHotkey(event, keys);
         if (direction) {
           swallow(event);
@@ -198,25 +281,25 @@ function ThreadSwitcher() {
   useEffect(() => {
     if (!pinchToOpen) return;
     const controller = new AbortController();
-    const tracker = new PinchTracker();
-    const follow = (event: TouchEvent) => tracker.touch(touchPoints(event));
-    const options = { passive: true, signal: controller.signal };
-    window.addEventListener("touchstart", follow, options);
-    window.addEventListener("touchend", follow, options);
-    window.addEventListener("touchcancel", follow, options);
-    window.addEventListener(
-      "touchmove",
-      (event) => {
-        if (tracker.move(touchPoints(event)) !== "in") return;
+    let startScale = 1;
+    listenForPinch(
+      window,
+      controller.signal,
+      (pinch, event) => {
         const { candidates: list, state: current } = latest.current;
-        const zoomedIn = (window.visualViewport?.scale ?? 1) > MAX_FREE_SCALE;
-        if (current || event.defaultPrevented || zoomedIn || list.length < 2) return;
+        if (pinch !== "in" || current || event.defaultPrevented || list.length < 2) return;
+        if (!pinchCanOpen(readScreen(startScale))) return;
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         setState({ threads: list, index: 0, layout: "grid" });
       },
-      options,
+      { onGestureStart: () => (startScale = window.visualViewport?.scale ?? 1) },
     );
     return () => controller.abort();
   }, [pinchToOpen]);
+
+  useEffect(() => {
+    if (latest.current.state?.layout === "grid") setState(null);
+  }, [currentId]);
 
   if (!state) return null;
 
@@ -228,10 +311,7 @@ function ThreadSwitcher() {
         projectNames={projectNames}
         subthreads={subthreads}
         onClose={() => close(false)}
-        onPick={(index) => {
-          latest.current.state = { ...state, index };
-          close(true);
-        }}
+        onPick={pick}
       />
     );
   }
@@ -258,10 +338,7 @@ function ThreadSwitcher() {
             age={formatAge(thread.updatedAt, Date.now())}
             selected={index === state.index}
             onHover={() => setState((current) => (current ? { ...current, index } : current))}
-            onPick={() => {
-              latest.current.state = { ...state, index };
-              close(true);
-            }}
+            onPick={() => pick(index)}
           />
         ))}
       </div>
@@ -269,9 +346,8 @@ function ThreadSwitcher() {
   );
 }
 
-const ENTER_EASING = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+const EASE_OUT = "cubic-bezier(0.2, 0.8, 0.2, 1)";
 
-/** Fades in from slightly larger, as if the open chat shrank into its card. */
 function useZoomOutEntrance(ref: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const element = ref.current;
@@ -284,12 +360,12 @@ function useZoomOutEntrance(ref: RefObject<HTMLElement | null>) {
             { opacity: 0, transform: "scale(1.12)" },
             { opacity: 1, transform: "scale(1)" },
           ],
-      { duration: reduced ? 150 : 260, easing: ENTER_EASING },
+      { duration: reduced ? 150 : 260, easing: EASE_OUT },
     );
   }, [ref]);
 }
 
-/** Spreading two fingers over the grid closes it, the reverse of the pinch that opened it, instead of zooming the page. */
+/** Unmounts only once every finger is up: bb's sidebar swipe waits for that touchend on window. */
 function useSpreadToClose(ref: RefObject<HTMLElement | null>, onClose: () => void) {
   const latestClose = useRef(onClose);
   latestClose.current = onClose;
@@ -297,24 +373,22 @@ function useSpreadToClose(ref: RefObject<HTMLElement | null>, onClose: () => voi
     const element = ref.current;
     if (!element) return;
     const controller = new AbortController();
-    const tracker = new PinchTracker();
-    const follow = (event: TouchEvent) => tracker.touch(touchPoints(event));
-    const passive = { passive: true, signal: controller.signal };
-    element.addEventListener("touchstart", follow, passive);
-    element.addEventListener("touchend", follow, passive);
-    element.addEventListener("touchcancel", follow, passive);
-    element.addEventListener(
-      "touchmove",
-      (event) => {
-        if (event.touches.length > 1) event.preventDefault();
-        if (tracker.move(touchPoints(event)) === "out") latestClose.current();
+    let closing = false;
+    listenForPinch(
+      element,
+      controller.signal,
+      (pinch) => {
+        if (pinch !== "out" || closing) return;
+        closing = true;
+        element.style.pointerEvents = "none";
+        element.animate?.([{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(1.08)" }], {
+          duration: 180,
+          easing: EASE_OUT,
+          fill: "forwards",
+        });
       },
-      { passive: false, signal: controller.signal },
+      { blockZoom: true, onGestureEnd: () => closing && latestClose.current() },
     );
-    // Safari zooms on its own gesture events even when touchmove is cancelled.
-    for (const type of ["gesturestart", "gesturechange"]) {
-      element.addEventListener(type, (event) => event.preventDefault(), { passive: false, signal: controller.signal });
-    }
     return () => controller.abort();
   }, [ref]);
 }

@@ -3,10 +3,9 @@ export interface Point {
   y: number;
 }
 
-/** Fingers must close to this share of their starting spread, or open by its inverse… */
-export const PINCH_RATIO = 0.65;
-/** …and travel at least this many CSS pixels together, so a jittery two-finger scroll never counts. */
-export const PINCH_MIN_TRAVEL = 60;
+export const PINCH_RATIO = 0.75;
+/** CSS pixels, so a jittery two-finger scroll never counts as a pinch. */
+export const PINCH_MIN_TRAVEL = 40;
 /** A page zoomed in past this keeps the pinch for the browser's own zoom-out. */
 export const MAX_FREE_SCALE = 1.01;
 
@@ -25,19 +24,17 @@ export function pinchDirection(start: number, current: number): Pinch | null {
   return null;
 }
 
-/**
- * Follows one two-finger gesture. `move` reports its direction once, when the fingers have moved
- * far enough; a third finger or lifting one ends the gesture without firing.
- */
+/** Reports one direction per gesture; a third finger or a lifted one ends it unreported. */
 export class PinchTracker {
   private start: number | null = null;
   private fired = false;
 
-  touch(points: readonly Point[]): void {
+  /** `fresh` is a touchstart with no other finger already down. */
+  touch(points: readonly Point[], fresh = false): void {
+    if (fresh || points.length === 0) this.fired = false;
     const distance = spread(points);
     if (distance === null) {
       this.start = null;
-      if (points.length === 0) this.fired = false;
       return;
     }
     if (this.start === null && !this.fired) this.start = distance;
