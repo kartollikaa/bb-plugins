@@ -59,6 +59,7 @@ import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersist
 import { useDragReorder, useFlipOrder } from "./useReorder";
 import { ReduceMotionContext, useStill } from "./motion";
 import { Collapse } from "./Collapse";
+import { TOUCH_DIMMED } from "./rowStyles";
 import { useArchiveUndo } from "./useArchiveUndo";
 
 const ROW_PAD_PX = 6;
@@ -1024,6 +1025,7 @@ function ThreadSortMenu(props: {
           title={title !== undefined ? "Thread settings" : "Sort threads"}
           className={title !== undefined
             ? "flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 opacity-0 outline-none hover:bg-sidebar-accent focus-visible:opacity-100 group-hover/header:opacity-100 data-[state=open]:opacity-100"
+              + ` ${TOUCH_DIMMED}`
             : "flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"}
         >
           <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3">

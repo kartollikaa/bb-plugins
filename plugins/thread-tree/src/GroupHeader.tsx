@@ -2,6 +2,7 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Icon } from "@/components/ui/icon";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import { cn } from "@/lib/utils";
+import { TOUCH_DIMMED } from "./rowStyles";
 
 export function GroupHeader({
   title,
@@ -41,6 +42,7 @@ export function GroupHeader({
           aria-hidden
           className={cn(
             "size-3 shrink-0 text-sidebar-foreground/40 opacity-0 transition group-hover/header:opacity-100",
+            TOUCH_DIMMED,
             !isCollapsed && "rotate-90",
           )}
         />
@@ -54,7 +56,7 @@ export function GroupHeader({
           title={action.label}
           className={cn(
             "flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-            !action.alwaysVisible && "opacity-0 focus-visible:opacity-100 group-hover/header:opacity-100",
+            !action.alwaysVisible && ["opacity-0 focus-visible:opacity-100 group-hover/header:opacity-100", TOUCH_DIMMED],
           )}
         >
           <Icon name={action.icon} aria-hidden className="size-3.5" />

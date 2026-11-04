@@ -16,7 +16,7 @@ import {
   type GithubSettingsPatch,
 } from "./githubFolder";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
-import { ROW_HOVER_SOLID_BG } from "./rowStyles";
+import { ROW_HOVER_SOLID_BG, TOUCH_DIMMED } from "./rowStyles";
 import { formatAge } from "./time";
 import { Collapse } from "./Collapse";
 
@@ -324,7 +324,7 @@ function CustomizeMenu({
           type="button"
           aria-label="Customize the GitHub folder"
           title="Customize"
-          className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 opacity-0 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:opacity-100 group-hover/header:opacity-100 data-[state=open]:bg-sidebar-accent data-[state=open]:opacity-100"
+          className={`flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 opacity-0 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:opacity-100 group-hover/header:opacity-100 data-[state=open]:bg-sidebar-accent data-[state=open]:opacity-100 ${TOUCH_DIMMED}`}
         >
           <Icon name="SlidersHorizontal" aria-hidden className="size-3.5" />
         </button>
