@@ -29,6 +29,12 @@ export default function plugin(bb: BbPluginApi) {
       description: "Put threads waiting for your input, then failed ones, right after the current thread. The rest stay in recent order.",
       default: true,
     },
+    pinchToOpen: {
+      type: "boolean",
+      label: "Pinch to open on touch screens",
+      description: "Pinch two fingers together, as when zooming out of a photo, to open a grid of recent threads. A page you have zoomed into zooms out first.",
+      default: true,
+    },
   });
 
   bb.rpc.register(rpcContract, {

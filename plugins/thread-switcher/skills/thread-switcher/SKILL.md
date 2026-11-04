@@ -1,6 +1,6 @@
 ---
 name: thread-switcher
-description: Explains the Thread Switcher plugin, the Control+Tab overlay that previews recent bb threads and switches between them, and its hotkey, thread-count and ordering settings. Use when the user asks how to switch threads from the keyboard, wants to change the switcher's shortcut or card count, or reports that Control+Tab does something unexpected.
+description: Explains the Thread Switcher plugin, the Control+Tab overlay (or a two-finger pinch on a phone) that previews recent bb threads and switches between them, and its hotkey, thread-count, ordering and pinch settings. Use when the user asks how to switch threads from the keyboard or on mobile, wants to change the switcher's shortcut or card count, or reports that Control+Tab or a pinch does something unexpected.
 ---
 
 # Thread Switcher
@@ -23,6 +23,14 @@ total plus any that need input, failed or are running; the hover text adds the d
 subthreads, the same line counts the provider subagents in the thread's recent turns. The switcher
 deliberately doesn't show what a thread or subagent is doing.
 
+## On a touch screen
+
+Pinching two fingers together anywhere in bb, as when zooming out of a photo, opens a full-screen
+grid of the same cards, two per row (three on a wide screen), with the current thread highlighted.
+Tap a card to open it. Spreading two fingers over the grid closes it, as do ✕, a tap on an empty
+spot, and Esc; the page doesn't zoom while the grid is open. The pinch only counts when the page is
+at its normal scale: if the user zoomed in, the pinch zooms back out as usual.
+
 ## Settings
 
 ```sh
@@ -30,6 +38,7 @@ bb plugin config thread-switcher                       # show values
 bb plugin config thread-switcher set hotkey "Option+Tab"
 bb plugin config thread-switcher set threadCount 8     # 2–20, default 6
 bb plugin config thread-switcher set attentionFirst false   # recency only
+bb plugin config thread-switcher set pinchToOpen false      # no pinch gesture
 ```
 
 - `hotkey`: modifiers and one key joined by `+`. Modifiers: `Control`/`Ctrl`, `Option`/`Alt`,

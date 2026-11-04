@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   definePluginApp,
   experimental_usePluginId as usePluginId,
@@ -40,6 +40,7 @@ import {
   stepIndex,
   type ThreadPreview,
 } from "./lib/switcher.ts";
+import { MAX_FREE_SCALE, PinchTracker, type Point } from "./lib/pinch.ts";
 
 const PREFETCH_DEBOUNCE_MS = 800;
 const CARDS_PER_ROW = 6;
@@ -63,6 +64,11 @@ function useAttentionFirst(): boolean {
   return values?.attentionFirst !== false;
 }
 
+function usePinchToOpen(): boolean {
+  const { values } = useSettings();
+  return values?.pinchToOpen !== false;
+}
+
 function useRecentThreads(currentId: string | null): string[] {
   const storageKey = `${usePluginId()}:recent`;
   const [recent, setRecent] = useState(() => parseRecent(localStorage.getItem(storageKey)));
@@ -78,9 +84,17 @@ function useRecentThreads(currentId: string | null): string[] {
   return recent;
 }
 
+/** `row` follows the held hotkey; `grid` is the touch layout a pinch opens. */
+type SwitcherLayout = "row" | "grid";
+
 interface SwitcherState {
   threads: SidebarThread[];
   index: number;
+  layout: SwitcherLayout;
+}
+
+function touchPoints(event: TouchEvent): Point[] {
+  return Array.from(event.touches, (touch) => ({ x: touch.clientX, y: touch.clientY }));
 }
 
 function usePrefetchPreviews(threads: readonly SidebarThread[]) {
@@ -105,6 +119,7 @@ function ThreadSwitcher() {
   const recent = useRecentThreads(currentId);
   const count = useThreadCount();
   const attentionFirst = useAttentionFirst();
+  const pinchToOpen = usePinchToOpen();
   const navigate = useBbNavigate();
   const [state, setState] = useState<SwitcherState | null>(null);
   const candidates = useMemo(
@@ -142,7 +157,7 @@ function ThreadSwitcher() {
           if (!current) {
             if (list.length < 2) return;
             const hasCurrent = list[0]?.id === activeId;
-            setState({ threads: list, index: initialIndex(direction, list.length, hasCurrent) });
+            setState({ threads: list, index: initialIndex(direction, list.length, hasCurrent), layout: "row" });
           } else {
             const delta = direction === "forward" ? 1 : -1;
             setState({ ...current, index: stepIndex(current.index, delta, current.threads.length) });
@@ -171,7 +186,7 @@ function ThreadSwitcher() {
       "keyup",
       (event) => {
         const { hotkey: keys, state: current } = latest.current;
-        if (current && hotkeyModifierReleased(event, keys)) close(true);
+        if (current?.layout === "row" && hotkeyModifierReleased(event, keys)) close(true);
       },
       { capture: true, signal: controller.signal },
     );
@@ -180,7 +195,46 @@ function ThreadSwitcher() {
     return () => controller.abort();
   }, [close]);
 
+  useEffect(() => {
+    if (!pinchToOpen) return;
+    const controller = new AbortController();
+    const tracker = new PinchTracker();
+    const follow = (event: TouchEvent) => tracker.touch(touchPoints(event));
+    const options = { passive: true, signal: controller.signal };
+    window.addEventListener("touchstart", follow, options);
+    window.addEventListener("touchend", follow, options);
+    window.addEventListener("touchcancel", follow, options);
+    window.addEventListener(
+      "touchmove",
+      (event) => {
+        if (tracker.move(touchPoints(event)) !== "in") return;
+        const { candidates: list, state: current } = latest.current;
+        const zoomedIn = (window.visualViewport?.scale ?? 1) > MAX_FREE_SCALE;
+        if (current || event.defaultPrevented || zoomedIn || list.length < 2) return;
+        setState({ threads: list, index: 0, layout: "grid" });
+      },
+      options,
+    );
+    return () => controller.abort();
+  }, [pinchToOpen]);
+
   if (!state) return null;
+
+  if (state.layout === "grid") {
+    return (
+      <TouchSwitcher
+        threads={state.threads}
+        currentId={currentId}
+        projectNames={projectNames}
+        subthreads={subthreads}
+        onClose={() => close(false)}
+        onPick={(index) => {
+          latest.current.state = { ...state, index };
+          close(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div
@@ -215,7 +269,129 @@ function ThreadSwitcher() {
   );
 }
 
+const ENTER_EASING = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+
+/** Fades in from slightly larger, as if the open chat shrank into its card. */
+function useZoomOutEntrance(ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const element = ref.current;
+    if (!element?.animate) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    element.animate(
+      reduced
+        ? [{ opacity: 0 }, { opacity: 1 }]
+        : [
+            { opacity: 0, transform: "scale(1.12)" },
+            { opacity: 1, transform: "scale(1)" },
+          ],
+      { duration: reduced ? 150 : 260, easing: ENTER_EASING },
+    );
+  }, [ref]);
+}
+
+/** Spreading two fingers over the grid closes it, the reverse of the pinch that opened it, instead of zooming the page. */
+function useSpreadToClose(ref: RefObject<HTMLElement | null>, onClose: () => void) {
+  const latestClose = useRef(onClose);
+  latestClose.current = onClose;
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const controller = new AbortController();
+    const tracker = new PinchTracker();
+    const follow = (event: TouchEvent) => tracker.touch(touchPoints(event));
+    const passive = { passive: true, signal: controller.signal };
+    element.addEventListener("touchstart", follow, passive);
+    element.addEventListener("touchend", follow, passive);
+    element.addEventListener("touchcancel", follow, passive);
+    element.addEventListener(
+      "touchmove",
+      (event) => {
+        if (event.touches.length > 1) event.preventDefault();
+        if (tracker.move(touchPoints(event)) === "out") latestClose.current();
+      },
+      { passive: false, signal: controller.signal },
+    );
+    // Safari zooms on its own gesture events even when touchmove is cancelled.
+    for (const type of ["gesturestart", "gesturechange"]) {
+      element.addEventListener(type, (event) => event.preventDefault(), { passive: false, signal: controller.signal });
+    }
+    return () => controller.abort();
+  }, [ref]);
+}
+
+function TouchSwitcher({
+  threads,
+  currentId,
+  projectNames,
+  subthreads,
+  onClose,
+  onPick,
+}: {
+  threads: readonly SidebarThread[];
+  currentId: string | null;
+  projectNames: ReadonlyMap<string, string>;
+  subthreads: ReadonlyMap<string, StateCounts>;
+  onClose: () => void;
+  onPick: (index: number) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useZoomOutEntrance(ref);
+  useSpreadToClose(ref, onClose);
+  return (
+    <div
+      ref={ref}
+      className="fixed inset-0 z-[2147483000] flex flex-col bg-background/80 backdrop-blur-xl"
+      style={{
+        touchAction: "pan-y",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingLeft: "env(safe-area-inset-left)",
+        paddingRight: "env(safe-area-inset-right)",
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="flex shrink-0 items-center justify-between px-4 pb-2 pt-3">
+        <span className="text-base font-semibold text-foreground">Recent threads</span>
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="inline-flex size-9 items-center justify-center rounded-full bg-muted text-foreground active:bg-accent"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden className="size-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
+        </button>
+      </div>
+      <div
+        role="listbox"
+        aria-label="Switch thread"
+        className="grid min-h-0 flex-1 auto-rows-min grid-cols-2 gap-x-3 gap-y-4 overflow-y-auto overscroll-contain px-3 pt-1 sm:grid-cols-3"
+        style={{ touchAction: "pan-y", paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) onClose();
+        }}
+      >
+        {threads.map((thread, index) => (
+          <ThreadCard
+            key={thread.id}
+            variant="grid"
+            thread={thread}
+            projectName={projectNames.get(thread.projectId) ?? null}
+            subthreads={subthreads.get(thread.id) ?? null}
+            age={formatAge(thread.updatedAt, Date.now())}
+            selected={thread.id === currentId}
+            onPick={() => onPick(index)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ThreadCard({
+  variant = "row",
   thread,
   projectName,
   subthreads,
@@ -224,20 +400,22 @@ function ThreadCard({
   onHover,
   onPick,
 }: {
+  variant?: SwitcherLayout;
   thread: SidebarThread;
   projectName: string | null;
   subthreads: StateCounts | null;
   age: string;
   selected: boolean;
-  onHover: () => void;
+  onHover?: () => void;
   onPick: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const dot = threadDotState(thread);
   const needsInput = dot === "input";
+  const grid = variant === "grid";
   useEffect(() => {
-    if (selected) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [selected]);
+    if (selected && !grid) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [selected, grid]);
 
   return (
     <div
@@ -245,17 +423,22 @@ function ThreadCard({
       role="option"
       aria-selected={selected}
       aria-description={DOT_LABEL[dot]}
-      onMouseMove={selected ? undefined : onHover}
-      onMouseDown={(event) => {
-        event.preventDefault();
-        onPick();
-      }}
-      className={`flex min-w-0 cursor-default flex-col gap-1.5 rounded-xl p-1.5 transition-colors ${
-        selected ? "bg-accent" : ""
-      }`}
+      onMouseMove={selected || grid ? undefined : onHover}
+      onMouseDown={
+        grid
+          ? undefined
+          : (event) => {
+              event.preventDefault();
+              onPick();
+            }
+      }
+      onClick={grid ? onPick : undefined}
+      className={`flex min-w-0 cursor-default select-none flex-col gap-1.5 rounded-xl p-1.5 ${
+        grid ? "transition-[background-color,transform] active:scale-[0.97]" : "transition-colors"
+      } ${selected ? "bg-accent" : ""}`}
     >
       <div
-        className={`aspect-[3/2] overflow-hidden rounded-lg border bg-background shadow-sm ${
+        className={`${grid ? "aspect-[3/4]" : "aspect-[3/2]"} overflow-hidden rounded-lg border bg-background shadow-sm ${
           needsInput ? "border-attention ring-2 ring-attention/50" : selected ? "border-ring" : "border-border"
         }`}
       >
