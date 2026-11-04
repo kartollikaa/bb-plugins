@@ -370,6 +370,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                     ? {
                         label: `New thread in ${title}`,
                         icon: "Plus",
+                        alwaysVisible: true,
                         onClick: () => {
                           navigate.toCompose({ projectId: group.projectId!, focusPrompt: true });
                           onNavigate();

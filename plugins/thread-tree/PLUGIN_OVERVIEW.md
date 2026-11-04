@@ -14,7 +14,8 @@ under it, and the subagents it runs inside its own session show on its row.
   newest first. Show more extends it.
 - Threads grouped by Project, by Status (needs input, error, working, done) or
   not at all, with Pinned on top. Projects keep a fixed order you set by
-  dragging their headers, or follow recent activity.
+  dragging their headers, or follow recent activity. The + at the right of a
+  project header starts a new thread in that project.
 - Sort threads by last activity, creation date or status from the funnel icon
   beside the Threads heading. Creation date keeps rows in place as messages
   arrive. Set a global order, override it per folder, or choose Use global

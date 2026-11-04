@@ -20,8 +20,8 @@ export function GroupHeader({
   onToggle: () => void;
   /** Controls drawn before `action`, such as a menu trigger. */
   extra?: React.ReactNode;
-  /** A hover button at the end of the header. */
-  action?: { label: string; icon: string; onClick: () => void };
+  /** A button at the end of the header, shown on hover unless `alwaysVisible`. */
+  action?: { label: string; icon: string; onClick: () => void; alwaysVisible?: boolean };
   /** Right-click menu on the header. */
   menu?: readonly HeaderMenuItem[];
 }) {
@@ -52,7 +52,10 @@ export function GroupHeader({
           onClick={action.onClick}
           aria-label={action.label}
           title={action.label}
-          className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 opacity-0 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:opacity-100 group-hover/header:opacity-100"
+          className={cn(
+            "flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+            !action.alwaysVisible && "opacity-0 focus-visible:opacity-100 group-hover/header:opacity-100",
+          )}
         >
           <Icon name={action.icon} aria-hidden className="size-3.5" />
         </button>
