@@ -168,8 +168,11 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   current thread (setting `attentionFirst`, on by default). The key moves on, Shift moves back, letting go of the modifier opens the
   selection; a tap returns to the previous thread. The settings page has a shortcut recorder.
   On touch screens a two-finger pinch-in (setting `pinchToOpen`, on by default) opens the same cards
-  as a full-screen grid: tap to open, spread two fingers, ✕ or a tap outside to close. It only
-  fires at page scale 1, so a zoomed-in page keeps the browser's zoom-out; the grid blocks page zoom.
+  as a full-screen grid: tap to open, spread two fingers, ✕ or a tap outside to close. It fires only
+  on a thread route or over the open thread list, at page scale 1 from the gesture's start, with no
+  side panel, dialog, menu or photo lightbox open (`lib/gate.ts`, fed from bb's DOM in `readScreen`).
+  The grid blocks page zoom and unmounts only after every finger lifts, so bb's sidebar swipe gets
+  its touchend.
 - **How:** an `experimental_appOverlay` with capture-phase `keydown`/`keyup` listeners on `window`.
   The visit order is in `localStorage` (`<pluginId>:recent`), updated from `useBbContext().threadId`;
   threads come from `experimental_useSidebarThreads`. Previews are conversation rows and the pending
@@ -180,9 +183,13 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **Agent skill:** `skills/thread-switcher/`.
 - **Tests:** `npm test` covers `test/switcher.test.ts` (hotkey parsing and matching, release, visit
   order, ordering, urgency order, count, preview and pending-request extraction, subagent and subthread counts, status priority,
-  ages) and `test/pinch.test.ts` (pinch direction and gesture tracking). Run `npm run typecheck`. Opening, stepping, release, tap-back, Esc, the one-row layout, the
-  subthread recap and the recorder were checked in the live app, and on a 390px touch viewport the
-  pinch open, tap to switch, spread and ✕ to close, no open while zoomed, and grid scrolling; the pending-request card was not, as no
+  ages), `test/pinch.test.ts` (pinch direction and gesture tracking) and `test/gate.test.ts` (where
+  the pinch may open the grid). Run `npm run typecheck`. Opening, stepping, release, tap-back, Esc, the one-row layout, the
+  subthread recap and the recorder were checked in the live app. On a phone-sized touch viewport:
+  pinch open in a chat and over the thread list, tap to switch, spread and ✕ to close, sidebar and
+  side-panel swipes afterwards, no grid on `/`, over the side panel, a modal or while pinching a
+  zoomed page back out, keyboard hidden on open, grid scrolling. The photo lightbox itself was not
+  opened; a stand-in modal was; the pending-request card was not, as no
   thread was waiting at the time.
 - MIT. Release and marketplace status: [publication.md](publication.md).
 

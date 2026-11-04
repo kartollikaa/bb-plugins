@@ -104,7 +104,12 @@ can find it by the error text.
 - **Multi-touch in DevBrowser:** `page.touchscreen` drives one finger. For a pinch, send
   `Input.dispatchTouchEvent` (`touchStart`, stepped `touchMove`, `touchEnd`) with two `touchPoints`
   through `p.createCDPSession()`. It zooms the page for real (`visualViewport.scale`), so it is a
-  usable positive control for zoom blocking; `Emulation.setPageScaleFactor` sets and resets zoom.
+  usable positive control for zoom blocking. Pinch along the vertical axis: horizontal finger travel
+  also drives bb's sidebar and side-panel swipes. `Emulation.setPageScaleFactor` silently stops
+  touch events reaching the page for the rest of the session; zoom with a real spread instead.
+- **Don't unmount an element while a finger is on it.** bb's sidebar swipe waits for that finger's
+  touchend on `window`, and a touch whose target was removed never bubbles there. Keep a touch
+  overlay mounted (fade it, `pointer-events: none`) until `touches.length === 0`.
 - **zsh** has no `timeout` command. Don't wrap commands in it.
 
 ## Installs and catalogs
