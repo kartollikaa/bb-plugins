@@ -7,7 +7,7 @@ export function useTapToOpenMenu() {
   const touchPress = useRef(false);
   const closingPress = useRef<Event | null>(null);
 
-  // An open modal menu disables pointer events on body, so the trigger never gets a second tap and iOS sends no click to <html>.
+  // Radix dismisses on a bubbling document pointerdown or focus loss; on mobile neither may arrive, so close from capture.
   useEffect(() => {
     if (!open) return;
     const closeOnTriggerTouch = (event: globalThis.PointerEvent) => {
