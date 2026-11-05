@@ -193,6 +193,22 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   thread was waiting at the time.
 - MIT. Release and marketplace status: [publication.md](publication.md).
 
+## task-stop — `plugins/task-stop/`
+
+- **What:** a ■ button on each row of bb's background tasks card ("Running background command/agent").
+  bb core can only interrupt the whole turn; this stops one task. A command's processes are killed
+  directly; a background agent gets a steer message asking the agent to call `TaskStop` on it.
+- **How:** a content script (`lib/stop-buttons.ts`, selectors in `lib/card.ts`) adds the buttons and
+  POSTs to the plugin's `/stop` route. The server folds the thread's `backgroundTask` events
+  (`lib/tasks.ts`; `familyId` is Claude's task id, `providerThreadId` its session), finds the task's
+  `<tmp>/claude-<uid>/<cwd>/<session>/tasks/<id>.output` and kills what `lsof` says writes it. No
+  output file or no writer (remote host, other provider) falls back to the message.
+- **Agent skill:** `skills/task-stop/`. It tells the agent to obey the stop message and not to restart
+  a command the user stopped.
+- **Tests:** `npm test` covers `test/*.test.ts` (event fold, task matching, request schema, route
+  parsing). Run `npm run typecheck`.
+- MIT. Not released yet; not in `marketplace.json`.
+
 ## Retired repos
 
 Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on

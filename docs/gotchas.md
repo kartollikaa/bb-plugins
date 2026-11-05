@@ -76,6 +76,14 @@ can find it by the error text.
   fires. Use it for every `DropdownMenu` trigger. It also closes an open menu on a touch over the
   trigger from a capture listener: Radix dismisses from a bubbling `document` `pointerdown` or focus
   loss, and on bb mobile a second tap on the trigger reached neither.
+- **bb has no API to stop one background task.** The bridge's `thread/stop` only takes `interrupt`
+  (the whole turn) or `release`, and nothing calls the Claude SDK's `stopTask`. A `backgroundTask`
+  event's `familyId` is Claude's task id and `providerThreadId` its session; task-stop kills a
+  command through its `tasks/<id>.output` file and asks the agent to `TaskStop` an agent.
+- **A headless check of a content script works on bb's own web UI.** Open
+  `http://127.0.0.1:<bb port>/projects/<p>/threads/<id>` in a `bb browser-automation` headless
+  session and assert the DOM (`p.evaluate`); an element screenshot of the target renders fine even
+  when `screencapture` is unavailable.
 
 ## Tooling
 
