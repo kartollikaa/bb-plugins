@@ -26,6 +26,7 @@ type Snapshot = { board: BoardView["board"]; error: string | null; fetchedAt: nu
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
+    if (signal.aborted) return resolve();
     const timer = setTimeout(resolve, ms);
     signal.addEventListener(
       "abort",
@@ -59,6 +60,8 @@ export default async function plugin(bb: BbPluginApi) {
 
   let snapshot: Snapshot | null = null;
   let userId: number | null = null;
+  const stopping = new AbortController();
+  bb.onDispose(() => stopping.abort());
 
   async function credentials(): Promise<Credentials> {
     const { token, domain } = await settings.get();
@@ -78,7 +81,7 @@ export default async function plugin(bb: BbPluginApi) {
   async function kaiten<T>(creds: Credentials, path: string): Promise<T> {
     const response = await fetch(`https://${creds.domain}/api/latest${path}`, {
       headers: { Authorization: `Bearer ${creds.token}`, Accept: "application/json" },
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.any([AbortSignal.timeout(20_000), stopping.signal]),
     });
     if (!response.ok) {
       throw new Error(`Kaiten answered ${response.status}${response.status === 401 ? " (check the token)" : ""} for ${path.split("?")[0]}`);
@@ -122,6 +125,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   async function refresh(): Promise<Snapshot> {
     const next = await fetchBoard();
+    if (stopping.signal.aborted) return next;
     const changed = JSON.stringify(next.board) !== JSON.stringify(snapshot?.board) || next.error !== snapshot?.error;
     snapshot = next;
     if (changed) bb.rpc.experimental_invalidate([BOARD_TAG]);
@@ -176,6 +180,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.background.service("refresh", {
     async start(signal) {
+      signal.addEventListener("abort", () => stopping.abort(), { once: true });
       while (!signal.aborted) {
         await refresh();
         await sleep(REFRESH_MS, signal);

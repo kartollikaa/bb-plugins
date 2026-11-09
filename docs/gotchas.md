@@ -5,6 +5,11 @@ can find it by the error text.
 
 ## SDK
 
+- **`service refresh did not stop` after a reload or install** (plugin goes `degraded`). A background
+  loop that awaits work and then a `sleep(ms, signal)` hangs when the abort arrived during the work:
+  the `abort` listener is added too late. Return at once from `sleep` when `signal.aborted`, and pass
+  the signal to in-flight `fetch`. `github-folder` has the same loop shape. A degraded plugin can't be
+  reinstalled over; `bb plugin disable <id>` first.
 - **A frontend import from the server SDK can pass a local build and fail Git installation.**
   Git installs omit dev dependencies. Keep shared RPC contracts as plain schema objects and use
   type-only SDK imports; verify with an isolated production dependency build.
