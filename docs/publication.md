@@ -23,6 +23,7 @@ distribution, not community publication. Recheck these sources before acting on 
 | [github-folder](../plugins/github-folder) | No public tag | Not submitted | No live listing | None |
 | [thread-links](../plugins/thread-links) | No public tag | Not submitted | No live listing | None |
 | [mouse-pet](../plugins/mouse-pet) | No public tag | Not submitted | No live listing | None |
+| [kaiten](../plugins/kaiten) | No public tag | Not submitted | No live listing | None |
 | [power-pill](../plugins/power-pill) | No public tag | Not submitted | No live listing | None |
 
 All tagged plugins above are also in the self-hosted [catalog](../marketplace.json). The untagged

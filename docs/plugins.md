@@ -209,6 +209,25 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   parsing). Run `npm run typecheck`.
 - MIT. Not released yet; not in `marketplace.json`.
 
+## kaiten — `plugins/kaiten/`
+
+- **What:** a Kaiten nav panel with the sprint board (default: board `1330003`, "Sprint", on
+  `dodopizza.kaiten.ru`) as columns of cards. A click on a card starts a thread in the project chosen
+  in the page header ("Threads start in"); the thread's first message carries the card (title, link,
+  type, owner, size, tags, description, checklists, latest comments). A card that already has a live
+  thread shows a "Thread" chip and a click opens that thread instead of starting a second one. Filters:
+  text, Mine, Done (hidden by default). CLI: `bb kaiten board [--json]`.
+- **How:** the server reads the token from the plugin settings, then `~/.config/kaiten/.env.local`
+  (`KAITEN_TOKEN`, `KAITEN_DOMAIN`), then the Kaiten MCP's `~/.config/kaiten/config.json` (`token`,
+  `url`). It pages `GET /cards?board_id=…&condition=1` and refreshes on a background loop, invalidating
+  the `board` RPC tag on change. Card → thread links and the chosen project live in `bb.storage.kv`
+  (`threads`, `projectId`); links are checked against `threads.list` so an archived thread frees the card.
+  Sub-columns (Coding, Code review) fold into their column and show as a chip on the card.
+- **Agent skill:** `skills/kaiten/`.
+- **Tests:** `npm test` covers `test/kaiten.test.ts` (credentials order, board building, filters, the
+  card prompt). Run `npm run typecheck`.
+- MIT. Not released yet; not in `marketplace.json`.
+
 ## Retired repos
 
 Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on
