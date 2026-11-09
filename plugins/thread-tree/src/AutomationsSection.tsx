@@ -90,6 +90,7 @@ export function AutomationsSection({
         icon={<Icon name="Zap" aria-hidden className="size-3.5" />}
         isCollapsed={isCollapsed}
         count={active.length}
+        alwaysShowCount
         onToggle={onToggle}
         menu={menu}
         action={{ label: "Open Automations", icon: "ArrowUpRight", onClick: openAutomationsPage }}

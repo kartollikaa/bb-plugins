@@ -9,6 +9,7 @@ export function GroupHeader({
   icon,
   isCollapsed,
   count,
+  alwaysShowCount,
   onToggle,
   extra,
   action,
@@ -18,6 +19,8 @@ export function GroupHeader({
   icon: React.ReactNode;
   isCollapsed: boolean;
   count: number;
+  /** Keep the count visible while the group is expanded. */
+  alwaysShowCount?: boolean;
   onToggle: () => void;
   /** Controls drawn before `action`, such as a menu trigger. */
   extra?: React.ReactNode;
@@ -36,7 +39,7 @@ export function GroupHeader({
       >
         <span className="flex w-4 shrink-0 items-center justify-center text-sidebar-foreground/50">{icon}</span>
         <span className="truncate">{title}</span>
-        {isCollapsed ? <span className="tabular-nums text-sidebar-foreground/40">{count}</span> : null}
+        {isCollapsed || alwaysShowCount ? <span className="tabular-nums text-sidebar-foreground/40">{count}</span> : null}
         <Icon
           name="ChevronRight"
           aria-hidden

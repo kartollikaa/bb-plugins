@@ -279,6 +279,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                   icon={<Icon name="Clock" aria-hidden className="size-3.5" />}
                   isCollapsed={recentCollapsed}
                   count={recent.length}
+  alwaysShowCount
                   onToggle={() => collapsedGroups.toggle("recent")}
                   menu={menu}
                 />

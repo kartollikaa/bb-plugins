@@ -108,6 +108,7 @@ export function GithubSection({
         icon={<Icon name="Github" aria-hidden className="size-3.5" />}
         isCollapsed={isCollapsed}
         count={view.items.length}
+        alwaysShowCount
         onToggle={onToggle}
         extra={
           <CustomizeMenu
