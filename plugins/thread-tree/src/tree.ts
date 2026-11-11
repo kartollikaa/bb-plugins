@@ -216,6 +216,16 @@ export type GroupMode = "project" | "status" | "none";
 export type ThreadSort = "activity" | "created" | "status";
 export type FolderSorts = Readonly<Record<string, ThreadSort>>;
 
+export function rememberProjectFolders(
+  saved: readonly string[],
+  projects: readonly { id: string }[],
+  threads: readonly Pick<TreeThread, "projectId" | "isHidden">[],
+): string[] {
+  const existing = new Set(projects.map((project) => project.id));
+  return [...new Set([...saved, ...threads.filter((thread) => !thread.isHidden).map((thread) => thread.projectId)])]
+    .filter((id) => existing.has(id));
+}
+
 export function readFolderSorts(raw: unknown): FolderSorts {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   return Object.fromEntries(Object.entries(raw).filter(([, value]) =>
@@ -247,6 +257,7 @@ export function groupRows<T extends TreeThread>(
   activeThreadId: string | null = null,
   folderSorts: FolderSorts = {},
   defaultSort: ThreadSort = "activity",
+  retainedProjectIds: readonly string[] = [],
 ): TreeGroup<T>[] {
   const pinned = forest.roots.filter((root) => root.isPinned).sort(byPinOrder);
   const buckets = new Map<string, { projectId: string | null; roots: T[] }>();
@@ -260,6 +271,12 @@ export function groupRows<T extends TreeThread>(
     if (mode === "project") add(`project:${root.projectId}`, root.projectId, root);
     else if (mode === "status") add(`status:${subtreeDotState(forest, root)}`, null, root);
     else add("all", null, root);
+  }
+  if (mode === "project") {
+    for (const projectId of retainedProjectIds) {
+      const key = `project:${projectId}`;
+      if (!buckets.has(key)) buckets.set(key, { projectId, roots: [] });
+    }
   }
   const makeGroup = (key: string, projectId: string | null, roots: T[]): TreeGroup<T> => ({
     key,

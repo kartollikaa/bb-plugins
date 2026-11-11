@@ -85,3 +85,15 @@ Folder thread sorting is separate from project folder order in the grouping menu
 
 Sorting and grouping menus stay open after a selection; click outside or press
 Escape to close them. Changes apply immediately.
+
+## Empty project folders
+
+Once a project has had a visible thread, its folder stays in the active Project
+view even after its last thread is archived or deleted. The folder shows zero
+threads and keeps its + button for starting a new chat. Used projects are stored
+on the bb server and seeded from existing active and archived threads, so the
+folders survive reloads and appear on other clients. A browser cache keeps them
+visible during a failed history read. Deleting a project removes its folder;
+new projects without threads stay hidden. The Archived view continues to show
+only folders with archived threads. Threads deleted before this feature was
+installed cannot be recovered from history.

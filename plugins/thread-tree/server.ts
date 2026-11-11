@@ -16,11 +16,13 @@ import {
   githubSettingsPatchSchema,
 } from "./src/githubFolder";
 import { sectionPatchSchema, SETTINGS } from "./src/settings";
+import { createProjectFolderHistory } from "./src/projectFolders";
 import { createArchiveHistory } from "./src/archiveUndo";
 
 const MAX_THREADS_PER_CALL = 200;
 
 export const rpcContract = defineRpcContract({
+  projectFolders: { input: z.null(), output: z.object({ projectIds: z.array(z.string()) }) },
   automations: {
     input: z.null(),
     output: z.object({
@@ -97,8 +99,13 @@ export default async function plugin(bb: BbPluginApi) {
   const ok = z.object({ ok: z.literal(true) });
 
   const archives = createArchiveHistory();
+  const projectFolders = createProjectFolderHistory(bb.storage.kv, async (args) => ({ threads: await bb.sdk.threads.list(args) }));
+  for (const event of ["thread.created", "thread.archived", "thread.unarchived", "thread.deleted"] as const) {
+    bb.events.on(event, ({ thread }) => projectFolders.record(thread));
+  }
 
   bb.rpc.register(rpcContract, {
+    projectFolders: async () => ({ projectIds: await projectFolders.list() }),
     undoArchive: async () => {
       const batch = archives.takeLatestBatch();
       const restored: { threadId: string; title: string }[] = [];

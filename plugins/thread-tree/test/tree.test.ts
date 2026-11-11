@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ancestorsOf, buildForest, countStates, effectiveState, groupRows, placeNear, readFolderSorts, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
+import { ancestorsOf, buildForest, countStates, effectiveState, groupRows, placeNear, readFolderSorts, rememberProjectFolders, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
@@ -350,4 +350,38 @@ test("global sort applies across folders while local overrides take precedence",
   assert.deepEqual(rows({}), [["a-new", "a-old"], ["b-new", "b-old"]]);
   assert.deepEqual(rows({ "project:a": "activity" }), [["a-old", "a-new"], ["b-new", "b-old"]]);
   assert.deepEqual(rows({}), [["a-new", "a-old"], ["b-new", "b-old"]]);
+});
+
+
+test("used project folders survive the last thread disappearing and a storage round trip", () => {
+  const projects = [{ id: "p1" }, { id: "unused" }];
+  const saved = rememberProjectFolders([], projects, [thread("last")]);
+  assert.deepEqual(saved, ["p1"]);
+  const restored = rememberProjectFolders(JSON.parse(JSON.stringify(saved)), projects, []);
+  const groups = groupRows(buildForest([]), new Set(), "project", null, null, {}, "activity", restored);
+  assert.deepEqual(groups.map(({ projectId, rootCount, rows }) => ({ projectId, rootCount, rows })), [
+    { projectId: "p1", rootCount: 0, rows: [] },
+  ]);
+});
+
+test("retention includes pinned, child and archived projects but excludes hidden and deleted projects", () => {
+  const saved = rememberProjectFolders(["deleted", "p1"], [{ id: "p1" }, { id: "p2" }, { id: "p3" }, { id: "hidden" }], [
+    thread("pinned", { isPinned: true }),
+    thread("child", { projectId: "p2", parentThreadId: "pinned" }),
+    thread("archived", { projectId: "p3", isArchived: true }),
+    thread("hidden", { projectId: "hidden", isHidden: true }),
+  ]);
+  assert.deepEqual(saved, ["p1", "p2", "p3"]);
+  assert.deepEqual(rememberProjectFolders(saved, [{ id: "p2" }], []), ["p2"]);
+});
+
+test("retained folders respect project order without duplicating populated folders", () => {
+  const forest = buildForest([thread("root", { updatedAt: 10 })]);
+  const groups = groupRows(forest, new Set(), "project", ["p2", "p1"], null, {}, "activity", ["p1", "p2"]);
+  assert.deepEqual(groups.map((group) => [group.projectId, group.rootCount]), [["p2", 0], ["p1", 1]]);
+  const activity = groupRows(forest, new Set(), "project", null, null, {}, "activity", ["p2"]);
+  assert.deepEqual(activity.map((group) => group.projectId), ["p1", "p2"]);
+  for (const mode of ["status", "none"] as const) {
+    assert.deepEqual(groupRows(forest, new Set(), mode, null, null, {}, "activity", ["p2"]), groupRows(forest, new Set(), mode));
+  }
 });

@@ -46,6 +46,7 @@ import {
   groupRows,
   recentThreads,
   readFolderSorts,
+  rememberProjectFolders,
   type ThreadSort,
   resolveProjectOrder,
   threadDotState,
@@ -126,6 +127,27 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const showArchived = lifecycle === "archived";
   const archivedPages = showArchived ? listed.experimental_archived : null;
   const treeThreads = showArchived ? listed.threads : threads;
+  const rpc = useRpc<typeof rpcContract>();
+  const [serverProjectFolders, setServerProjectFolders] = useState<readonly string[]>([]);
+  const projectPresence = [...new Set(threads.map((thread) => thread.projectId))].sort().join();
+  useEffect(() => {
+    let cancelled = false;
+    void rpc.call("projectFolders", null).then(({ projectIds }) => {
+      if (!cancelled) setServerProjectFolders(projectIds);
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [rpc, projectPresence, projects]);
+  const [savedProjectFolders, setSavedProjectFolders] = usePersistentList("used-project-folders");
+  const retainedProjectIds = useMemo(
+    () => rememberProjectFolders([...savedProjectFolders, ...serverProjectFolders], projects, [...threads, ...listed.threads]),
+    [savedProjectFolders, serverProjectFolders, projects, threads, listed.threads],
+  );
+  useEffect(() => {
+    if (status !== "ready") return;
+    if (retainedProjectIds.length !== savedProjectFolders.length || retainedProjectIds.some((id, index) => id !== savedProjectFolders[index])) {
+      setSavedProjectFolders(retainedProjectIds);
+    }
+  }, [status, retainedProjectIds, savedProjectFolders, setSavedProjectFolders]);
   const [savedSectionOrder, setSavedSectionOrder] = usePersistentList("section-order");
   const now = useNow(30_000);
   const settingValues = useSettings().values;
@@ -143,8 +165,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const projectDrag = useDragReorder(projectOrder ?? [], setSavedProjectOrder);
   const shownProjectOrder = projectOrder && projectDrag.order;
   const groups = useMemo(
-    () => groupRows(forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId ?? null, folderSorts, threadSort),
-    [forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId, folderSorts, threadSort],
+    () => groupRows(forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId ?? null, folderSorts, threadSort, showArchived ? [] : retainedProjectIds),
+    [forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId, folderSorts, threadSort, showArchived, retainedProjectIds],
   );
   const showMoreRecent = flags.has("recent-more");
   const recentHidden = !view.showRecent || collapsedGroups.has("recent");
@@ -366,6 +388,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                   />
                 ) : undefined}
                 count={group.rootCount}
+                alwaysShowCount={group.rootCount === 0}
                 onToggle={() => collapsedGroups.toggle(group.key)}
                 action={
                   group.projectId
