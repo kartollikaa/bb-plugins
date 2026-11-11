@@ -745,7 +745,7 @@ function ThreadRowView({
         aria-selected={isTree ? isActive : undefined}
         title={context ? `${thread.displayTitle} · ${context}` : undefined}
         className={cn(
-          "group/row relative flex h-8 items-center gap-2 rounded-md pr-2 text-sm text-sidebar-foreground/90",
+          "group/row relative rounded-md pr-2 text-sm text-sidebar-foreground/90",
           isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60",
         )}
         data-keyboard-focus={keyboardFocus || undefined}
@@ -764,94 +764,96 @@ function ThreadRowView({
         }}
       >
         {isTree ? <TreeGuides depth={depth} guides={row.guides} hasOpenChildren={row.hasVisibleChildren || row.foldCounts !== null} isPeek={row.isPeek} /> : null}
-        {isTree && row.hasChildren ? (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggle();
-            }}
-            aria-label={row.isExpanded ? "Collapse subthreads" : "Expand subthreads"}
-            title={row.isExpanded ? "Collapse subthreads" : "Expand subthreads"}
-            className="group/toggle relative flex size-4 shrink-0 items-center justify-center rounded text-sidebar-foreground/60 outline-none hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring"
-          >
-            <span className="flex group-hover/row:hidden group-focus-visible/toggle:hidden">{dot}</span>
-            <Icon
-              name="ChevronRight"
-              aria-hidden
-              className={cn(
-                "hidden size-3.5 transition-transform group-hover/row:block group-focus-visible/toggle:block",
-                row.isExpanded && "rotate-90",
-              )}
-            />
-          </button>
-        ) : (
-          <span className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
-        )}
-        <a
-          href={thread.href}
-          {...(isTree ? { "data-sidebar-thread-shortcut-target": "", "data-sidebar-thread-id": thread.id } : {})}
-          aria-current={isActive ? "page" : undefined}
-          aria-label={thread.displayTitle}
-          {...splitProps}
-          onClick={(event) => onOpen(thread, event)}
-          className="flex min-w-0 items-center gap-1.5 self-stretch outline-none"
-        >
-          <span className={cn("min-w-0 truncate", thread.isUnread && "font-semibold text-sidebar-foreground")}>
-            <ThreadTitle threadId={thread.id} />
-          </span>
-        </a>
-        <span aria-hidden className="min-w-0 flex-1" />
-        {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
-        {view.showProviderIcon ? (
-          <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
-            <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3" />
-          </span>
-        ) : null}
-        {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
-        {/* Age shrinks away as the actions grow in, so the row's icons glide left and the title truncates. */}
-        <span className="-mr-1 flex shrink-0 items-center">
-          {view.showAge ? (
-            <span
-              className={cn(
-                "overflow-hidden whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45",
-                !isCompactViewport && [!view.reduceMotion && SWAP_TRANSITION, "max-w-10 group-hover/row:max-w-0 group-hover/row:opacity-0 group-data-[keyboard-focus]/row:max-w-0 group-data-[keyboard-focus]/row:opacity-0"],
-                menuOpen && "max-w-0 opacity-0",
-              )}
+        <div className="flex h-8 min-w-0 items-center gap-2">
+          {isTree && row.hasChildren ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggle();
+              }}
+              aria-label={row.isExpanded ? "Collapse subthreads" : "Expand subthreads"}
+              title={row.isExpanded ? "Collapse subthreads" : "Expand subthreads"}
+              className="group/toggle relative flex size-4 shrink-0 items-center justify-center rounded text-sidebar-foreground/60 outline-none hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring"
             >
-              {age}
-            </span>
-          ) : null}
-          <ThreadPullRequestBadge thread={thread} />
-          {isCompactViewport ? null : (
-            <span
-              className={cn(
-                "flex items-center gap-0.5 overflow-hidden",
-                !view.reduceMotion && SWAP_TRANSITION,
-                menuOpen
-                  ? "max-w-12 opacity-100"
-                  : "max-w-0 opacity-0 group-hover/row:max-w-12 group-hover/row:opacity-100 group-data-[keyboard-focus]/row:max-w-12 group-data-[keyboard-focus]/row:opacity-100",
-              )}
-            >
-              <ArchiveButton thread={target} />
-              <ThreadActionsMenu
-                thread={target}
-                onOpenChange={setMenuOpen}
-                align="start"
-                trigger={(props) => (
-                  <button
-                    type="button"
-                    aria-label="Thread actions"
-                    {...props}
-                    className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                  >
-                    <Icon name="MoreHorizontal" fallback="Ellipsis" aria-hidden className="size-3.5" />
-                  </button>
+              <span className="flex group-hover/row:hidden group-focus-visible/toggle:hidden">{dot}</span>
+              <Icon
+                name="ChevronRight"
+                aria-hidden
+                className={cn(
+                  "hidden size-3.5 transition-transform group-hover/row:block group-focus-visible/toggle:block",
+                  row.isExpanded && "rotate-90",
                 )}
               />
-              </span>
+            </button>
+          ) : (
+            <span className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
           )}
-        </span>
+          <a
+            href={thread.href}
+            {...(isTree ? { "data-sidebar-thread-shortcut-target": "", "data-sidebar-thread-id": thread.id } : {})}
+            aria-current={isActive ? "page" : undefined}
+            aria-label={thread.displayTitle}
+            {...splitProps}
+            onClick={(event) => onOpen(thread, event)}
+            className="flex min-w-0 items-center gap-1.5 self-stretch outline-none"
+          >
+            <span className={cn("min-w-0 truncate", thread.isUnread && "font-semibold text-sidebar-foreground")}>
+              <ThreadTitle threadId={thread.id} />
+            </span>
+          </a>
+          <span aria-hidden className="min-w-0 flex-1" />
+          {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
+          {view.showProviderIcon ? (
+            <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
+              <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3" />
+            </span>
+          ) : null}
+          {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
+          {/* Age shrinks away as the actions grow in, so the row's icons glide left and the title truncates. */}
+          <span className="-mr-1 flex shrink-0 items-center">
+            {view.showAge ? (
+              <span
+                className={cn(
+                  "overflow-hidden whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45",
+                  !isCompactViewport && [!view.reduceMotion && SWAP_TRANSITION, "max-w-10 group-hover/row:max-w-0 group-hover/row:opacity-0 group-data-[keyboard-focus]/row:max-w-0 group-data-[keyboard-focus]/row:opacity-0"],
+                  menuOpen && "max-w-0 opacity-0",
+                )}
+              >
+                {age}
+              </span>
+            ) : null}
+            {isCompactViewport ? null : (
+              <span
+                className={cn(
+                  "flex items-center gap-0.5 overflow-hidden",
+                  !view.reduceMotion && SWAP_TRANSITION,
+                  menuOpen
+                    ? "max-w-12 opacity-100"
+                    : "max-w-0 opacity-0 group-hover/row:max-w-12 group-hover/row:opacity-100 group-data-[keyboard-focus]/row:max-w-12 group-data-[keyboard-focus]/row:opacity-100",
+                )}
+              >
+                <ArchiveButton thread={target} />
+                <ThreadActionsMenu
+                  thread={target}
+                  onOpenChange={setMenuOpen}
+                  align="start"
+                  trigger={(props) => (
+                    <button
+                      type="button"
+                      aria-label="Thread actions"
+                      {...props}
+                      className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    >
+                      <Icon name="MoreHorizontal" fallback="Ellipsis" aria-hidden className="size-3.5" />
+                    </button>
+                  )}
+                />
+                </span>
+            )}
+          </span>
+        </div>
+        <ThreadPullRequestBadge thread={thread} />
       </div>
     </ThreadActionsContextMenu>
   );
@@ -932,7 +934,7 @@ function FoldLine({
   const description = [subthreads, ...parts.map(({ state, label }) => `${counts[state]} ${label}`)].join(", ");
   return (
     <div role="none" className="relative flex h-6 items-center pr-2" style={{ paddingLeft: ROW_PAD_PX + depth * INDENT_PX }}>
-      <TreeGuides depth={depth} guides={guides} hasOpenChildren={false} isPeek />
+      <TreeGuides depth={depth} guides={guides} hasOpenChildren={false} isPeek centerY={12} />
       <button
         type="button"
         onClick={onExpand}
@@ -962,12 +964,14 @@ function TreeGuides({
   guides,
   hasOpenChildren,
   isPeek,
+  centerY = 16,
 }: {
   depth: number;
   guides: boolean[];
   hasOpenChildren: boolean;
   /** Dashed: the row shows through its parent's fold. */
   isPeek: boolean;
+  centerY?: number;
 }) {
   const lineX = (level: number) => ROW_PAD_PX + level * INDENT_PX + GLYPH_CENTER_PX;
   const line = "pointer-events-none absolute border-sidebar-foreground/20";
@@ -985,11 +989,11 @@ function TreeGuides({
           <span key={level}>
             <span
               aria-hidden
-              className={cn(ownLine, "top-0 h-1/2 rounded-bl-md border-b border-l")}
-              style={{ left: lineX(level), width: INDENT_PX - GLYPH_CENTER_PX - 2 }}
+              className={cn(ownLine, "top-0 rounded-bl-md border-b border-l")}
+              style={{ left: lineX(level), height: centerY, width: INDENT_PX - GLYPH_CENTER_PX - 2 }}
             />
             {continues ? (
-              <span aria-hidden className={cn(ownLine, "top-1/2 border-l")} style={{ left: lineX(level), bottom: -ROW_GAP_PX }} />
+              <span aria-hidden className={cn(ownLine, "border-l")} style={{ left: lineX(level), top: centerY, bottom: -ROW_GAP_PX }} />
             ) : null}
           </span>
         );

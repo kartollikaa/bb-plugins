@@ -9,8 +9,8 @@ See [PLUGIN_OVERVIEW.md](PLUGIN_OVERVIEW.md) for what it does and
 The subagent counter opens a list that fits the available screen space, including
 on mobile. Longer lists scroll inside the card while the summary stays visible.
 
-A PR icon after the age label shows the pull request for the thread's environment
-branch. Its color shows draft, open, merged or closed; a small indicator shows
+A PR icon with its number sits below the thread title and shows the pull request
+for the thread's environment branch. Its color shows draft, open, merged or closed; a small indicator shows
 pending or failed checks and conflicts. Hover for details; click to open GitHub.
 It also appears on child threads and Recent Activity rows, including when age
 labels are hidden. The built-in GitHub PR Status plugin supplies and refreshes

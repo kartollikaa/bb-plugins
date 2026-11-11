@@ -28,7 +28,7 @@ under it, and the subagents it runs inside its own session show on its row.
   click it to fold the subtree. A folded parent gets a line counting its whole
   subtree by state. The thread you have open and threads waiting for your
   input stay visible under the fold.
-- A PR icon after the age label shows the environment branch's pull request:
+- A PR icon and number below the thread title show the environment branch's pull request:
   draft, open, merged or closed, plus checks and conflicts. Hover for details;
   click to open GitHub. Requires bb's built-in GitHub PR Status plugin.
 - A small icon on each row shows the thread's agent provider.

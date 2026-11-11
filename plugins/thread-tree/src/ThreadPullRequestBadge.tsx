@@ -54,13 +54,16 @@ export function ThreadPullRequestBadge({ thread }: { thread: PluginSidebarThread
         navigate.openUrl(pr.url);
       }}
       className={cn(
-        "relative mx-1 flex size-4 shrink-0 items-center justify-center rounded outline-none hover:bg-sidebar-foreground/10 focus-visible:ring-1 focus-visible:ring-sidebar-ring",
+        "relative mb-1 ml-6 flex h-5 w-fit items-center gap-1.5 rounded px-1 text-2xs tabular-nums outline-none hover:bg-sidebar-foreground/10 focus-visible:ring-1 focus-visible:ring-sidebar-ring",
         pr.state === "merged" ? "text-purple-400" : pr.state === "closed" ? "text-red-400" : pr.state === "draft" ? "text-muted-foreground" : "text-green-400",
       )}
     >
-      <Icon name={pr.state === "merged" ? "GitMerge" : pr.state === "closed" ? "GitPullRequestClosed" : pr.state === "draft" ? "GitPullRequestDraft" : "GitPullRequest"} aria-hidden className="size-3.5" />
-      {failed ? <Icon name="X" aria-hidden className="absolute -bottom-0.5 -right-1 size-2.5 rounded-full bg-sidebar text-red-400" /> : null}
-      {pending ? <span aria-hidden className="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-amber-400" /> : null}
+      <span className="relative flex size-4 items-center justify-center">
+        <Icon name={pr.state === "merged" ? "GitMerge" : pr.state === "closed" ? "GitPullRequestClosed" : pr.state === "draft" ? "GitPullRequestDraft" : "GitPullRequest"} aria-hidden className="size-3.5" />
+        {failed ? <Icon name="X" aria-hidden className="absolute -bottom-0.5 -right-1 size-2.5 rounded-full bg-sidebar text-red-400" /> : null}
+        {pending ? <span aria-hidden className="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-amber-400" /> : null}
+      </span>
+      <span>#{pr.number}</span>
     </button>
   );
 }
