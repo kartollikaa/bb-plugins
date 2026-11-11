@@ -16,6 +16,14 @@ It also appears on child threads and Recent Activity rows, including when age
 labels are hidden. The built-in GitHub PR Status plugin supplies and refreshes
 the status; GitHub Folder is optional.
 
+With Thread Links installed, every PR linked in the session's prompts or agent
+replies is listed below that thread, alongside its branch PR. Duplicate URLs
+appear once; different repositories with the same PR number stay separate.
+Badges form one horizontal row with scrolling when they overflow. Thread Links
+supplies their status through the bb server's gh login. Unavailable statuses
+keep a neutral clickable badge. Session PRs refresh as the thread changes and
+periodically while visible; without Thread Links, the branch badge still works.
+
 ## Develop
 
 ```sh

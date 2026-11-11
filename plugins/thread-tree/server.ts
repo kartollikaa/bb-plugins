@@ -16,12 +16,17 @@ import {
   githubSettingsPatchSchema,
 } from "./src/githubFolder";
 import { sectionPatchSchema, SETTINGS } from "./src/settings";
+import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/threadPullRequests";
 import { createProjectFolderHistory } from "./src/projectFolders";
 import { createArchiveHistory } from "./src/archiveUndo";
 
 const MAX_THREADS_PER_CALL = 200;
 
 export const rpcContract = defineRpcContract({
+  threadPullRequests: {
+    input: z.object({ keys: z.array(z.string().min(1)).min(1).max(200) }),
+    output: z.record(z.string(), z.array(threadPullRequestSchema)),
+  },
   projectFolders: { input: z.null(), output: z.object({ projectIds: z.array(z.string()) }) },
   automations: {
     input: z.null(),
@@ -104,7 +109,13 @@ export default async function plugin(bb: BbPluginApi) {
     bb.events.on(event, ({ thread }) => projectFolders.record(thread));
   }
 
+  const readSessionPullRequests = createThreadPullRequestReader((method, input, outputSchema) =>
+    bb.sdk.plugins.callRpc({ pluginId: "thread-links", method, input, outputSchema }));
+
   bb.rpc.register(rpcContract, {
+    threadPullRequests: async ({ keys }) => Object.fromEntries(await Promise.all(keys.map(async (threadId) =>
+      [threadId, await readSessionPullRequests(threadId)],
+    ))),
     projectFolders: async () => ({ projectIds: await projectFolders.list() }),
     undoArchive: async () => {
       const batch = archives.takeLatestBatch();

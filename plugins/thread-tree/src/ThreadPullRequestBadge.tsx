@@ -1,9 +1,15 @@
+import { useEffect } from "react";
 import { experimental_useRpcKeyedQuery, useBbNavigate, type PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
+import { mergePullRequests, threadPullRequestSchema, type ThreadPullRequest } from "./threadPullRequests";
 
 const contract = {
+  threadPullRequests: {
+    input: z.object({ keys: z.array(z.string()) }),
+    output: z.record(z.string(), z.array(threadPullRequestSchema)),
+  },
   pullRequests: {
     input: z.object({ keys: z.array(z.string()) }),
     output: z.record(z.string(), z.discriminatedUnion("outcome", [
@@ -25,7 +31,6 @@ const contract = {
 };
 
 export function ThreadPullRequestBadge({ thread }: { thread: PluginSidebarThread }) {
-  const navigate = useBbNavigate();
   const environmentId = thread.environment?.id;
   const { data, error } = experimental_useRpcKeyedQuery({
     pluginId: "bb--github-pr-status",
@@ -35,8 +40,27 @@ export function ThreadPullRequestBadge({ thread }: { thread: PluginSidebarThread
     enabled: Boolean(environmentId),
   });
   const row = environmentId ? data?.[environmentId] : undefined;
-  if (error || row?.outcome !== "available") return null;
-  const pr = row.pullRequest;
+  const session = experimental_useRpcKeyedQuery({
+    contract, method: "threadPullRequests", keys: [thread.id],
+  });
+  useEffect(() => {
+    const timer = window.setTimeout(() => void session.refetchKeys([thread.id]), 500);
+    return () => window.clearTimeout(timer);
+  }, [thread.id, thread.updatedAt]);
+  useEffect(() => {
+    const timer = window.setInterval(() => void session.refetchKeys([thread.id]), 60_000);
+    return () => window.clearInterval(timer);
+  }, [thread.id, session.refetchKeys]);
+  const prs = mergePullRequests(!error && row?.outcome === "available" ? row.pullRequest : undefined, session.data?.[thread.id] ?? []);
+  return prs.length > 0 ? (
+    <div className="-mt-1 mb-0.5 ml-6 flex gap-1 overflow-x-auto">
+      {prs.map((pr) => <PullRequestBadge key={pr.url} pr={pr} />)}
+    </div>
+  ) : null;
+}
+
+function PullRequestBadge({ pr }: { pr: ThreadPullRequest }) {
+  const navigate = useBbNavigate();
   const active = pr.state === "open" || pr.state === "draft";
   const failed = active && (pr.checks.state === "failing" || pr.attention === "conflicts");
   const pending = active && !failed && pr.checks.state === "pending";
@@ -54,14 +78,14 @@ export function ThreadPullRequestBadge({ thread }: { thread: PluginSidebarThread
         navigate.openUrl(pr.url);
       }}
       className={cn(
-        "relative mb-1 ml-6 flex h-5 w-fit items-center gap-1.5 rounded px-1 text-2xs tabular-nums outline-none hover:bg-sidebar-foreground/10 focus-visible:ring-1 focus-visible:ring-sidebar-ring",
-        pr.state === "merged" ? "text-purple-400" : pr.state === "closed" ? "text-red-400" : pr.state === "draft" ? "text-muted-foreground" : "text-green-400",
+        "relative flex h-4 shrink-0 items-center gap-0.5 rounded px-0.5 text-2xs tabular-nums outline-none hover:bg-sidebar-foreground/10 focus-visible:ring-1 focus-visible:ring-sidebar-ring",
+        pr.state === "merged" ? "text-purple-400" : pr.state === "closed" ? "text-red-400" : (pr.state === "draft" || pr.state === "unknown") ? "text-muted-foreground" : "text-green-400",
       )}
     >
       <span className="relative flex size-4 items-center justify-center">
         <Icon name={pr.state === "merged" ? "GitMerge" : pr.state === "closed" ? "GitPullRequestClosed" : pr.state === "draft" ? "GitPullRequestDraft" : "GitPullRequest"} aria-hidden className="size-3.5" />
-        {failed ? <Icon name="X" aria-hidden className="absolute -bottom-0.5 -right-1 size-2.5 rounded-full bg-sidebar text-red-400" /> : null}
-        {pending ? <span aria-hidden className="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-amber-400" /> : null}
+        {failed ? <Icon name="X" aria-hidden className="absolute bottom-0 right-0 size-2.5 rounded-full bg-sidebar text-red-400" /> : null}
+        {pending ? <span aria-hidden className="absolute bottom-0 right-0 size-1.5 rounded-full bg-amber-400" /> : null}
       </span>
       <span>#{pr.number}</span>
     </button>

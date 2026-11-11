@@ -90,6 +90,9 @@ can find it by the error text.
   session and assert the DOM (`p.evaluate`); an element screenshot of the target renders fine even
   when `screencapture` is unavailable.
 
+- **A per-thread concurrency limit multiplies across keyed RPC batches.** Put the limiter at
+  server-instance scope for subprocess-backed status lookups, and test concurrent thread readers.
+
 ## Tooling
 
 - **Profiling the bb page:** a DevBrowser page has `createCDPSession()`, so `Profiler.*` and

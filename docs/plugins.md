@@ -23,7 +23,8 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   reordering (live preview, sliding, the grabbed block pinned while the others fold).
 - **Thread PR status:** an icon and PR number below the thread title show the built-in GitHub PR Status
   data for the environment's branch, including state, checks and conflicts. Hover for
-  details; click to open GitHub. Child threads and Recent Activity use the same row.
+  details; click to open GitHub. With Thread Links installed, session PR links are
+  also listed and deduplicated by URL. Child threads and Recent Activity use the same row.
 - **GitHub folder:** when the `github-folder` plugin is installed, the top section draws its folder
   in thread-tree's row style. The server proxies `githubFolder`, `githubFolderUpdate`,
   `githubFolderSnooze` and `githubFolderPrefetch` to that plugin's RPC, like Automations; without it the section is hidden.
