@@ -404,9 +404,11 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                     : undefined
                 }
               />
-              <Collapse open={!isCollapsed}>
-                <div role="group" className="mt-0.5 flex flex-col gap-0.5">{group.rows.map((row) => renderRow(row, "tree"))}</div>
-              </Collapse>
+              {group.rows.length > 0 ? (
+                <Collapse open={!isCollapsed}>
+                  <div role="group" className="mt-0.5 flex flex-col gap-0.5">{group.rows.map((row) => renderRow(row, "tree"))}</div>
+                </Collapse>
+              ) : null}
             </section>
           );
         })}

@@ -64,7 +64,8 @@ Escape to close them. Changes apply immediately.
 
 Once a project has had a visible thread, its folder stays in the active Project
 view even after its last thread is archived or deleted. The folder shows zero
-threads and keeps its + button for starting a new chat. Used projects are stored
+threads and keeps its + button for starting a new chat. Expanding or collapsing
+an empty folder keeps its height fixed; only folders with chats render a body. Used projects are stored
 on the bb server and seeded from existing active and archived threads, so the
 folders survive reloads and appear on other clients. A browser cache keeps them
 visible during a failed history read. Deleting a project removes its folder;
