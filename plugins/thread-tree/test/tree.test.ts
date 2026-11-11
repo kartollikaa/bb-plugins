@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ancestorsOf, buildForest, countStates, effectiveState, groupRows, placeNear, readFolderSorts, rememberProjectFolders, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
+import { ancestorsOf, buildForest, descendantsOf, countStates, effectiveState, groupRows, placeNear, readFolderSorts, rememberProjectFolders, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
@@ -384,4 +384,19 @@ test("retained folders respect project order without duplicating populated folde
   for (const mode of ["status", "none"] as const) {
     assert.deepEqual(groupRows(forest, new Set(), mode, null, null, {}, "activity", ["p2"]), groupRows(forest, new Set(), mode));
   }
+});
+
+
+test("PR ownership follows nested displayed subthreads, including lifecycle owners and excluding hidden rows", () => {
+  const forest = buildForest([
+    thread("parent"), thread("kid", { parentThreadId: "parent" }),
+    thread("nested", { parentThreadId: "kid" }),
+    thread("owned", { lifecycleOwnerThreadId: "parent" }),
+    thread("hidden", { parentThreadId: "parent", isHidden: true }),
+    thread("pinned", { parentThreadId: "parent", isPinned: true }),
+    thread("unrelated"),
+  ]);
+  assert.deepEqual(descendantsOf(forest, "parent").map((t) => t.id).sort(), ["kid", "nested", "owned"]);
+  assert.deepEqual(descendantsOf(forest, "kid").map((t) => t.id), ["nested"]);
+  assert.deepEqual(descendantsOf(forest, "unrelated"), []);
 });

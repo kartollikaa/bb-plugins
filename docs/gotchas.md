@@ -93,6 +93,9 @@ can find it by the error text.
 - **A per-thread concurrency limit multiplies across keyed RPC batches.** Put the limiter at
   server-instance scope for subprocess-backed status lookups, and test concurrent thread readers.
 
+- **A sidebar forest is rebuilt on unrelated thread activity.** Key PR refresh effects by
+  subtree IDs and activity values; Recent Activity always uses the active forest, even in Archived.
+
 ## Tooling
 
 - **Profiling the bb page:** a DevBrowser page has `createCDPSession()`, so `Profiler.*` and

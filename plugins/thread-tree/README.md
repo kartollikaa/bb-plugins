@@ -23,6 +23,8 @@ Badges form one horizontal row with scrolling when they overflow. Thread Links
 supplies their status through the bb server's gh login. Unavailable statuses
 keep a neutral clickable badge. Session PRs refresh as the thread changes and
 periodically while visible; without Thread Links, the branch badge still works.
+An orchestrator hides PRs owned by its subthreads, including nested or folded
+subthreads, while keeping its own unique PRs. Matching uses the full PR URL.
 
 ## Develop
 

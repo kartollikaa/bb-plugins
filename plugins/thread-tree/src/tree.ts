@@ -133,6 +133,17 @@ export function buildForest<T extends TreeThread>(threads: readonly T[]): Forest
   return { roots, children, parentOf };
 }
 
+export function descendantsOf<T extends TreeThread>(forest: Forest<T>, threadId: string): T[] {
+  const found: T[] = [];
+  const pending = [...(forest.children.get(threadId) ?? [])];
+  while (pending.length > 0) {
+    const thread = pending.pop()!;
+    found.push(thread);
+    pending.push(...(forest.children.get(thread.id) ?? []));
+  }
+  return found;
+}
+
 /** Every ancestor of `threadId`, nearest first. */
 export function ancestorsOf<T extends TreeThread>(forest: Forest<T>, threadId: string): string[] {
   const out: string[] = [];

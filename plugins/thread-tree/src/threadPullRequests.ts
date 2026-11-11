@@ -73,3 +73,9 @@ export function createThreadPullRequestReader(call: Call) {
   };
   return (threadId: string) => readThreadPullRequests(threadId, limited);
 }
+
+
+export function excludeDescendantPullRequests(own: readonly ThreadPullRequest[], descendants: readonly ThreadPullRequest[]): ThreadPullRequest[] {
+  const childUrls = new Set(descendants.map((pr) => pr.url.toLowerCase()));
+  return own.filter((pr) => !childUrls.has(pr.url.toLowerCase()));
+}

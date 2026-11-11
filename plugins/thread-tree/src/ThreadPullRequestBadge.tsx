@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { experimental_useRpcKeyedQuery, useBbNavigate, type PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import { mergePullRequests, threadPullRequestSchema, type ThreadPullRequest } from "./threadPullRequests";
+import { excludeDescendantPullRequests, mergePullRequests, threadPullRequestSchema, type ThreadPullRequest } from "./threadPullRequests";
 
 const contract = {
   threadPullRequests: {
@@ -30,28 +30,36 @@ const contract = {
   },
 };
 
-export function ThreadPullRequestBadge({ thread }: { thread: PluginSidebarThread }) {
-  const environmentId = thread.environment?.id;
+export function ThreadPullRequestBadge({ thread, descendants }: { thread: PluginSidebarThread; descendants: readonly PluginSidebarThread[] }) {
+  const threads = useMemo(() => [thread, ...descendants], [thread, descendants]);
+  const threadKey = JSON.stringify(threads.map((entry) => entry.id).sort());
+  const activityKey = JSON.stringify(threads.map((entry) => [entry.id, entry.updatedAt]).sort());
+  const environmentKey = JSON.stringify([...new Set(threads.flatMap((entry) => entry.environment?.id ? [entry.environment.id] : []))].sort());
+  const threadIds = useMemo<string[]>(() => JSON.parse(threadKey), [threadKey]);
+  const environmentIds = useMemo<string[]>(() => JSON.parse(environmentKey), [environmentKey]);
   const { data, error } = experimental_useRpcKeyedQuery({
     pluginId: "bb--github-pr-status",
     contract,
     method: "pullRequests",
-    keys: environmentId ? [environmentId] : [],
-    enabled: Boolean(environmentId),
+    keys: environmentIds,
+    enabled: environmentIds.length > 0,
   });
-  const row = environmentId ? data?.[environmentId] : undefined;
   const session = experimental_useRpcKeyedQuery({
-    contract, method: "threadPullRequests", keys: [thread.id],
+    contract, method: "threadPullRequests", keys: threadIds,
   });
   useEffect(() => {
-    const timer = window.setTimeout(() => void session.refetchKeys([thread.id]), 500);
+    const timer = window.setTimeout(() => void session.refetchKeys(threadIds), 500);
     return () => window.clearTimeout(timer);
-  }, [thread.id, thread.updatedAt]);
+  }, [threadIds, activityKey]);
   useEffect(() => {
-    const timer = window.setInterval(() => void session.refetchKeys([thread.id]), 60_000);
+    const timer = window.setInterval(() => void session.refetchKeys(threadIds), 60_000);
     return () => window.clearInterval(timer);
-  }, [thread.id, session.refetchKeys]);
-  const prs = mergePullRequests(!error && row?.outcome === "available" ? row.pullRequest : undefined, session.data?.[thread.id] ?? []);
+  }, [threadIds, session.refetchKeys]);
+  const prsFor = (entry: PluginSidebarThread) => {
+    const row = entry.environment?.id ? data?.[entry.environment.id] : undefined;
+    return mergePullRequests(!error && row?.outcome === "available" ? row.pullRequest : undefined, session.data?.[entry.id] ?? []);
+  };
+  const prs = excludeDescendantPullRequests(prsFor(thread), descendants.flatMap(prsFor));
   return prs.length > 0 ? (
     <div className="-mt-1 mb-0.5 ml-6 flex gap-1 overflow-x-auto">
       {prs.map((pr) => <PullRequestBadge key={pr.url} pr={pr} />)}

@@ -42,6 +42,8 @@ import {
 import { formatAge } from "./time";
 import {
   buildForest,
+  descendantsOf,
+  type Forest,
   countStates,
   groupRows,
   recentThreads,
@@ -126,7 +128,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const listed = useSidebarThreads(LIFECYCLE_QUERY[lifecycle]);
   const showArchived = lifecycle === "archived";
   const archivedPages = showArchived ? listed.experimental_archived : null;
-  const treeThreads = showArchived ? listed.threads : threads;
   const rpc = useRpc<typeof rpcContract>();
   const [serverProjectFolders, setServerProjectFolders] = useState<readonly string[]>([]);
   const projectPresence = [...new Set(threads.map((thread) => thread.projectId))].sort().join();
@@ -155,7 +156,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   const activeThreadIds = useMemo(() => threads.map((thread) => thread.id), [threads]);
   useArchiveUndo(activeThreadIds, status === "ready");
-  const forest = useMemo(() => buildForest(treeThreads), [treeThreads]);
+  const activeForest = useMemo(() => buildForest(threads), [threads]);
+  const forest = useMemo(() => showArchived ? buildForest(listed.threads) : activeForest, [showArchived, listed.threads, activeForest]);
 
   const projectOrder = useMemo(
     () => (projectOrderMode === "fixed" ? resolveProjectOrder(savedProjectOrder, projects) : null),
@@ -231,6 +233,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     <Fragment key={row.thread.id}>
       <ThreadRowView
         row={row}
+        forest={variant === "recent" ? activeForest : forest}
         variant={variant}
         context={variant === "recent" ? projectById.get(row.thread.projectId)?.name : undefined}
         isActive={row.thread.id === activeThreadId}
@@ -702,6 +705,7 @@ function GroupByMenu({
 
 function ThreadRowView({
   row,
+  forest,
   variant,
   context,
   isActive,
@@ -714,6 +718,7 @@ function ThreadRowView({
   onOpen,
 }: {
   row: TreeRow<PluginSidebarThread>;
+  forest: Forest<PluginSidebarThread>;
   /** A recent row is flat and leaves bb's keyboard shortcuts to the tree. */
   variant: "tree" | "recent";
   context?: string;
@@ -727,6 +732,7 @@ function ThreadRowView({
   onOpen: (thread: PluginSidebarThread, event: MouseEvent) => void;
 }) {
   const { thread, depth } = row;
+  const descendants = useMemo(() => descendantsOf(forest, thread.id), [forest, thread.id]);
   const { splitProps } = useSidebarThreadSplit(thread.id);
   const [menuOpen, setMenuOpen] = useState(false);
   const [keyboardFocus, setKeyboardFocus] = useState(false);
@@ -853,7 +859,7 @@ function ThreadRowView({
             )}
           </span>
         </div>
-        <ThreadPullRequestBadge thread={thread} />
+        <ThreadPullRequestBadge thread={thread} descendants={descendants} />
       </div>
     </ThreadActionsContextMenu>
   );

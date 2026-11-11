@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createThreadPullRequestReader, mergePullRequests, readThreadPullRequests, type ThreadPullRequest } from "../src/threadPullRequests.ts";
+import { createThreadPullRequestReader, excludeDescendantPullRequests, mergePullRequests, readThreadPullRequests, type ThreadPullRequest } from "../src/threadPullRequests.ts";
 
 const pr = (url: string, number = 1): ThreadPullRequest => ({ url, number, title: "Fix", state: "open", attention: "none", checks: { state: "none" } });
 
@@ -61,4 +61,15 @@ test("status concurrency is bounded across concurrent thread readers and recover
   assert.equal(active, 0);
   assert.ok(groups.every((prs) => prs.length === 4 && prs.every((pr) => pr.state === "unknown")));
   assert.equal((await read("next-batch")).length, 4);
+});
+
+
+test("orchestrators keep unique PRs and hide PRs owned by descendants by full URL", () => {
+  const shared = pr("https://github.com/a/one/pull/1");
+  const unique = pr("https://github.com/a/two/pull/1");
+  const child = { ...shared, state: "unknown" as const };
+  assert.deepEqual(excludeDescendantPullRequests([shared, unique], [child]), [unique]);
+  assert.deepEqual(excludeDescendantPullRequests([shared], []), [shared]);
+  assert.deepEqual(excludeDescendantPullRequests([shared], [{ ...child, url: child.url.toUpperCase() }]), []);
+  assert.deepEqual(excludeDescendantPullRequests([child], []), [child]);
 });
