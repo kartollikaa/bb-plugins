@@ -367,6 +367,10 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           const project = group.projectId ? projectById.get(group.projectId) : undefined;
           const { title, icon } = groupLook(group.key, project, isCollapsed);
           const projectId = group.projectId;
+          const startThread = projectId ? () => {
+            navigate.toCompose({ projectId, focusPrompt: true });
+            onNavigate();
+          } : undefined;
           const reorderable = canReorder && projectId !== null;
           return (
             <section
@@ -391,24 +395,30 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                 alwaysShowCount={group.rootCount === 0}
                 onToggle={() => collapsedGroups.toggle(group.key)}
                 action={
-                  group.projectId
+                  startThread
                     ? {
                         label: `New thread in ${title}`,
                         icon: "Plus",
                         alwaysVisible: true,
-                        onClick: () => {
-                          navigate.toCompose({ projectId: group.projectId!, focusPrompt: true });
-                          onNavigate();
-                        },
+                        onClick: startThread,
                       }
                     : undefined
                 }
               />
-              {group.rows.length > 0 ? (
-                <Collapse open={!isCollapsed}>
-                  <div role="group" className="mt-0.5 flex flex-col gap-0.5">{group.rows.map((row) => renderRow(row, "tree"))}</div>
-                </Collapse>
-              ) : null}
+              <Collapse open={!isCollapsed}>
+                <div role="group" className="mt-0.5 flex flex-col gap-0.5">
+                  {group.rows.map((row) => renderRow(row, "tree"))}
+                  {group.rows.length === 0 && startThread ? (
+                    <button
+                      type="button"
+                      onClick={startThread}
+                      className="ml-[26px] flex h-8 items-center rounded-md px-2 text-left text-xs text-sidebar-foreground/45 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+                    >
+                      Start a new thread
+                    </button>
+                  ) : null}
+                </div>
+              </Collapse>
             </section>
           );
         })}
