@@ -43,7 +43,7 @@ import { GithubSection, useGithubFolder } from "./GithubSection";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph } from "./statusGlyph";
 import { StatusLine } from "./StatusLine";
-import { countStatusFilters, filterThreads, isSearchKey, orchestrationTitle, returnFocus, runningContext, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
+import { countStatusFilters, filterThreads, handleFlatListEscape, handleSearchKey, isModalDialog, MODAL_DIALOG_SELECTOR, orchestrationTitle, returnFocus, runningContext, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
 import type { rpcContract } from "../server";
 import {
   moveSection,
@@ -257,16 +257,12 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   });
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const origin = event.composedPath()[0];
-      const target = origin instanceof HTMLElement ? origin : null;
-      const typing = !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
       const sidebar = sectionsRef.current;
-      const modalOpen = Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"], [aria-modal="true"]')).some((dialog) => !sidebar || !dialog.contains(sidebar));
-      const { key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing } = event;
-      if (!isSearchKey({ key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing, typing, modalOpen })) return;
-      if ((sidebar?.getClientRects().length ?? 0) === 0) return;
-      event.preventDefault();
-      openSearch();
+      handleSearchKey(event, {
+        modalOpen: () => Array.from(document.querySelectorAll(MODAL_DIALOG_SELECTOR)).some((dialog) => isModalDialog(dialog) && (!sidebar || !dialog.contains(sidebar))),
+        sidebarShown: () => (sidebar?.getClientRects().length ?? 0) > 0,
+        open: openSearch,
+      });
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -301,7 +297,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             ? "No archived threads."
             : "Loading archived threads…";
 
-  const renderRow = (row: TreeRow<PluginSidebarThread>, variant: "tree" | "flat", subtitle?: string, numbered = variant === "tree") => (
+  const renderRow = (row: TreeRow<PluginSidebarThread>, variant: "tree" | "flat", { subtitle, numbered = variant === "tree" }: { subtitle?: string; numbered?: boolean } = {}) => (
     <Fragment key={row.thread.id}>
       <ThreadRowView
         row={row}
@@ -342,9 +338,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         className="relative flex flex-col gap-3 px-1.5 pb-3 pt-1"
         {...sectionDrag.containerProps}
         onKeyDown={(event) => {
-          if (event.key !== "Escape" || !(statusFilter || searchOpen) || !event.currentTarget.contains(event.target as Node)) return;
-          event.preventDefault();
-          closeFlatList();
+          if (event.currentTarget.contains(event.target as Node)) handleFlatListEscape(event, !!(statusFilter || searchOpen), closeFlatList);
         }}
       >
       <div className="-mb-2 flex h-5 items-center justify-between gap-2 px-1.5">
@@ -368,14 +362,10 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           emptyText={statusFilter ? "Nothing here." : "No threads match."}
           onClear={closeFlatList}
         >
-          {flatList.map((thread) => renderRow(
-            flatRow(thread),
-            "flat",
-            statusFilter === "running"
-              ? runningContext(projectById.get(thread.projectId)?.name ?? null, orchestrationOf(thread.id))
-              : undefined,
-            true,
-          ))}
+          {flatList.map((thread) => renderRow(flatRow(thread), "flat", {
+            numbered: true,
+            subtitle: statusFilter === "running" ? runningContext(projectById.get(thread.projectId)?.name ?? null, orchestrationOf(thread.id)) : undefined,
+          }))}
         </FlatListSection>
       ) : (
       <>

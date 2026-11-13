@@ -12,7 +12,7 @@ export function familyRootOf(
   threads: readonly { id: string; parentThreadId: string | null; lifecycleOwnerThreadId: string | null; isHidden?: boolean }[],
 ): (threadId: string) => string {
   const drawn = new Set(threads.filter((thread) => !thread.isHidden).map((thread) => thread.id));
-  // Same choice as buildForest; with neither drawn, the missing id still groups its children.
+  // Picks a drawn parent as buildForest does but ignores pins: a pinned subthread stays in its family.
   const parentOf = new Map(threads.map((thread) => {
     const candidates = [thread.parentThreadId, thread.lifecycleOwnerThreadId].filter((id): id is string => !!id && id !== thread.id);
     return [thread.id, candidates.find((id) => drawn.has(id)) ?? candidates[0] ?? null];

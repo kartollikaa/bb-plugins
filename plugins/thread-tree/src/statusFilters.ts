@@ -115,3 +115,49 @@ export function returnFocus(
   control?.focus();
   return control !== null;
 }
+
+interface KeyEventLike {
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  defaultPrevented: boolean;
+  isComposing: boolean;
+  composedPath(): readonly unknown[];
+  preventDefault(): void;
+}
+
+/** A Radix popover also carries role=dialog; only a modal one owns the keyboard. */
+export function isModalDialog(element: { getAttribute(name: string): string | null }): boolean {
+  return element.getAttribute("role") === "alertdialog" || element.getAttribute("aria-modal") === "true";
+}
+
+export const MODAL_DIALOG_SELECTOR = '[role="alertdialog"], [aria-modal="true"]';
+
+/** Runs on every key in the app, so anything but `/` leaves before a DOM query. */
+export function handleSearchKey(
+  event: KeyEventLike,
+  env: { modalOpen(): boolean; sidebarShown(): boolean; open(): void },
+): boolean {
+  if (event.key !== "/") return false;
+  const origin = event.composedPath()[0] as { isContentEditable?: boolean; tagName?: string } | undefined;
+  const typing = !!origin && (origin.isContentEditable === true || /^(INPUT|TEXTAREA|SELECT)$/.test(origin.tagName ?? ""));
+  const { key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing } = event;
+  if (!isSearchKey({ key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing, typing, modalOpen: false })) return false;
+  if (env.modalOpen() || !env.sidebarShown()) return false;
+  event.preventDefault();
+  env.open();
+  return true;
+}
+
+export function handleFlatListEscape(
+  event: { key: string; preventDefault(): void; stopPropagation(): void },
+  listOpen: boolean,
+  close: () => void,
+): boolean {
+  if (event.key !== "Escape" || !listOpen) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  close();
+  return true;
+}

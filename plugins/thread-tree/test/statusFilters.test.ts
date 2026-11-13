@@ -161,3 +161,54 @@ test("closing the flat list or search hands focus back to the control that opene
   assert.equal(returnFocus({ activeElement: body, body }, { querySelector: () => null }, { search: true }), false);
   assert.equal(focused.length, 2);
 });
+
+const keyEvent = (key: string) => {
+  const calls: string[] = [];
+  return {
+    calls,
+    event: {
+      key, metaKey: false, ctrlKey: false, altKey: false, defaultPrevented: false, isComposing: false,
+      composedPath: () => { calls.push("composedPath"); return []; },
+      preventDefault: () => calls.push("preventDefault"),
+      stopPropagation: () => calls.push("stopPropagation"),
+    },
+  };
+};
+
+test("the / listener ignores every other key before touching the DOM", async () => {
+  const { handleSearchKey } = await import("../src/statusFilters.ts");
+  const queries: string[] = [];
+  const env = {
+    modalOpen: () => { queries.push("modal"); return false; },
+    sidebarShown: () => { queries.push("sidebar"); return true; },
+    open: () => queries.push("open"),
+  };
+  const other = keyEvent("a");
+  assert.equal(handleSearchKey(other.event, env), false);
+  assert.deepEqual([...other.calls, ...queries], []);
+  const slash = keyEvent("/");
+  assert.equal(handleSearchKey(slash.event, env), true);
+  assert.deepEqual(queries, ["modal", "sidebar", "open"]);
+  assert.deepEqual(slash.calls, ["composedPath", "preventDefault"]);
+});
+
+test("only a modal dialog takes / away; a non-modal popover's role=dialog does not", async () => {
+  const { isModalDialog } = await import("../src/statusFilters.ts");
+  const el = (attributes: Record<string, string>) => ({ getAttribute: (name: string) => attributes[name] ?? null });
+  assert.equal(isModalDialog(el({ role: "dialog" })), false);
+  assert.equal(isModalDialog(el({ role: "dialog", "aria-modal": "true" })), true);
+  assert.equal(isModalDialog(el({ role: "alertdialog" })), true);
+  assert.equal(isModalDialog(el({ role: "dialog", "aria-modal": "false" })), false);
+});
+
+test("Escape in the flat list closes it and keeps bb's own Escape handlers out of it", async () => {
+  const { handleFlatListEscape } = await import("../src/statusFilters.ts");
+  let closed = 0;
+  const escape = keyEvent("Escape");
+  assert.equal(handleFlatListEscape(escape.event, true, () => closed++), true);
+  assert.deepEqual(escape.calls, ["preventDefault", "stopPropagation"]);
+  const shut = keyEvent("Escape");
+  assert.equal(handleFlatListEscape(shut.event, false, () => closed++), false);
+  assert.equal(handleFlatListEscape(keyEvent("Enter").event, true, () => closed++), false);
+  assert.equal(closed, 1);
+});
