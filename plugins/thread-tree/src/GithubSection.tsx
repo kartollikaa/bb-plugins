@@ -32,7 +32,7 @@ function openGithubFolderPrPage(url: string) {
 const PULLS_URL = "https://github.com/pulls/review-requested";
 
 /** The GitHub Folder plugin's view; null while loading or when that plugin is absent. */
-function useGithubFolder() {
+export function useGithubFolder() {
   const rpc = useRpc<typeof rpcContract>();
   const [state, setState] = useState<{ view: GithubFolderView | null } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -69,6 +69,8 @@ function useGithubFolder() {
   };
 }
 
+type GithubFolder = ReturnType<typeof useGithubFolder>;
+
 const ATTENTION_STYLE: Record<Attention | "none", { short: string; className: string }> = {
   review: { short: "review", className: "text-blue-600 dark:text-blue-400" },
   changes_requested: { short: "changes", className: "text-red-600 dark:text-red-400" },
@@ -86,7 +88,9 @@ export function GithubSection({
   menu,
   showSnoozed,
   onToggleSnoozed,
+  folder,
 }: {
+  folder: GithubFolder;
   isCollapsed: boolean;
   onToggle: () => void;
   /** The header's right-click menu. */
@@ -94,7 +98,7 @@ export function GithubSection({
   showSnoozed: boolean;
   onToggleSnoozed: () => void;
 }) {
-  const { view, isRefreshing, refresh, update, snooze, prefetch } = useGithubFolder();
+  const { view, isRefreshing, refresh, update, snooze, prefetch } = folder;
   const navigate = useBbNavigate();
   if (!view) return null;
 

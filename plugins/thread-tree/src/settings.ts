@@ -79,6 +79,11 @@ export function resolveSectionOrder(saved: readonly string[]): SectionId[] {
   return [...kept, ...SIDEBAR_SECTIONS.map((section) => section.id).filter((id) => !kept.includes(id))];
 }
 
+/** The ids in `order` that are present and turned on in `view`. */
+export function shownSectionIds(order: readonly SectionId[], view: Pick<ViewSettings, SectionKey>, present: readonly SectionId[]): SectionId[] {
+  return order.filter((id) => present.includes(id) && view[SIDEBAR_SECTIONS.find((section) => section.id === id)!.key]);
+}
+
 /** `order` with `id` swapped one step toward the top (-1) or bottom (+1) among the `shown` ids. */
 export function moveSection(order: readonly SectionId[], shown: readonly SectionId[], id: SectionId, step: -1 | 1): SectionId[] {
   const visible = order.filter((entry) => shown.includes(entry));

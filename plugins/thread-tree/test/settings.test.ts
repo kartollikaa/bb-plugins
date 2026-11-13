@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { moveSection, readViewSettings, resolveSectionOrder, SETTINGS } from "../src/settings.ts";
+import { moveSection, readViewSettings, resolveSectionOrder, SETTINGS, shownSectionIds } from "../src/settings.ts";
 
 test("missing values fall back to every descriptor's default", () => {
   const view = readViewSettings(undefined);
@@ -40,4 +40,10 @@ test("moving a section steps over the next shown one and stops at the ends", () 
   assert.deepEqual(moveSection(order, order, "github", -1), ["github", "automations", "recent"]);
   assert.deepEqual(moveSection(order, ["github", "recent"], "github", 1), ["recent", "automations", "github"]);
   assert.deepEqual(moveSection(order, ["github", "recent"], "automations", 1), ["github", "automations", "recent"]);
+});
+
+test("a section whose source plugin is absent is not shown even when turned on", () => {
+  const view = { showGithub: true, showAutomations: false, showRecent: true };
+  assert.deepEqual(shownSectionIds(["github", "automations", "recent"], view, ["github", "automations", "recent"]), ["github", "recent"]);
+  assert.deepEqual(shownSectionIds(["github", "automations", "recent"], view, ["automations", "recent"]), ["recent"]);
 });

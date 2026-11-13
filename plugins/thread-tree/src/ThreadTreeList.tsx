@@ -27,13 +27,14 @@ import { ThreadPullRequestBadge } from "./ThreadPullRequestBadge";
 import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { AutomationsSection } from "./AutomationsSection";
-import { GithubSection } from "./GithubSection";
+import { GithubSection, useGithubFolder } from "./GithubSection";
 import { StatusDot } from "./StatusDot";
 import type { rpcContract } from "../server";
 import {
   moveSection,
   readViewSettings,
   resolveSectionOrder,
+  shownSectionIds,
   SIDEBAR_SECTIONS,
   type SectionId,
   type SectionKey,
@@ -192,7 +193,12 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const sectionDrag = useDragReorder(sectionOrder, setSavedSectionOrder);
   const foldSections = view.foldOnDrag && sectionDrag.isDragging;
   const recentCollapsed = foldSections || collapsedGroups.has("recent");
-  const shownSections = sectionDrag.order.filter((id) => view[SECTION_BY_ID[id].key]);
+  const githubFolder = useGithubFolder();
+  const presentSections = useMemo(
+    () => SIDEBAR_SECTIONS.map((section) => section.id).filter((id) => id !== "github" || githubFolder.view !== null),
+    [githubFolder.view],
+  );
+  const shownSections = shownSectionIds(sectionDrag.order, view, presentSections);
   const sectionsRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   useFlipOrder(sectionsRef, shownSections.join(), view.reduceMotion);
@@ -262,7 +268,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       <div ref={sectionsRef} className="relative flex flex-col gap-3 px-1.5 pb-3 pt-1" {...sectionDrag.containerProps}>
       <div className="-mb-2 flex h-5 items-center justify-between gap-2 px-1.5">
         <ActivityOverview counts={overview} />
-        <SectionsMenu view={view} order={sectionOrder} onChange={setSection} />
+        <SectionsMenu view={view} order={sectionOrder.filter((id) => presentSections.includes(id))} onChange={setSection} />
       </div>
       {shownSections.map((id, index) => {
         const section = SECTION_BY_ID[id];
@@ -280,6 +286,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           >
             {id === "github" ? (
               <GithubSection
+                folder={githubFolder}
                 isCollapsed={foldSections || collapsedGroups.has("github")}
                 onToggle={() => collapsedGroups.toggle("github")}
                 showSnoozed={flags.has("github-snoozed")}
@@ -586,7 +593,7 @@ function SectionsMenu({
 }) {
   const portalProps = usePortalScopeProps();
   const menu = useTapToOpenMenu();
-  const hidden = SIDEBAR_SECTIONS.filter(({ key }) => !view[key]).length;
+  const hidden = order.filter((id) => !view[SECTION_BY_ID[id].key]).length;
   return (
     <DropdownMenu.Root {...menu.rootProps}>
       <DropdownMenu.Trigger asChild {...menu.triggerProps}>
