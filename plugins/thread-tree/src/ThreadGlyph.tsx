@@ -1,4 +1,4 @@
-import { experimental_ThreadStatusGlyph as ThreadStatusGlyph, type PluginSidebarThreadRowStatus } from "@get-bb/plugin-sdk/app";
+import { experimental_ThreadStatusGlyph as ThreadStatusGlyph, type PluginSidebarThreadIndicator, type PluginSidebarThreadRowStatus } from "@get-bb/plugin-sdk/app";
 import { cn } from "@/lib/utils";
 import { useStill } from "./motion";
 import { glyphMotionClass, isIdleGlyph, ROLLUP_GLYPH, type RowGlyph } from "./statusGlyph";
@@ -26,7 +26,11 @@ export function RowStatusGlyph({ glyph }: { glyph: RowGlyph<PluginSidebarThreadR
 
 /** A rollup state (overview, fold line, status group) in bb's glyph, held still: it labels a count, it isn't live. */
 export function RollupGlyph({ state, className }: { state: ThreadState; className?: string }) {
-  const indicator = ROLLUP_GLYPH[state];
+  return <StillGlyph indicator={ROLLUP_GLYPH[state]} className={className} />;
+}
+
+/** bb's glyph for `indicator` at count size, held still. */
+export function StillGlyph({ indicator, className }: { indicator: PluginSidebarThreadIndicator; className?: string }) {
   if (indicator === "none") return <IdleDot className={cn("size-3.5 shrink-0", className)} />;
   return (
     <span aria-hidden className={cn("flex size-3.5 shrink-0 items-center justify-center [&_svg]:size-3", glyphMotionClass(true), className)}>

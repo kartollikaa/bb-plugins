@@ -42,6 +42,8 @@ import { AutomationsSection } from "./AutomationsSection";
 import { GithubSection, useGithubFolder } from "./GithubSection";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph } from "./statusGlyph";
+import { StatusLine } from "./StatusLine";
+import { countStatusFilters, filterThreads, isSearchKey, runningContext, searchThreads, STATUS_FILTERS, type StatusFilter } from "./statusFilters";
 import type { rpcContract } from "../server";
 import {
   moveSection,
@@ -58,7 +60,6 @@ import {
   buildForest,
   descendantsOf,
   type Forest,
-  countStates,
   groupRows,
   recentThreads,
   readFolderSorts,
@@ -197,7 +198,11 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     return [...byId.values()];
   }, [groups, recent, recentHidden, view.showSubagents, collapsedGroups.values]);
   const subagents = useSubagents(visibleThreads);
-  const overview = useMemo(() => countStates(threads), [threads]);
+  const filterCounts = useMemo(() => countStatusFilters(threads), [threads]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const sectionOrder = useMemo(() => resolveSectionOrder(savedSectionOrder), [savedSectionOrder]);
   const sectionDrag = useDragReorder(sectionOrder, setSavedSectionOrder);
   const foldSections = view.foldOnDrag && sectionDrag.isDragging;
@@ -223,6 +228,37 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   );
   const sharedBranches = useMemo(() => sharedBranchThreads(threads, familyRootOf(threads)), [threads]);
   const canHover = !useMediaQuery(NO_HOVER_QUERY);
+  const searchPool = showArchived ? listed.threads : threads;
+  const flatList = useMemo(() => {
+    if (statusFilter) return filterThreads(threads, statusFilter);
+    if (!searchOpen || query.trim() === "") return null;
+    return searchThreads(searchPool, query, (thread) => ({
+      projectName: projectById.get(thread.projectId)?.name ?? null,
+      pullRequestNumbers: pullRequestsOf(thread).map((pr) => pr.number),
+    }));
+  }, [statusFilter, threads, searchOpen, query, searchPool, projectById, pullRequestsOf]);
+  const openSearch = useCallback(() => {
+    setStatusFilter(null);
+    setSearchOpen(true);
+    requestAnimationFrame(() => searchInputRef.current?.focus());
+  }, []);
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setQuery("");
+  }, []);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      const typing = !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+      const { key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing } = event;
+      if (!isSearchKey({ key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing, typing })) return;
+      if ((sectionsRef.current?.getClientRects().length ?? 0) === 0) return;
+      event.preventDefault();
+      openSearch();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [openSearch]);
   const { providers } = useProviders();
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
 
@@ -253,13 +289,14 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             ? "No archived threads."
             : "Loading archived threads…";
 
-  const renderRow = (row: TreeRow<PluginSidebarThread>, variant: "tree" | "recent") => (
+  const renderRow = (row: TreeRow<PluginSidebarThread>, variant: "tree" | "flat", subtitle?: string) => (
     <Fragment key={row.thread.id}>
       <ThreadRowView
         row={row}
-        forest={variant === "recent" ? activeForest : forest}
+        forest={variant === "flat" ? activeForest : forest}
         variant={variant}
-        context={variant === "recent" ? projectById.get(row.thread.projectId)?.name : undefined}
+        context={variant === "flat" ? projectById.get(row.thread.projectId)?.name : undefined}
+        subtitle={subtitle}
         isActive={row.thread.id === activeThreadId}
         isCompactViewport={isCompactViewport}
         canHover={canHover}
@@ -287,11 +324,51 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   return (
     <ReduceMotionContext.Provider value={view.reduceMotion}>
-      <div ref={sectionsRef} className="relative flex flex-col gap-3 px-1.5 pb-3 pt-1" {...sectionDrag.containerProps}>
+      <div
+        ref={sectionsRef}
+        className="relative flex flex-col gap-3 px-1.5 pb-3 pt-1"
+        {...sectionDrag.containerProps}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape" || !(statusFilter || searchOpen) || !event.currentTarget.contains(event.target as Node)) return;
+          event.preventDefault();
+          setStatusFilter(null);
+          closeSearch();
+        }}
+      >
       <div className="-mb-2 flex h-5 items-center justify-between gap-2 px-1.5">
-        <ActivityOverview counts={overview} />
+        <StatusLine
+          counts={filterCounts}
+          filter={statusFilter}
+          onFilter={setStatusFilter}
+          searchOpen={searchOpen}
+          query={query}
+          onQuery={setQuery}
+          onOpenSearch={openSearch}
+          onCloseSearch={closeSearch}
+          inputRef={searchInputRef}
+        />
         <SectionsMenu view={view} order={sectionOrder.filter((id) => presentSections.includes(id))} onChange={setSection} />
       </div>
+      {flatList ? (
+        <FlatListSection
+          heading={statusFilter ? STATUS_FILTERS.find((entry) => entry.id === statusFilter)!.heading : `Matching “${query.trim()}”`}
+          count={flatList.length}
+          emptyText={statusFilter ? "Nothing here." : "No threads match."}
+          onClear={() => {
+            setStatusFilter(null);
+            closeSearch();
+          }}
+        >
+          {flatList.map((thread) => renderRow(
+            flatRow(thread),
+            "flat",
+            statusFilter === "running"
+              ? runningContext(projectById.get(thread.projectId)?.name ?? null, parentTitle(activeForest, threads, thread.id))
+              : undefined,
+          ))}
+        </FlatListSection>
+      ) : (
+      <>
       {shownSections.map((id, index) => {
         const section = SECTION_BY_ID[id];
         const menu: HeaderMenuItem[] = [
@@ -339,7 +416,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                 />
                 <Collapse open={!recentCollapsed}>
                   <div role="list" className="mt-0.5 flex flex-col gap-0.5">
-                    {recent.map((thread) => renderRow(flatRow(thread), "recent"))}
+                    {recent.map((thread) => renderRow(flatRow(thread), "flat"))}
                     {threads.length > view.recentLimit ? (
                       <button
                         type="button"
@@ -470,6 +547,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
               : "Show more"}
         </button>
       ) : null}
+      </>
+      )}
       </div>
     </ReduceMotionContext.Provider>
   );
@@ -554,26 +633,44 @@ function flatRow(thread: PluginSidebarThread): TreeRow<PluginSidebarThread> {
   };
 }
 
-const OVERVIEW_STATES: readonly { state: ThreadState; label: string }[] = [
-  { state: "input", label: "need input" },
-  { state: "error", label: "failed" },
-  { state: "running", label: "running" },
-];
-
-/** What needs attention across all active threads, at a glance. */
-function ActivityOverview({ counts }: { counts: StateCounts }) {
-  const parts = OVERVIEW_STATES.filter(({ state }) => (counts[state] ?? 0) > 0);
-  if (parts.length === 0) return <span className="truncate text-2xs text-sidebar-foreground/40">Nothing running</span>;
+/** A status filter's or a search's matches, flat, in place of the sections and the tree. */
+function FlatListSection({
+  heading,
+  count,
+  emptyText,
+  onClear,
+  children,
+}: {
+  heading: string;
+  count: number;
+  emptyText: string;
+  onClear: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <span role="status" className="flex min-w-0 items-center gap-2.5 overflow-hidden text-2xs tabular-nums text-sidebar-foreground/60">
-      {parts.map(({ state, label }) => (
-        <span key={state} className="flex shrink-0 items-center gap-1">
-          <RollupGlyph state={state} />
-          {counts[state]} {label}
-        </span>
-      ))}
-    </span>
+    <section aria-label={heading} data-flat-list="">
+      <div className="flex h-7 items-center gap-2 px-1.5 text-xs font-medium text-sidebar-foreground/60">
+        <span className="min-w-0 truncate">{heading}</span>
+        <span className="tabular-nums text-sidebar-foreground/40">{count}</span>
+        <button
+          type="button"
+          onClick={onClear}
+          className="ml-auto flex h-5 shrink-0 items-center rounded-md px-1.5 text-2xs font-normal text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+        >
+          Clear
+        </button>
+      </div>
+      <div role="list" className="mt-0.5 flex flex-col gap-0.5">
+        {children}
+        {count === 0 ? <div className="px-3 py-1 text-xs text-muted-foreground">{emptyText}</div> : null}
+      </div>
+    </section>
   );
+}
+
+function parentTitle(forest: Forest<PluginSidebarThread>, threads: readonly PluginSidebarThread[], threadId: string): string | null {
+  const parentId = forest.parentOf.get(threadId);
+  return parentId ? threads.find((thread) => thread.id === parentId)?.displayTitle ?? null : null;
 }
 
 /** Section visibility lives in the plugin settings; a toggle applies at once and saves in the background. */
@@ -733,6 +830,7 @@ function ThreadRowView({
   forest,
   variant,
   context,
+  subtitle,
   isActive,
   isCompactViewport,
   canHover,
@@ -748,9 +846,11 @@ function ThreadRowView({
 }: {
   row: TreeRow<PluginSidebarThread>;
   forest: Forest<PluginSidebarThread>;
-  /** A recent row is flat and leaves bb's keyboard shortcuts to the tree. */
-  variant: "tree" | "recent";
+  /** A flat row (Recent Activity, a filter, a search) leaves bb's keyboard shortcuts to the tree. */
+  variant: "tree" | "flat";
   context?: string;
+  /** A second line under the title; only the Running filter has one. */
+  subtitle?: string;
   isActive: boolean;
   isCompactViewport: boolean;
   canHover: boolean;
@@ -787,7 +887,7 @@ function ThreadRowView({
     `Updated ${age === "now" ? "just now" : `${age} ago`}`,
   ].filter(Boolean).join("\n");
 
-  const heightPx = rowHeightPx(isCompactViewport);
+  const heightPx = rowHeightPx(isCompactViewport, subtitle ? 2 : 1);
   const stopInline = useStopInlineAction(thread);
 
   return (
@@ -849,10 +949,15 @@ function ThreadRowView({
           )}
           {isTree ? (
             <TreeRowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
+          ) : subtitle ? (
+            <span className="flex min-w-0 flex-1 flex-col justify-center">
+              <RowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
+              <span data-row-subtitle="" className="truncate text-2xs text-sidebar-foreground/50">{subtitle}</span>
+            </span>
           ) : (
             <RowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
           )}
-          <span aria-hidden className="min-w-0 flex-1" />
+          {subtitle ? null : <span aria-hidden className="min-w-0 flex-1" />}
           {/* Above the overlay's fade, so hover and focus never hide or block them. */}
           <span className="relative z-[1] flex shrink-0 items-center gap-2 empty:hidden">
             {failed ? <RetryButton threadId={thread.id} /> : null}

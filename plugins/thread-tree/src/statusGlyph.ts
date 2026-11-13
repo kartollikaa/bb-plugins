@@ -1,6 +1,7 @@
 // What a thread row's status glyph shows, folded the way bb's own sidebar folds it.
 import type { PluginSidebarThreadIndicator } from "@get-bb/plugin-sdk/app";
 import { hasBackgroundWork, WORKING_INDICATORS, type ThreadState } from "./tree.ts";
+import type { StatusFilter } from "./statusFilters.ts";
 
 export type GlyphIndicator = PluginSidebarThreadIndicator;
 
@@ -106,6 +107,14 @@ export const ROLLUP_GLYPH: Record<ThreadState, GlyphIndicator> = {
   running: "runtime",
   waiting: "queued-waiting",
   done: "none",
+};
+
+/** The status line's counts, drawn as the row glyph each one lists. */
+export const FILTER_GLYPH: Record<StatusFilter, GlyphIndicator> = {
+  input: "waiting-for-input",
+  error: "unread-error",
+  running: "runtime",
+  unread: "unread-success",
 };
 
 /** Stops every animation inside bb's glyph under the plugin's Reduce motion setting or the system preference. */
