@@ -5,9 +5,9 @@ export function rowHeightPx(isCompactViewport: boolean): number {
   return isCompactViewport ? 40 : 32;
 }
 
-/** Work Stop would end; a thread already stopping keeps its spinner. */
+/** A thread stays `stopping` when the machine can't confirm the stop, so Stop stays offered to retry it. */
 export function canStop(thread: Pick<TreeThread, "status" | "indicator" | "activity">): boolean {
-  return thread.status !== "stopping" && isWorking(thread);
+  return isWorking(thread);
 }
 
 /** A parent row's glyph is its fold toggle, so its Stop lives in the ⋯ menu instead. */

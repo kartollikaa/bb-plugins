@@ -5,12 +5,12 @@ import { canStop, hoverActionsClass, rowHeightPx, stopsFromGlyph } from "../src/
 const idle = { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 };
 const t = (status: string, extra: { indicator?: string; activity?: typeof idle } = {}) => ({ status, indicator: "none", activity: idle, ...extra });
 
-test("Stop is offered while work runs, and not while it is already stopping or idle", () => {
+test("Stop is offered while work runs, including a stop the machine never confirmed, and not when idle", () => {
   assert.equal(canStop(t("active")), true);
   assert.equal(canStop(t("starting")), true);
   assert.equal(canStop(t("idle", { activity: { ...idle, backgroundAgents: 1 } })), true);
   assert.equal(canStop(t("idle", { indicator: "workflow" })), true);
-  assert.equal(canStop(t("stopping")), false);
+  assert.equal(canStop(t("stopping")), true, "a stuck stopping thread can be stopped again");
   assert.equal(canStop(t("idle")), false);
   assert.equal(canStop(t("error")), false);
 });

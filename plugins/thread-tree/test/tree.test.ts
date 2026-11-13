@@ -132,6 +132,7 @@ test("thread dot: input, then unread error, then running, else done", () => {
   assert.equal(threadDotState(thread("t", { indicator: "waiting-for-input" })), "input");
   assert.equal(threadDotState(thread("t", { indicator: "unread-error" })), "error");
   assert.equal(threadDotState(thread("t", { status: "active" })), "running");
+  assert.equal(threadDotState(thread("t", { status: "stopping" })), "running", "bb counts a stopping thread busy until the stop is confirmed");
   assert.equal(threadDotState(thread("t")), "done");
 });
 
