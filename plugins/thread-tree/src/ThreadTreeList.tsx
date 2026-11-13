@@ -840,7 +840,7 @@ function ThreadRowView({
                 )}
               />
             </button>
-          ) : stopsFromGlyph(thread, row.hasChildren) ? (
+          ) : stopsFromGlyph(thread, { hasChildren: row.hasChildren, isCompactViewport }) ? (
             <StopGlyphButton threadId={thread.id}>{dot}</StopGlyphButton>
           ) : (
             <span title={glyph.label ?? undefined} className="flex size-4 shrink-0 items-center justify-center">{dot}</span>

@@ -10,9 +10,12 @@ export function canStop(thread: Pick<TreeThread, "status" | "indicator" | "activ
   return isWorking(thread);
 }
 
-/** A parent row's glyph is its fold toggle, so its Stop lives in the ⋯ menu instead. */
-export function stopsFromGlyph(thread: Pick<TreeThread, "status" | "indicator" | "activity">, hasChildren: boolean): boolean {
-  return !hasChildren && canStop(thread);
+/** A parent's glyph is its fold toggle, and a tap on touch must not stop work; both keep Stop in the menus. */
+export function stopsFromGlyph(
+  thread: Pick<TreeThread, "status" | "indicator" | "activity">,
+  row: { hasChildren: boolean; isCompactViewport: boolean },
+): boolean {
+  return !row.hasChildren && !row.isCompactViewport && canStop(thread);
 }
 
 /** Shown at once on hover, keyboard focus or an open menu; only opacity and visibility change, so nothing reflows. */

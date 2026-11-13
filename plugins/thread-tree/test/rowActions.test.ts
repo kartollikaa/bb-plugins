@@ -16,9 +16,14 @@ test("Stop is offered while work runs, including a stop the machine never confir
 });
 
 test("a parent row keeps its glyph as the fold toggle, so only a leaf row's glyph turns into Stop", () => {
-  assert.equal(stopsFromGlyph(t("active"), false), true);
-  assert.equal(stopsFromGlyph(t("active"), true), false);
-  assert.equal(stopsFromGlyph(t("idle"), false), false);
+  assert.equal(stopsFromGlyph(t("active"), { hasChildren: false, isCompactViewport: false }), true);
+  assert.equal(stopsFromGlyph(t("active"), { hasChildren: true, isCompactViewport: false }), false);
+  assert.equal(stopsFromGlyph(t("idle"), { hasChildren: false, isCompactViewport: false }), false);
+});
+
+test("on a touch-first compact viewport the glyph never stops a thread in one tap; Stop stays in the menus", () => {
+  assert.equal(stopsFromGlyph(t("active"), { hasChildren: false, isCompactViewport: true }), false);
+  assert.equal(canStop(t("active")), true);
 });
 
 test("compact viewports get taller rows than the fixed 32px", () => {
