@@ -27,8 +27,8 @@ go back. `/` (outside a text field) or the search icon opens a search box that
 matches the title, branch, PR number (`#123`) and project of the threads the
 tree lists, archived ones when Archived is on. Escape clears it.
 
-Every thread row is one line and keeps one height whatever its state; rows are
-taller on a phone-sized viewport. Left to right: status glyph, title, Retry on a
+Every thread row keeps one height whatever its state; rows are taller on a
+phone-sized viewport. A row is one line, except under the Running filter. Left to right: status glyph, title, Retry on a
 failed turn, PR icon, shared-branch warning, subagent counter, provider icon, age.
 Hovering the row shows its title, branch, provider and when it last updated.
 
