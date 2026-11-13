@@ -95,6 +95,12 @@ test("a draft never hides a question or a failure, nor an idle thread's unread o
   assert.equal(resolveRowGlyph(thread("queued-failed", "x"), true, null).indicator, "queued-failed");
 });
 
+test("a draft on a busy thread never hides a queued message that failed to send", () => {
+  const glyph = resolveRowGlyph(thread("queued-failed", "Queued message failed to send", { runtimeStatus: "active" }), true, null);
+  assert.equal(glyph.indicator, "queued-failed");
+  assert.equal(glyph.label, "Queued message failed to send");
+});
+
 test("another plugin's row status replaces the draft and quiet states, with its own label", () => {
   assert.deepEqual(resolveRowGlyph(thread("none"), true, running), { indicator: "draft", rowStatus: running, label: "Syncing" });
   assert.deepEqual(resolveRowGlyph(thread("none"), false, running), { indicator: "none", rowStatus: running, label: "Syncing" });

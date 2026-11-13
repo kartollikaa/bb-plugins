@@ -42,7 +42,7 @@ const OUTRANKS_ROW_STATUS = new Set<GlyphIndicator>(["runtime", "unread-error", 
 /** Already a failure in bb's own words, so the generic failed override leaves it alone. */
 const REPORTS_FAILURE = new Set<GlyphIndicator>(["unread-error", "waiting-for-input", "queued-failed"]);
 
-const OUTRANKS_DRAFT = new Set<GlyphIndicator>(["unread-error", "waiting-for-input"]);
+const OUTRANKS_DRAFT = new Set<GlyphIndicator>(["unread-error", "waiting-for-input", "queued-failed"]);
 
 const BUSY_RUNTIME = new Set(["active", "provisioning", "starting", "stopping"]);
 
