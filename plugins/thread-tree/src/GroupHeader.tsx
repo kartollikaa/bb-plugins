@@ -2,7 +2,8 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Icon } from "@/components/ui/icon";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import { cn } from "@/lib/utils";
-import { HEADER_CHEVRON_MOTION, TOUCH_DIMMED } from "./rowStyles";
+import { headerChevronMotion, TOUCH_DIMMED } from "./rowStyles";
+import { useStill } from "./motion";
 
 export function GroupHeader({
   title,
@@ -29,6 +30,7 @@ export function GroupHeader({
   /** Right-click menu on the header. */
   menu?: readonly HeaderMenuItem[];
 }) {
+  const still = useStill();
   const header = (
     <div data-drag-image className="group/header flex h-7 items-center gap-1 px-1.5">
       <button
@@ -45,7 +47,7 @@ export function GroupHeader({
           aria-hidden
           className={cn(
             "size-3 shrink-0 text-sidebar-foreground/40 opacity-0 group-hover/header:opacity-100",
-            HEADER_CHEVRON_MOTION,
+            headerChevronMotion(still),
             TOUCH_DIMMED,
             !isCollapsed && "rotate-90",
           )}

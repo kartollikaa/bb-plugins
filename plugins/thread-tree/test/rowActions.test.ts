@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { canStop, END_SLOT_MIN_PX, HOVER_ACTIONS_STRIP_PX, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, stopsFromGlyph } from "../src/rowActions.ts";
-import { HEADER_CHEVRON_MOTION, ROW_TINT } from "../src/rowStyles.ts";
+import { headerChevronMotion, ROW_TINT } from "../src/rowStyles.ts";
 
 const idle = { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 };
 const leaf = { glyph: { indicator: "runtime", rowStatus: null }, canHover: true };
@@ -78,9 +78,13 @@ test("every state that shows the overlay also tints the row, so its solid end ne
   }
 });
 
-test("a header chevron fades in within 80ms but keeps its 150ms fold rotation, and holds still under reduced motion", () => {
-  assert.match(HEADER_CHEVRON_MOTION, /opacity_(\d+)ms/);
-  assert.ok(Number(/opacity_(\d+)ms/.exec(HEADER_CHEVRON_MOTION)?.[1]) <= 80);
-  assert.equal(/transform_(\d+)ms/.exec(HEADER_CHEVRON_MOTION)?.[1], "150");
-  assert.ok(HEADER_CHEVRON_MOTION.split(" ").includes("motion-reduce:transition-none"));
+test("a header chevron fades in within 80ms and animates its 150ms fold on the rotate property rotate-90 sets", () => {
+  const motion = headerChevronMotion(false);
+  assert.ok(Number(/opacity_(\d+)ms/.exec(motion)?.[1]) <= 80);
+  assert.equal(/(?:^|[[,])rotate_(\d+)ms/.exec(motion)?.[1], "150", "Tailwind v4's rotate-90 sets `rotate`, not `transform`");
+  assert.ok(motion.split(" ").includes("motion-reduce:transition-none"));
+});
+
+test("a header chevron holds still under the plugin's Reduce motion setting", () => {
+  assert.deepEqual(headerChevronMotion(true).split(" "), ["transition-none"]);
 });
