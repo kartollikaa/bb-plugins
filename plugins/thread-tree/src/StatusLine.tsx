@@ -3,7 +3,7 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { StillGlyph } from "./ThreadGlyph";
 import { FILTER_GLYPH } from "./statusGlyph";
-import { STATUS_FILTERS, type StatusFilter, type StatusFilterCounts } from "./statusFilters";
+import { STATUS_FILTERS, statusSummary, type StatusFilter, type StatusFilterCounts } from "./statusFilters";
 
 const LINE_BUTTON =
   "flex h-5 shrink-0 items-center gap-1 rounded-md px-1 text-2xs tabular-nums outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring";
@@ -61,6 +61,7 @@ export function StatusLine({
   }
   return (
     <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
+      <span role="status" className="sr-only">{statusSummary(counts)}</span>
       {STATUS_FILTERS.map(({ id, label }) => {
         const count = counts[id];
         const pressed = filter === id;

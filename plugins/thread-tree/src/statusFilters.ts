@@ -18,6 +18,11 @@ export const STATUS_FILTERS: readonly { id: StatusFilter; label: string; heading
 
 export type StatusFilterCounts = Record<StatusFilter, number>;
 
+export function statusSummary(counts: StatusFilterCounts): string {
+  const parts = STATUS_FILTERS.filter(({ id }) => counts[id] > 0).map(({ id, label }) => `${counts[id]} ${label}`);
+  return parts.length > 0 ? parts.join(", ") : "No threads need attention";
+}
+
 export function statusFilterOf(thread: FilterThread): StatusFilter | null {
   const state = threadDotState(thread);
   if (state === "input" || state === "error" || state === "running") return state;

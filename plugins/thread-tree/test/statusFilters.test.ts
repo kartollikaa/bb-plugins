@@ -4,6 +4,7 @@ import {
   countStatusFilters,
   filterThreads,
   isSearchKey,
+  statusSummary,
   runningContext,
   searchThreads,
   STATUS_FILTERS,
@@ -126,4 +127,9 @@ test("/ opens search only outside text fields, without modifiers, when nothing e
   assert.equal(isSearchKey(key("/", { isComposing: true })), false);
   assert.equal(isSearchKey(key("?")), false);
   assert.equal(isSearchKey(key("/", { modalOpen: true })), false);
+});
+
+test("the status summary names the nonzero counts, or says nothing is going on", () => {
+  assert.equal(statusSummary({ input: 1, error: 0, running: 3, unread: 0 }), "1 need input, 3 running");
+  assert.equal(statusSummary({ input: 0, error: 0, running: 0, unread: 0 }), "No threads need attention");
 });
