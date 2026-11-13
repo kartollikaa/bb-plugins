@@ -266,10 +266,23 @@ export function itemTarget(item: NeedsYouItem): ItemTarget {
   return item.kind === "pr" ? { kind: "pr", url: item.url } : { kind: "automations" };
 }
 
-/** ⇧⌘I: the item after the one open now, wrapping; the first when none is open. */
-export function nextItem(items: readonly NeedsYouItem[], activeThreadId: string | null): NeedsYouItem | null {
-  if (items.length === 0) return null;
-  const current = activeThreadId ? items.findIndex((item) => item.threadId === activeThreadId) : -1;
-  return items[(current + 1) % items.length] ?? null;
+/** Where the last ⇧⌘I left off; it holds while the user stays where it took them. */
+export interface InboxCursor {
+  key: string;
+  index: number;
+  threadId: string | null;
 }
 
+/** ⇧⌘I: the item after the last one opened, else after the open thread's items, wrapping; the first when neither is in the queue. */
+export function nextItem(items: readonly NeedsYouItem[], activeThreadId: string | null, cursor: InboxCursor | null = null): NeedsYouItem | null {
+  if (items.length === 0) return null;
+  if (cursor && cursor.threadId === activeThreadId) {
+    const at = items.findIndex((item) => item.key === cursor.key);
+    return items[at >= 0 ? (at + 1) % items.length : cursor.index % items.length] ?? null;
+  }
+  let last = -1;
+  items.forEach((item, index) => {
+    if (activeThreadId && item.threadId === activeThreadId) last = index;
+  });
+  return items[(last + 1) % items.length] ?? null;
+}

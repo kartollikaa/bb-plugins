@@ -246,3 +246,27 @@ test("Resend picks the oldest failed queued message, retrying or exhausted", () 
   assert.equal(failedQueuedMessage(rows)?.id, "q1");
   assert.equal(failedQueuedMessage([{ id: "q", state: "waiting", createdAt: 0 }]), null);
 });
+
+test("⇧⌘I steps past every item of the open thread, and from the last opened item when it has no thread or left the queue", () => {
+  const prs = pullRequestItems("linked", [{ threadId: "a", pullRequests: [pr(1, { checks: { state: "failing" } }), pr(2, { checks: { state: "failing" } })] }], new Map(), []);
+  const [question] = build([thread("b", { hasPendingInteraction: true })]);
+  const queue = [...prs, question!];
+  assert.equal(nextItem(queue, "a")?.threadId, "b", "both of a's PRs are skipped");
+  const folder = pullRequestItems("all", [], new Map(), [folderItem(8, ["review"]), folderItem(9, ["review"])]);
+  const opened = folder[0]!;
+  assert.equal(nextItem(folder, null, { key: opened.key, index: 0, threadId: null })?.key, folder[1]!.key, "a PR page has no thread, the cursor knows where it was");
+  const unread = build([thread("u1", { isUnread: true, updatedAt: 2 }), thread("u2", { isUnread: true, updatedAt: 1 })]);
+  const afterRead = unread.slice(1);
+  assert.equal(nextItem(afterRead, "u1", { key: unread[0]!.key, index: 0, threadId: "u1" })?.threadId, "u2", "the read result left; the next one took its place");
+  assert.equal(nextItem(unread, "elsewhere", { key: unread[0]!.key, index: 0, threadId: "u1" })?.threadId, "u1", "navigating away drops the cursor");
+});
+
+test("with two sidebars mounted, unmounting the newer one hands ⇧⌘I back to the older", () => {
+  const calls: string[] = [];
+  const dropOld = setInboxHandler(() => { calls.push("old"); return true; });
+  const dropNew = setInboxHandler(() => { calls.push("new"); return true; });
+  dropNew();
+  assert.equal(openNextInboxItem(null), true);
+  assert.deepEqual(calls, ["old"]);
+  dropOld();
+});

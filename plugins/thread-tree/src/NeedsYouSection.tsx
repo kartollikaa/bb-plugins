@@ -15,6 +15,7 @@ import {
   readSnoozes,
   threadItems,
   trackFirstSeen,
+  type InboxCursor,
   type NeedsYouItem,
   type PendingInteraction,
   type ThreadItemKind,
@@ -88,8 +89,10 @@ export function useNeedsYou(sources: NeedsYouSources) {
 
   const navigate = useBbNavigate();
   const openAutomationsPage = useOpenAutomationsPage(onNavigate);
+  const cursor = useRef<InboxCursor | null>(null);
   const open = (item: NeedsYouItem, split = false) => {
     const target = itemTarget(item);
+    cursor.current = { key: item.key, index: Math.max(0, items.indexOf(item)), threadId: target.kind === "thread" ? target.threadId : null };
     if (target.kind === "thread") {
       navigate.toThread(target.threadId, { split });
       onNavigate();
@@ -110,7 +113,7 @@ export function useNeedsYou(sources: NeedsYouSources) {
   latest.current = { items, activeThreadId, open };
   useEffect(() => setInboxHandler((threadId) => {
     const { items: current, activeThreadId: active, open: openItem } = latest.current;
-    const item = nextItem(current, threadId ?? active);
+    const item = nextItem(current, threadId ?? active, cursor.current);
     if (item) openItem(item);
     else toast("Nothing needs you");
     return item !== null;
