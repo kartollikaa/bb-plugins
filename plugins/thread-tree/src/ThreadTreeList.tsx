@@ -44,7 +44,7 @@ import { GithubSection, useGithubFolder } from "./GithubSection";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph } from "./statusGlyph";
 import { StatusLine } from "./StatusLine";
-import { countStatusFilters, filterThreads, handleFlatListEscape, handleSearchKey, isModalDialog, MODAL_DIALOG_SELECTOR, orchestrationTitle, returnFocus, runningContext, sidebarBehindModal, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
+import { countStatusFilters, filterThreads, handleFlatListEscape, handleSearchKey, isModalDialog, MODAL_DIALOG_SELECTOR, orchestrationTitle, refocusAfterClose, returnFocus, runningContext, type CloseReason, sidebarBehindModal, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
 import type { rpcContract } from "../server";
 import {
   moveSection,
@@ -255,8 +255,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     searchInputRef.current?.focus();
   }, []);
   const pendingFocus = useRef<ClosedView | null>(null);
-  const closeSearch = useCallback(() => {
-    pendingFocus.current = { search: true };
+  const closeSearch = useCallback((reason: CloseReason = "action") => {
+    pendingFocus.current = refocusAfterClose({ search: true }, reason);
     setSearchOpen(false);
     setQuery("");
   }, []);

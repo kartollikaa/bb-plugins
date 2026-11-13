@@ -3,7 +3,7 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { StillGlyph } from "./ThreadGlyph";
 import { FILTER_GLYPH } from "./statusGlyph";
-import { STATUS_FILTERS, statusSummary, type StatusFilter, type StatusFilterCounts } from "./statusFilters";
+import { STATUS_FILTERS, statusSummary, type CloseReason, type StatusFilter, type StatusFilterCounts } from "./statusFilters";
 
 const LINE_BUTTON =
   "flex h-5 shrink-0 items-center gap-1 rounded-md px-1 text-2xs tabular-nums outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring";
@@ -28,7 +28,7 @@ export function StatusLine({
   query: string;
   onQuery: (query: string) => void;
   onOpenSearch: () => void;
-  onCloseSearch: () => void;
+  onCloseSearch: (reason: CloseReason) => void;
   inputRef: RefObject<HTMLInputElement | null>;
 }) {
   if (searchOpen) {
@@ -45,13 +45,13 @@ export function StatusLine({
           placeholder="Title, branch, PR #, project"
           onChange={(event) => onQuery(event.target.value)}
           onBlur={() => {
-            if (query.trim() === "") onCloseSearch();
+            if (query.trim() === "") onCloseSearch("blur");
           }}
           onKeyDown={(event) => {
             if (event.key !== "Escape") return;
             event.preventDefault();
             event.stopPropagation();
-            onCloseSearch();
+            onCloseSearch("action");
           }}
           className="h-full min-w-0 flex-1 bg-transparent text-xs text-sidebar-foreground outline-none placeholder:text-sidebar-foreground/40"
         />

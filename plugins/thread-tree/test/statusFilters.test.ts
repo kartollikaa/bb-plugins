@@ -220,3 +220,10 @@ test("a Radix modal has no aria-modal but hides the rest of the page, sidebar in
   assert.equal(sidebarBehindModal(at("[inert]")), true);
   assert.equal(sidebarBehindModal(at(null)), false);
 });
+
+test("the empty search box closing on blur leaves focus where the click put it", async () => {
+  const { refocusAfterClose } = await import("../src/statusFilters.ts");
+  assert.equal(refocusAfterClose({ search: true }, "blur"), null);
+  assert.deepEqual(refocusAfterClose({ search: true }, "action"), { search: true });
+  assert.deepEqual(refocusAfterClose({ filter: "input" }, "action"), { filter: "input" });
+});

@@ -104,6 +104,13 @@ export function isSearchKey(event: SearchKeyEvent): boolean {
 /** What just closed: a status filter's flat list, or the search box. */
 export type ClosedView = { filter: StatusFilter } | { search: true };
 
+export type CloseReason = "blur" | "action";
+
+/** A blur already moved focus where the user wanted it; Escape, Clear or a toggle took it away. */
+export function refocusAfterClose(closed: ClosedView, reason: CloseReason): ClosedView | null {
+  return reason === "blur" ? null : closed;
+}
+
 /** Closing removes the focused control; without this, focus drops to `<body>` and Tab restarts from the page top. */
 export function returnFocus(
   doc: { activeElement: unknown; body: unknown },
