@@ -53,3 +53,10 @@ test("the provider icon is tinted by default and monochrome only when chosen", (
   assert.equal(readViewSettings({ providerIconStyle: "monochrome" }).providerIconStyle, "monochrome");
   assert.equal(readViewSettings({ providerIconStyle: "neon" }).providerIconStyle, "tint");
 });
+
+test("Needs you PRs default to linked and take only known modes", () => {
+  assert.equal(readViewSettings(undefined).needsYouPullRequests, "linked");
+  assert.equal(readViewSettings({ needsYouPullRequests: "all" }).needsYouPullRequests, "all");
+  assert.equal(readViewSettings({ needsYouPullRequests: "none" }).needsYouPullRequests, "none");
+  assert.equal(readViewSettings({ needsYouPullRequests: "bogus" }).needsYouPullRequests, "linked");
+});

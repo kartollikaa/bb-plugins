@@ -5,6 +5,7 @@ import { PR_REASON_LOOK, prActionReason, type FolderAttention, type PrReason } f
 import type { ThreadPullRequest } from "./threadPullRequests.ts";
 import { ATTENTION_LABEL, type GithubFolderItem } from "./githubFolder.ts";
 import { automationDot, type AutomationSummary } from "./automations.ts";
+import type { NeedsYouPullRequests } from "./settings.ts";
 
 export type ThreadItemKind = "input" | "failed" | "queued-failed" | "unread";
 export type NeedsYouKind = ThreadItemKind | "pr" | "automation";
@@ -146,8 +147,6 @@ export function trackFirstSeen(previous: ReadonlyMap<string, number>, waitingIds
   return new Map(waitingIds.map((id) => [id, previous.get(id) ?? now]));
 }
 
-export type PullRequestMode = "linked" | "all" | "none";
-
 /** Agents can act on these; Ready to merge stays a row icon. */
 const QUEUE_PR_REASONS = new Set<PrReason>(["failing", "conflicts", "changes"]);
 
@@ -158,7 +157,7 @@ export interface LinkedPullRequests {
 }
 
 export function pullRequestItems(
-  mode: PullRequestMode,
+  mode: NeedsYouPullRequests,
   linked: readonly LinkedPullRequests[],
   folder: FolderAttention,
   folderItems: readonly GithubFolderItem[],

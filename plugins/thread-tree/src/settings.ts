@@ -32,6 +32,14 @@ export const SETTINGS = {
     experimental_schema: limit,
     default: 15,
   },
+  needsYouPullRequests: {
+    type: "select",
+    label: "Pull requests in Needs you",
+    description: "Linked: PRs of your threads with failing checks, conflicts or changes requested. All: every GitHub Folder item. None: no PRs.",
+    options: ["linked", "all", "none"] as string[],
+    experimental_optionLabels: { linked: "Linked to my threads", all: "All GitHub Folder items", none: "None" },
+    default: "linked",
+  },
   providerIconStyle: {
     type: "select",
     label: "Provider icon colour",
@@ -100,6 +108,7 @@ export const sectionPatchSchema = z
   .strict();
 
 export type ProviderIconStyle = "tint" | "monochrome";
+export type NeedsYouPullRequests = "linked" | "all" | "none";
 
 export type ViewSettings = {
   showGithub: boolean;
@@ -107,6 +116,7 @@ export type ViewSettings = {
   showRecent: boolean;
   recentLimit: number;
   recentMoreLimit: number;
+  needsYouPullRequests: NeedsYouPullRequests;
   providerIconStyle: ProviderIconStyle;
   showSubagents: boolean;
   showAge: boolean;
@@ -120,7 +130,7 @@ const DEFAULTS: ViewSettings = Object.fromEntries(
 
 /** Frontend values are untrusted: anything missing or of the wrong type falls back to its default. */
 export function readViewSettings(values: Record<string, unknown> | undefined): ViewSettings {
-  const bool = (key: Exclude<keyof ViewSettings, "providerIconStyle">) => (typeof values?.[key] === "boolean" ? (values[key] as boolean) : (DEFAULTS[key] as boolean));
+  const bool = (key: Exclude<keyof ViewSettings, "providerIconStyle" | "needsYouPullRequests">) => (typeof values?.[key] === "boolean" ? (values[key] as boolean) : (DEFAULTS[key] as boolean));
   const count = (key: "recentLimit" | "recentMoreLimit") => {
     const parsed = limit.safeParse(values?.[key]);
     return parsed.success ? parsed.data : DEFAULTS[key];
@@ -132,6 +142,7 @@ export function readViewSettings(values: Record<string, unknown> | undefined): V
     showRecent: bool("showRecent"),
     recentLimit,
     recentMoreLimit: Math.max(recentLimit, count("recentMoreLimit")),
+    needsYouPullRequests: values?.needsYouPullRequests === "all" || values?.needsYouPullRequests === "none" ? values.needsYouPullRequests : "linked",
     providerIconStyle: values?.providerIconStyle === "monochrome" ? "monochrome" : "tint",
     showSubagents: bool("showSubagents"),
     showAge: bool("showAge"),
