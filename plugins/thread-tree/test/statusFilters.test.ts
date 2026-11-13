@@ -212,3 +212,11 @@ test("Escape in the flat list closes it and keeps bb's own Escape handlers out o
   assert.equal(handleFlatListEscape(keyEvent("Enter").event, true, () => closed++), false);
   assert.equal(closed, 1);
 });
+
+test("a Radix modal has no aria-modal but hides the rest of the page, sidebar included, so / stays out", async () => {
+  const { sidebarBehindModal } = await import("../src/statusFilters.ts");
+  const at = (match: string | null) => ({ closest: (selector: string) => (match && selector.includes(match) ? {} : null) });
+  assert.equal(sidebarBehindModal(at('[aria-hidden="true"]')), true);
+  assert.equal(sidebarBehindModal(at("[inert]")), true);
+  assert.equal(sidebarBehindModal(at(null)), false);
+});

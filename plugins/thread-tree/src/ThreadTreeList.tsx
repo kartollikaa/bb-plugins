@@ -44,7 +44,7 @@ import { GithubSection, useGithubFolder } from "./GithubSection";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph } from "./statusGlyph";
 import { StatusLine } from "./StatusLine";
-import { countStatusFilters, filterThreads, handleFlatListEscape, handleSearchKey, isModalDialog, MODAL_DIALOG_SELECTOR, orchestrationTitle, returnFocus, runningContext, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
+import { countStatusFilters, filterThreads, handleFlatListEscape, handleSearchKey, isModalDialog, MODAL_DIALOG_SELECTOR, orchestrationTitle, returnFocus, runningContext, sidebarBehindModal, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
 import type { rpcContract } from "../server";
 import {
   moveSection,
@@ -275,7 +275,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     const onKeyDown = (event: KeyboardEvent) => {
       const sidebar = sectionsRef.current;
       handleSearchKey(event, {
-        modalOpen: () => Array.from(document.querySelectorAll(MODAL_DIALOG_SELECTOR)).some((dialog) => isModalDialog(dialog) && (!sidebar || !dialog.contains(sidebar))),
+        modalOpen: () => (!!sidebar && sidebarBehindModal(sidebar)) || Array.from(document.querySelectorAll(MODAL_DIALOG_SELECTOR)).some((dialog) => isModalDialog(dialog) && (!sidebar || !dialog.contains(sidebar))),
         sidebarShown: () => (sidebar?.getClientRects().length ?? 0) > 0,
         open: openSearch,
       });

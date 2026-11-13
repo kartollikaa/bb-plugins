@@ -134,6 +134,11 @@ export function isModalDialog(element: { getAttribute(name: string): string | nu
 
 export const MODAL_DIALOG_SELECTOR = '[role="alertdialog"], [aria-modal="true"]';
 
+/** A Radix modal sets no aria-modal; it hides everything outside it, the sidebar too. */
+export function sidebarBehindModal(sidebar: { closest(selector: string): unknown }): boolean {
+  return sidebar.closest('[aria-hidden="true"], [inert]') !== null;
+}
+
 /** Runs on every key in the app, so anything but `/` leaves before a DOM query. */
 export function handleSearchKey(
   event: KeyEventLike,
