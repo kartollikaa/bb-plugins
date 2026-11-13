@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { glyphMotionClass, resolveRowGlyph, ROLLUP_GLYPH, type GlyphThread } from "../src/statusGlyph.ts";
+import { glyphMotionClass, isIdleGlyph, resolveRowGlyph, ROLLUP_GLYPH, type GlyphThread } from "../src/statusGlyph.ts";
 import { threadDotState, type TreeThread } from "../src/tree.ts";
 
 const idleActivity = { workflows: 0, backgroundAgents: 0, backgroundCommands: 0, planMode: 0 };
@@ -34,8 +34,17 @@ test("each host indicator passes through with the host's label", () => {
   }
 });
 
-test("an idle thread draws nothing and has no state label", () => {
-  assert.deepEqual(resolveRowGlyph(thread("none"), false, null), { indicator: "none", rowStatus: null, label: null });
+test("an idle thread gets the faint idle dot and no state label", () => {
+  const glyph = resolveRowGlyph(thread("none"), false, null);
+  assert.deepEqual(glyph, { indicator: "none", rowStatus: null, label: null });
+  assert.equal(isIdleGlyph(glyph), true);
+});
+
+test("only a thread bb's glyph would leave blank is idle", () => {
+  assert.equal(isIdleGlyph(resolveRowGlyph(thread("none"), true, null)), false);
+  assert.equal(isIdleGlyph(resolveRowGlyph(thread("none"), false, running)), false);
+  assert.equal(isIdleGlyph(resolveRowGlyph(thread("unread-success", "x"), false, null)), false);
+  assert.equal(isIdleGlyph(resolveRowGlyph(thread("teleporting", "x"), false, null)), true);
 });
 
 test("an unknown future indicator falls back to nothing", () => {

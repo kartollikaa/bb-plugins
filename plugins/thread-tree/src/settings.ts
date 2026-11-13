@@ -57,7 +57,7 @@ export const SETTINGS = {
   reduceMotion: {
     type: "boolean",
     label: "Reduce motion",
-    description: "Folders open and close, blocks reorder and row actions appear without animation.",
+    description: "Folders open and close, blocks reorder and row actions appear without animation, and status spinners hold still.",
     default: false,
   },
 } as const;

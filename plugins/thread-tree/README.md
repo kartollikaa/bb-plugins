@@ -6,6 +6,12 @@ thread's provider subagents show as a counter with a status dot.
 See [PLUGIN_OVERVIEW.md](PLUGIN_OVERVIEW.md) for what it does and
 [skills/thread-tree/SKILL.md](skills/thread-tree/SKILL.md) for the CLI.
 
+Each row draws bb's thread status glyph (spinner, needs input, failed, unread
+result, draft, or another plugin's row status) and a faint dot when idle; the
+row's link carries bb's state label, and holding the jump modifier shows bb's
+jump keys on the rows. `src/statusGlyph.ts` folds the draft and row status into
+the indicator the way bb's own list does.
+
 The subagent counter opens a list that fits the available screen space, including
 on mobile. Longer lists scroll inside the card while the summary stays visible.
 

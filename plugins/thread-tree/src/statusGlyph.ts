@@ -83,6 +83,11 @@ export function resolveRowGlyph<S extends GlyphRowStatus>(
   return { indicator, rowStatus: shownStatus, label };
 }
 
+/** bb's glyph would draw nothing; the row shows a faint dot instead so the slot never reads as a hole. */
+export function isIdleGlyph(glyph: RowGlyph<GlyphRowStatus>): boolean {
+  return glyph.indicator === "none" && glyph.rowStatus === null;
+}
+
 /** The rollup states (overview, fold line, status groups) drawn with bb's glyphs; "done" and "stopped" draw nothing. */
 export const ROLLUP_GLYPH: Record<DotState, GlyphIndicator> = {
   input: "waiting-for-input",

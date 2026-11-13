@@ -8,6 +8,9 @@ description: List the provider subagents (Claude Code Agent calls, Codex subagen
 The Thread Tree plugin replaces the sidebar thread list. Child threads nest
 under the thread that spawned them; provider subagents, which are not threads
 and cannot be messaged, show as a counter with a status dot on the parent's row.
+Each row's status is bb's own thread status glyph, including drafts and
+statuses other plugins set on the row; an idle row shows a faint dot. The
+row's link reads the state after the title for screen readers.
 The counter's card fits the available screen space on mobile and desktop;
 longer lists scroll inside it while the summary stays visible.
 
@@ -63,7 +66,7 @@ the keystroke stays a text undo once the user has typed there since the archive.
 
 `bb plugin config thread-tree` lists them; `bb plugin config thread-tree set <key> <value>` changes one.
 Booleans: `showGithub`, `showAutomations`, `showRecent`, `showProviderIcon`, `showSubagents`, `showAge`,
-`foldOnDrag` (fold every block while a section or project is dragged), `reduceMotion` (no folder, reorder or hover animation).
+`foldOnDrag` (fold every block while a section or project is dragged), `reduceMotion` (no folder, reorder, hover or status-spinner animation).
 Numbers (1–50): `recentLimit` (Recent Activity rows), `recentMoreLimit` (rows after Show more).
 The order of GitHub, Automations and Recent Activity, the project order, and which groups are
 folded are not settings: each browser client keeps them itself. The user changes them in the

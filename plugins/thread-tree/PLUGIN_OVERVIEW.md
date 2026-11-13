@@ -23,7 +23,7 @@ under it, and the subagents it runs inside its own session show on its row.
   pick; click outside or press Escape to close.
 - The Archived toggle shows archived threads in the same grouping and nesting.
 - Each child thread sits under the thread that spawned it, at any depth, even
-  in another project. A parent's status dot turns into a chevron on hover;
+  in another project. A parent's status glyph turns into a chevron on hover;
   click it to fold the subtree. A folded parent gets a line counting its whole
   subtree by state. The thread you have open and threads waiting for your
   input stay visible under the fold.
@@ -38,8 +38,13 @@ under it, and the subagents it runs inside its own session show on its row.
 - Cmd+Z or Ctrl+Z restores recently archived threads and their children.
 - Provider subagents show a counter and status dot on the parent's row;
   hover for type, state, duration and tokens. They cannot be messaged.
-- A dot before each title shows the thread's state: blue running, green done,
-  yellow needs input, red error with a Retry button, gray stopped.
+- Before each title, bb's own status glyph: a spinner while the agent works, a
+  question mark when it needs your input, a red cross for a failed turn or a
+  queued message that failed to send, a dot for a finished result you have not
+  read, a pencil for an unsent draft, and a status another plugin set on the
+  row. An idle thread shows only a faint dot. A failed thread also gets a Retry
+  button. Screen readers hear the state with the title.
+- Hold Ctrl (or Cmd on a Mac) to see each row's jump key, as in bb's own list.
 - `bb thread-tree list` prints a thread's subagents from a terminal.
 
 ## Arranging the sidebar
@@ -56,7 +61,8 @@ Settings → Installed plugins → Thread Tree holds the section switches, how m
 Recent Activity rows show before and after Show more, and switches for the
 provider icon, the subagent counters and the age label. Fold folders while
 dragging can be turned off, and Reduce motion stops the folder, reorder and
-hover animations.
+hover animations and holds status spinners still; the system's reduced-motion
+preference does the same for the spinners.
 
 ## How it works
 
