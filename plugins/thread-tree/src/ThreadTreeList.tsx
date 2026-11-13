@@ -840,8 +840,8 @@ function ThreadRowView({
                 )}
               />
             </button>
-          ) : stopsFromGlyph(thread, { hasChildren: row.hasChildren, isCompactViewport }) ? (
-            <StopGlyphButton threadId={thread.id}>{dot}</StopGlyphButton>
+          ) : stopsFromGlyph(thread, { glyph, hasChildren: row.hasChildren, isCompactViewport }) ? (
+            <StopGlyphButton threadId={thread.id} stateLabel={glyph.label}>{dot}</StopGlyphButton>
           ) : (
             <span title={glyph.label ?? undefined} className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
           )}
@@ -1016,7 +1016,7 @@ async function stopThread(sdk: ReturnType<typeof useSdk>, threadId: string) {
 }
 
 /** The running glyph turns into Stop under the pointer, away from Archive at the row's other end. */
-function StopGlyphButton({ threadId, children }: { threadId: string; children: React.ReactNode }) {
+function StopGlyphButton({ threadId, stateLabel, children }: { threadId: string; stateLabel: string | null; children: React.ReactNode }) {
   const sdk = useSdk();
   const [pending, setPending] = useState(false);
   return (
@@ -1024,7 +1024,7 @@ function StopGlyphButton({ threadId, children }: { threadId: string; children: R
       type="button"
       data-stop-glyph=""
       aria-label="Stop"
-      title="Stop"
+      title={stateLabel ? `${stateLabel} · Click to stop` : "Stop"}
       disabled={pending}
       onClick={async (event) => {
         event.stopPropagation();

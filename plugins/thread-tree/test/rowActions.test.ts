@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { canStop, hoverActionsClass, rowHeightPx, stopsFromGlyph } from "../src/rowActions.ts";
 
 const idle = { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 };
+const leaf = { glyph: { indicator: "runtime", rowStatus: null } };
 const t = (status: string, extra: { indicator?: string; activity?: typeof idle } = {}) => ({ status, indicator: "none", activity: idle, ...extra });
 
 test("Stop is offered while work runs, including a stop the machine never confirmed, and not when idle", () => {
@@ -16,13 +17,13 @@ test("Stop is offered while work runs, including a stop the machine never confir
 });
 
 test("a parent row keeps its glyph as the fold toggle, so only a leaf row's glyph turns into Stop", () => {
-  assert.equal(stopsFromGlyph(t("active"), { hasChildren: false, isCompactViewport: false }), true);
-  assert.equal(stopsFromGlyph(t("active"), { hasChildren: true, isCompactViewport: false }), false);
-  assert.equal(stopsFromGlyph(t("idle"), { hasChildren: false, isCompactViewport: false }), false);
+  assert.equal(stopsFromGlyph(t("active"), { ...leaf, hasChildren: false, isCompactViewport: false }), true);
+  assert.equal(stopsFromGlyph(t("active"), { ...leaf, hasChildren: true, isCompactViewport: false }), false);
+  assert.equal(stopsFromGlyph(t("idle"), { ...leaf, hasChildren: false, isCompactViewport: false }), false);
 });
 
 test("on a touch-first compact viewport the glyph never stops a thread in one tap; Stop stays in the menus", () => {
-  assert.equal(stopsFromGlyph(t("active"), { hasChildren: false, isCompactViewport: true }), false);
+  assert.equal(stopsFromGlyph(t("active"), { ...leaf, hasChildren: false, isCompactViewport: true }), false);
   assert.equal(canStop(t("active")), true);
 });
 
@@ -44,4 +45,15 @@ test("hover actions appear at once on hover, keyboard focus or an open menu, fad
     assert.equal(classes.some((c) => /max-w|(^|:)w-|(^|:)hidden$|(^|:)flex$/.test(c)), false);
   }
   assert.ok(hoverActionsClass(true).includes("transition-none"));
+});
+
+test("Stop replaces only a glyph that shows running work, not a question, failure or another plugin's status", () => {
+  const row = (indicator: string, rowStatus: { label: string } | null = null) => ({ glyph: { indicator, rowStatus }, hasChildren: false, isCompactViewport: false });
+  for (const indicator of ["runtime", "background-agent", "background-command", "workflow", "working-draft"]) {
+    assert.equal(stopsFromGlyph(t("active"), row(indicator)), true, indicator);
+  }
+  for (const indicator of ["waiting-for-input", "queued-failed", "unread-error", "draft", "none"]) {
+    assert.equal(stopsFromGlyph(t("active"), row(indicator)), false, indicator);
+  }
+  assert.equal(stopsFromGlyph(t("active"), row("background-agent", { label: "Deploying" })), false);
 });

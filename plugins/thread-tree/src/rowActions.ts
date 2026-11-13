@@ -1,4 +1,4 @@
-import { isWorking, type TreeThread } from "./tree.ts";
+import { isWorking, WORKING_INDICATORS, type TreeThread } from "./tree.ts";
 
 /** Compact viewports are touch-first, so their rows are taller. */
 export function rowHeightPx(isCompactViewport: boolean): number {
@@ -13,9 +13,10 @@ export function canStop(thread: Pick<TreeThread, "status" | "indicator" | "activ
 /** A parent's glyph is its fold toggle, and a tap on touch must not stop work; both keep Stop in the menus. */
 export function stopsFromGlyph(
   thread: Pick<TreeThread, "status" | "indicator" | "activity">,
-  row: { hasChildren: boolean; isCompactViewport: boolean },
+  row: { glyph: { indicator: string; rowStatus: unknown }; hasChildren: boolean; isCompactViewport: boolean },
 ): boolean {
-  return !row.hasChildren && !row.isCompactViewport && canStop(thread);
+  const showsRunning = row.glyph.rowStatus === null && WORKING_INDICATORS.has(row.glyph.indicator);
+  return showsRunning && !row.hasChildren && !row.isCompactViewport && canStop(thread);
 }
 
 /** Shown at once on hover, keyboard focus or an open menu; only opacity and visibility change, so nothing reflows. */
