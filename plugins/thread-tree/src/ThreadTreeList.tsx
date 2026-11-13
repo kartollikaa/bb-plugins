@@ -33,6 +33,7 @@ import { excludeDescendantPullRequests, type ThreadPullRequest } from "./threadP
 import { folderAttentionByUrl, PR_REASON_LOOK, prTooltip, rowPullRequest, type FolderAttention, type RowPullRequest } from "./prAttention";
 import { providerTintColor } from "./providerTint";
 import { familyRootOf, sharedBranchThreads, sharedBranchTooltip } from "./sharedBranch";
+import { pullRequestThreads } from "./pullRequestKeys";
 import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { AutomationsSection } from "./AutomationsSection";
@@ -211,8 +212,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   useFlipOrder(treeRef, groups.map((group) => group.key).join(), view.reduceMotion);
   const moveSectionBy = (id: SectionId, step: -1 | 1) => setSavedSectionOrder(moveSection(sectionOrder, shownSections, id, step));
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
-  const forestThreads = useMemo(() => forest.roots.flatMap((root) => [root, ...descendantsOf(forest, root.id)]), [forest]);
-  const pullRequestsOf = useThreadPullRequests(forestThreads, sectionsRef);
+  const prThreads = useMemo(() => pullRequestThreads(activeForest, forest), [activeForest, forest]);
+  const pullRequestsOf = useThreadPullRequests(prThreads, sectionsRef);
   const folderItems = githubFolder.view;
   const folderAttention = useMemo(
     () => folderAttentionByUrl(folderItems ? [...folderItems.items, ...folderItems.snoozed] : []),

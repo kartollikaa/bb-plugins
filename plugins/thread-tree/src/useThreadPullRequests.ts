@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import { experimental_useRpcKeyedQuery, type PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import { createRefreshScheduler } from "./refreshScheduler";
+import { activitySignatures, changedKeys } from "./pullRequestKeys";
 import { mergePullRequests, threadPullRequestSchema, type ThreadPullRequest } from "./threadPullRequests";
 
 const REFRESH_MS = 60_000;
+const ACTIVITY_DEBOUNCE_MS = 500;
 
 const contract = {
   threadPullRequests: {
@@ -31,7 +33,7 @@ const contract = {
   },
 };
 
-/** True while the page is visible and the element is on screen; a hidden sidebar is neither. */
+/** A hidden sidebar is neither on screen nor on a visible page. */
 function useShown(element: HTMLElement | null, onChange: (shown: boolean) => void) {
   useEffect(() => {
     let onScreen = true;
@@ -52,13 +54,9 @@ function useShown(element: HTMLElement | null, onChange: (shown: boolean) => voi
   }, [element, onChange]);
 }
 
-/**
- * Every listed thread's PRs from one list-level query: bb's PR status for each environment and
- * the PRs a thread's links mention. Refreshes once a minute, paused while the sidebar is hidden.
- */
+/** Every listed thread's PRs in one list-level query, refreshed by one scheduler that pauses while hidden. */
 export function useThreadPullRequests(threads: readonly PluginSidebarThread[], containerRef: RefObject<HTMLElement | null>) {
   const threadKey = JSON.stringify(threads.map((thread) => thread.id).sort());
-  const activityKey = JSON.stringify(threads.map((thread) => [thread.id, thread.updatedAt]).sort());
   const environmentKey = JSON.stringify([...new Set(threads.flatMap((thread) => thread.environment?.id ? [thread.environment.id] : []))].sort());
   const threadIds = useMemo<string[]>(() => JSON.parse(threadKey), [threadKey]);
   const environmentIds = useMemo<string[]>(() => JSON.parse(environmentKey), [environmentKey]);
@@ -71,17 +69,30 @@ export function useThreadPullRequests(threads: readonly PluginSidebarThread[], c
   });
   const session = experimental_useRpcKeyedQuery({ contract, method: "threadPullRequests", keys: threadIds, enabled: threadIds.length > 0 });
 
-  const refetch = useRef(() => {});
-  refetch.current = () => void session.refetchKeys(threadIds);
-  const scheduler = useMemo(() => createRefreshScheduler(() => refetch.current(), REFRESH_MS, window), []);
+  const latest = useRef({ session, threadIds });
+  latest.current = { session, threadIds };
+  const scheduler = useMemo(() => createRefreshScheduler({
+    refreshAll: () => void latest.current.session.refetchKeys(latest.current.threadIds),
+    refreshKeys: (keys) => void latest.current.session.refetchKeys(keys.filter((key) => latest.current.threadIds.includes(key))),
+    intervalMs: REFRESH_MS,
+    debounceMs: ACTIVITY_DEBOUNCE_MS,
+    timers: {
+      setInterval: (run, ms) => window.setInterval(run, ms),
+      clearInterval: (id) => window.clearInterval(id),
+      setTimeout: (run, ms) => window.setTimeout(run, ms),
+      clearTimeout: (id) => window.clearTimeout(id),
+      now: () => Date.now(),
+    },
+  }), []);
   useEffect(() => () => scheduler.dispose(), [scheduler]);
   // The container mounts after the loading placeholder, so the next render picks it up.
   useShown(containerRef.current, useCallback((shown: boolean) => scheduler.setShown(shown), [scheduler]));
+  const signatures = useRef(new Map<string, string>());
   useEffect(() => {
-    if (threadIds.length === 0) return;
-    const timer = window.setTimeout(() => refetch.current(), 500);
-    return () => window.clearTimeout(timer);
-  }, [threadIds, activityKey]);
+    const next = activitySignatures(threads);
+    scheduler.requestKeys(changedKeys(signatures.current, next));
+    signatures.current = next;
+  }, [threads, scheduler]);
 
   const statusData = status.error ? undefined : status.data;
   const sessionData = session.data;

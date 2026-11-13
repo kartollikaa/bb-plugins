@@ -151,25 +151,80 @@ test("the warning names the other threads, two at most", () => {
   assert.equal(sharedBranchTooltip(null, [{ displayTitle: "A" }, { displayTitle: "B" }, { displayTitle: "C" }]), "This worktree is also used by “A”, “B” and 1 more");
 });
 
-test("the PR refresh ticks only while shown and catches up once when shown again", () => {
-  const timers = new Map<number, () => void>();
+function fakeTimers() {
+  let clock = 0;
   let next = 1;
-  let refreshes = 0;
-  const scheduler = createRefreshScheduler(() => refreshes++, 60_000, {
-    setInterval: (run) => { timers.set(next, run); return next++; },
-    clearInterval: (id) => void timers.delete(id),
+  const intervals = new Map<number, () => void>();
+  const timeouts = new Map<number, () => void>();
+  return {
+    intervals,
+    timeouts,
+    advance(ms: number) { clock += ms; },
+    timers: {
+      setInterval: (run: () => void) => { intervals.set(next, run); return next++; },
+      clearInterval: (id: number) => void intervals.delete(id),
+      setTimeout: (run: () => void) => { timeouts.set(next, run); return next++; },
+      clearTimeout: (id: number) => void timeouts.delete(id),
+      now: () => clock,
+    },
+  };
+}
+
+function scheduled() {
+  const fake = fakeTimers();
+  const calls: string[] = [];
+  const scheduler = createRefreshScheduler({
+    refreshAll: () => calls.push("all"),
+    refreshKeys: (keys) => calls.push(keys.sort().join(",")),
+    intervalMs: 60_000,
+    debounceMs: 500,
+    timers: fake.timers,
   });
-  assert.equal(timers.size, 0);
+  return { fake, calls, scheduler };
+}
+
+test("the PR refresh ticks only while shown and dispose stops it", () => {
+  const { fake, calls, scheduler } = scheduled();
+  assert.equal(fake.intervals.size, 0);
   scheduler.setShown(true);
-  assert.equal(timers.size, 1);
-  assert.equal(refreshes, 0);
-  [...timers.values()][0]!();
-  assert.equal(refreshes, 1);
+  assert.equal(fake.intervals.size, 1);
+  assert.deepEqual(calls, []);
+  [...fake.intervals.values()][0]!();
+  assert.deepEqual(calls, ["all"]);
   scheduler.setShown(false);
-  assert.equal(timers.size, 0);
+  assert.equal(fake.intervals.size, 0);
   scheduler.setShown(true);
-  assert.equal(refreshes, 2);
-  assert.equal(timers.size, 1);
   scheduler.dispose();
-  assert.equal(timers.size, 0);
+  assert.equal(fake.intervals.size, 0);
+});
+
+test("showing the sidebar again refreshes only when a tick fell due while it was hidden", () => {
+  const { fake, calls, scheduler } = scheduled();
+  scheduler.setShown(true);
+  fake.advance(10_000);
+  scheduler.setShown(false);
+  fake.advance(5_000);
+  scheduler.setShown(true);
+  assert.deepEqual(calls, []);
+  scheduler.setShown(false);
+  fake.advance(60_000);
+  scheduler.setShown(true);
+  assert.deepEqual(calls, ["all"]);
+});
+
+test("activity refetches only the changed keys, debounced, and waits while hidden", () => {
+  const { fake, calls, scheduler } = scheduled();
+  scheduler.setShown(true);
+  scheduler.requestKeys(["a"]);
+  scheduler.requestKeys(["b", "a"]);
+  assert.equal(fake.timeouts.size, 1);
+  [...fake.timeouts.values()][0]!();
+  assert.deepEqual(calls, ["a,b"]);
+  scheduler.setShown(false);
+  scheduler.requestKeys(["c"]);
+  assert.deepEqual(calls, ["a,b"]);
+  scheduler.setShown(true);
+  assert.deepEqual(calls, ["a,b", "c"]);
+  scheduler.requestKeys([]);
+  assert.equal([...fake.timeouts.keys()].length <= 1, true);
 });
