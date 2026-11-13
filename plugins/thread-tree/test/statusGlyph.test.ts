@@ -142,3 +142,11 @@ test("the Waiting rollup draws bb's queued-waiting glyph, not Done's idle dot", 
   assert.equal(ROLLUP_GLYPH.waiting, "queued-waiting");
   assert.notEqual(ROLLUP_GLYPH.waiting, ROLLUP_GLYPH.done);
 });
+
+test("another plugin's row status never covers a failed queued message", () => {
+  assert.deepEqual(resolveRowGlyph(thread("queued-failed", "Queued message failed to send", { status: "error" }), false, running), {
+    indicator: "queued-failed",
+    rowStatus: null,
+    label: "Queued message failed to send",
+  });
+});

@@ -37,7 +37,7 @@ export interface RowGlyph<S extends GlyphRowStatus> {
 
 const KNOWN = new Set<string>(INDICATORS);
 
-const OUTRANKS_ROW_STATUS = new Set<GlyphIndicator>(["runtime", "unread-error", "waiting-for-input"]);
+const OUTRANKS_ROW_STATUS = new Set<GlyphIndicator>(["runtime", "unread-error", "waiting-for-input", "queued-failed"]);
 
 /** Already a failure in bb's own words, so the generic failed override leaves it alone. */
 const REPORTS_FAILURE = new Set<GlyphIndicator>(["unread-error", "waiting-for-input", "queued-failed"]);
