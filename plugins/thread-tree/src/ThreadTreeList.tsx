@@ -76,7 +76,7 @@ import { useDragReorder, useFlipOrder } from "./useReorder";
 import { ReduceMotionContext, useStill } from "./motion";
 import { Collapse } from "./Collapse";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
-import { canStop, END_SLOT_MIN_PX, NO_HOVER_QUERY, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
+import { canStop, END_SLOT_MIN_PX, NO_HOVER_QUERY, ROW_ACTION_BUTTON, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
 
 const ROW_PAD_PX = 6;
@@ -84,8 +84,6 @@ const ROW_PAD_PX = 6;
 const INDENT_PX = 24;
 
 const ARCHIVE_ACTION_KEY = "bb--core/archive";
-const ROW_ACTION_BUTTON =
-  "pointer-events-auto flex size-6 items-center justify-center rounded-md text-sidebar-foreground/60 outline-none hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring";
 
 const GROUP_MODES: readonly { id: GroupMode; label: string; chip: string; icon: React.ReactNode }[] = [
   { id: "project", label: "Project", chip: "Group: Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },

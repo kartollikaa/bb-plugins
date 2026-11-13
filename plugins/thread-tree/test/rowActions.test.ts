@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canStop, END_SLOT_MIN_PX, HOVER_ACTIONS_STRIP_PX, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, stopsFromGlyph } from "../src/rowActions.ts";
+import { canStop, END_SLOT_MIN_PX, hoverActionsClass, ROW_ACTION_BUTTON, ROW_ACTION_PX, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "../src/rowActions.ts";
 import { headerChevronMotion, ROW_TINT } from "../src/rowStyles.ts";
 
 const idle = { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 };
@@ -68,7 +68,9 @@ test("the overlay lets clicks through to the row and its controls; only its own 
 });
 
 test("the provider and age slot reserves the button strip's width, so Archive and ⋯ never cover Retry, a PR icon, ⚠ or the badge", () => {
-  assert.ok(END_SLOT_MIN_PX + ROW_END_PAD_PX >= HOVER_ACTIONS_STRIP_PX);
+  const sizes = [...ROW_ACTION_BUTTON.matchAll(/(?:^|\s)(?:size|w)-(\d+(?:\.\d+)?)(?=\s|$)/g)].map((match) => Number(match[1]) * 4);
+  assert.deepEqual(sizes, [ROW_ACTION_PX], "the strip math must use the buttons' real width");
+  assert.ok(END_SLOT_MIN_PX + ROW_END_PAD_PX >= 2 * sizes[0]! + STRIP_GAP_PX + STRIP_END_PAD_PX);
 });
 
 test("every state that shows the overlay also tints the row, so its solid end never sits on an untinted row", () => {

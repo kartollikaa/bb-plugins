@@ -5,7 +5,8 @@ export function rowHeightPx(isCompactViewport: boolean): number {
   return isCompactViewport ? 40 : 32;
 }
 
-/** Archive and ⋯ are `size-6` buttons. */
+export const ROW_ACTION_BUTTON =
+  "pointer-events-auto flex size-6 items-center justify-center rounded-md text-sidebar-foreground/60 outline-none hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring";
 export const ROW_ACTION_PX = 24;
 export const STRIP_GAP_PX = 2;
 export const STRIP_END_PAD_PX = 4;
