@@ -8,8 +8,10 @@ export interface BranchThread {
   environment: { id: string | null; branchName: string | null; path: string | null; isWorktree: boolean | null; providerId: string | null } | null;
 }
 
-export function familyRootOf(threads: readonly { id: string; parentThreadId: string | null }[]): (threadId: string) => string {
-  const parentOf = new Map(threads.map((thread) => [thread.id, thread.parentThreadId]));
+export function familyRootOf(
+  threads: readonly { id: string; parentThreadId: string | null; lifecycleOwnerThreadId: string | null }[],
+): (threadId: string) => string {
+  const parentOf = new Map(threads.map((thread) => [thread.id, thread.parentThreadId ?? thread.lifecycleOwnerThreadId]));
   return (threadId) => {
     const seen = new Set<string>();
     let id = threadId;

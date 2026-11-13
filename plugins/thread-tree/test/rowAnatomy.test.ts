@@ -115,12 +115,12 @@ test("a checkout of unknown type or with no environment provider is the project'
 
 test("a thread's family is its topmost parent by parentThreadId, wherever the sidebar draws it", () => {
   const rootOf = familyRootOf([
-    { id: "orch", parentThreadId: null },
-    { id: "pinned-kid", parentThreadId: "orch" },
-    { id: "grandkid", parentThreadId: "pinned-kid" },
-    { id: "orphan", parentThreadId: "gone" },
-    { id: "loop-a", parentThreadId: "loop-b" },
-    { id: "loop-b", parentThreadId: "loop-a" },
+    { id: "orch", parentThreadId: null, lifecycleOwnerThreadId: null },
+    { id: "pinned-kid", parentThreadId: "orch", lifecycleOwnerThreadId: null },
+    { id: "grandkid", parentThreadId: "pinned-kid", lifecycleOwnerThreadId: null },
+    { id: "orphan", parentThreadId: "gone", lifecycleOwnerThreadId: null },
+    { id: "loop-a", parentThreadId: "loop-b", lifecycleOwnerThreadId: null },
+    { id: "loop-b", parentThreadId: "loop-a", lifecycleOwnerThreadId: null },
   ]);
   assert.equal(rootOf("pinned-kid"), "orch");
   assert.equal(rootOf("grandkid"), "orch");
@@ -130,6 +130,22 @@ test("a thread's family is its topmost parent by parentThreadId, wherever the si
   const shared = sharedBranchThreads([
     bt("orch", { branchName: "feature/x" }),
     bt("pinned-kid", { branchName: "feature/x" }, { parentThreadId: "orch" }),
+  ], rootOf);
+  assert.equal(shared.size, 0);
+});
+
+test("a delegated child linked only by its lifecycle owner belongs to its orchestrator's family", () => {
+  const threads = [
+    { id: "orch", parentThreadId: null, lifecycleOwnerThreadId: null },
+    { id: "delegate", parentThreadId: null, lifecycleOwnerThreadId: "orch" },
+    { id: "moved", parentThreadId: "orch", lifecycleOwnerThreadId: "elsewhere" },
+  ];
+  const rootOf = familyRootOf(threads);
+  assert.equal(rootOf("delegate"), "orch");
+  assert.equal(rootOf("moved"), "orch");
+  const shared = sharedBranchThreads([
+    bt("orch", { branchName: "feature/x" }),
+    bt("delegate", { branchName: "feature/x" }),
   ], rootOf);
   assert.equal(shared.size, 0);
 });
