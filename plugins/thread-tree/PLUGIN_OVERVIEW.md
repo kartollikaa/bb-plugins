@@ -39,7 +39,8 @@ under it, and the subagents it runs inside its own session show on its row.
 - Child threads are ordinary threads: open, message, pin, archive or split them
   with bb's own menu. Hovering or focusing a row fades Archive and ⋯ in over
   its end without moving anything; Archive keeps bb's confirmation and Undo.
-- Hover a running thread's spinner to stop it; Stop is also in the row's menu.
+- Hover a running thread's spinner to stop it; Stop is also in the row's menu,
+  which is the only place on a phone, so a tap never stops a thread.
 - Cmd+Z or Ctrl+Z restores recently archived threads and their children.
 - Provider subagents show a counter and status dot on the parent's row;
   hover for type, state, duration and tokens. They cannot be messaged.
