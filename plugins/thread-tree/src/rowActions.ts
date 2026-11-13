@@ -1,8 +1,8 @@
 import { isWorking, WORKING_INDICATORS, type TreeThread } from "./tree.ts";
 
-/** Compact viewports are touch-first, so their rows are taller. */
-export function rowHeightPx(isCompactViewport: boolean): number {
-  return isCompactViewport ? 40 : 32;
+/** Compact viewports are touch-first, so their rows are taller. A second line adds one small text line. */
+export function rowHeightPx(isCompactViewport: boolean, lines: 1 | 2 = 1): number {
+  return (isCompactViewport ? 40 : 32) + (lines === 2 ? 12 : 0);
 }
 
 export const ROW_ACTION_BUTTON =
