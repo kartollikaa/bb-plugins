@@ -32,7 +32,7 @@ import { useThreadPullRequests } from "./useThreadPullRequests";
 import { excludeDescendantPullRequests, type ThreadPullRequest } from "./threadPullRequests";
 import { folderAttentionByUrl, PR_REASON_LOOK, prTooltip, rowPullRequest, type FolderAttention, type RowPullRequest } from "./prAttention";
 import { providerTintColor } from "./providerTint";
-import { sharedBranchThreads, sharedBranchTooltip } from "./sharedBranch";
+import { familyRootOf, sharedBranchThreads, sharedBranchTooltip } from "./sharedBranch";
 import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { AutomationsSection } from "./AutomationsSection";
@@ -53,7 +53,6 @@ import {
 import { formatAge } from "./time";
 import {
   buildForest,
-  ancestorsOf,
   descendantsOf,
   type Forest,
   countStates,
@@ -219,10 +218,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     () => folderAttentionByUrl(folderItems ? [...folderItems.items, ...folderItems.snoozed] : []),
     [folderItems],
   );
-  const sharedBranches = useMemo(() => {
-    const familyOf = (id: string) => ancestorsOf(activeForest, id).at(-1) ?? id;
-    return sharedBranchThreads(threads, familyOf);
-  }, [threads, activeForest]);
+  const sharedBranches = useMemo(() => sharedBranchThreads(threads, familyRootOf(threads)), [threads]);
   const { providers } = useProviders();
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
 

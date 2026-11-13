@@ -4,19 +4,32 @@ export interface BranchThread {
   displayTitle: string;
   isArchived: boolean;
   isHidden: boolean;
-  environment: { id: string | null; branchName: string | null; path: string | null; isWorktree: boolean | null } | null;
+  parentThreadId: string | null;
+  environment: { id: string | null; branchName: string | null; path: string | null; isWorktree: boolean | null; providerId: string | null } | null;
 }
 
-/**
- * For each live thread, the other live threads on its branch or worktree. A project's own checkout
- * (isWorktree false) and threads of one family (an orchestrator and its subthreads) share by design.
- */
+export function familyRootOf(threads: readonly { id: string; parentThreadId: string | null }[]): (threadId: string) => string {
+  const parentOf = new Map(threads.map((thread) => [thread.id, thread.parentThreadId]));
+  return (threadId) => {
+    const seen = new Set<string>();
+    let id = threadId;
+    while (!seen.has(id)) {
+      seen.add(id);
+      const parent = parentOf.get(id);
+      if (!parent) return id;
+      id = parent;
+    }
+    return id;
+  };
+}
+
+/** A project's own checkout and one orchestration family share a branch by design. */
 export function sharedBranchThreads<T extends BranchThread>(threads: readonly T[], familyOf: (threadId: string) => string = (id) => id): Map<string, T[]> {
   const byKey = new Map<string, T[]>();
   const keysOf = new Map<string, string[]>();
   for (const thread of threads) {
     const env = thread.environment;
-    if (thread.isArchived || thread.isHidden || !env || env.isWorktree === false) continue;
+    if (thread.isArchived || thread.isHidden || !env || env.isWorktree !== true || env.providerId === null) continue;
     const keys = [
       ...(env.path ? [`path:${env.path}`] : []),
       ...(env.branchName ? [`branch:${thread.projectId}:${env.branchName}`] : []),
@@ -44,3 +57,4 @@ export function sharedBranchTooltip(branch: string | null, others: readonly { di
   const named = others.slice(0, 2).map((other) => `“${other.displayTitle}”`).join(", ");
   return `${where} is also used by ${named}${others.length > 2 ? ` and ${others.length - 2} more` : ""}`;
 }
+

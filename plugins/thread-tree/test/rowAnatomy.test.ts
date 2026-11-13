@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { providerTintColor } from "../src/providerTint.ts";
 import { folderAttentionByUrl, prActionReason, prTooltip, rowPullRequest } from "../src/prAttention.ts";
-import { sharedBranchThreads, sharedBranchTooltip, type BranchThread } from "../src/sharedBranch.ts";
+import { familyRootOf, sharedBranchThreads, sharedBranchTooltip, type BranchThread } from "../src/sharedBranch.ts";
 import { createRefreshScheduler } from "../src/refreshScheduler.ts";
 import type { ThreadPullRequest } from "../src/threadPullRequests.ts";
 import type { GithubFolderItem } from "../src/githubFolder.ts";
@@ -72,7 +72,8 @@ const bt = (id: string, env: Partial<NonNullable<BranchThread["environment"]>> |
   displayTitle: id.toUpperCase(),
   isArchived: false,
   isHidden: false,
-  environment: env ? { id: `env-${id}`, branchName: null, path: null, isWorktree: true, ...env } : null,
+  parentThreadId: null,
+  environment: env ? { id: `env-${id}`, branchName: null, path: null, isWorktree: true, providerId: "git-worktree", ...env } : null,
   ...extra,
 });
 
@@ -99,6 +100,37 @@ test("archived and hidden threads, other projects, the project checkout and miss
     bt("m2", { branchName: "main", path: "/repo", isWorktree: false }),
     bt("none", null),
   ]);
+  assert.equal(shared.size, 0);
+});
+
+test("a checkout of unknown type or with no environment provider is the project's own and never warns", () => {
+  const shared = sharedBranchThreads([
+    bt("u1", { branchName: "main", path: "/repo", isWorktree: null }),
+    bt("u2", { branchName: "main", path: "/repo", isWorktree: null }),
+    bt("o1", { branchName: "dev", path: "/repo2", providerId: null }),
+    bt("o2", { branchName: "dev", path: "/repo2", providerId: null }),
+  ]);
+  assert.equal(shared.size, 0);
+});
+
+test("a thread's family is its topmost parent by parentThreadId, wherever the sidebar draws it", () => {
+  const rootOf = familyRootOf([
+    { id: "orch", parentThreadId: null },
+    { id: "pinned-kid", parentThreadId: "orch" },
+    { id: "grandkid", parentThreadId: "pinned-kid" },
+    { id: "orphan", parentThreadId: "gone" },
+    { id: "loop-a", parentThreadId: "loop-b" },
+    { id: "loop-b", parentThreadId: "loop-a" },
+  ]);
+  assert.equal(rootOf("pinned-kid"), "orch");
+  assert.equal(rootOf("grandkid"), "orch");
+  assert.equal(rootOf("orch"), "orch");
+  assert.equal(rootOf("orphan"), "gone");
+  assert.ok(["loop-a", "loop-b"].includes(rootOf("loop-a")));
+  const shared = sharedBranchThreads([
+    bt("orch", { branchName: "feature/x" }),
+    bt("pinned-kid", { branchName: "feature/x" }, { parentThreadId: "orch" }),
+  ], rootOf);
   assert.equal(shared.size, 0);
 });
 
