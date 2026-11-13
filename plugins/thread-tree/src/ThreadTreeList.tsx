@@ -58,7 +58,7 @@ import {
   rememberProjectFolders,
   type ThreadSort,
   resolveProjectOrder,
-  type DotState,
+  type ThreadState,
   type GroupMode,
   type StateCounts,
   type TreeRow,
@@ -108,7 +108,7 @@ const STATUS_GROUP_TITLE: Record<string, string> = {
   input: "Needs input",
   error: "Error",
   running: "Working",
-  stopped: "Waiting",
+  waiting: "Waiting",
   done: "Done",
 };
 
@@ -503,7 +503,7 @@ function groupLook(
   if (key === "pinned") return { title: "Pinned", icon: <Icon name="Pin" aria-hidden className="size-3.5" /> };
   if (key === "all") return { title: "All threads", icon: <Icon name="Layers" aria-hidden className="size-3.5" /> };
   if (key.startsWith("status:")) {
-    const state = key.slice("status:".length) as DotState;
+    const state = key.slice("status:".length) as ThreadState;
     return {
       title: STATUS_GROUP_TITLE[state] ?? state,
       icon: <RollupGlyph state={state} />,
@@ -534,7 +534,7 @@ function flatRow(thread: PluginSidebarThread): TreeRow<PluginSidebarThread> {
   };
 }
 
-const OVERVIEW_STATES: readonly { state: DotState; label: string }[] = [
+const OVERVIEW_STATES: readonly { state: ThreadState; label: string }[] = [
   { state: "input", label: "need input" },
   { state: "error", label: "failed" },
   { state: "running", label: "running" },
@@ -806,7 +806,7 @@ function ThreadRowView({
           {isTree ? (
             <TreeRowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
           ) : (
-            <RowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} isTree={false} shortcut={null} />
+            <RowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
           )}
           <span aria-hidden className="min-w-0 flex-1" />
           {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
@@ -885,9 +885,9 @@ function RowLink({
   stateLabel,
   splitProps,
   onOpen,
-  isTree,
-  shortcut,
-}: RowLinkProps & { isTree: boolean; shortcut: PluginSidebarThreadShortcut | null }) {
+  isTree = false,
+  shortcut = null,
+}: RowLinkProps & { isTree?: boolean; shortcut?: PluginSidebarThreadShortcut | null }) {
   return (
     <>
       <a
@@ -905,7 +905,7 @@ function RowLink({
         </span>
       </a>
       {shortcut ? (
-        <span data-shortcut-hint="" className="pointer-events-none absolute right-0 top-1/2 z-10 flex -translate-y-1/2 rounded bg-sidebar">
+        <span aria-hidden data-shortcut-hint="" className="pointer-events-none absolute right-0 top-1/2 z-10 flex -translate-y-1/2 rounded bg-sidebar">
           <ShortcutHint shortcut={shortcut} />
         </span>
       ) : null}
@@ -962,11 +962,11 @@ function RetryButton({ threadId }: { threadId: string }) {
   );
 }
 
-const FOLD_STATES: readonly { state: DotState; label: string }[] = [
+const FOLD_STATES: readonly { state: ThreadState; label: string }[] = [
   { state: "input", label: "needs input" },
   { state: "error", label: "failed" },
   { state: "running", label: "running" },
-  { state: "stopped", label: "waiting" },
+  { state: "waiting", label: "waiting" },
   { state: "done", label: "done" },
 ];
 

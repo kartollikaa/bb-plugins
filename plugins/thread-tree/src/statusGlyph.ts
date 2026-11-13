@@ -1,6 +1,6 @@
 // What a thread row's status glyph shows, folded the way bb's own sidebar folds it.
 import type { PluginSidebarThreadIndicator } from "@get-bb/plugin-sdk/app";
-import type { DotState } from "./tree";
+import { hasBackgroundWork, WORKING_INDICATORS, type ThreadState } from "./tree.ts";
 
 export type GlyphIndicator = PluginSidebarThreadIndicator;
 
@@ -20,6 +20,7 @@ export interface GlyphRowStatus {
 
 export interface GlyphThread {
   status: string;
+  isArchived: boolean;
   indicator: string;
   indicatorLabel: string | null;
   runtimeStatus: string;
@@ -38,12 +39,13 @@ const KNOWN = new Set<string>(INDICATORS);
 
 const OUTRANKS_ROW_STATUS = new Set<GlyphIndicator>(["runtime", "unread-error", "waiting-for-input"]);
 
+/** Already a failure in bb's own words, so the generic failed override leaves it alone. */
+const REPORTS_FAILURE = new Set<GlyphIndicator>(["unread-error", "waiting-for-input", "queued-failed"]);
+
 const OUTRANKS_DRAFT = new Set<GlyphIndicator>(["unread-error", "waiting-for-input"]);
 
 const BUSY_RUNTIME = new Set(["active", "provisioning", "starting", "stopping"]);
 
-/** The host may report these from a hidden helper thread, so the thread's own counts can read idle. */
-const BUSY_INDICATORS = new Set<GlyphIndicator>(["runtime", "workflow", "background-agent", "background-command", "plan-mode"]);
 
 const FAILED_LABEL = "Last turn failed";
 
@@ -53,12 +55,14 @@ const DRAFT_LABEL = {
   "working-draft": "Thread working with unsubmitted draft",
 } as const;
 
+/** The host may report a busy indicator from a hidden helper thread, so the thread's own counts can read idle. */
 function isBusy(thread: GlyphThread, hostIndicator: GlyphIndicator): boolean {
-  const { workflows, backgroundAgents, backgroundCommands, planMode } = thread.activity;
   return (
-    BUSY_INDICATORS.has(hostIndicator) ||
+    WORKING_INDICATORS.has(hostIndicator) ||
+    hostIndicator === "plan-mode" ||
     BUSY_RUNTIME.has(thread.runtimeStatus) ||
-    workflows + backgroundAgents + backgroundCommands + planMode > 0
+    hasBackgroundWork(thread.activity) ||
+    thread.activity.planMode > 0
   );
 }
 
@@ -69,8 +73,8 @@ export function resolveRowGlyph<S extends GlyphRowStatus>(
 ): RowGlyph<S> {
   // bb adds kinds over time; an unknown one falls back to drawing nothing.
   const reported: GlyphIndicator = KNOWN.has(thread.indicator) ? (thread.indicator as GlyphIndicator) : "none";
-  // bb only marks a root thread's failure unread; a read one or a subthread still failed.
-  const failedUnmarked = thread.status === "error" && reported !== "unread-error" && reported !== "waiting-for-input";
+  // bb only marks a root thread's failure unread; a read one or a subthread still failed. Archived rows stay as bb draws them.
+  const failedUnmarked = thread.status === "error" && !thread.isArchived && !REPORTS_FAILURE.has(reported);
   const hostIndicator: GlyphIndicator = failedUnmarked ? "unread-error" : reported;
   let indicator = hostIndicator;
   if (hasUnsubmittedDraft && !OUTRANKS_DRAFT.has(hostIndicator)) {
@@ -96,12 +100,12 @@ export function isIdleGlyph(glyph: RowGlyph<GlyphRowStatus>): boolean {
 }
 
 /** The rollup states (overview, fold line, status groups) drawn with bb's glyphs; "none" gets the idle dot. */
-export const ROLLUP_GLYPH: Record<DotState, GlyphIndicator> = {
+export const ROLLUP_GLYPH: Record<ThreadState, GlyphIndicator> = {
   input: "waiting-for-input",
   error: "unread-error",
   running: "runtime",
+  waiting: "queued-waiting",
   done: "none",
-  stopped: "none",
 };
 
 /** Stops every animation inside bb's glyph under the plugin's Reduce motion setting or the system preference. */

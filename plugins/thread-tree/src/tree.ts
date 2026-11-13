@@ -40,27 +40,29 @@ export interface TreeRow<T extends TreeThread> {
   guides: boolean[];
 }
 
-/** Dot colors, shared by thread rollups and subagents. */
+/** Subagent and automation dot colors. */
 export type DotState = "input" | "error" | "running" | "done" | "stopped";
 
-export type StateCounts = Partial<Record<DotState, number>>;
+/** A thread's rollup state; "waiting" is a queued message or a goal with no turn running. */
+export type ThreadState = "input" | "error" | "running" | "waiting" | "done";
+
+export type StateCounts = Partial<Record<ThreadState, number>>;
 
 /** Most urgent first: what needs the user, then what broke, then live work, then work parked between turns. */
-const THREAD_DOT_PRIORITY: readonly DotState[] = ["input", "error", "running", "stopped", "done"];
+const THREAD_DOT_PRIORITY: readonly ThreadState[] = ["input", "error", "running", "waiting", "done"];
 
-/** For a thread, "stopped" means waiting between turns: a queued message or a goal, with no turn running. */
 const WAITING_INDICATORS = new Set(["goal", "queued-waiting"]);
 
-export function threadDotState(thread: TreeThread): DotState {
+export function threadDotState(thread: TreeThread): ThreadState {
   if (thread.hasPendingInteraction || thread.indicator === "waiting-for-input") return "input";
   // A failed turn (an app exit, a daemon disconnect) stays failed until retried, read or not.
   if (thread.status === "error" || thread.indicator === "unread-error" || thread.indicator === "queued-failed") return "error";
   if (isWorking(thread) || thread.indicator === "plan-mode") return "running";
-  if (WAITING_INDICATORS.has(thread.indicator)) return "stopped";
+  if (WAITING_INDICATORS.has(thread.indicator)) return "waiting";
   return "done";
 }
 
-function moreUrgent(a: DotState | null, b: DotState): DotState {
+function moreUrgent(a: ThreadState | null, b: ThreadState): ThreadState {
   if (a === null) return b;
   return THREAD_DOT_PRIORITY.indexOf(b) < THREAD_DOT_PRIORITY.indexOf(a) ? b : a;
 }
@@ -162,13 +164,15 @@ export function ancestorsOf<T extends TreeThread>(forest: Forest<T>, threadId: s
 }
 
 /** bb indicators that mean the thread is doing something right now. */
-const WORKING_INDICATORS = new Set(["runtime", "background-agent", "background-command", "workflow", "working-draft"]);
+export const WORKING_INDICATORS: ReadonlySet<string> = new Set(["runtime", "background-agent", "background-command", "workflow", "working-draft"]);
+
+export function hasBackgroundWork(activity: TreeThread["activity"]): boolean {
+  return activity.backgroundAgents > 0 || activity.backgroundCommands > 0 || activity.workflows > 0;
+}
 
 export function isWorking(thread: TreeThread): boolean {
   if (thread.status === "active" || thread.status === "starting") return true;
-  const { backgroundAgents, backgroundCommands, workflows } = thread.activity;
-  if (backgroundAgents > 0 || backgroundCommands > 0 || workflows > 0) return true;
-  return WORKING_INDICATORS.has(thread.indicator);
+  return hasBackgroundWork(thread.activity) || WORKING_INDICATORS.has(thread.indicator);
 }
 
 /**
@@ -302,7 +306,7 @@ export function groupRows<T extends TreeThread>(
   });
   const rest = [...buckets].map(([key, bucket]) => makeGroup(key, bucket.projectId, bucket.roots));
   if (mode === "status") {
-    const rank = (key: string) => THREAD_DOT_PRIORITY.indexOf(key.slice("status:".length) as DotState);
+    const rank = (key: string) => THREAD_DOT_PRIORITY.indexOf(key.slice("status:".length) as ThreadState);
     rest.sort((a, b) => rank(a.key) - rank(b.key));
   } else if (mode === "project" && projectOrder) {
     const rank = (group: TreeGroup<T>) => {
@@ -316,7 +320,7 @@ export function groupRows<T extends TreeThread>(
   return pinned.length > 0 ? [makeGroup("pinned", null, pinned), ...rest] : rest;
 }
 
-function subtreeDotState<T extends TreeThread>(forest: Forest<T>, root: T): DotState {
+function subtreeDotState<T extends TreeThread>(forest: Forest<T>, root: T): ThreadState {
   let state = threadDotState(root);
   const stack = [...(forest.children.get(root.id) ?? [])];
   for (let kid = stack.pop(); kid; kid = stack.pop()) {

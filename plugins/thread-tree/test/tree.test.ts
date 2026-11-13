@@ -408,10 +408,10 @@ test("queued-failed rolls up as failed and plan-mode as running", () => {
 
 test("a queued message or a goal with no turn running waits: not running, not done", () => {
   for (const indicator of ["queued-waiting", "goal"]) {
-    assert.equal(threadDotState(thread("t", { indicator })), "stopped", indicator);
+    assert.equal(threadDotState(thread("t", { indicator })), "waiting", indicator);
     assert.equal(threadDotState(thread("t", { indicator, status: "active" })), "running", indicator);
   }
-  assert.deepEqual(countStates([thread("q", { indicator: "queued-waiting" }), thread("g", { indicator: "goal" })]), { stopped: 2 });
+  assert.deepEqual(countStates([thread("q", { indicator: "queued-waiting" }), thread("g", { indicator: "goal" })]), { waiting: 2 });
 });
 
 test("a waiting thread ranks below running and above done in status groups", () => {
@@ -421,5 +421,5 @@ test("a waiting thread ranks below running and above done in status groups", () 
     thread("run", { status: "active", updatedAt: 1 }),
   ];
   const groups = groupRows(buildForest(threads), new Set(), "status");
-  assert.deepEqual(groups.map((g) => g.key), ["status:running", "status:stopped", "status:done"]);
+  assert.deepEqual(groups.map((g) => g.key), ["status:running", "status:waiting", "status:done"]);
 });

@@ -6,6 +6,7 @@ const idleActivity = { workflows: 0, backgroundAgents: 0, backgroundCommands: 0,
 
 const thread = (indicator: string, indicatorLabel: string | null = null, extra: Partial<GlyphThread> = {}): GlyphThread => ({
   status: "idle",
+  isArchived: false,
   indicator,
   indicatorLabel,
   runtimeStatus: "idle",
@@ -84,7 +85,6 @@ test("a failed subthread, which bb never marks unread, keeps the error glyph ove
 
 test("a failed thread keeps the host's own error label, and a question still outranks the failure", () => {
   assert.equal(resolveRowGlyph(thread("unread-error", "Unread thread failed", { status: "error" }), false, null).label, "Unread thread failed");
-  assert.equal(resolveRowGlyph(thread("queued-failed", "q", { status: "error" }), false, null).indicator, "unread-error");
   assert.equal(resolveRowGlyph(thread("waiting-for-input", "w", { status: "error" }), false, null).indicator, "waiting-for-input");
 });
 
@@ -120,4 +120,25 @@ test("Reduce motion stops the glyph's animations outright; otherwise only the sy
   assert.match(glyphMotionClass(true), /^animate-none! \[&_\*\]:animate-none!$/);
   assert.doesNotMatch(glyphMotionClass(false), /(^| )animate-none/);
   assert.match(glyphMotionClass(false), /motion-reduce:\[&_\*\]:animate-none!/);
+});
+
+test("a failed queued message keeps bb's own glyph and label over the failed override", () => {
+  assert.deepEqual(resolveRowGlyph(thread("queued-failed", "Queued message failed to send", { status: "error" }), false, null), {
+    indicator: "queued-failed",
+    rowStatus: null,
+    label: "Queued message failed to send",
+  });
+});
+
+test("an archived failed thread is drawn as bb draws it, without the failed override", () => {
+  assert.deepEqual(resolveRowGlyph(thread("none", null, { status: "error", isArchived: true }), false, null), {
+    indicator: "none",
+    rowStatus: null,
+    label: null,
+  });
+});
+
+test("the Waiting rollup draws bb's queued-waiting glyph, not Done's idle dot", () => {
+  assert.equal(ROLLUP_GLYPH.waiting, "queued-waiting");
+  assert.notEqual(ROLLUP_GLYPH.waiting, ROLLUP_GLYPH.done);
 });
