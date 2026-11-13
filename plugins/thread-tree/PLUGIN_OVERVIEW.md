@@ -27,12 +27,15 @@ under it, and the subagents it runs inside its own session show on its row.
   click it to fold the subtree. A folded parent gets a line counting its whole
   subtree by state. The thread you have open and threads waiting for your
   input stay visible under the fold.
-- A PR icon and number below the title show the branch's pull request:
-  draft, open, merged or closed, plus checks and conflicts. Hover for details;
-  click to open GitHub. With Thread Links installed, all PRs linked in the
-  session's PRs share a scrolling row; parents omit child PRs. Branch status
-  uses bb's GitHub PR Status plugin.
-- A small icon on each row shows the thread's agent provider.
+- Rows are one line and never change height. A tinted PR icon appears only
+  when a pull request needs action: checks failing, conflicts, changes
+  requested or ready to merge. Hover for its number and title; click to open
+  GitHub. Checks and conflicts come from bb's GitHub PR Status plugin (and
+  Thread Links for PRs mentioned in the session); changes requested and ready
+  to merge need the GitHub Folder plugin.
+- A ⚠ warns when another live thread works on the same branch or worktree.
+- Each row shows its agent provider before the age, in the provider's brand
+  colour or monochrome. Hover a row for its title, branch, provider and age.
 - Child threads are ordinary threads: open, message, pin, archive or split them
   with bb's own menu. Hovering a row swaps its age for Archive and the menu.
 - Cmd+Z or Ctrl+Z restores recently archived threads and their children.
@@ -58,8 +61,9 @@ where it lands, the list scrolls near its edges, and all reopens on drop.
 ## Settings
 
 Settings → Installed plugins → Thread Tree holds the section switches, how many
-Recent Activity rows show before and after Show more, and switches for the
-provider icon, the subagent counters and the age label. Fold folders while
+Recent Activity rows show before and after Show more, and the provider
+icon colour (brand tint or monochrome), and switches for the subagent counters
+and the age label. Fold folders while
 dragging can be turned off, and Reduce motion stops the folder, reorder and
 hover animations and holds status spinners still; the system's reduced-motion
 preference does the same for the spinners.

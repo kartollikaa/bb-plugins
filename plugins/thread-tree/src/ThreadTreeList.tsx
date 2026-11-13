@@ -28,7 +28,11 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import { useTapToOpenMenu } from "./useTapToOpenMenu";
-import { ThreadPullRequestBadge } from "./ThreadPullRequestBadge";
+import { useThreadPullRequests } from "./useThreadPullRequests";
+import { excludeDescendantPullRequests, type ThreadPullRequest } from "./threadPullRequests";
+import { folderAttentionByUrl, PR_REASON_LOOK, prTooltip, rowPullRequest, type FolderAttention, type RowPullRequest } from "./prAttention";
+import { providerTintClass } from "./providerTint";
+import { sharedBranchThreads, sharedBranchTooltip } from "./sharedBranch";
 import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { AutomationsSection } from "./AutomationsSection";
@@ -207,6 +211,14 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   useFlipOrder(treeRef, groups.map((group) => group.key).join(), view.reduceMotion);
   const moveSectionBy = (id: SectionId, step: -1 | 1) => setSavedSectionOrder(moveSection(sectionOrder, shownSections, id, step));
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
+  const forestThreads = useMemo(() => forest.roots.flatMap((root) => [root, ...descendantsOf(forest, root.id)]), [forest]);
+  const pullRequestsOf = useThreadPullRequests(forestThreads, sectionsRef);
+  const folderItems = githubFolder.view;
+  const folderAttention = useMemo(
+    () => folderAttentionByUrl(folderItems ? [...folderItems.items, ...folderItems.snoozed] : []),
+    [folderItems],
+  );
+  const sharedBranches = useMemo(() => sharedBranchThreads(threads), [threads]);
   const { providers } = useProviders();
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
 
@@ -248,6 +260,9 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         isCompactViewport={isCompactViewport}
         subagents={subagents.get(row.thread.id)}
         provider={providerById.get(row.thread.providerId)}
+        pullRequestsOf={pullRequestsOf}
+        folderAttention={folderAttention}
+        sharesBranchWith={sharedBranches.get(row.thread.id)}
         view={view}
         now={now}
         onToggle={() => collapsedThreads.toggle(row.thread.id)}
@@ -717,6 +732,9 @@ function ThreadRowView({
   isCompactViewport,
   subagents,
   provider,
+  pullRequestsOf,
+  folderAttention,
+  sharesBranchWith,
   view,
   now,
   onToggle,
@@ -731,6 +749,9 @@ function ThreadRowView({
   isCompactViewport: boolean;
   subagents: ThreadSubagents | undefined;
   provider: RowProvider | undefined;
+  pullRequestsOf: (thread: PluginSidebarThread) => ThreadPullRequest[];
+  folderAttention: FolderAttention;
+  sharesBranchWith: readonly PluginSidebarThread[] | undefined;
   view: ViewSettings;
   now: number;
   onToggle: () => void;
@@ -749,6 +770,15 @@ function ThreadRowView({
   const glyph = resolveRowGlyph(thread, hasUnsubmittedDraft, rowStatus);
   const dot = <RowStatusGlyph glyph={glyph} />;
   const providerName = provider?.displayName ?? thread.providerId;
+  const failed = thread.status === "error" && !thread.isArchived;
+  const pullRequest = rowPullRequest(excludeDescendantPullRequests(pullRequestsOf(thread), descendants.flatMap(pullRequestsOf)), folderAttention, failed);
+  const branch = thread.environment?.branchName ?? null;
+  const tooltip = [
+    context ? `${thread.displayTitle} · ${context}` : thread.displayTitle,
+    branch ? `Branch: ${branch}` : null,
+    `Provider: ${providerName}`,
+    `Updated ${age === "now" ? "just now" : `${age} ago`}`,
+  ].filter(Boolean).join("\n");
 
   return (
     <ThreadActionsContextMenu thread={target}>
@@ -757,9 +787,10 @@ function ThreadRowView({
         aria-level={isTree ? depth + 1 : undefined}
         aria-expanded={isTree && row.hasChildren ? row.isExpanded : undefined}
         aria-selected={isTree ? isActive : undefined}
-        title={context ? `${thread.displayTitle} · ${context}` : undefined}
+        title={tooltip}
+        data-thread-row=""
         className={cn(
-          "group/row relative rounded-md pr-2 text-sm text-sidebar-foreground/90",
+          "group/row relative h-8 rounded-md pr-2 text-sm text-sidebar-foreground/90",
           isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60",
         )}
         data-keyboard-focus={keyboardFocus || undefined}
@@ -809,13 +840,23 @@ function ThreadRowView({
             <RowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
           )}
           <span aria-hidden className="min-w-0 flex-1" />
-          {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
-          {view.showProviderIcon ? (
-            <span title={providerName} className="flex shrink-0 text-sidebar-foreground/45">
-              <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3" />
+          {failed ? <RetryButton threadId={thread.id} /> : null}
+          {pullRequest ? <PullRequestIcon pullRequest={pullRequest} /> : null}
+          {sharesBranchWith ? (
+            <span
+              data-shared-branch=""
+              role="img"
+              aria-label={sharedBranchTooltip(branch, sharesBranchWith)}
+              title={sharedBranchTooltip(branch, sharesBranchWith)}
+              className="flex size-4 shrink-0 items-center justify-center text-amber-600 dark:text-amber-400"
+            >
+              <Icon name="TriangleAlert" fallback="AlertTriangle" aria-hidden className="size-3.5" />
             </span>
           ) : null}
           {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
+          <span data-provider-icon={thread.providerId} title={providerName} className={cn("flex size-3.5 shrink-0 items-center justify-center", providerTintClass(thread.providerId, view.providerIconStyle))}>
+            <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3.5" />
+          </span>
           {/* Age shrinks away as the actions grow in, so the row's icons glide left and the title truncates. */}
           <span className="-mr-1 flex shrink-0 items-center">
             {view.showAge ? (
@@ -859,9 +900,30 @@ function ThreadRowView({
             )}
           </span>
         </div>
-        <ThreadPullRequestBadge thread={thread} descendants={descendants} />
       </div>
     </ThreadActionsContextMenu>
+  );
+}
+
+/** Shown only when the PR needs action; the reason is its tint and tooltip. */
+function PullRequestIcon({ pullRequest }: { pullRequest: RowPullRequest }) {
+  const navigate = useBbNavigate();
+  const look = PR_REASON_LOOK[pullRequest.reason];
+  const label = prTooltip(pullRequest);
+  return (
+    <button
+      type="button"
+      data-pr-reason={pullRequest.reason}
+      aria-label={label}
+      title={label}
+      onClick={(event) => {
+        event.stopPropagation();
+        navigate.openUrl(pullRequest.pr.url);
+      }}
+      className={cn("flex size-4 shrink-0 items-center justify-center rounded outline-none hover:bg-sidebar-foreground/10 focus-visible:ring-1 focus-visible:ring-sidebar-ring", look.className)}
+    >
+      <Icon name={look.icon} aria-hidden className="size-3.5" />
+    </button>
   );
 }
 

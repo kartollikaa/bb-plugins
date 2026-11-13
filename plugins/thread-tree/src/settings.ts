@@ -32,11 +32,13 @@ export const SETTINGS = {
     experimental_schema: limit,
     default: 15,
   },
-  showProviderIcon: {
-    type: "boolean",
-    label: "Show the agent provider icon",
-    description: "A small mark after each title for the provider the thread runs on.",
-    default: true,
+  providerIconStyle: {
+    type: "select",
+    label: "Provider icon colour",
+    description: "Each row shows the provider it runs on before the age: in the provider's brand tint, or in the text colour.",
+    options: ["tint", "monochrome"] as string[],
+    experimental_optionLabels: { tint: "Brand tint", monochrome: "Monochrome" },
+    default: "tint",
   },
   showSubagents: {
     type: "boolean",
@@ -97,13 +99,15 @@ export const sectionPatchSchema = z
   .partial()
   .strict();
 
+export type ProviderIconStyle = "tint" | "monochrome";
+
 export type ViewSettings = {
   showGithub: boolean;
   showAutomations: boolean;
   showRecent: boolean;
   recentLimit: number;
   recentMoreLimit: number;
-  showProviderIcon: boolean;
+  providerIconStyle: ProviderIconStyle;
   showSubagents: boolean;
   showAge: boolean;
   foldOnDrag: boolean;
@@ -116,7 +120,7 @@ const DEFAULTS: ViewSettings = Object.fromEntries(
 
 /** Frontend values are untrusted: anything missing or of the wrong type falls back to its default. */
 export function readViewSettings(values: Record<string, unknown> | undefined): ViewSettings {
-  const bool = (key: keyof ViewSettings) => (typeof values?.[key] === "boolean" ? (values[key] as boolean) : (DEFAULTS[key] as boolean));
+  const bool = (key: Exclude<keyof ViewSettings, "providerIconStyle">) => (typeof values?.[key] === "boolean" ? (values[key] as boolean) : (DEFAULTS[key] as boolean));
   const count = (key: "recentLimit" | "recentMoreLimit") => {
     const parsed = limit.safeParse(values?.[key]);
     return parsed.success ? parsed.data : DEFAULTS[key];
@@ -128,7 +132,7 @@ export function readViewSettings(values: Record<string, unknown> | undefined): V
     showRecent: bool("showRecent"),
     recentLimit,
     recentMoreLimit: Math.max(recentLimit, count("recentMoreLimit")),
-    showProviderIcon: bool("showProviderIcon"),
+    providerIconStyle: values?.providerIconStyle === "monochrome" ? "monochrome" : "tint",
     showSubagents: bool("showSubagents"),
     showAge: bool("showAge"),
     foldOnDrag: bool("foldOnDrag"),

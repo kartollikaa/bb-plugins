@@ -47,3 +47,9 @@ test("a section whose source plugin is absent is not shown even when turned on",
   assert.deepEqual(shownSectionIds(["github", "automations", "recent"], view, ["github", "automations", "recent"]), ["github", "recent"]);
   assert.deepEqual(shownSectionIds(["github", "automations", "recent"], view, ["automations", "recent"]), ["recent"]);
 });
+
+test("the provider icon is tinted by default and monochrome only when chosen", () => {
+  assert.equal(readViewSettings(undefined).providerIconStyle, "tint");
+  assert.equal(readViewSettings({ providerIconStyle: "monochrome" }).providerIconStyle, "monochrome");
+  assert.equal(readViewSettings({ providerIconStyle: "neon" }).providerIconStyle, "tint");
+});

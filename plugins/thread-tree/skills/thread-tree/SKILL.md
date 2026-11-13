@@ -18,22 +18,29 @@ When the GitHub Folder plugin is installed, the list's top section is its
 folder of pull requests that need the user. Use that plugin's
 `bb github-folder list` to read it.
 
-A PR icon with its number sits below the thread title and shows the pull request
-for the thread's environment branch. Its color shows draft, open, merged or closed; a small indicator shows
-pending or failed checks and conflicts. Hover for details; click to open GitHub.
-It also appears on child threads and Recent Activity rows, including when age
-labels are hidden. The built-in GitHub PR Status plugin supplies and refreshes
-the status; GitHub Folder is optional.
+Every thread row is one line, 32px tall, whatever its state. Left to right: status
+glyph, title, Retry on a failed turn, PR icon, shared-branch warning, subagent
+counter, provider icon, age. Hovering the row shows its title, branch, provider
+and when it last updated.
 
-With Thread Links installed, every PR linked in the session's prompts or agent
-replies is listed below that thread, alongside its branch PR. Duplicate URLs
-appear once; different repositories with the same PR number stay separate.
-Badges form one horizontal row with scrolling when they overflow. Thread Links
-supplies their status through the bb server's gh login. Unavailable statuses
-keep a neutral clickable badge. Session PRs refresh as the thread changes and
-periodically while visible; without Thread Links, the branch badge still works.
-An orchestrator hides PRs owned by its subthreads, including nested or folded
-subthreads, while keeping its own unique PRs. Matching uses the full PR URL.
+The PR icon appears only when one of the thread's pull requests needs action:
+checks failing (red), conflicts (orange), changes requested (amber) or ready to
+merge (green). Hover it for the number, title and reason; click it to open
+GitHub. A quiet, merged or closed PR shows nothing, and a failed thread shows
+Retry instead. The built-in GitHub PR Status plugin supplies the branch PR's
+checks and conflicts; with Thread Links installed, PRs linked in the session
+count too. Changes requested and ready to merge come from the GitHub Folder
+plugin, matched by PR URL; without it those two reasons never show. An
+orchestrator leaves PRs owned by its subthreads to their rows. The whole list
+refreshes PR status in one batch, and pauses while the sidebar is hidden.
+
+A ⚠ marks a thread whose branch or worktree another unarchived thread also
+uses; its tooltip names the other thread. Threads in a project's own checkout
+never warn.
+
+The provider icon sits in a fixed slot before the age, in the provider's brand
+tint (Claude orange, Codex green), or in the text colour with the
+`providerIconStyle` setting set to `monochrome`.
 
 ## Command
 
@@ -65,8 +72,9 @@ the keystroke stays a text undo once the user has typed there since the archive.
 ## Settings
 
 `bb plugin config thread-tree` lists them; `bb plugin config thread-tree set <key> <value>` changes one.
-Booleans: `showGithub`, `showAutomations`, `showRecent`, `showProviderIcon`, `showSubagents`, `showAge`,
+Booleans: `showGithub`, `showAutomations`, `showRecent`, `showSubagents`, `showAge`,
 `foldOnDrag` (fold every block while a section or project is dragged), `reduceMotion` (no folder, reorder, hover or status-spinner animation).
+Select: `providerIconStyle` (`tint` or `monochrome`).
 Numbers (1–50): `recentLimit` (Recent Activity rows), `recentMoreLimit` (rows after Show more).
 The order of GitHub, Automations and Recent Activity, the project order, and which groups are
 folded are not settings: each browser client keeps them itself. The user changes them in the
