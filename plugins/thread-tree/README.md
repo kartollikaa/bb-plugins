@@ -15,10 +15,18 @@ the indicator the way bb's own list does.
 The subagent counter opens a list that fits the available screen space, including
 on mobile. Longer lists scroll inside the card while the summary stays visible.
 
-Every thread row is one line, 32px tall, whatever its state. Left to right: status
-glyph, title, Retry on a failed turn, PR icon, shared-branch warning, subagent
-counter, provider icon, age. Hovering the row shows its title, branch, provider
-and when it last updated.
+Every thread row is one line, 32px tall (40px on a phone-sized viewport), whatever
+its state. Left to right: status glyph, title, Retry on a failed turn, PR icon,
+shared-branch warning, subagent counter, provider icon, age. Hovering the row
+shows its title, branch, provider and when it last updated.
+
+Hovering a row, or focusing it with the keyboard, fades Archive and ⋯ in over
+its right end at once; nothing under them moves. ⋯ is outermost. Archive is
+bb's own action, with its confirmation and Undo toast, and Cmd/Ctrl+Z still
+restores it. Hovering a running thread's spinner turns it into Stop, which ends
+the turn and its background work. A parent row's glyph folds its subtree, so a
+running parent offers Stop in ⋯ and the right-click menu, as every working row
+does. Buttons are 24px. On touch screens a long press opens the row's menu.
 
 The PR icon appears only when one of the thread's pull requests needs action:
 checks failing (red), conflicts (orange), changes requested (amber) or ready to

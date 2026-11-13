@@ -27,7 +27,7 @@ under it, and the subagents it runs inside its own session show on its row.
   click it to fold the subtree. A folded parent gets a line counting its whole
   subtree by state. The thread you have open and threads waiting for your
   input stay visible under the fold.
-- Rows are one line and never change height. A tinted PR icon appears only
+- Rows are one line and never change height (taller on phones). A tinted PR icon appears only
   when a pull request needs action: checks failing, conflicts, changes
   requested or ready to merge. Hover for its number and title; click to open
   GitHub. Checks and conflicts come from bb's GitHub PR Status plugin (and
@@ -37,7 +37,9 @@ under it, and the subagents it runs inside its own session show on its row.
 - Each row shows its agent provider before the age, in the provider's brand
   colour or monochrome. Hover a row for its title, branch, provider and age.
 - Child threads are ordinary threads: open, message, pin, archive or split them
-  with bb's own menu. Hovering a row swaps its age for Archive and the menu.
+  with bb's own menu. Hovering or focusing a row fades Archive and ⋯ in over
+  its end without moving anything; Archive keeps bb's confirmation and Undo.
+- Hover a running thread's spinner to stop it; Stop is also in the row's menu.
 - Cmd+Z or Ctrl+Z restores recently archived threads and their children.
 - Provider subagents show a counter and status dot on the parent's row;
   hover for type, state, duration and tokens. They cannot be messaged.
