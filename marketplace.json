@@ -56,6 +56,31 @@
       }
     },
     {
+      "id": "github-folder",
+      "displayName": "GitHub Folder",
+      "description": "A sidebar folder of the open GitHub pull requests that need you: review requests, your PRs with changes requested, failing checks or conflicts, and the ones ready to merge.",
+      "icon": {
+        "url": "./icons/github-folder.svg"
+      },
+      "tags": [
+        "github",
+        "pull-requests",
+        "sidebar"
+      ],
+      "author": {
+        "name": "Dmitrii Maksimov",
+        "github": "kartollikaa"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/kartollikaa/bb-plugins.git",
+          "subdir": "plugins/github-folder",
+          "range": "^0.1.0",
+          "tagPrefix": "github-folder/"
+        }
+      }
+    },
+    {
       "id": "reveal-in-finder",
       "displayName": "Reveal In Finder",
       "description": "Shows files an agent hands over as cards in chat, with Open in Finder, the default app or bb's preview.",
