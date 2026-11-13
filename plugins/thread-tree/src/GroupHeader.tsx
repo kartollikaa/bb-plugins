@@ -2,7 +2,7 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Icon } from "@/components/ui/icon";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import { cn } from "@/lib/utils";
-import { TOUCH_DIMMED } from "./rowStyles";
+import { HEADER_CHEVRON_MOTION, TOUCH_DIMMED } from "./rowStyles";
 
 export function GroupHeader({
   title,
@@ -44,7 +44,8 @@ export function GroupHeader({
           name="ChevronRight"
           aria-hidden
           className={cn(
-            "size-3 shrink-0 text-sidebar-foreground/40 opacity-0 transition-[opacity,transform] duration-75 group-hover/header:opacity-100",
+            "size-3 shrink-0 text-sidebar-foreground/40 opacity-0 group-hover/header:opacity-100",
+            HEADER_CHEVRON_MOTION,
             TOUCH_DIMMED,
             !isCollapsed && "rotate-90",
           )}

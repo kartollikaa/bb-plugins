@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { canStop, END_SLOT_MIN_PX, HOVER_ACTIONS_STRIP_PX, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, stopsFromGlyph } from "../src/rowActions.ts";
-import { ROW_TINT } from "../src/rowStyles.ts";
+import { HEADER_CHEVRON_MOTION, ROW_TINT } from "../src/rowStyles.ts";
 
 const idle = { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 };
 const leaf = { glyph: { indicator: "runtime", rowStatus: null } };
@@ -72,4 +72,11 @@ test("every state that shows the overlay also tints the row, so its solid end ne
   for (const state of ["hover", "data-[keyboard-focus]", "data-[menu-open]"]) {
     assert.ok(tint.includes(`${state}:bg-sidebar-accent/60`), state);
   }
+});
+
+test("a header chevron fades in within 80ms but keeps its 150ms fold rotation, and holds still under reduced motion", () => {
+  assert.match(HEADER_CHEVRON_MOTION, /opacity_(\d+)ms/);
+  assert.ok(Number(/opacity_(\d+)ms/.exec(HEADER_CHEVRON_MOTION)?.[1]) <= 80);
+  assert.equal(/transform_(\d+)ms/.exec(HEADER_CHEVRON_MOTION)?.[1], "150");
+  assert.ok(HEADER_CHEVRON_MOTION.split(" ").includes("motion-reduce:transition-none"));
 });
