@@ -48,11 +48,14 @@ export type StateCounts = Partial<Record<DotState, number>>;
 /** Most urgent first: what needs the user, then what broke, then live work. */
 const THREAD_DOT_PRIORITY: readonly DotState[] = ["input", "error", "running", "done"];
 
+/** Not live work for a subagent's liveness, but not finished either. */
+const PENDING_WORK_INDICATORS = new Set(["plan-mode", "goal", "queued-waiting"]);
+
 export function threadDotState(thread: TreeThread): DotState {
   if (thread.hasPendingInteraction || thread.indicator === "waiting-for-input") return "input";
   // A failed turn (an app exit, a daemon disconnect) stays failed until retried, read or not.
-  if (thread.status === "error" || thread.indicator === "unread-error") return "error";
-  if (isWorking(thread)) return "running";
+  if (thread.status === "error" || thread.indicator === "unread-error" || thread.indicator === "queued-failed") return "error";
+  if (isWorking(thread) || PENDING_WORK_INDICATORS.has(thread.indicator)) return "running";
   return "done";
 }
 

@@ -14,6 +14,9 @@ import {
   useRpc,
   useSdk,
   useSettings,
+  useSidebarThreadDraft,
+  useSidebarThreadRowStatus,
+  useSidebarThreadShortcut,
   type PluginSidebarProject,
   type PluginSidebarThread,
   type PluginThreadActionTarget,
@@ -28,7 +31,8 @@ import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { AutomationsSection } from "./AutomationsSection";
 import { GithubSection, useGithubFolder } from "./GithubSection";
-import { StatusDot } from "./StatusDot";
+import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
+import { resolveRowGlyph } from "./statusGlyph";
 import type { rpcContract } from "../server";
 import {
   moveSection,
@@ -52,7 +56,6 @@ import {
   rememberProjectFolders,
   type ThreadSort,
   resolveProjectOrder,
-  threadDotState,
   type DotState,
   type GroupMode,
   type StateCounts,
@@ -79,11 +82,7 @@ const GROUP_MODES: readonly { id: GroupMode; label: string; chip: string; icon: 
     id: "status",
     label: "Status",
     chip: "Group: Status",
-    icon: (
-      <span className="flex size-3.5 items-center justify-center">
-        <StatusDot state="running" className="size-2 animate-none" />
-      </span>
-    ),
+    icon: <RollupGlyph state="running" />,
   },
   { id: "none", label: "None", chip: "No grouping", icon: <Icon name="Layers" aria-hidden className="size-3.5" /> },
 ];
@@ -504,11 +503,7 @@ function groupLook(
     const state = key.slice("status:".length) as DotState;
     return {
       title: STATUS_GROUP_TITLE[state] ?? state,
-      icon: (
-        <span className="flex size-3.5 items-center justify-center">
-          <StatusDot state={state} className="size-2" />
-        </span>
-      ),
+      icon: <RollupGlyph state={state} />,
     };
   }
   return {
@@ -550,7 +545,7 @@ function ActivityOverview({ counts }: { counts: StateCounts }) {
     <span role="status" className="flex min-w-0 items-center gap-2.5 overflow-hidden text-2xs tabular-nums text-sidebar-foreground/60">
       {parts.map(({ state, label }) => (
         <span key={state} className="flex shrink-0 items-center gap-1">
-          <StatusDot state={state} className="size-1.5" />
+          <RollupGlyph state={state} />
           {counts[state]} {label}
         </span>
       ))}
@@ -746,7 +741,11 @@ function ThreadRowView({
   const age = formatAge(thread.updatedAt, now);
   const target = useMemo(() => toActionTarget(thread), [thread]);
   const isTree = variant === "tree";
-  const dot = <StatusDot state={threadDotState(thread)} className="size-2" />;
+  const { hasUnsubmittedDraft } = useSidebarThreadDraft(thread.id);
+  const rowStatus = useSidebarThreadRowStatus(thread.id);
+  const shortcut = useSidebarThreadShortcut(thread.id);
+  const glyph = resolveRowGlyph(thread, hasUnsubmittedDraft, rowStatus);
+  const dot = <RowStatusGlyph glyph={glyph} />;
   const providerName = provider?.displayName ?? thread.providerId;
 
   return (
@@ -777,7 +776,8 @@ function ThreadRowView({
         }}
       >
         {isTree ? <TreeGuides depth={depth} guides={row.guides} hasOpenChildren={row.hasVisibleChildren || row.foldCounts !== null} isPeek={row.isPeek} /> : null}
-        <div className="flex h-8 min-w-0 items-center gap-2">
+        <div className="relative flex h-8 min-w-0 items-center gap-2">
+          {shortcut ? <ShortcutPill label={shortcut.label} /> : null}
           {isTree && row.hasChildren ? (
             <button
               type="button"
@@ -789,7 +789,7 @@ function ThreadRowView({
               title={row.isExpanded ? "Collapse subthreads" : "Expand subthreads"}
               className="group/toggle relative flex size-4 shrink-0 items-center justify-center rounded text-sidebar-foreground/60 outline-none hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring"
             >
-              <span className="flex group-hover/row:hidden group-focus-visible/toggle:hidden">{dot}</span>
+              <span title={glyph.label ?? undefined} className="flex group-hover/row:hidden group-focus-visible/toggle:hidden">{dot}</span>
               <Icon
                 name="ChevronRight"
                 aria-hidden
@@ -800,13 +800,14 @@ function ThreadRowView({
               />
             </button>
           ) : (
-            <span className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
+            <span title={glyph.label ?? undefined} className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
           )}
           <a
             href={thread.href}
             {...(isTree ? { "data-sidebar-thread-shortcut-target": "", "data-sidebar-thread-id": thread.id } : {})}
             aria-current={isActive ? "page" : undefined}
-            aria-label={thread.displayTitle}
+            aria-label={glyph.label ? `${thread.displayTitle}, ${glyph.label}` : thread.displayTitle}
+            aria-keyshortcuts={shortcut?.ariaKeyshortcuts}
             {...splitProps}
             onClick={(event) => onOpen(thread, event)}
             className="flex min-w-0 items-center gap-1.5 self-stretch outline-none"
@@ -869,6 +870,19 @@ function ThreadRowView({
         <ThreadPullRequestBadge thread={thread} descendants={descendants} />
       </div>
     </ThreadActionsContextMenu>
+  );
+}
+
+/** bb's jump-key hint while the command modifier is held; it covers the row's right end instead of reflowing it. */
+function ShortcutPill({ label }: { label: string }) {
+  return (
+    <kbd
+      aria-hidden
+      data-shortcut-hint=""
+      className="pointer-events-none absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded border border-sidebar-border bg-sidebar px-1 font-sans text-2xs tabular-nums leading-4 text-sidebar-foreground/70 shadow-sm"
+    >
+      {label}
+    </kbd>
   );
 }
 
@@ -958,7 +972,7 @@ function FoldLine({
         <span className="shrink-0">{subthreads}</span>
         {parts.map(({ state, label }) => (
           <span key={state} className="flex shrink-0 items-center gap-1">
-            <StatusDot state={state} className="animate-none" />
+            <RollupGlyph state={state} />
             {counts[state]} {label}
           </span>
         ))}
