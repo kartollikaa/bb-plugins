@@ -170,21 +170,32 @@ test("the warning names the other threads, two at most", () => {
 function fakeTimers() {
   let clock = 0;
   let next = 1;
-  const intervals = new Map<number, () => void>();
-  const timeouts = new Map<number, () => void>();
+  const intervals = new Map<number, { run: () => void; ms: number }>();
+  const timeouts = new Map<number, { run: () => void; ms: number }>();
+  const fire = (map: Map<number, { run: () => void; ms: number }>, ms: number) => {
+    const entry = [...map].find(([, timer]) => timer.ms === ms);
+    assert.ok(entry, `no timer of ${ms}ms`);
+    if (map === timeouts) timeouts.delete(entry[0]);
+    entry[1].run();
+  };
   return {
     intervals,
     timeouts,
     advance(ms: number) { clock += ms; },
+    fireTimeout: (ms: number) => fire(timeouts, ms),
+    fireInterval: (ms: number) => fire(intervals, ms),
     timers: {
-      setInterval: (run: () => void) => { intervals.set(next, run); return next++; },
+      setInterval: (run: () => void, ms: number) => { intervals.set(next, { run, ms }); return next++; },
       clearInterval: (id: number) => void intervals.delete(id),
-      setTimeout: (run: () => void) => { timeouts.set(next, run); return next++; },
+      setTimeout: (run: () => void, ms: number) => { timeouts.set(next, { run, ms }); return next++; },
       clearTimeout: (id: number) => void timeouts.delete(id),
       now: () => clock,
     },
   };
 }
+
+const INTERVAL_MS = 60_000;
+const DEBOUNCE_MS = 500;
 
 function scheduled() {
   const fake = fakeTimers();
@@ -192,26 +203,32 @@ function scheduled() {
   const scheduler = createRefreshScheduler({
     refreshAll: () => calls.push("all"),
     refreshKeys: (keys) => calls.push(keys.sort().join(",")),
-    intervalMs: 60_000,
-    debounceMs: 500,
+    intervalMs: INTERVAL_MS,
+    debounceMs: DEBOUNCE_MS,
     timers: fake.timers,
   });
   return { fake, calls, scheduler };
 }
 
-test("the PR refresh ticks only while shown and dispose stops it", () => {
+const delays = (map: Map<number, { ms: number }>) => [...map.values()].map((timer) => timer.ms).sort((a, b) => a - b);
+
+test("the PR refresh ticks only while shown, and dispose stops it", () => {
   const { fake, calls, scheduler } = scheduled();
-  assert.equal(fake.intervals.size, 0);
+  assert.deepEqual(delays(fake.timeouts), []);
   scheduler.setShown(true);
-  assert.equal(fake.intervals.size, 1);
-  assert.deepEqual(calls, []);
-  [...fake.intervals.values()][0]!();
+  assert.deepEqual(delays(fake.timeouts), [INTERVAL_MS]);
+  fake.advance(INTERVAL_MS);
+  fake.fireTimeout(INTERVAL_MS);
   assert.deepEqual(calls, ["all"]);
+  assert.deepEqual(delays(fake.intervals), [INTERVAL_MS]);
+  fake.fireInterval(INTERVAL_MS);
+  assert.deepEqual(calls, ["all", "all"]);
   scheduler.setShown(false);
-  assert.equal(fake.intervals.size, 0);
+  assert.deepEqual([delays(fake.intervals), delays(fake.timeouts)], [[], []]);
   scheduler.setShown(true);
+  assert.equal(fake.intervals.size + fake.timeouts.size, 1);
   scheduler.dispose();
-  assert.equal(fake.intervals.size, 0);
+  assert.deepEqual([delays(fake.intervals), delays(fake.timeouts)], [[], []]);
 });
 
 test("showing the sidebar again refreshes only when a tick fell due while it was hidden", () => {
@@ -223,9 +240,25 @@ test("showing the sidebar again refreshes only when a tick fell due while it was
   scheduler.setShown(true);
   assert.deepEqual(calls, []);
   scheduler.setShown(false);
-  fake.advance(60_000);
+  fake.advance(INTERVAL_MS);
   scheduler.setShown(true);
   assert.deepEqual(calls, ["all"]);
+  assert.deepEqual(delays(fake.intervals), [INTERVAL_MS]);
+});
+
+test("an early re-show keeps the tick due on time instead of starting a fresh interval", () => {
+  const { fake, calls, scheduler } = scheduled();
+  scheduler.setShown(true);
+  fake.advance(50_000);
+  scheduler.setShown(false);
+  fake.advance(5_000);
+  scheduler.setShown(true);
+  assert.deepEqual(delays(fake.timeouts), [5_000]);
+  assert.deepEqual(delays(fake.intervals), []);
+  fake.advance(5_000);
+  fake.fireTimeout(5_000);
+  assert.deepEqual(calls, ["all"]);
+  assert.deepEqual(delays(fake.intervals), [INTERVAL_MS]);
 });
 
 test("activity refetches only the changed keys, debounced, and waits while hidden", () => {
@@ -233,8 +266,8 @@ test("activity refetches only the changed keys, debounced, and waits while hidde
   scheduler.setShown(true);
   scheduler.requestKeys(["a"]);
   scheduler.requestKeys(["b", "a"]);
-  assert.equal(fake.timeouts.size, 1);
-  [...fake.timeouts.values()][0]!();
+  assert.deepEqual(delays(fake.timeouts), [DEBOUNCE_MS, INTERVAL_MS]);
+  fake.fireTimeout(DEBOUNCE_MS);
   assert.deepEqual(calls, ["a,b"]);
   scheduler.setShown(false);
   scheduler.requestKeys(["c"]);
@@ -242,5 +275,5 @@ test("activity refetches only the changed keys, debounced, and waits while hidde
   scheduler.setShown(true);
   assert.deepEqual(calls, ["a,b", "c"]);
   scheduler.requestKeys([]);
-  assert.equal([...fake.timeouts.keys()].length <= 1, true);
+  assert.deepEqual(delays(fake.timeouts), [INTERVAL_MS]);
 });

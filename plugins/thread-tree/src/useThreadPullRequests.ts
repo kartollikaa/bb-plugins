@@ -73,7 +73,7 @@ export function useThreadPullRequests(threads: readonly PluginSidebarThread[], c
   latest.current = { session, threadIds };
   const scheduler = useMemo(() => createRefreshScheduler({
     refreshAll: () => void latest.current.session.refetchKeys(latest.current.threadIds),
-    refreshKeys: (keys) => void latest.current.session.refetchKeys(keys.filter((key) => latest.current.threadIds.includes(key))),
+    refreshKeys: (keys) => void latest.current.session.refetchKeys(keys),
     intervalMs: REFRESH_MS,
     debounceMs: ACTIVITY_DEBOUNCE_MS,
     timers: {
