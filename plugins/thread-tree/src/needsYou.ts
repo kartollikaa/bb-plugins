@@ -249,6 +249,16 @@ export function readSnoozes(raw: unknown): Snoozes {
   return Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
 }
 
+export interface QueuedMessageRow {
+  id: string;
+  state: string;
+  createdAt: number;
+}
+
+export function failedQueuedMessage<T extends QueuedMessageRow>(rows: readonly T[]): T | null {
+  return rows.filter((row) => row.state.startsWith("failed_")).sort((a, b) => a.createdAt - b.createdAt)[0] ?? null;
+}
+
 export type ItemTarget = { kind: "thread"; threadId: string } | { kind: "pr"; url: string } | { kind: "automations" };
 
 export function itemTarget(item: NeedsYouItem): ItemTarget {

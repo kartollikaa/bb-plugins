@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   automationItems,
   describeQuestion,
+  failedQueuedMessage,
   isSnoozed,
   itemTarget,
   linkedPullRequests,
@@ -234,4 +235,14 @@ test("⇧⌘I reaches the mounted sidebar, and an old sidebar unmounting doesn't
   assert.deepEqual(calls, ["t1"]);
   dropNew();
   assert.equal(openNextInboxItem("t1"), false);
+});
+
+test("Resend picks the oldest failed queued message, retrying or exhausted", () => {
+  const rows = [
+    { id: "q0", state: "queued", createdAt: 0 },
+    { id: "q2", state: "failed_exhausted", createdAt: 2 },
+    { id: "q1", state: "failed_retrying", createdAt: 1 },
+  ];
+  assert.equal(failedQueuedMessage(rows)?.id, "q1");
+  assert.equal(failedQueuedMessage([{ id: "q", state: "waiting", createdAt: 0 }]), null);
 });

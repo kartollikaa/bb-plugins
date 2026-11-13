@@ -18,7 +18,8 @@ import { Collapse } from "./Collapse";
 const POLL_MS = 30_000;
 const AUTOMATIONS_NAV_ITEM = "__bb__/automations";
 
-function useAutomations() {
+/** Polled once in the list and shared by this section and Needs you. */
+export function useAutomations() {
   const rpc = useRpc<typeof rpcContract>();
   const [state, setState] = useState<{ available: boolean; automations: AutomationSummary[] } | null>(null);
   const refresh = useCallback(() => {
@@ -36,7 +37,18 @@ function useAutomations() {
   return { state, refresh, rpc };
 }
 
+export type Automations = ReturnType<typeof useAutomations>;
+
+export function useOpenAutomationsPage(onNavigate: () => void) {
+  const { actions } = useSidebarNavigation();
+  return () => {
+    actions.activate(AUTOMATIONS_NAV_ITEM, { target: "current" });
+    onNavigate();
+  };
+}
+
 export function AutomationsSection({
+  automations,
   isCollapsed,
   onToggle,
   menu,
@@ -46,6 +58,7 @@ export function AutomationsSection({
   now,
   onNavigate,
 }: {
+  automations: Automations;
   isCollapsed: boolean;
   onToggle: () => void;
   /** The header's right-click menu. */
@@ -56,13 +69,9 @@ export function AutomationsSection({
   now: number;
   onNavigate: () => void;
 }) {
-  const { state, refresh, rpc } = useAutomations();
+  const { state, refresh, rpc } = automations;
   const navigate = useBbNavigate();
-  const { actions } = useSidebarNavigation();
-  const openAutomationsPage = () => {
-    actions.activate(AUTOMATIONS_NAV_ITEM, { target: "current" });
-    onNavigate();
-  };
+  const openAutomationsPage = useOpenAutomationsPage(onNavigate);
 
   if (!state?.available || state.automations.length === 0) return null;
   const sorted = sortAutomations(state.automations);

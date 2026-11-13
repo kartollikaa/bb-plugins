@@ -38,7 +38,8 @@ import { familyRootOf, sharedBranchThreads, sharedBranchTooltip } from "./shared
 import { pullRequestThreads } from "./pullRequestKeys";
 import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
-import { AutomationsSection } from "./AutomationsSection";
+import { AutomationsSection, useAutomations } from "./AutomationsSection";
+import { NeedsYouSection, useNeedsYou } from "./NeedsYouSection";
 import { GithubSection, useGithubFolder } from "./GithubSection";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph } from "./statusGlyph";
@@ -80,6 +81,7 @@ import { Collapse } from "./Collapse";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
 import { canStop, END_SLOT_MIN_PX, NO_HOVER_QUERY, ROW_ACTION_BUTTON, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
+import { RetryButton } from "./RetryButton";
 
 const ROW_PAD_PX = 6;
 /** One level puts a child's status icon under its parent's title. */
@@ -217,6 +219,20 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     [folderItems],
   );
   const orchestrationOf = useMemo(() => orchestrationTitle(threads), [threads]);
+  const automations = useAutomations();
+  const descendantIdsOf = useCallback((threadId: string) => descendantsOf(activeForest, threadId).map((thread) => thread.id), [activeForest]);
+  const needsYou = useNeedsYou({
+    threads,
+    descendantIdsOf,
+    pullRequestsOf,
+    folderAttention,
+    folderItems: useMemo(() => folderItems?.items ?? [], [folderItems]),
+    automations: useMemo(() => automations.state?.automations ?? [], [automations.state]),
+    pullRequestMode: view.needsYouPullRequests,
+    orchestrationOf,
+    activeThreadId: activeThreadId ?? null,
+    onNavigate,
+  });
   const sharedBranches = useMemo(() => sharedBranchThreads(threads, familyRootOf(threads)), [threads]);
   const canHover = !useMediaQuery(NO_HOVER_QUERY);
   const searchPool = showArchived ? listed.threads : threads;
@@ -369,6 +385,17 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         </FlatListSection>
       ) : (
       <>
+      <NeedsYouSection
+        items={needsYou.items}
+        isCollapsed={collapsedGroups.has("needs-you")}
+        onToggle={() => collapsedGroups.toggle("needs-you")}
+        activeThreadId={activeThreadId ?? null}
+        isCompactViewport={isCompactViewport}
+        reduceMotion={view.reduceMotion}
+        now={now}
+        onOpen={needsYou.open}
+        onSnooze={needsYou.snooze}
+      />
       {shownSections.map((id, index) => {
         const section = SECTION_BY_ID[id];
         const menu: HeaderMenuItem[] = [
@@ -394,6 +421,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
               />
             ) : id === "automations" ? (
               <AutomationsSection
+                automations={automations}
                 isCollapsed={foldSections || collapsedGroups.has("automations")}
                 onToggle={() => collapsedGroups.toggle("automations")}
                 showPaused={flags.has("automations-paused")}
@@ -1155,34 +1183,6 @@ function useStopInlineAction(thread: PluginSidebarThread): PluginThreadActionsIn
   return useMemo(
     () => running ? [{ key: "thread-tree/stop", group: THREAD_ACTION_GROUPS.lifecycle, action: { label: "Stop", icon: "Square", run: () => stopThread(sdk, thread.id) } }] : undefined,
     [running, sdk, thread.id],
-  );
-}
-
-/** Re-submits the failed turn, the same as bb's own Retry in the thread. */
-function RetryButton({ threadId }: { threadId: string }) {
-  const sdk = useSdk();
-  const [pending, setPending] = useState(false);
-  return (
-    <button
-      type="button"
-      disabled={pending}
-      onClick={async (event) => {
-        event.stopPropagation();
-        setPending(true);
-        try {
-          await sdk.threads.retry({ threadId });
-        } catch (error) {
-          toast.error("Retry failed", { description: error instanceof Error ? error.message : String(error) });
-        } finally {
-          setPending(false);
-        }
-      }}
-      aria-label="Retry the failed turn"
-      className="flex h-5 shrink-0 items-center gap-1 rounded-full border border-destructive/40 px-1.5 text-2xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-60"
-    >
-      <Icon name={pending ? "Loading" : "RotateCcw"} aria-hidden className="size-3" />
-      Retry
-    </button>
   );
 }
 

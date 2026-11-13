@@ -15,6 +15,19 @@ the indicator the way bb's own list does.
 The subagent counter opens a list that fits the available screen space, including
 on mobile. Longer lists scroll inside the card while the summary stays visible.
 
+Needs you sits above the sections and hides when nothing waits. In order:
+threads asking a question (the question and how long they have waited, longest
+first), failed turns, failed queued messages, and finished results not read
+yet; then pull requests of the user's threads with failing checks, conflicts or
+changes requested (ready to merge stays a row icon); then enabled automations
+whose last run failed. Each item is two lines, title then reason; a subthread's
+reason names its orchestration. Clicking an item opens its thread; a PR with no
+thread opens GitHub Folder's PR page, an automation with no run the Automations
+page. A failed turn offers Retry, a failed queued message Resend. Hovering an
+item shows Snooze, which hides it until it changes and offers Undo, and Mark
+read on a result. ⇧⌘I opens the next item from anywhere in bb; Settings →
+Keyboard rebinds it. Each browser client keeps its own snoozes.
+
 The line at the top counts threads that need input, failed, are running, and
 finished but are not read yet. Each count is a toggle: it swaps the sections and
 the tree for a flat list of those threads, children included, most recently

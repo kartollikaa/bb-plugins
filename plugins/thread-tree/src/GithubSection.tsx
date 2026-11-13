@@ -23,7 +23,7 @@ import { Collapse } from "./Collapse";
 const POLL_MS = 60_000;
 
 /** The GitHub Folder plugin's PR page; `toPluginPanel` only reaches this plugin's own panels, so go through the router's history. */
-function openGithubFolderPrPage(url: string) {
+export function openGithubFolderPrPage(url: string) {
   const match = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/.exec(url);
   if (!match) return;
   window.history.pushState(window.history.state, "", `/plugins/github-folder/pr/${match[1]}/${match[2]}/${match[3]}`);
