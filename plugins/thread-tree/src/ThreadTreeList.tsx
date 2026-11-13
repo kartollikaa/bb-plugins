@@ -76,7 +76,7 @@ import { useDragReorder, useFlipOrder } from "./useReorder";
 import { ReduceMotionContext, useStill } from "./motion";
 import { Collapse } from "./Collapse";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, TOUCH_DIMMED } from "./rowStyles";
-import { canStop, hoverActionsClass, rowHeightPx, stopsFromGlyph } from "./rowActions";
+import { canStop, END_SLOT_MIN_PX, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
 
 const ROW_PAD_PX = 6;
@@ -85,7 +85,7 @@ const INDENT_PX = 24;
 
 const ARCHIVE_ACTION_KEY = "bb--core/archive";
 const ROW_ACTION_BUTTON =
-  "flex size-6 items-center justify-center rounded-md text-sidebar-foreground/60 outline-none hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring";
+  "pointer-events-auto flex size-6 items-center justify-center rounded-md text-sidebar-foreground/60 outline-none hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring";
 
 const GROUP_MODES: readonly { id: GroupMode; label: string; chip: string; icon: React.ReactNode }[] = [
   { id: "project", label: "Project", chip: "Group: Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },
@@ -798,12 +798,12 @@ function ThreadRowView({
         title={tooltip}
         data-thread-row=""
         className={cn(
-          "group/row relative rounded-md pr-2 text-sm text-sidebar-foreground/90",
+          "group/row relative rounded-md text-sm text-sidebar-foreground/90",
           isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60 data-[keyboard-focus]:bg-sidebar-accent/60",
         )}
         data-keyboard-focus={keyboardFocus || undefined}
         data-menu-open={menuOpen || undefined}
-        style={{ paddingLeft: ROW_PAD_PX + depth * INDENT_PX, height: heightPx }}
+        style={{ paddingLeft: ROW_PAD_PX + depth * INDENT_PX, paddingRight: ROW_END_PAD_PX, height: heightPx }}
         onFocus={(event) => {
           if (event.currentTarget.contains(event.target)) setKeyboardFocus(event.target.matches(":focus-visible"));
         }}
@@ -851,33 +851,38 @@ function ThreadRowView({
             <RowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
           )}
           <span aria-hidden className="min-w-0 flex-1" />
-          {failed ? <RetryButton threadId={thread.id} /> : null}
-          {pullRequest ? <PullRequestIcon pullRequest={pullRequest} /> : null}
-          {sharesBranchWith ? (
-            <span
-              data-shared-branch=""
-              role="img"
-              aria-label={sharedBranchTooltip(branch, sharesBranchWith)}
-              title={sharedBranchTooltip(branch, sharesBranchWith)}
-              className="flex size-4 shrink-0 items-center justify-center text-amber-600 dark:text-amber-400"
-            >
-              <Icon name="TriangleAlert" fallback="AlertTriangle" aria-hidden className="size-3.5" />
-            </span>
-          ) : null}
-          {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
-          <span
-            data-provider-icon={thread.providerId}
-            title={providerName}
-            className="flex size-3.5 shrink-0 items-center justify-center text-sidebar-foreground"
-            style={{ color: providerTintColor(thread.providerId, view.providerIconStyle) ?? undefined }}
-          >
-            <ProviderIcon providerKind="agent" provider={untinted(provider, thread.providerId)} aria-label={providerName} className="size-3.5" />
+          {/* Above the overlay's fade, so hover and focus never hide or block them. */}
+          <span className="relative z-[1] flex shrink-0 items-center gap-2 empty:hidden">
+            {failed ? <RetryButton threadId={thread.id} /> : null}
+            {pullRequest ? <PullRequestIcon pullRequest={pullRequest} /> : null}
+            {sharesBranchWith ? (
+              <span
+                data-shared-branch=""
+                role="img"
+                aria-label={sharedBranchTooltip(branch, sharesBranchWith)}
+                title={sharedBranchTooltip(branch, sharesBranchWith)}
+                className="flex size-4 shrink-0 items-center justify-center text-amber-600 dark:text-amber-400"
+              >
+                <Icon name="TriangleAlert" fallback="AlertTriangle" aria-hidden className="size-3.5" />
+              </span>
+            ) : null}
+            {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
           </span>
-          {view.showAge ? (
-            <span data-row-age="" className="-mr-1 shrink-0 whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45">
-              {age}
+          <span className="flex shrink-0 items-center justify-end gap-2" style={{ minWidth: isCompactViewport ? undefined : END_SLOT_MIN_PX }}>
+            <span
+              data-provider-icon={thread.providerId}
+              title={providerName}
+              className="flex size-3.5 shrink-0 items-center justify-center text-sidebar-foreground"
+              style={{ color: providerTintColor(thread.providerId, view.providerIconStyle) ?? undefined }}
+            >
+              <ProviderIcon providerKind="agent" provider={untinted(provider, thread.providerId)} aria-label={providerName} className="size-3.5" />
             </span>
-          ) : null}
+            {view.showAge ? (
+              <span data-row-age="" className="-mr-1 shrink-0 whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45">
+                {age}
+              </span>
+            ) : null}
+          </span>
         </div>
         {isCompactViewport ? null : (
           <span
@@ -889,7 +894,7 @@ function ThreadRowView({
             )}
           >
             <span aria-hidden className={cn("h-full w-6", ROW_FADE_GRADIENT)} />
-            <span className={cn("flex h-full items-center gap-0.5 pr-1", ROW_FADE_SOLID)}>
+            <span className={cn("flex h-full items-center", ROW_FADE_SOLID)} style={{ gap: STRIP_GAP_PX, paddingRight: STRIP_END_PAD_PX }}>
               <ArchiveButton thread={target} />
               <ThreadActionsMenu
                 thread={target}

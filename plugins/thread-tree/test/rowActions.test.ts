@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canStop, hoverActionsClass, rowHeightPx, stopsFromGlyph } from "../src/rowActions.ts";
+import { canStop, END_SLOT_MIN_PX, HOVER_ACTIONS_STRIP_PX, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, stopsFromGlyph } from "../src/rowActions.ts";
 
 const idle = { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 };
 const leaf = { glyph: { indicator: "runtime", rowStatus: null } };
@@ -56,4 +56,12 @@ test("Stop replaces only a glyph that shows running work, not a question, failur
     assert.equal(stopsFromGlyph(t("active"), row(indicator)), false, indicator);
   }
   assert.equal(stopsFromGlyph(t("active"), row("background-agent", { label: "Deploying" })), false);
+});
+
+test("the overlay lets clicks through to the row and its controls; only its own buttons catch them", () => {
+  for (const reduceMotion of [false, true]) assert.ok(hoverActionsClass(reduceMotion).split(" ").includes("pointer-events-none"));
+});
+
+test("the provider and age slot reserves the button strip's width, so Archive and ⋯ never cover Retry, a PR icon, ⚠ or the badge", () => {
+  assert.ok(END_SLOT_MIN_PX + ROW_END_PAD_PX >= HOVER_ACTIONS_STRIP_PX);
 });
