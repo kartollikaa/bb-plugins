@@ -126,6 +126,10 @@ can find it by the error text.
   usable positive control for zoom blocking. Pinch along the vertical axis: horizontal finger travel
   also drives bb's sidebar and side-panel swipes. `Emulation.setPageScaleFactor` silently stops
   touch events reaching the page for the rest of the session; zoom with a real spread instead.
+- **CDP emulation outlives its session.** An `Emulation.*` override sent through one
+  `createCDPSession()` stays on the page after that session is gone. Touch emulation leaves
+  `(hover: hover)` false, so every `group-hover` control silently stops showing. Open a fresh
+  browser session after any mobile emulation before checking hover behaviour.
 - **Don't unmount an element while a finger is on it.** bb's sidebar swipe waits for that finger's
   touchend on `window`, and a touch whose target was removed never bubbles there. Keep a touch
   overlay mounted (fade it, `pointer-events: none`) until `touches.length === 0`.
