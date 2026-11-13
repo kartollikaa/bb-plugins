@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   automationItems,
   describeQuestion,
+  questionsToRead,
   isSnoozed,
   itemTarget,
   linkedPullRequests,
@@ -75,7 +76,7 @@ export function useNeedsYou(sources: NeedsYouSources) {
     };
     return [
       ...threadItems({ threads, questions, firstSeen: firstSeen.current, orchestrationOf }),
-      ...pullRequestItems(pullRequestMode, linkedPullRequests(threads.map((thread) => thread.id), prsOf, descendantIdsOf), folderAttention, folderItems),
+      ...(pullRequestMode === "none" ? [] : pullRequestItems(pullRequestMode, linkedPullRequests(threads.map((thread) => thread.id), prsOf, descendantIdsOf), folderAttention, folderItems)),
       ...automationItems(automations),
     ];
   }, [threads, questions, orchestrationOf, pullRequestMode, pullRequestsOf, descendantIdsOf, folderAttention, folderItems, automations]);
@@ -122,29 +123,38 @@ export function useNeedsYou(sources: NeedsYouSources) {
   return { items, open, snooze };
 }
 
-/** Pending requests of the threads that need input, read again whenever such a thread changes. */
+/** Pending requests of the threads that need input, read again only for a thread that changed. */
 function useQuestions(threads: readonly PluginSidebarThread[]): ReadonlyMap<string, ThreadQuestion> {
   const sdk = useSdk();
   const [questions, setQuestions] = useState<ReadonlyMap<string, ThreadQuestion>>(new Map());
+  const readAt = useRef(new Map<string, number>());
   const waitingKey = threads
     .filter((thread) => thread.hasPendingInteraction || thread.indicator === "waiting-for-input")
     .map((thread) => `${thread.id}@${thread.updatedAt}`)
     .sort()
     .join();
   useEffect(() => {
-    const ids = waitingKey ? waitingKey.split(",").map((entry) => entry.slice(0, entry.lastIndexOf("@"))) : [];
-    const controller = new AbortController();
-    void Promise.all(ids.map(async (threadId) => {
-      try {
-        const pending = await sdk.threads.interactions.list({ threadId, signal: controller.signal });
-        return [threadId, describeQuestion(pending as unknown as PendingInteraction[])] as const;
-      } catch {
-        return null;
-      }
-    })).then((entries) => {
-      if (!controller.signal.aborted) setQuestions(new Map(entries.filter((entry) => entry !== null)));
-    });
-    return () => controller.abort();
+    const waiting = waitingKey
+      ? waitingKey.split(",").map((entry) => {
+          const at = entry.lastIndexOf("@");
+          return { id: entry.slice(0, at), updatedAt: Number(entry.slice(at + 1)) };
+        })
+      : [];
+    const ids = new Set(waiting.map((thread) => thread.id));
+    for (const id of [...readAt.current.keys()]) if (!ids.has(id)) readAt.current.delete(id);
+    setQuestions((previous) => ([...previous.keys()].every((id) => ids.has(id)) ? previous : new Map([...previous].filter(([id]) => ids.has(id)))));
+    for (const id of questionsToRead(waiting, readAt.current)) {
+      const updatedAt = waiting.find((thread) => thread.id === id)!.updatedAt;
+      readAt.current.set(id, updatedAt);
+      sdk.threads.interactions.list({ threadId: id }).then(
+        (pending) => {
+          if (readAt.current.get(id) === updatedAt) setQuestions((previous) => new Map(previous).set(id, describeQuestion(pending as unknown as PendingInteraction[])));
+        },
+        () => {
+          if (readAt.current.get(id) === updatedAt) readAt.current.delete(id);
+        },
+      );
+    }
   }, [sdk, waitingKey]);
   return questions;
 }

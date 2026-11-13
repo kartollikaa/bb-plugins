@@ -145,6 +145,11 @@ export function threadItems<T extends NeedsYouThread>({ threads, questions, firs
   return items.map(({ updatedAt: _updatedAt, ...item }) => item);
 }
 
+/** Waiting threads whose pending requests weren't read at their current update. */
+export function questionsToRead(waiting: readonly { id: string; updatedAt: number }[], readAt: ReadonlyMap<string, number>): string[] {
+  return waiting.filter((thread) => readAt.get(thread.id) !== thread.updatedAt).map((thread) => thread.id);
+}
+
 /** Today's first-seen times for threads that need input: kept while they wait, dropped once they don't. */
 export function trackFirstSeen(previous: ReadonlyMap<string, number>, waitingIds: readonly string[], now: number): Map<string, number> {
   return new Map(waitingIds.map((id) => [id, previous.get(id) ?? now]));

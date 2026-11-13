@@ -10,6 +10,7 @@ import {
   nextItem,
   pruneSnoozes,
   pullRequestItems,
+  questionsToRead,
   readSnoozes,
   threadItemKind,
   threadItems,
@@ -275,4 +276,9 @@ test("only a thread whose turn failed offers Retry; an unread failure that has m
   const [errored, unreadError] = build([thread("e", { status: "error", updatedAt: 2 }), thread("u", { status: "idle", indicator: "unread-error", updatedAt: 1 })]);
   assert.equal(errored!.kind === "failed" && errored!.canRetry, true);
   assert.equal(unreadError!.kind === "failed" && unreadError!.canRetry, false);
+});
+
+test("questions are read again only for waiting threads that changed since the last read", () => {
+  const read = new Map([["a", 1], ["b", 1], ["gone", 1]]);
+  assert.deepEqual(questionsToRead([{ id: "a", updatedAt: 1 }, { id: "b", updatedAt: 2 }, { id: "c", updatedAt: 1 }], read), ["b", "c"]);
 });
