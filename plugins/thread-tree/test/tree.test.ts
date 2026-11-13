@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ancestorsOf, buildForest, descendantsOf, countStates, effectiveState, groupRows, placeNear, readFolderSorts, rememberProjectFolders, recentThreads, resolveProjectOrder, summarize, threadDotState, threadsOnScreen, type TreeThread } from "../src/tree.ts";
+import { ancestorsOf, buildForest, descendantsOf, effectiveState, groupRows, placeNear, readFolderSorts, rememberProjectFolders, recentThreads, resolveProjectOrder, summarize, threadDotState, threadsOnScreen, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
@@ -273,17 +273,6 @@ test("a thread whose turn failed is red even once read, and outranks live backgr
   assert.equal(threadDotState(thread("t", { status: "error", activity: busy, indicator: "runtime" })), "error");
 });
 
-test("the overview counts visible active threads by their own state", () => {
-  const counts = countStates([
-    thread("a", { status: "active" }),
-    thread("b", { hasPendingInteraction: true }),
-    thread("c", { status: "active", isArchived: true }),
-    thread("d", { isHidden: true, status: "active" }),
-    thread("e"),
-  ]);
-  assert.deepEqual(counts, { running: 1, input: 1, done: 1 });
-});
-
 test("placeNear drops a block before or after its target", () => {
   assert.deepEqual(placeNear(["a", "b", "c"], "a", "c", true), ["b", "c", "a"]);
   assert.deepEqual(placeNear(["a", "b", "c"], "a", "c", false), ["b", "a", "c"]);
@@ -412,7 +401,8 @@ test("a queued message or a goal with no turn running waits: not running, not do
     assert.equal(threadDotState(thread("t", { indicator })), "waiting", indicator);
     assert.equal(threadDotState(thread("t", { indicator, status: "active" })), "running", indicator);
   }
-  assert.deepEqual(countStates([thread("q", { indicator: "queued-waiting" }), thread("g", { indicator: "goal" })]), { waiting: 2 });
+  assert.equal(threadDotState(thread("q", { indicator: "queued-waiting" })), "waiting");
+  assert.equal(threadDotState(thread("g", { indicator: "goal" })), "waiting");
 });
 
 test("a waiting thread ranks below running and above done in status groups", () => {
