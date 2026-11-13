@@ -32,7 +32,7 @@ that don't move or change height while agents work.
 - **Nothing moves under the cursor.** Hover actions overlay the row instead of reflowing it.
 - **The top of the sidebar is no taller than today.** New things go into the status line or
   under Threads.
-- **Quiet when fine.** Healthy sections collapse to a summary header; idle threads draw no glyph.
+- **Quiet when fine.** Healthy sections collapse to a summary header; idle threads get only a faint dot.
 - **Use bb's own pieces** (status glyph, drafts, row statuses, provider icon, thread actions) so
   the list matches bb and keeps other plugins' contributions.
 
@@ -77,9 +77,13 @@ Left to right, fixed 32px height:
 
 - **Status glyph:** bb's `experimental_ThreadStatusGlyph`, fed with the thread's indicator, its
   draft state and any row status another plugin set. Spinner while working, attention dot for
-  input, error dot, a dot for finished-unread, pencil for an unsent draft, nothing when idle.
+  input, error dot, a dot for finished-unread, pencil for an unsent draft, and a small dim dot when idle.
   Fixes today's bug where queued-failed, plan-mode, goal and queued-waiting threads show green.
-  Rejected: a hollow ring for idle (noise across dozens of rows).
+  Idle: a 4px solid dot in the glyph's centre, in the faintest text colour. Owner, on a blank slot:
+  "it feels really awkward because there is an empty space between the title". The dot keeps the
+  title column aligned and turns into a state by changing colour only. Rejected: a blank slot (reads
+  as a hole), collapsing the slot for idle rows (titles jump sideways when state changes and
+  siblings misalign), a hollow ring (noise across dozens of rows).
 - **PR:** a tinted 14px icon only when a PR needs action (checks failing, conflicts, changes
   requested, ready to merge); the number and title are in its tooltip, click opens GitHub.
   Nothing otherwise. A failed thread shows Retry and no PR icon. Owner: the PR line "feels like
@@ -189,7 +193,7 @@ Each slice ships alone, updates `skills/thread-tree/SKILL.md`, `README.md` and
 `PLUGIN_OVERVIEW.md` for the behaviour it changes, passes tests, typecheck and build, is checked in
 the live bb, and is released per [docs/workflow.md](../../../docs/workflow.md).
 
-1. **Row foundation.** bb status glyph with drafts and row statuses; idle draws nothing;
+1. **Row foundation.** bb status glyph with drafts and row statuses; idle draws a small dim dot;
    `indicatorLabel` as the accessible label; jump-shortcut hints; spinner and pulse respect Reduce
    motion and `prefers-reduced-motion`.
 2. **Row anatomy.** Fixed 32px rows; provider fixed slot with tint setting; PR icon only when
