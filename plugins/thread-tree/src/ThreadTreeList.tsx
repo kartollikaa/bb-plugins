@@ -1118,7 +1118,7 @@ function FoldLine({
         onClick={onExpand}
         title={`Expand: ${description}`}
         aria-label={`Expand subthreads: ${description}`}
-        className="-ml-1 flex h-5 min-w-0 items-center gap-2 overflow-hidden rounded-md px-1 text-2xs tabular-nums text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+        className={cn("-ml-1 flex h-5 min-w-0 items-center gap-2 overflow-hidden rounded-md px-1 text-2xs tabular-nums text-sidebar-foreground/50 outline-none hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring", ROW_TINT)}
       >
         <span className="shrink-0">{subthreads}</span>
         {parts.map(({ state, label }) => (

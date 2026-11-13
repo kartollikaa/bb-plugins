@@ -16,3 +16,14 @@ test("sidebar classes use no :has() selector, which restyles the whole page on e
     );
   assert.deepEqual(offenders, []);
 });
+
+test("rows take their hover tint from ROW_TINT instead of spelling it again", () => {
+  const offenders = readdirSync(SRC)
+    .filter((file) => /\.tsx?$/.test(file) && file !== "rowStyles.ts")
+    .flatMap((file) =>
+      readFileSync(join(SRC, file), "utf8")
+        .split("\n")
+        .flatMap((line, index) => (/hover:bg-sidebar-accent\/60/.test(line) ? [`src/${file}:${index + 1}`] : [])),
+    );
+  assert.deepEqual(offenders, []);
+});

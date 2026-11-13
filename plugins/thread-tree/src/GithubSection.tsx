@@ -16,7 +16,7 @@ import {
   type GithubSettingsPatch,
 } from "./githubFolder";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
-import { ROW_HOVER_SOLID_BG, TOUCH_DIMMED } from "./rowStyles";
+import { ROW_HOVER_SOLID_BG, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
 import { formatAge } from "./time";
 import { Collapse } from "./Collapse";
 
@@ -210,7 +210,8 @@ function PullRequestRow({
         if (event.button === 1) onOpenOnGithub();
       }}
       className={cn(
-        "group/row relative flex h-8 cursor-default items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90 hover:bg-sidebar-accent/60",
+        "group/row relative flex h-8 cursor-default items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90",
+        ROW_TINT,
         isSnoozed && "text-sidebar-foreground/50",
       )}
     >

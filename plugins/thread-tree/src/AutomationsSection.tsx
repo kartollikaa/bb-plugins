@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import type { rpcContract } from "../server";
 import { automationDot, sortAutomations, type AutomationAction, type AutomationSummary } from "./automations";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
-import { ROW_HOVER_SOLID_BG } from "./rowStyles";
+import { ROW_HOVER_SOLID_BG, ROW_TINT } from "./rowStyles";
 import { StatusDot } from "./StatusDot";
 import { formatUntil } from "./time";
 import { Collapse } from "./Collapse";
@@ -159,7 +159,7 @@ function AutomationRow({
       onClick={onOpen}
       className={cn(
         "group/row relative flex h-8 cursor-default items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90",
-        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60",
+        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : ROW_TINT,
         !automation.enabled && "text-sidebar-foreground/55",
       )}
     >
