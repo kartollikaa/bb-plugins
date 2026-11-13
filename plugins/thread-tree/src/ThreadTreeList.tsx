@@ -43,7 +43,7 @@ import { GithubSection, useGithubFolder } from "./GithubSection";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph } from "./statusGlyph";
 import { StatusLine } from "./StatusLine";
-import { countStatusFilters, filterThreads, isSearchKey, runningContext, searchThreads, STATUS_FILTERS, type StatusFilter } from "./statusFilters";
+import { countStatusFilters, filterThreads, isSearchKey, orchestrationTitle, runningContext, searchThreads, STATUS_FILTERS, type StatusFilter } from "./statusFilters";
 import type { rpcContract } from "../server";
 import {
   moveSection,
@@ -208,7 +208,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   useFlipOrder(sectionsRef, shownSections.join(), view.reduceMotion);
   useFlipOrder(treeRef, groups.map((group) => group.key).join(), view.reduceMotion);
   const moveSectionBy = (id: SectionId, step: -1 | 1) => setSavedSectionOrder(moveSection(sectionOrder, shownSections, id, step));
-  const threadById = useMemo(() => new Map(threads.map((thread) => [thread.id, thread])), [threads]);
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const prThreads = useMemo(() => pullRequestThreads(activeForest, forest), [activeForest, forest]);
   const pullRequestsOf = useThreadPullRequests(prThreads, sectionsRef);
@@ -217,6 +216,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     () => folderAttentionByUrl(folderItems ? [...folderItems.items, ...folderItems.snoozed] : []),
     [folderItems],
   );
+  const orchestrationOf = useMemo(() => orchestrationTitle(threads), [threads]);
   const sharedBranches = useMemo(() => sharedBranchThreads(threads, familyRootOf(threads)), [threads]);
   const canHover = !useMediaQuery(NO_HOVER_QUERY);
   const searchPool = showArchived ? listed.threads : threads;
@@ -363,7 +363,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             flatRow(thread),
             "flat",
             statusFilter === "running"
-              ? runningContext(projectById.get(thread.projectId)?.name ?? null, parentTitle(activeForest, threadById, thread.id))
+              ? runningContext(projectById.get(thread.projectId)?.name ?? null, orchestrationOf(thread.id))
               : undefined,
             true,
           ))}
@@ -667,11 +667,6 @@ function FlatListSection({
       </div>
     </section>
   );
-}
-
-function parentTitle(forest: Forest<PluginSidebarThread>, threadById: ReadonlyMap<string, PluginSidebarThread>, threadId: string): string | null {
-  const parentId = forest.parentOf.get(threadId);
-  return parentId ? threadById.get(parentId)?.displayTitle ?? null : null;
 }
 
 /** Section visibility lives in the plugin settings; a toggle applies at once and saves in the background. */

@@ -1,4 +1,5 @@
 // The status line's counts, the flat lists they filter to, and `/` search.
+import { familyRootOf } from "./sharedBranch.ts";
 import { threadDotState, type TreeThread } from "./tree.ts";
 
 export type StatusFilter = "input" | "error" | "running" | "unread";
@@ -67,6 +68,16 @@ export function searchThreads<T extends FilterThread>(threads: readonly T[], que
       return words.every((word) => haystack.includes(word));
     })
     .sort(byActivity);
+}
+
+/** The title of the orchestration a thread runs under: its family's root, null for a root itself. */
+export function orchestrationTitle(threads: readonly FilterThread[]): (threadId: string) => string | null {
+  const familyOf = familyRootOf(threads);
+  const titleById = new Map(threads.map((thread) => [thread.id, thread.displayTitle]));
+  return (threadId) => {
+    const rootId = familyOf(threadId);
+    return rootId === threadId ? null : titleById.get(rootId) ?? null;
+  };
 }
 
 export function runningContext(projectName: string | null, parentTitle: string | null): string {

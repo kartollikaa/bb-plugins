@@ -5,6 +5,7 @@ import {
   filterThreads,
   isSearchKey,
   statusSummary,
+  orchestrationTitle,
   runningContext,
   searchThreads,
   STATUS_FILTERS,
@@ -106,6 +107,20 @@ test("a Running row's second line names its project and the orchestration it run
   assert.equal(runningContext("bb-plugins", "Orchestrate PR review"), "bb-plugins · under Orchestrate PR review");
   assert.equal(runningContext("bb-plugins", null), "bb-plugins");
   assert.equal(runningContext(null, null), "");
+});
+
+test("a Running row names the orchestration at the top of its family, not its direct parent", () => {
+  const threads = [
+    thread("o", { displayTitle: "Orchestrate PR review" }),
+    thread("a", { parentThreadId: "o", displayTitle: "Slice A" }),
+    thread("b", { parentThreadId: "a", displayTitle: "Helper B" }),
+    thread("pinned", { parentThreadId: "a", isPinned: true, displayTitle: "Pinned helper" }),
+  ];
+  const titleOf = orchestrationTitle(threads);
+  assert.equal(titleOf("b"), "Orchestrate PR review");
+  assert.equal(titleOf("a"), "Orchestrate PR review");
+  assert.equal(titleOf("pinned"), "Orchestrate PR review", "pinning moves the row, not the thread out of its orchestration");
+  assert.equal(titleOf("o"), null, "the orchestrator itself runs under nothing");
 });
 
 test("a two-line row is taller than a one-line row on every viewport", () => {
