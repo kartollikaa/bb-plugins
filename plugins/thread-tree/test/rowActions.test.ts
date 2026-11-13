@@ -26,15 +26,17 @@ test("compact viewports get taller rows than the fixed 32px", () => {
   assert.ok(rowHeightPx(true) > 32);
 });
 
-test("hover actions appear after a 120ms delay on hover, at once for keyboard focus or an open menu, and never resize the row", () => {
+test("hover actions appear at once on hover, keyboard focus or an open menu, fade in 80ms at most, and never resize the row", () => {
   for (const reduceMotion of [false, true]) {
     const classes = hoverActionsClass(reduceMotion).split(" ");
     assert.ok(classes.includes("invisible") && classes.includes("opacity-0"));
-    assert.ok(classes.includes("group-hover/row:delay-[120ms]"));
-    assert.ok(classes.includes("group-data-[keyboard-focus]/row:visible") && classes.includes("group-data-[keyboard-focus]/row:delay-0"));
-    assert.ok(classes.includes("group-data-[menu-open]/row:visible"));
+    for (const state of ["group-hover/row", "group-data-[keyboard-focus]/row", "group-data-[menu-open]/row"]) {
+      assert.ok(classes.includes(`${state}:visible`) && classes.includes(`${state}:opacity-100`), state);
+    }
+    assert.equal(classes.some((c) => /delay/.test(c)), false);
+    const duration = classes.map((c) => /^duration-(\d+)$/.exec(c)?.[1]).find(Boolean);
+    assert.ok(duration === undefined || Number(duration) <= 80, `duration ${duration}`);
     assert.equal(classes.some((c) => /max-w|(^|:)w-|(^|:)hidden$|(^|:)flex$/.test(c)), false);
   }
-  assert.ok(hoverActionsClass(false).includes("transition-[opacity,visibility]"));
-  assert.ok(hoverActionsClass(true).includes("duration-0"));
+  assert.ok(hoverActionsClass(true).includes("transition-none"));
 });

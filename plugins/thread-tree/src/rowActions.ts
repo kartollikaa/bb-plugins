@@ -15,16 +15,13 @@ export function stopsFromGlyph(thread: Pick<TreeThread, "status" | "indicator" |
   return !hasChildren && canStop(thread);
 }
 
-/**
- * The right-end overlay: hidden at rest, shown after the hover delay, at once for keyboard focus
- * or an open menu. Only opacity and visibility change, so nothing in the row reflows.
- */
+/** Shown at once on hover, keyboard focus or an open menu; only opacity and visibility change, so nothing reflows. */
 export function hoverActionsClass(reduceMotion: boolean): string {
   return [
     "invisible opacity-0",
-    reduceMotion ? "transition-[visibility] duration-0" : "transition-[opacity,visibility] duration-100 ease-out",
-    "group-hover/row:visible group-hover/row:opacity-100 group-hover/row:delay-[120ms]",
-    "group-data-[keyboard-focus]/row:visible group-data-[keyboard-focus]/row:opacity-100 group-data-[keyboard-focus]/row:delay-0",
-    "group-data-[menu-open]/row:visible group-data-[menu-open]/row:opacity-100 group-data-[menu-open]/row:delay-0",
+    reduceMotion ? "transition-none" : "transition-[opacity,visibility] duration-75 ease-out",
+    "group-hover/row:visible group-hover/row:opacity-100",
+    "group-data-[keyboard-focus]/row:visible group-data-[keyboard-focus]/row:opacity-100",
+    "group-data-[menu-open]/row:visible group-data-[menu-open]/row:opacity-100",
   ].join(" ");
 }

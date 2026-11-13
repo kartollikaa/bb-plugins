@@ -44,7 +44,7 @@ export function GroupHeader({
           name="ChevronRight"
           aria-hidden
           className={cn(
-            "size-3 shrink-0 text-sidebar-foreground/40 opacity-0 transition group-hover/header:opacity-100",
+            "size-3 shrink-0 text-sidebar-foreground/40 opacity-0 transition-[opacity,transform] duration-75 group-hover/header:opacity-100",
             TOUCH_DIMMED,
             !isCollapsed && "rotate-90",
           )}

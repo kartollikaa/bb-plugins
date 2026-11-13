@@ -104,9 +104,12 @@ Left to right, fixed 32px height:
 
 ### Hover actions
 
-- Archive and ⋯ overlay the right end of the row over a fade of the row's background, after a
-  120ms delay; nothing underneath moves. Keyboard focus shows them at once. ⋯ is always outermost.
-  The Automations section already uses this overlay; thread rows join it.
+- Archive and ⋯ overlay the right end of the row over a fade of the row's background; nothing
+  underneath moves. They appear at once on hover and on keyboard focus, with a fade-in of 80ms at
+  most. ⋯ is always outermost. The Automations section already uses this overlay; thread rows join
+  it. The first pick was a 120ms hover delay; the owner dropped it after trying it: "There is an
+  uncomfortable delay between I hover the chat and they appear." Every hover control in the
+  sidebar (thread rows, Automations, section headers) shows without a wait.
 - Stop lives on the spinner: hovering a running thread's glyph turns it into a Stop button. It is
   never on the spot where Archive sits, so a habitual archive click can't stop an agent.
 - Hit targets are 24px. Touch keeps long-press for the menu; compact viewports get taller rows.
@@ -200,7 +203,7 @@ the live bb, and is released per [docs/workflow.md](../../../docs/workflow.md).
    actionable, replacing the PR line (one list-level PR refresh that pauses when hidden, replacing
    per-row timers; theme-safe colours); tooltip with branch; shared-branch warning; subagent counter
    kept.
-3. **Hover actions.** Overlay with delay, 24px targets, Stop on the spinner, compact-viewport rows.
+3. **Hover actions.** Overlay shown at once, 24px targets, Stop on the spinner, compact-viewport rows.
 4. **Status line filters and `/` search,** including the Running filter's flat list. Step text
    and timer can arrive later (slice 9).
 5. **Needs you.** Thread items first (input with question and wait, failed, queued-failed,
