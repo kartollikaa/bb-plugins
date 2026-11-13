@@ -1,4 +1,3 @@
-import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { folderItemSchema, settingsPatchSchema, settingsSchema } from "./github";
 import { prDetailsSchema } from "./pr-context";
@@ -18,7 +17,7 @@ export const folderViewSchema = z.object({
 });
 export type FolderView = z.infer<typeof folderViewSchema>;
 
-export const rpcContract = defineRpcContract({
+export const rpcContract = {
   folder: {
     input: z.null(),
     output: folderViewSchema,
@@ -46,4 +45,4 @@ export const rpcContract = defineRpcContract({
     input: z.object({ key: z.string().min(1).max(400), snoozed: z.boolean() }).strict(),
     output: z.object({ ok: z.literal(true) }),
   },
-});
+} as const;
