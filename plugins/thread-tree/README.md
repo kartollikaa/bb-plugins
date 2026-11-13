@@ -26,6 +26,12 @@ periodically while visible; without Thread Links, the branch badge still works.
 An orchestrator hides PRs owned by its subthreads, including nested or folded
 subthreads, while keeping its own unique PRs. Matching uses the full PR URL.
 
+## Redesign in progress
+
+The next sidebar redesign is specified in [docs/sidebar-v2.md](docs/sidebar-v2.md),
+with an interactive prototype in [docs/sidebar-v2-prototype.html](docs/sidebar-v2-prototype.html).
+It is built in slices; each slice updates this README when it ships.
+
 ## Develop
 
 ```sh

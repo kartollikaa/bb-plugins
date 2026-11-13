@@ -1,0 +1,496 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --run: #3b82f6; --merged: #a371f7; --claude: #d97757; --codex: #10a37f; }
+  * { box-sizing: border-box; }
+  .top { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 2px; }
+  .seg button { font: inherit; font-size: 12px; padding: 4px 12px; border: 0; border-radius: 999px; background: transparent; color: var(--muted-foreground); cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+  .choices { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; color: var(--muted-foreground); margin-bottom: 14px; }
+  .choices label { display: flex; flex-direction: column; gap: 3px; }
+  .choices select { font: inherit; font-size: 12px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); }
+  .stage { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; }
+  .sb { width: 300px; max-width: 100%; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-recessed, var(--muted)); padding: 6px 6px 12px; font-size: 13.5px; position: relative; --rowbg: var(--surface-recessed, var(--muted)); }
+  .notes { flex: 1; min-width: 260px; max-width: 400px; font-size: 13px; line-height: 1.5; }
+  .notes ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
+  .notes li { display: flex; gap: 8px; padding: 4px 6px; border-radius: 8px; }
+  .notes li:hover, .notes li.hl { background: var(--accent); }
+  .src { font-size: 11px; color: var(--muted-foreground); }
+  .num { flex: none; width: 17px; height: 17px; border-radius: 50%; background: var(--brand, var(--primary)); color: var(--primary-foreground); font-size: 10px; font-weight: 600; display: grid; place-items: center; margin-top: 1px; }
+  .mk { position: absolute; right: -9px; z-index: 5; transform: translateY(-50%); }
+  .mk.hl { outline: 2px solid var(--brand, var(--primary)); outline-offset: 2px; }
+  .hide-mk .mk { display: none; }
+  svg.i { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  svg.s { width: 12px; height: 12px; }
+  .muted { color: var(--muted-foreground); }
+  .tiny { font-size: 11px; font-variant-numeric: tabular-nums; }
+
+  .strip { display: flex; align-items: center; gap: 2px; height: 26px; padding: 0 2px 0 4px; position: relative; }
+  .sf { font: inherit; font-size: 11.5px; height: 22px; padding: 0 6px; border-radius: 6px; border: 0; background: transparent; color: var(--muted-foreground); cursor: pointer; display: flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+  .sf:hover { background: var(--accent); color: var(--foreground); }
+  .sf[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: inset 0 0 0 1px var(--border); }
+  .search { display: flex; align-items: center; gap: 6px; height: 26px; flex: 1; padding: 0 8px; border-radius: 7px; background: var(--background); border: 1px solid var(--border); color: var(--muted-foreground); }
+  .search input { border: 0; outline: 0; background: transparent; font: inherit; font-size: 12.5px; color: var(--foreground); flex: 1; min-width: 0; }
+  .kbd { font-size: 10px; border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; color: var(--muted-foreground); }
+
+  .sec { margin-top: 8px; position: relative; }
+  .hd { display: flex; align-items: center; gap: 7px; height: 26px; padding: 0 8px; font-size: 12px; font-weight: 500; color: var(--muted-foreground); cursor: pointer; border-radius: 6px; }
+  .hd:hover { color: var(--foreground); }
+  .hd .sum { font-weight: 400; margin-left: auto; font-size: 11px; display: flex; gap: 6px; align-items: center; }
+  .hd .chev { transition: transform .15s; opacity: .6; }
+  .hd.isopen .chev { transform: rotate(90deg); }
+  .bad { color: var(--destructive-text, var(--destructive)); }
+
+  .row { position: relative; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 8px 0 6px; border-radius: 6px; cursor: default; min-width: 0; --bg: var(--rowbg); }
+  .row:hover { background: color-mix(in oklab, var(--accent) 60%, var(--rowbg)); --bg: color-mix(in oklab, var(--accent) 60%, var(--rowbg)); }
+  .row.active { background: var(--accent); --bg: var(--accent); }
+  .row.flash { animation: flash 1.2s ease-out; }
+  @keyframes flash { 0%,30% { background: color-mix(in oklab, var(--brand, var(--primary)) 30%, transparent); } }
+  .row.two { height: 42px; }
+  .g { width: 16px; height: 16px; display: grid; place-items: center; flex: none; position: relative; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .d-input { background: var(--attention); } .d-error { background: var(--destructive); } .d-new { background: var(--success); } .d-ring { box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--muted-foreground) 45%, transparent); }
+  .spin { width: 12px; height: 12px; border-radius: 50%; border: 1.6px solid color-mix(in oklab, var(--run) 30%, transparent); border-top-color: var(--run); animation: rot .9s linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  .stop { display: none; width: 16px; height: 16px; border-radius: 4px; place-items: center; color: var(--foreground); cursor: pointer; }
+  .stop:hover { background: color-mix(in oklab, var(--foreground) 12%, transparent); }
+  .row:hover .g.canstop .spin { display: none; } .row:hover .g.canstop .stop { display: grid; }
+  .ttl { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .ttl.unread { font-weight: 600; }
+  .ttl .sub { display: block; font-size: 11px; font-weight: 400; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; }
+  .age { flex: none; width: 26px; text-align: right; font-size: 11px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+  .pslot { flex: none; width: 14px; height: 14px; display: grid; place-items: center; }
+  .pslot svg { width: 13px; height: 13px; }
+  .pv-claude { color: var(--claude); } .pv-codex { color: var(--codex); }
+  .mono .pv-claude, .mono .pv-codex { color: var(--foreground); }
+  .muted-prov .pslot { opacity: .45; } .muted-prov .row:hover .pslot { opacity: 1; }
+  .pbadge { position: absolute; right: -2px; bottom: -2px; width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--bg); }
+  .prc { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; position: relative; }
+  .prc.fail { color: var(--destructive-text, var(--destructive)); background: color-mix(in oklab, var(--destructive) 14%, transparent); }
+  .prc.ready { color: var(--success); background: color-mix(in oklab, var(--success) 14%, transparent); }
+  .prc.chg { color: var(--warning-text, var(--attention)); background: color-mix(in oklab, var(--attention) 16%, transparent); }
+  .pill { display: flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 500; white-space: nowrap; flex: none; }
+  .p-fail { color: var(--destructive-text, var(--destructive)); background: color-mix(in oklab, var(--destructive) 14%, transparent); }
+  .p-ready { color: var(--success); background: color-mix(in oklab, var(--success) 14%, transparent); }
+  .p-chg { color: var(--warning-text, var(--attention)); background: color-mix(in oklab, var(--attention) 16%, transparent); }
+  .prline { display: flex; gap: 4px; overflow-x: auto; margin: -5px 0 2px 30px; }
+  .prl { display: flex; align-items: center; gap: 2px; height: 16px; font-size: 11px; flex: none; }
+  .open { color: var(--success); } .merged { color: var(--merged); } .closed { color: var(--destructive-text, var(--destructive)); } .draft { color: var(--muted-foreground); }
+  .btn { font: inherit; font-size: 11px; font-weight: 500; height: 22px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); cursor: pointer; display: flex; align-items: center; gap: 3px; flex: none; }
+  .btn:hover { background: var(--accent); }
+  .btn.danger { color: var(--destructive-text, var(--destructive)); border-color: color-mix(in oklab, var(--destructive) 45%, transparent); }
+  .sa { flex: none; display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+  .warn { flex: none; color: var(--warning-text, var(--attention)); display: grid; }
+
+  /* hover overlay: nothing underneath moves */
+  .ov { position: absolute; right: 4px; top: 0; bottom: 0; display: flex; align-items: center; gap: 2px; padding-left: 18px; opacity: 0; pointer-events: none; transition: opacity .1s; background: linear-gradient(to right, transparent, var(--bg) 16px); }
+  .row:hover .ov, .row:focus-within .ov { opacity: 1; pointer-events: auto; transition-delay: .12s; }
+  .ib { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; color: var(--muted-foreground); cursor: pointer; }
+  .ib:hover { background: color-mix(in oklab, var(--foreground) 10%, transparent); color: var(--foreground); }
+  /* today's swap */
+  .swap .acts { display: none; gap: 2px; } .swap:hover .acts { display: flex; } .swap:hover .age { display: none; }
+
+  .guide { position: absolute; border-left: 1px solid color-mix(in oklab, var(--foreground) 18%, transparent); }
+  .guide.dash { border-left-style: dashed; }
+  .fold { height: 24px; padding-left: 30px; cursor: pointer; gap: 8px; }
+  .fold .tiny { display: flex; gap: 8px; align-items: center; }
+  .fold .dot { width: 6px; height: 6px; display: inline-block; margin-right: 3px; }
+  .bar { width: 40px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--foreground) 12%, transparent); overflow: hidden; display: flex; flex: none; }
+  .bar span { height: 100%; }
+  .queue { margin-top: 2px; padding: 3px; border-radius: 9px; background: color-mix(in oklab, var(--attention) 7%, var(--rowbg)); border: 1px solid color-mix(in oklab, var(--attention) 25%, transparent); --rowbg: color-mix(in oklab, var(--attention) 7%, var(--surface-recessed, var(--muted))); }
+  .divider { border-top: 1px solid var(--border); margin: 10px 8px 2px; }
+  .toast { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); font-size: 12px; padding: 6px 12px; border-radius: 8px; background: var(--foreground); color: var(--background); opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9; }
+  .changed { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12.5px; }
+  .changed ul { padding-left: 18px; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="seg" id="mode"><button data-m="now">Now</button><button data-m="v2">Vision v2</button></div>
+  <label class="tiny muted" style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="mk" checked> Numbered notes</label>
+</div>
+<div class="choices" id="choices"></div>
+<div class="stage"><div class="sb" id="sb"></div><div class="notes" id="notes"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+const P = {
+  open: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M6 9v12"/>',
+  draft: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M18 6V5"/><path d="M18 11v-1"/><path d="M6 9v12"/>',
+  merged: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
+  closed: '<circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="m21 3-6 6"/><path d="m21 9-6-6"/><path d="M18 11.5V15"/><circle cx="18" cy="18" r="3"/>',
+  failing: '<circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="m15 15 6 6"/><path d="m21 15-6 6"/><path d="M13 6h3a2 2 0 0 1 2 2v3"/>',
+  conflict: '<circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9v4"/><path d="M18 17h.01"/><path d="M13 6h3a2 2 0 0 1 2 2"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>', chev: '<path d="m9 18 6-6-6-6"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>', snooze: '<path d="M10 2h4"/><path d="M12 14v-4"/><path d="M4 13a8 8 0 0 1 8-7 8 8 0 1 1-5.3 14L4 17.6"/><path d="M9 17H4v5"/>',
+  gh: '<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65S8.93 17.38 9 18v4"/><path d="M9 18c-4.51 2-5-2-7-2"/>',
+  pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+  archive: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>', pencil: '<path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/>',
+  retry: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>', square: '<rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor"/>',
+  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+  merge: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>', play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  eye: '<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
+  network: '<rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/>',
+  claude: '<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" stroke-width="2.6"/>',
+  codex: '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="m8 10 3 2-3 2"/><path d="M13 15h3"/>',
+};
+const I = (n, c = '') => `<svg class="i ${c}" viewBox="0 0 24 24">${P[n]}</svg>`;
+const $ = (id) => document.getElementById(id);
+const t0 = Date.now();
+const since = (s) => Math.floor((Date.now() - t0) / 1000) + s;
+const mins = (s) => s < 60 ? 'now' : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h`;
+const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+// s: running | input | error | done ; unread → finished, not read ; qfail → queued message failed ; silent → running, no output
+const T = {
+  plan: { t: 'Weekly planning notes', s: 'done', age: '3d', pv: 'claude', pinned: true },
+  orch: { t: 'Orchestrate PR review batch', s: 'running', age: '1m', pv: 'claude', proj: 'bb-plugins', branch: 'main', kids: ['k1', 'k2', 'k3', 'k4'], prs: [] },
+  k1: { t: 'Review #7175 checkout retry', s: 'done', age: '9m', pv: 'codex', proj: 'bb-plugins', parent: 'orch', prs: [{ n: 7175, st: 'open', a: 'failing', title: 'Checkout: retry on 502' }] },
+  k2: { t: 'Review #7177 menu image cache', s: 'running', silent: 8 * 60, started: 9 * 60, step: 'No output for 8m', age: '8m', pv: 'codex', proj: 'bb-plugins', parent: 'orch', prs: [{ n: 7177, st: 'open', a: 'ready', title: 'Menu: cache images' }] },
+  k3: { t: 'Review #7180 payments sheet', s: 'done', unread: true, age: '3m', pv: 'claude', proj: 'bb-plugins', parent: 'orch', prs: [{ n: 7180, st: 'draft', a: 'none' }] },
+  k4: { t: 'Rebase #7168 onto main', s: 'input', wait: 11 * 60, ask: 'Force-push the rebased branch?', age: '11m', pv: 'claude', proj: 'bb-plugins', parent: 'orch' },
+  glyph: { t: 'thread-tree: use bb status glyph', s: 'running', started: 192, step: 'Running npm test', age: 'now', pv: 'claude', proj: 'bb-plugins', branch: 'bb/sidebar-ux', active: true, sub: '2/3', prs: [{ n: 982, st: 'open', a: 'pending' }] },
+  dens: { t: 'Sidebar density ideas', s: 'done', age: '5h', pv: 'codex', proj: 'bb-plugins', branch: 'bb/sidebar-ux', draft: true },
+  subm: { t: 'github-folder marketplace submission', s: 'done', unread: true, age: '2h', pv: 'codex', proj: 'bb-plugins', prs: [{ n: 949, st: 'open', a: 'review', title: 'Add github-folder' }] },
+  ana: { t: 'Migrate analytics SDK', s: 'done', qfail: true, age: '25m', pv: 'codex', proj: 'bb-plugins' },
+  q1: { t: 'Fix archive undo for children', s: 'done', age: '1d', pv: 'claude', proj: 'bb-plugins', quiet: true, prs: [{ n: 931, st: 'merged', a: 'none' }] },
+  q2: { t: 'Explore provider icons', s: 'done', age: '9d', pv: 'codex', proj: 'bb-plugins', quiet: true },
+  q3: { t: 'Bump plugin SDK to 0.6.104', s: 'done', age: '4d', pv: 'claude', proj: 'bb-plugins', quiet: true, prs: [{ n: 902, st: 'merged', a: 'none' }] },
+  crash: { t: 'Crash in order history on iOS 17', s: 'error', age: '12m', pv: 'codex', proj: 'app-ios', branch: 'fix/order-history', prs: [{ n: 3310, st: 'open', a: 'conflicts', title: 'Fix order history crash' }] },
+  rel: { t: 'Release 4.12 rollout', s: 'done', age: '40m', pv: 'codex', proj: 'app-ios', kids: ['r1', 'r2'] },
+  r1: { t: 'Bump version and changelog', s: 'done', age: '1h', pv: 'codex', proj: 'app-ios', parent: 'rel' },
+  r2: { t: 'Android: store screenshots', s: 'done', age: '45m', pv: 'claude', proj: 'app-android', parent: 'rel' },
+  loy: { t: 'Loyalty card redesign', s: 'done', age: '5h', pv: 'claude', proj: 'app-ios', prs: [{ n: 3302, st: 'open', a: 'changes', title: 'Loyalty card v2' }, { n: 3299, st: 'merged', a: 'none' }] },
+  q5: { t: 'Bump Kotlin and AGP', s: 'done', age: '3d', pv: 'codex', proj: 'app-ios', quiet: true, prs: [{ n: 3290, st: 'closed', a: 'none' }] },
+};
+for (const [id, t] of Object.entries(T)) { t.id = id; t.prs = t.prs || []; }
+const PROJECTS = [{ name: 'bb-plugins', roots: ['orch', 'glyph', 'subm', 'ana', 'dens', 'q1', 'q2', 'q3'] }, { name: 'app-ios', roots: ['crash', 'rel', 'loy', 'q5'] }];
+const AUTOS = [{ name: 'Nightly dependency bump', st: 'error', when: 'failed 2h ago' }, { name: 'PR babysitter', st: 'running', when: 'running' }, { name: 'Daily digest', st: 'ok', when: 'in 12m' }];
+const GH = [
+  { n: 7175, title: 'Checkout: retry on 502', a: 'failing', repo: 'bb-plugins', thread: 'k1' },
+  { n: 3310, title: 'Fix order history crash', a: 'conflicts', repo: 'app-ios', thread: 'crash' },
+  { n: 3302, title: 'Loyalty card v2', a: 'changes', repo: 'app-ios', thread: 'loy' },
+  { n: 8812, title: 'Android: cart badge animation', a: 'review', repo: 'app-android', thread: null },
+  { n: 7177, title: 'Menu: cache images', a: 'ready', repo: 'bb-plugins', thread: 'k2' },
+];
+const ATT = { failing: ['Checks failing', 'fail', 'failing'], conflicts: ['Has conflicts', 'fail', 'conflict'], changes: ['Changes requested', 'chg', 'open'], ready: ['Ready to merge', 'ready', 'check'], review: ['Review requested', '', 'eye'], pending: ['Checks running', '', ''], none: ['', '', ''] };
+const ACTIONABLE = ['failing', 'conflicts', 'changes', 'ready'];
+
+let mode = 'v2';
+const opt = { pr: 'icon', prov: 'slot', tint: 'tint', orch: 'mirror', idle: 'blank', qpr: 'linked', hover: 'overlay' };
+const ui = { col: new Set(['gh', 'au']), fold: new Set(['rel']), quiet: new Set(), filter: null, search: false, q: '', more: false, snoozed: new Set() };
+
+const CHOICES = [
+  ['pr', 'PR on a thread row', [['icon', 'Tinted icon, only when actionable ★'], ['pill', 'One-word pill'], ['off', 'Nothing'], ['line', 'Second line (today)']]],
+  ['prov', 'Provider icon', [['slot', 'Fixed slot, full contrast ★'], ['badge', 'Logo as the status glyph'], ['muted', 'Muted until hover (today)'], ['off', 'Off']]],
+  ['tint', 'Provider colour', [['tint', 'Brand tint ★'], ['mono', 'Monochrome']]],
+  ['orch', 'Orchestrators', [['mirror', 'Shortcut list + full tree in folders ★'], ['group', 'Moved into their own group'], ['tree', 'Only in project folders (today)']]],
+  ['idle', 'Idle thread glyph', [['blank', 'Nothing ★'], ['ring', 'Hollow ring']]],
+  ['qpr', 'PRs in Needs you', [['linked', 'Only PRs of my threads ★'], ['all', 'All from GitHub Folder'], ['off', 'None']]],
+  ['hover', 'Row hover actions', [['overlay', 'Overlay, nothing moves ★'], ['swap', 'Age swaps for buttons (today)']]],
+];
+
+// ---------- shared bits ----------
+const kidsOf = (t) => (t.kids || []).map((k) => T[k]);
+const allKids = (t) => kidsOf(t).flatMap((k) => [k, ...allKids(k)]);
+const isRun = (t) => t.s === 'running';
+const prov = (t) => {
+  if (opt.prov === 'off' || opt.prov === 'badge') return '';
+  return `<span class="pslot pv-${t.pv}" title="${t.pv === 'claude' ? 'Claude Code' : 'Codex'}">${I(t.pv)}</span>`;
+};
+function glyphCore(t, rollup) {
+  const st = rollup || state(t);
+  if (st === 'running') return `<span class="spin"></span><span class="stop" data-stop="${t.id}" title="Stop">${I('square', 's')}</span>`;
+  if (st === 'input') return `<span class="dot d-input" title="Needs your input"></span>`;
+  if (st === 'error') return `<span class="dot d-error" title="${t.qfail ? 'Queued message failed' : 'Turn failed'}"></span>`;
+  if (t.draft) return `<span class="muted" title="Unsent draft">${I('pencil', 's')}</span>`;
+  if (st === 'new') return `<span class="dot d-new" title="Finished, not read"></span>`;
+  return opt.idle === 'ring' ? `<span class="dot d-ring"></span>` : '';
+}
+function state(t) { return t.s === 'input' ? 'input' : t.s === 'error' || t.qfail ? 'error' : isRun(t) ? 'running' : t.unread ? 'new' : 'idle'; }
+const RANKS = ['input', 'error', 'running', 'new', 'idle'];
+function urgent(t) { return [t, ...allKids(t)].map(state).sort((a, b) => RANKS.indexOf(a) - RANKS.indexOf(b))[0]; }
+function glyph(t, rollup) {
+  const core = glyphCore(t, rollup);
+  if (opt.prov === 'badge') {
+    const st = rollup || state(t);
+    const col = { running: 'var(--run)', input: 'var(--attention)', error: 'var(--destructive)', new: 'var(--success)' }[st];
+    return `<span class="g ${st === 'running' ? 'canstop' : ''}"><span class="pv-${t.pv}" style="display:grid">${I(t.pv, 's')}</span>${col ? `<span class="pbadge" style="background:${col}${st === 'running' ? ';animation:rot 0s' : ''}"></span>` : ''}${st === 'running' ? `<span class="stop" data-stop="${t.id}" style="position:absolute;background:var(--bg)">${I('square', 's')}</span>` : ''}</span>`;
+  }
+  return `<span class="g ${(rollup || state(t)) === 'running' ? 'canstop' : ''}">${core}</span>`;
+}
+function prBit(t) {
+  if (t.s === 'error' || opt.pr === 'off' || opt.pr === 'line') return '';
+  const p = t.prs.filter((x) => (x.st === 'open' || x.st === 'draft') && ACTIONABLE.includes(x.a)).sort((a, b) => ACTIONABLE.indexOf(a.a) - ACTIONABLE.indexOf(b.a))[0];
+  if (!p) return '';
+  const [label, cls, icon] = ATT[p.a];
+  if (opt.pr === 'pill') return `<span class="pill p-${cls}" title="#${p.n} ${p.title || ''}">${label.split(' ')[0] === 'Checks' ? 'Failing' : label.split(' ')[0] === 'Has' ? 'Conflicts' : label.split(' ')[0] === 'Ready' ? 'Ready' : 'Changes'}</span>`;
+  return `<span class="prc ${cls}" title="PR #${p.n} ${p.title || ''} · ${label}">${I(icon, 's')}</span>`;
+}
+function tip(t) { return [t.t, t.branch ? `branch ${t.branch}` : null, t.pv === 'claude' ? 'Claude Code' : 'Codex', `updated ${t.age === 'now' ? 'just now' : t.age + ' ago'}`].filter(Boolean).join(' · '); }
+function sharedWith(t) { if (!t.branch || t.branch === 'main') return null; const o = Object.values(T).find((x) => x !== t && x.branch === t.branch); return o; }
+
+function row(t, depth = 0, o = {}) {
+  const ind = 6 + depth * 22;
+  const guides = depth ? `<span class="guide ${o.peek ? 'dash' : ''}" style="left:${ind - 14}px;top:0;bottom:0"></span>` : '';
+  const sh = sharedWith(t);
+  const warn = sh ? `<span class="warn" title="Shares branch ${t.branch} with “${sh.t}”">${I('warn', 's')}</span>` : '';
+  const retry = t.s === 'error' || t.qfail ? `<span class="btn danger" data-toast="${t.qfail ? 'Resending the queued message…' : 'Retrying the failed turn…'}">${I('retry', 's')}${t.qfail ? 'Resend' : 'Retry'}</span>` : '';
+  const sa = t.sub ? `<span class="sa" title="3 subagents, 2 running">${I('network', 's')}${t.sub}</span>` : '';
+  const line = opt.pr === 'line' && t.prs.length ? `<div class="prline" style="margin-left:${ind + 24}px">${t.prs.map((p) => `<span class="prl ${p.st}">${I(p.st === 'open' ? 'open' : p.st, 's')}#${p.n}</span>`).join('')}</div>` : '';
+  const actions = opt.hover === 'overlay'
+    ? `<span class="ov"><span class="ib" title="Archive" data-toast="Archived · ⌘Z to undo">${I('archive')}</span><span class="ib" title="More actions">${I('more')}</span></span>`
+    : `<span class="acts"><span class="ib" style="width:20px;height:20px" title="Archive">${I('archive')}</span><span class="ib" style="width:20px;height:20px" title="More actions">${I('more')}</span></span>`;
+  const g = o.rollup ? glyph(t, o.rollup) : glyph(t);
+  const fold = t.kids ? `data-fold="${t.id}"` : '';
+  return `<div><div class="row ${t.active ? 'active' : ''} ${opt.hover === 'swap' ? 'swap' : ''}" data-row="${t.id}" title="${tip(t)}" style="padding-left:${ind}px">${guides}<span ${fold} style="display:contents;cursor:pointer">${g}</span>
+    <span class="ttl ${t.unread ? 'unread' : ''}">${t.t}</span>${retry}${prBit(t)}${warn}${sa}${prov(t)}<span class="age">${t.age}</span>${actions}${o.mk || ''}</div>${line}</div>`;
+}
+function foldLine(t, depth) {
+  const k = allKids(t), n = (st) => k.filter((x) => state(x) === st).length;
+  const parts = [['input', 'need input', 'var(--attention)'], ['error', 'failed', 'var(--destructive)'], ['running', 'running', 'var(--run)'], ['new', 'to review', 'var(--success)'], ['idle', 'done', 'color-mix(in oklab, var(--muted-foreground) 50%, transparent)']].map(([st, l, c]) => [n(st), l, c]).filter((p) => p[0]);
+  const finished = k.every((x) => state(x) === 'idle') && state(t) === 'idle';
+  const bar = k.length >= 5 ? `<span class="bar">${parts.map(([c, , col]) => `<span style="width:${c / k.length * 100}%;background:${col}"></span>`).join('')}</span>` : '';
+  return `<div class="row fold" data-fold="${t.id}" style="padding-left:${30 + depth * 22}px"><span class="guide" style="left:${14 + depth * 22}px;top:0;height:12px"></span>${bar}<span class="tiny muted" style="flex:1">${k.length} subthreads${finished ? ' · all done' : ''}${finished ? '' : parts.map(([c, l, col]) => `<span><span class="dot" style="background:${col}"></span>${c} ${l}</span>`).join('')}</span>${finished ? `<span class="btn" data-toast="Archived the orchestration and its subthreads · ⌘Z to undo">${I('archive', 's')}Archive</span>` : ''}</div>`;
+}
+function subtree(t, depth, marks = {}) {
+  const folded = ui.fold.has(t.id);
+  let h = row(t, depth, { rollup: folded ? urgent(t) : null, mk: marks[t.id] });
+  if (!t.kids) return h;
+  if (folded) {
+    for (const k of kidsOf(t)) if (k.s === 'input' || k.active) h += row(k, depth + 1, { peek: true });
+    return h + foldLine(t, depth);
+  }
+  for (const k of kidsOf(t)) h += subtree(k, depth + 1, marks);
+  return h;
+}
+function hd(key, icon, title, sum = '', mk = '') {
+  const open = !ui.col.has(key);
+  return `<div class="hd ${open ? 'isopen' : ''}" data-col="${key}">${icon}<span>${title}</span>${I('chev', 'chev s')}<span class="sum">${sum}</span>${mk}</div>`;
+}
+const mk = (n, top = '50%') => `<span class="num mk" data-n="${n}" style="top:${top}">${n}</span>`;
+
+// ---------- Needs you ----------
+function queue() {
+  const items = [];
+  const crumb = (t) => t.parent ? ` · under “${T[t.parent].t.slice(0, 18)}…”` : '';
+  for (const t of Object.values(T)) {
+    if (t.s === 'input') items.push({ r: 0, w: t.wait, id: t.id, t, why: `${t.ask} · <span data-wait="${t.id}">${mins(since(t.wait))}</span>${crumb(t)}` });
+    if (t.s === 'error') items.push({ r: 1, id: t.id, t, why: 'Turn failed · 12m ago', act: `<span class="btn danger" data-toast="Retrying…">${I('retry', 's')}Retry</span>` });
+    if (t.qfail) items.push({ r: 1, id: t.id, t, why: 'Queued message failed to send', act: `<span class="btn danger" data-toast="Resending…">${I('retry', 's')}Resend</span>` });
+    if (t.silent) items.push({ r: 2, id: t.id, t, why: `Running, no output for <span data-wait="${t.id}">${mins(since(t.silent))}</span>${crumb(t)}`, act: `<span class="btn" data-toast="Stopping ${t.t}">${I('square', 's')}Stop</span>` });
+    if (t.unread && !isRun(t)) items.push({ r: 3, id: t.id, t, why: `Finished · review the result${crumb(t)}`, hoverAct: `<span class="ib" title="Mark read" data-toast="Marked read">${I('check', 's')}</span>` });
+  }
+  if (opt.qpr !== 'off') for (const g of GH) {
+    if (opt.qpr === 'linked' && !g.thread) continue;
+    const th = g.thread && T[g.thread];
+    const [label, cls, icon] = ATT[g.a];
+    items.push({ r: 4, gh: g, glyph: `<span class="prc ${cls}">${I(icon || 'open', 's')}</span>`, title: `#${g.n} ${g.title}`, why: `${label}${th ? ` · from “${th.t.slice(0, 20)}…”` : ` · ${g.repo}`}`,
+      act: g.a === 'ready' ? `<span class="btn" data-toast="Confirm: merge #${g.n} (checks passing)?">${I('merge', 's')}Merge</span>` : !th ? `<span class="btn" data-toast="New thread: review PR #${g.n}">Agent review</span>` : '', go: g.thread });
+  }
+  items.push({ r: 5, glyph: `<span class="g">${I('zap', 's bad')}</span>`, title: 'Nightly dependency bump', why: 'Automation failed 2h ago', act: `<span class="btn" data-toast="Opening the failed run">Run log</span>`, key: 'auto' });
+  return items.filter((it) => !ui.snoozed.has(it.id || it.key || it.title)).sort((a, b) => a.r - b.r || (b.w || 0) - (a.w || 0));
+}
+function queueRow(it) {
+  const t = it.t;
+  const g = t ? glyph(t) : it.glyph;
+  const title = t ? t.t : it.title;
+  const pv = t ? prov(t) : '';
+  return `<div class="row two" ${it.id || it.go ? `data-go="${it.id || it.go}"` : ''} title="${title}">${g}<span class="ttl">${title}<span class="sub">${it.why}</span></span>${it.act || ''}${pv}<span class="ov">${it.hoverAct || ''}<span class="ib" title="Snooze until it changes" data-snooze="${it.id || it.key || it.title}">${I('snooze', 's')}</span></span></div>`;
+}
+
+// ---------- views ----------
+function renderV2() {
+  const items = queue();
+  const flat = Object.values(T);
+  const cnt = { input: flat.filter((t) => t.s === 'input').length, error: flat.filter((t) => t.s === 'error' || t.qfail).length, running: flat.filter(isRun).length, new: flat.filter((t) => t.unread && !isRun(t)).length };
+  let h = `<div class="strip">`;
+  if (ui.search) {
+    h += `<div class="search">${I('search', 's')}<input id="q" placeholder="Title, branch, PR #, project" value="${ui.q}"><span class="kbd">esc</span></div>`;
+  } else {
+    const sf = (k, inner, label) => `<button class="sf" data-f="${k}" aria-pressed="${ui.filter === k}" title="${label}">${inner}</button>`;
+    h += sf('input', `<span class="dot d-input" style="width:7px;height:7px"></span>${cnt.input}`, `${cnt.input} need input`);
+    h += sf('error', `<span class="dot d-error" style="width:7px;height:7px"></span>${cnt.error}`, `${cnt.error} failed`);
+    h += sf('running', `<span class="spin" style="width:9px;height:9px;animation:none;border-top-color:var(--run)"></span>${cnt.running}`, `${cnt.running} running`);
+    h += sf('new', `<span class="dot d-new" style="width:7px;height:7px"></span>${cnt.new}`, `${cnt.new} finished, not read`);
+    h += `<span style="flex:1"></span><button class="sf" data-search title="Search ( / )">${I('search', 's')}<span class="kbd">/</span></button><button class="sf" title="Sections">${I('layers', 's')}</button>`;
+  }
+  h += `${mk(1)}</div>`;
+
+  if (ui.filter || ui.q) {
+    const label = { input: 'Need input', error: 'Failed', running: 'Running', new: 'Finished, not read' }[ui.filter] || `Matching “${ui.q}”`;
+    const match = flat.filter((t) => ui.q ? [t.t, t.branch, t.proj, ...t.prs.map((p) => '#' + p.n)].join(' ').toLowerCase().includes(ui.q.toLowerCase().replace(/^#/, '#'))
+      : ui.filter === 'input' ? t.s === 'input' : ui.filter === 'error' ? (t.s === 'error' || t.qfail) : ui.filter === 'running' ? isRun(t) : (t.unread && !isRun(t)));
+    h += `<div class="hd isopen" style="cursor:default">${label}<span class="sum">${match.length} · <span style="cursor:pointer;text-decoration:underline" data-clear>clear</span></span></div>`;
+    h += match.map((t) => ui.filter === 'running'
+      ? `<div class="row two" data-row="${t.id}" title="${tip(t)}">${glyph(t)}<span class="ttl">${t.t}<span class="sub">${t.step} · ${t.proj}${t.parent ? ' · under ' + T[t.parent].t.slice(0, 14) + '…' : ''}</span></span>${prov(t)}<span class="age" style="width:34px" data-el="${t.id}">${clock(since(t.started))}</span></div>`
+      : row(t, 0)).join('') || `<div class="tiny muted" style="padding:6px 10px">Nothing here.</div>`;
+    return h;
+  }
+
+  if (items.length) {
+    const shown = ui.more ? items : items.slice(0, 5);
+    h += `<div class="sec">${hd('needs', `<span class="dot d-input" style="width:7px;height:7px"></span>`, 'Needs you', `<span class="kbd">⌘J next</span><span>${items.length}</span>`, mk(2, '13px'))}`;
+    if (!ui.col.has('needs')) h += `<div class="queue">${shown.map(queueRow).join('')}${items.length > 5 ? `<div class="tiny muted" data-more style="padding:4px 30px;cursor:pointer">${ui.more ? 'Show less' : `${items.length - 5} more`}</div>` : ''}${mk(3, '45%')}</div>`;
+    h += `</div>`;
+  }
+  const failing = GH.filter((g) => g.a === 'failing').length, conf = GH.filter((g) => g.a === 'conflicts').length;
+  h += `<div class="sec">${hd('gh', I('gh', 's'), 'Pull requests', `${failing ? `<span class="bad">${failing} failing</span>` : ''}${conf ? `<span class="bad">${conf} conflicts</span>` : ''}<span>${GH.length}</span>`, mk(4, '13px'))}`;
+  if (!ui.col.has('gh')) h += GH.map((g) => { const [label, cls, icon] = ATT[g.a]; return `<div class="row" title="#${g.n} · ${g.repo} · ${label}" ${g.thread ? `data-go="${g.thread}"` : ''}><span class="prc ${cls}">${I(icon || 'open', 's')}</span><span class="ttl">${g.title}</span><span class="tiny muted">${g.repo.replace('app-', '')}</span><span class="ov"><span class="ib" title="Snooze">${I('snooze', 's')}</span><span class="ib" title="Open on GitHub">${I('gh', 's')}</span></span></div>`; }).join('');
+  h += `</div>`;
+  h += `<div class="sec">${hd('au', I('zap', 's'), 'Automations', `<span class="bad">1 failed</span><span>· next in 12m</span>`)}`;
+  if (!ui.col.has('au')) h += AUTOS.map((a) => `<div class="row"><span class="g">${a.st === 'running' ? '<span class="spin"></span>' : a.st === 'error' ? '<span class="dot d-error"></span>' : ''}</span><span class="ttl">${a.name}</span><span class="tiny muted">${a.when}</span><span class="ov"><span class="ib" title="Run now">${I('play', 's')}</span><span class="ib" title="More">${I('more')}</span></span></div>`).join('') + `<div class="tiny muted" style="padding:2px 30px">1 paused</div>`;
+  h += `</div><div class="divider"></div>`;
+  h += `<div class="hd" style="cursor:default;color:var(--foreground)">Threads<span class="sum muted">${I('archive', 's')} Archived ${I('layers', 's')}</span></div>`;
+  h += `<div class="sec">${hd('pin', I('pin', 's'), 'Pinned')}${ui.col.has('pin') ? '' : row(T.plan)}</div>`;
+  const orchs = PROJECTS.flatMap((p) => p.roots).map((id) => T[id]).filter((t) => t.kids);
+  if (opt.orch === 'mirror') {
+    const live = orchs.filter((t) => urgent(t) !== 'idle');
+    if (live.length) {
+      h += `<div class="sec">${hd('orchs', I('network', 's'), 'Orchestrations', String(live.length), mk(5, '13px'))}`;
+      if (!ui.col.has('orchs')) for (const t of live) {
+        const k = allKids(t), n = (st) => k.filter((x) => state(x) === st).length;
+        const done = k.filter((x) => ['idle', 'new'].includes(state(x))).length;
+        const projs = [...new Set([t.proj, ...k.map((x) => x.proj)])];
+        const extra = [n('input') ? `<span style="color:var(--attention)">${n('input')} needs you</span>` : '', n('error') ? `<span class="bad">${n('error')} failed</span>` : '', n('running') ? `${n('running')} running` : ''].filter(Boolean).join(' · ');
+        h += `<div class="row two" data-reveal="${t.id}" title="Open · the full tree is in ${t.proj}">${glyph(t, urgent(t))}<span class="ttl">${t.t}<span class="sub">${projs.join(' + ')} · ${done}/${k.length} done${extra ? ' · ' + extra : ''}</span></span>${prov(t)}<span class="age">${t.age}</span>${t.id === 'orch' ? mk(6) : ''}</div>`;
+      }
+      h += `</div>`;
+    }
+  } else if (opt.orch === 'group') {
+    h += `<div class="sec">${hd('orchs', I('network', 's'), 'Orchestrations', String(orchs.length), mk(5, '13px'))}`;
+    if (!ui.col.has('orchs')) for (const t of orchs) {
+      const projs = [...new Set([t.proj, ...allKids(t).map((k) => k.proj)])];
+      h += subtree(t, 0, { orch: mk(6) }).replace(`<span class="ttl ${t.unread ? 'unread' : ''}">${t.t}</span>`, `<span class="ttl">${t.t} <span class="tiny muted" style="font-weight:400">${projs.length > 1 ? projs.join(' + ') : t.proj}</span></span>`);
+    }
+    h += `</div>`;
+  }
+  for (const p of PROJECTS) {
+    const key = 'p-' + p.name;
+    const roots = p.roots.map((id) => T[id]).filter((t) => !(opt.orch === 'group' && t.kids));
+    const orchMk = opt.orch === 'mirror' ? {} : { orch: mk(6) };
+    const quiet = roots.filter((t) => t.quiet), loud = roots.filter((t) => !t.quiet);
+    h += `<div class="sec">${hd(key, I('folder', 's'), p.name, String(roots.length))}`;
+    if (!ui.col.has(key)) {
+      h += loud.map((t) => subtree(t, 0, { glyph: mk(7), dens: mk(8), ...orchMk })).join('');
+      if (quiet.length) {
+        const open = ui.quiet.has(key);
+        if (open) h += quiet.map((t) => row(t)).join('');
+        h += `<div class="row" style="height:26px" data-quiet="${key}" title="Idle, read, no draft, not pinned, PR merged or closed or none, older than 1 day"><span class="g"></span><span class="tiny muted" style="flex:1;cursor:pointer">${open ? 'Hide older' : `${quiet.length} older`}</span>${open ? `<span class="btn" data-toast="Archived ${quiet.length} threads · ⌘Z to undo">${I('archive', 's')}Archive these</span>` : ''}${p.name === 'bb-plugins' ? mk(9) : ''}</div>`;
+      }
+    }
+    h += `</div>`;
+  }
+  return h;
+}
+
+function renderNow() {
+  const nowRow = (t, depth = 0, peek) => {
+    const st = state(t); const col = { running: 'var(--run)', input: 'var(--attention)', error: 'var(--destructive)' }[st] || 'var(--success)';
+    const prs = t.prs.length ? `<div class="prline" style="margin-left:${30 + depth * 24}px">${t.prs.map((p) => `<span class="prl ${p.st}">${I(p.st === 'open' ? 'open' : p.st, 's')}#${p.n}</span>`).join('')}</div>` : '';
+    return `<div><div class="row swap" style="padding-left:${6 + depth * 24}px"><span class="g"><span class="dot" style="background:${col}"></span></span><span class="ttl ${t.unread ? 'unread' : ''}">${t.t}</span>${t.s === 'error' ? `<span class="btn danger" style="height:20px">${I('retry', 's')}Retry</span>` : ''}<span class="pslot" style="opacity:.45">${I(t.pv)}</span>${t.sub ? `<span class="sa">● ${t.sub}</span>` : ''}<span class="age">${t.age}</span><span class="acts"><span class="ib" style="width:20px;height:20px">${I('archive')}</span><span class="ib" style="width:20px;height:20px">${I('more')}</span></span></div>${prs}</div>`;
+  };
+  let h = `<div class="strip tiny muted" style="gap:10px"><span><span class="dot d-input" style="display:inline-block;width:6px;height:6px"></span> 1 need input</span><span><span class="dot d-error" style="display:inline-block;width:6px;height:6px"></span> 2 failed</span><span>3 running</span><span style="margin-left:auto">${I('layers', 's')} Sections</span></div>`;
+  h += `<div class="sec">${hd('ngh', I('gh', 's'), 'GitHub', '5')}${ui.col.has('ngh') ? '' : GH.map((g) => `<div class="row swap"><span class="g">${I('open', 's open')}</span><span class="ttl">${g.title}</span><span class="age">#${g.n}</span></div>`).join('')}</div>`;
+  h += `<div class="sec">${hd('nau', I('zap', 's'), 'Automations', '3')}${ui.col.has('nau') ? '' : AUTOS.map((a) => `<div class="row"><span class="g"><span class="dot" style="background:${a.st === 'error' ? 'var(--success)' : a.st === 'running' ? 'var(--run)' : 'var(--success)'}"></span></span><span class="ttl">${a.name}</span><span class="tiny muted">${a.st === 'error' ? 'in 22h' : a.when}</span></div>`).join('')}</div>`;
+  h += `<div class="sec">${hd('nre', I('clock', 's'), 'Recent Activity', '5')}${ui.col.has('nre') ? '' : [T.glyph, T.k2, T.orch, T.k4, T.crash].map((t) => nowRow(t)).join('')}</div>`;
+  h += `<div class="divider"></div><div class="hd" style="cursor:default;color:var(--foreground)">Threads<span class="sum muted">${I('archive', 's')} Archived ${I('layers', 's')}</span></div>`;
+  h += `<div class="sec">${hd('npin', I('pin', 's'), 'Pinned')}${nowRow(T.plan)}</div>`;
+  for (const p of PROJECTS) {
+    h += `<div class="sec">${hd('np' + p.name, I('folder', 's'), p.name, String(p.roots.length))}`;
+    if (!ui.col.has('np' + p.name)) for (const id of p.roots) { const t = T[id]; h += nowRow(t); for (const k of allKids(t)) h += nowRow(k, 1); }
+    h += `</div>`;
+  }
+  return h;
+}
+
+const NOTES = [
+  ['Status strip = filters', 'Counts for need input · failed · running · to review. Click one for a flat list; Running shows the step and a live timer there, not in the tree. <span class="kbd">/</span> searches title, branch, PR # and project. Replaces the chips, the search box and the Running section.', 'Thread Tree'],
+  ['Needs you', 'Only things you act on: questions (longest wait first), failed turns, failed queued messages, agents silent for minutes, finished results to review, PRs of your own threads, failed automations. Click a row to open it; a button only for actions that aren’t navigation. Hover for snooze; subthreads say which orchestration they’re under. Hidden when empty.', 'Thread Tree; PRs via GitHub Folder'],
+  ['Queue rows', 'Two lines here only: the queue is where the words live. Tree rows stay one line, 32px, so heights never jump.', ''],
+  ['PR and Automations summaries', 'Collapsed by default; the header already says what matters (“1 failing · 1 conflicts”). Expanded PR rows show the reason as the icon and the repo; the number lives in the tooltip.', 'GitHub Folder, Automations plugin'],
+  ['Orchestrations shortcuts', 'One row per orchestration that still has work going: rolled-up status, the projects it spans, “2/4 done · 1 needs you”. No subthreads here. Click opens it and lights up its full tree in the project folder, which stays the home. Finished orchestrations drop out of this list on their own; Archive stays in the folder.', 'Thread Tree'],
+  ['Folded orchestrator', 'Its glyph rolls up the most urgent state below it; a subthread that needs you peeks out (dashed line); the fold line counts by state. A bar only from 5 subthreads. A finished one offers Archive.', 'Thread Tree (peek and fold line exist today)'],
+  ['Calm row', 'Glyph · title · Retry · PR icon only when actionable · shared-branch warning · subagent counter · provider in a fixed slot · age. Hover a spinner to get Stop on the left; Archive and ⋯ overlay the right end after 120 ms, nothing moves. Tooltip: branch, provider, updated.', 'bb status glyph + draft + row status from the SDK'],
+  ['Shared branch warning', 'Two live threads on one branch or worktree get a ⚠ with the other thread’s name in the tooltip.', 'Thread Tree (environment.branchName)'],
+  ['Older threads', '“3 older” instead of a sentence. Strict rule in the tooltip. Archive appears only after you expand it, with ⌘Z undo.', 'Thread Tree'],
+];
+function renderNotes() {
+  if (mode === 'now') return `<p class="muted" style="margin-top:0">Today’s plugin with the same data, including the provider icon and subagent counter it already draws. Expand GitHub to see the full sidebar height.</p>`;
+  return `<ol>${NOTES.map(([h, d, src], i) => `<li data-note="${i + 1}"><span class="num">${i + 1}</span><span><b>${h}.</b> ${d}${src ? `<br><span class="src">${src}</span>` : ''}</span></li>`).join('')}</ol>
+  <div class="changed"><b>Changed after the design review</b><ul>
+  <li>Running section and filter chips dropped; the status strip does both.</li>
+  <li>No step text or questions inside the tree; rows are one fixed height.</li>
+  <li>PR on rows: a tinted icon, no word, no hover reveal.</li>
+  <li>Provider icon: fixed slot, full contrast, optional brand tint.</li>
+  <li>Idle threads draw nothing; the subagent counter stays.</li>
+  <li>Stop moved off the Archive spot to the spinner.</li>
+  <li>Needs you gained review-ready, failed queued messages and stuck agents; PRs only from your threads; snooze.</li>
+  <li>Orchestrations moved under Threads, so the top area is shorter than today.</li><li>Your call: orchestrations stay in their folders with the full tree; the section is a flat list of shortcuts.</li></ul></div>`;
+}
+function renderChoices() {
+  $('choices').style.display = mode === 'v2' ? 'flex' : 'none';
+  $('choices').innerHTML = CHOICES.map(([k, l, os]) => `<label>${l}<select data-opt="${k}">${os.map(([v, t]) => `<option value="${v}" ${opt[k] === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`).join('');
+}
+function render() {
+  [...$('mode').children].forEach((b) => b.setAttribute('aria-pressed', b.dataset.m === mode));
+  renderChoices();
+  const sb = $('sb');
+  sb.innerHTML = mode === 'now' ? renderNow() : renderV2();
+  sb.classList.toggle('hide-mk', !$('mk').checked);
+  sb.classList.toggle('mono', opt.tint === 'mono' || mode === 'now');
+  sb.classList.toggle('muted-prov', opt.prov === 'muted');
+  $('notes').innerHTML = renderNotes();
+  const q = $('q'); if (q) { q.oninput = (e) => { ui.q = e.target.value; render(); }; q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+}
+function toast(s) { const t = $('toast'); t.textContent = s; t.style.opacity = 1; clearTimeout(t._h); t._h = setTimeout(() => (t.style.opacity = 0), 1700); }
+document.addEventListener('click', (e) => {
+  const c = (s) => e.target.closest(s);
+  if (c('[data-m]')) { mode = c('[data-m]').dataset.m; return render(); }
+  if (c('[data-stop]')) { e.stopPropagation(); return toast('Stop the running turn (bb’s own Stop)'); }
+  if (c('[data-snooze]')) { ui.snoozed.add(c('[data-snooze]').dataset.snooze); toast('Snoozed until it changes'); return render(); }
+  if (c('[data-toast]')) return toast(c('[data-toast]').dataset.toast);
+  if (c('[data-f]')) { const f = c('[data-f]').dataset.f; ui.filter = ui.filter === f ? null : f; return render(); }
+  if (c('[data-clear]')) { ui.filter = null; ui.q = ''; ui.search = false; return render(); }
+  if (c('[data-search]')) { ui.search = true; return render(); }
+  if (c('[data-more]')) { ui.more = !ui.more; return render(); }
+  if (c('[data-fold]')) { const id = c('[data-fold]').dataset.fold; ui.fold.has(id) ? ui.fold.delete(id) : ui.fold.add(id); return render(); }
+  if (c('[data-quiet]')) { const k = c('[data-quiet]').dataset.quiet; ui.quiet.has(k) ? ui.quiet.delete(k) : ui.quiet.add(k); return render(); }
+  if (c('[data-col]')) { const k = c('[data-col]').dataset.col; ui.col.has(k) ? ui.col.delete(k) : ui.col.add(k); return render(); }
+  if (c('[data-reveal]')) {
+    const id = c('[data-reveal]').dataset.reveal; ui.fold.delete(id); ui.col.delete('p-' + T[id].proj); render();
+    const r = [...document.querySelectorAll(`[data-row="${id}"]`)].pop(); if (r) { r.classList.add('flash'); r.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+    return toast('Opens the orchestrator; its tree lights up in ' + T[id].proj);
+  }
+  if (c('[data-go]')) {
+    const id = c('[data-go]').dataset.go; ui.filter = null; ui.q = ''; ui.search = false;
+    let p = T[id]; while (p && p.parent) { ui.fold.delete(p.parent); p = T[p.parent]; }
+    render(); const r = [...document.querySelectorAll(`[data-row="${id}"]`)].pop(); if (r) { r.classList.add('flash'); r.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  }
+});
+document.addEventListener('change', (e) => { const k = e.target.dataset?.opt; if (k) { opt[k] = e.target.value; render(); } });
+$('mk').addEventListener('change', render);
+document.addEventListener('keydown', (e) => {
+  if (e.key === '/' && document.activeElement?.id !== 'q' && mode === 'v2') { e.preventDefault(); ui.search = true; render(); }
+  if (e.key === 'Escape' && (ui.search || ui.filter)) { ui.search = false; ui.q = ''; ui.filter = null; render(); }
+});
+document.addEventListener('mouseover', (e) => {
+  document.querySelectorAll('.hl').forEach((x) => x.classList.remove('hl'));
+  const li = e.target.closest('[data-note]'); if (li) document.querySelectorAll(`.mk[data-n="${li.dataset.note}"]`).forEach((m) => m.classList.add('hl'));
+  const m = e.target.closest('.mk'); if (m) document.querySelector(`[data-note="${m.dataset.n}"]`)?.classList.add('hl');
+});
+setInterval(() => {
+  document.querySelectorAll('[data-el]').forEach((el) => { el.textContent = clock(since(T[el.dataset.el].started)); });
+  document.querySelectorAll('[data-wait]').forEach((el) => { const t = T[el.dataset.wait]; el.textContent = mins(since(t.wait || t.silent)); });
+}, 1000);
+render();
+</script>
+</body>
+</html>
