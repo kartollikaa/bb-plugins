@@ -29,15 +29,18 @@ checks and conflicts; with Thread Links installed, PRs linked in the session
 count too. Changes requested and ready to merge come from the GitHub Folder
 plugin, matched by PR URL; without it those two reasons never show. An
 orchestrator leaves PRs owned by its subthreads to their rows. The whole list
-refreshes PR status in one batch, and pauses while the sidebar is hidden.
+refreshes PR status in one batch once a minute, plus a thread's own PRs when
+its turn ends; nothing refreshes while the sidebar is hidden.
 
 A ⚠ marks a thread whose branch or worktree another unarchived thread also
-uses; its tooltip names the other thread. Threads in a project's own checkout
-never warn.
+uses; its tooltip names the other thread. Threads in a project's own checkout,
+and an orchestrator with its subthreads, never warn.
 
 The provider icon sits in a fixed slot before the age, in the provider's brand
 tint (Claude orange, Codex blue-violet), or in the text colour with the
-`providerIconStyle` setting set to `monochrome`.
+`providerIconStyle` setting set to `monochrome`. This setting replaces
+`showProviderIcon`: the icon can no longer be turned off, so a user who had
+turned it off sees it again.
 
 ## Redesign in progress
 
