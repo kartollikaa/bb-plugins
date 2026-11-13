@@ -19,13 +19,16 @@ export function canStop(thread: Pick<TreeThread, "status" | "indicator" | "activ
   return isWorking(thread);
 }
 
+/** The same test `TOUCH_DIMMED` uses for a screen that never hovers. */
+export const NO_HOVER_QUERY = "(hover: none)";
+
 /** A parent's glyph is its fold toggle, and a tap on touch must not stop work; both keep Stop in the menus. */
 export function stopsFromGlyph(
   thread: Pick<TreeThread, "status" | "indicator" | "activity">,
-  row: { glyph: { indicator: string; rowStatus: unknown }; hasChildren: boolean; isCompactViewport: boolean },
+  row: { glyph: { indicator: string; rowStatus: unknown }; hasChildren: boolean; isCompactViewport: boolean; canHover: boolean },
 ): boolean {
   const showsRunning = row.glyph.rowStatus === null && WORKING_INDICATORS.has(row.glyph.indicator);
-  return showsRunning && !row.hasChildren && !row.isCompactViewport && canStop(thread);
+  return showsRunning && !row.hasChildren && !row.isCompactViewport && row.canHover && canStop(thread);
 }
 
 /** Shown at once on hover, keyboard focus or an open menu; only opacity and visibility change, so nothing reflows. */

@@ -76,7 +76,7 @@ import { useDragReorder, useFlipOrder } from "./useReorder";
 import { ReduceMotionContext, useStill } from "./motion";
 import { Collapse } from "./Collapse";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
-import { canStop, END_SLOT_MIN_PX, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
+import { canStop, END_SLOT_MIN_PX, NO_HOVER_QUERY, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
 
 const ROW_PAD_PX = 6;
@@ -224,6 +224,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     [folderItems],
   );
   const sharedBranches = useMemo(() => sharedBranchThreads(threads, familyRootOf(threads)), [threads]);
+  const canHover = !useMediaQuery(NO_HOVER_QUERY);
   const { providers } = useProviders();
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
 
@@ -263,6 +264,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         context={variant === "recent" ? projectById.get(row.thread.projectId)?.name : undefined}
         isActive={row.thread.id === activeThreadId}
         isCompactViewport={isCompactViewport}
+        canHover={canHover}
         subagents={subagents.get(row.thread.id)}
         provider={providerById.get(row.thread.providerId)}
         pullRequestsOf={pullRequestsOf}
@@ -735,6 +737,7 @@ function ThreadRowView({
   context,
   isActive,
   isCompactViewport,
+  canHover,
   subagents,
   provider,
   pullRequestsOf,
@@ -752,6 +755,7 @@ function ThreadRowView({
   context?: string;
   isActive: boolean;
   isCompactViewport: boolean;
+  canHover: boolean;
   subagents: ThreadSubagents | undefined;
   provider: RowProvider | undefined;
   pullRequestsOf: (thread: PluginSidebarThread) => ThreadPullRequest[];
@@ -840,7 +844,7 @@ function ThreadRowView({
                 )}
               />
             </button>
-          ) : stopsFromGlyph(thread, { glyph, hasChildren: row.hasChildren, isCompactViewport }) ? (
+          ) : stopsFromGlyph(thread, { glyph, hasChildren: row.hasChildren, isCompactViewport, canHover }) ? (
             <StopGlyphButton threadId={thread.id} stateLabel={glyph.label}>{dot}</StopGlyphButton>
           ) : (
             <span title={glyph.label ?? undefined} className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
@@ -1202,6 +1206,18 @@ function toActionTarget(thread: PluginSidebarThread): PluginThreadActionTarget {
     status: thread.status,
     environment: environmentId ? { id: environmentId, path: thread.environment?.path ?? null } : null,
   };
+}
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const update = () => setMatches(list.matches);
+    update();
+    list.addEventListener("change", update);
+    return () => list.removeEventListener("change", update);
+  }, [query]);
+  return matches;
 }
 
 function useNow(intervalMs: number): number {

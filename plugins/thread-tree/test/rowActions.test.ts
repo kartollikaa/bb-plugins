@@ -4,7 +4,7 @@ import { canStop, END_SLOT_MIN_PX, HOVER_ACTIONS_STRIP_PX, hoverActionsClass, RO
 import { HEADER_CHEVRON_MOTION, ROW_TINT } from "../src/rowStyles.ts";
 
 const idle = { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 };
-const leaf = { glyph: { indicator: "runtime", rowStatus: null } };
+const leaf = { glyph: { indicator: "runtime", rowStatus: null }, canHover: true };
 const t = (status: string, extra: { indicator?: string; activity?: typeof idle } = {}) => ({ status, indicator: "none", activity: idle, ...extra });
 
 test("Stop is offered while work runs, including a stop the machine never confirmed, and not when idle", () => {
@@ -28,6 +28,10 @@ test("on a touch-first compact viewport the glyph never stops a thread in one ta
   assert.equal(canStop(t("active")), true);
 });
 
+test("on any screen without hover, such as a wide tablet, the glyph never stops a thread in one tap", () => {
+  assert.equal(stopsFromGlyph(t("active"), { ...leaf, canHover: false, hasChildren: false, isCompactViewport: false }), false);
+});
+
 test("compact viewports get taller rows than the fixed 32px", () => {
   assert.equal(rowHeightPx(false), 32);
   assert.ok(rowHeightPx(true) > 32);
@@ -49,7 +53,7 @@ test("hover actions appear at once on hover, keyboard focus or an open menu, fad
 });
 
 test("Stop replaces only a glyph that shows running work, not a question, failure or another plugin's status", () => {
-  const row = (indicator: string, rowStatus: { label: string } | null = null) => ({ glyph: { indicator, rowStatus }, hasChildren: false, isCompactViewport: false });
+  const row = (indicator: string, rowStatus: { label: string } | null = null) => ({ glyph: { indicator, rowStatus }, hasChildren: false, isCompactViewport: false, canHover: true });
   for (const indicator of ["runtime", "background-agent", "background-command", "workflow", "working-draft"]) {
     assert.equal(stopsFromGlyph(t("active"), row(indicator)), true, indicator);
   }
