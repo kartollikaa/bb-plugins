@@ -289,12 +289,13 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             ? "No archived threads."
             : "Loading archived threads…";
 
-  const renderRow = (row: TreeRow<PluginSidebarThread>, variant: "tree" | "flat", subtitle?: string) => (
+  const renderRow = (row: TreeRow<PluginSidebarThread>, variant: "tree" | "flat", subtitle?: string, numbered = variant === "tree") => (
     <Fragment key={row.thread.id}>
       <ThreadRowView
         row={row}
         forest={variant === "flat" ? activeForest : forest}
         variant={variant}
+        numbered={numbered}
         context={variant === "flat" ? projectById.get(row.thread.projectId)?.name : undefined}
         subtitle={subtitle}
         isActive={row.thread.id === activeThreadId}
@@ -365,6 +366,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             statusFilter === "running"
               ? runningContext(projectById.get(thread.projectId)?.name ?? null, parentTitle(activeForest, threads, thread.id))
               : undefined,
+            true,
           ))}
         </FlatListSection>
       ) : (
@@ -829,6 +831,7 @@ function ThreadRowView({
   row,
   forest,
   variant,
+  numbered,
   context,
   subtitle,
   isActive,
@@ -846,8 +849,9 @@ function ThreadRowView({
 }: {
   row: TreeRow<PluginSidebarThread>;
   forest: Forest<PluginSidebarThread>;
-  /** A flat row (Recent Activity, a filter, a search) leaves bb's keyboard shortcuts to the tree. */
   variant: "tree" | "flat";
+  /** bb's jump keys target these rows: the tree's, or the filter or search list that replaces it; never Recent Activity's duplicates. */
+  numbered: boolean;
   context?: string;
   /** A second line under the title; only the Running filter has one. */
   subtitle?: string;
@@ -872,6 +876,7 @@ function ThreadRowView({
   const age = formatAge(thread.updatedAt, now);
   const target = useMemo(() => toActionTarget(thread), [thread]);
   const isTree = variant === "tree";
+  const Link = numbered ? NumberedRowLink : RowLink;
   const { hasUnsubmittedDraft } = useSidebarThreadDraft(thread.id);
   const rowStatus = useSidebarThreadRowStatus(thread.id);
   const glyph = resolveRowGlyph(thread, hasUnsubmittedDraft, rowStatus);
@@ -947,15 +952,13 @@ function ThreadRowView({
           ) : (
             <span title={glyph.label ?? undefined} className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
           )}
-          {isTree ? (
-            <TreeRowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
-          ) : subtitle ? (
+          {subtitle ? (
             <span className="flex min-w-0 flex-1 flex-col justify-center">
-              <RowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
+              <Link thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
               <span data-row-subtitle="" className="truncate text-2xs text-sidebar-foreground/50">{subtitle}</span>
             </span>
           ) : (
-            <RowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
+            <Link thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
           )}
           {subtitle ? null : <span aria-hidden className="min-w-0 flex-1" />}
           {/* Above the overlay's fade, so hover and focus never hide or block them. */}
@@ -1058,10 +1061,10 @@ interface RowLinkProps {
   onOpen: (thread: PluginSidebarThread, event: MouseEvent) => void;
 }
 
-/** Only tree rows subscribe: bb numbers them, and every subscriber re-renders when the modifier is pressed. */
-function TreeRowLink(props: RowLinkProps) {
+/** Only numbered rows subscribe: every subscriber re-renders when the modifier is pressed. */
+function NumberedRowLink(props: RowLinkProps) {
   const shortcut = useSidebarThreadShortcut(props.thread.id);
-  return <RowLink {...props} isTree shortcut={shortcut} />;
+  return <RowLink {...props} numbered shortcut={shortcut} />;
 }
 
 function RowLink({
@@ -1070,14 +1073,14 @@ function RowLink({
   stateLabel,
   splitProps,
   onOpen,
-  isTree = false,
+  numbered = false,
   shortcut = null,
-}: RowLinkProps & { isTree?: boolean; shortcut?: PluginSidebarThreadShortcut | null }) {
+}: RowLinkProps & { numbered?: boolean; shortcut?: PluginSidebarThreadShortcut | null }) {
   return (
     <>
       <a
         href={thread.href}
-        {...(isTree ? { "data-sidebar-thread-shortcut-target": "", "data-sidebar-thread-id": thread.id } : {})}
+        {...(numbered ? { "data-sidebar-thread-shortcut-target": "", "data-sidebar-thread-id": thread.id } : {})}
         aria-current={isActive ? "page" : undefined}
         aria-label={stateLabel ? `${thread.displayTitle}, ${stateLabel}` : thread.displayTitle}
         aria-keyshortcuts={shortcut?.ariaKeyshortcuts}
