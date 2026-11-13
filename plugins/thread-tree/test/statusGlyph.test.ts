@@ -110,7 +110,7 @@ test("queued-failed, plan-mode, goal and queued-waiting no longer roll up as don
   assert.equal(threadDotState(treeThread({})), "done");
 });
 
-test("rollups draw bb glyphs, and nothing for done", () => {
+test("rollups draw bb glyphs, and the idle dot for done", () => {
   assert.equal(ROLLUP_GLYPH.input, "waiting-for-input");
   assert.equal(ROLLUP_GLYPH.error, "unread-error");
   assert.equal(ROLLUP_GLYPH.running, "runtime");

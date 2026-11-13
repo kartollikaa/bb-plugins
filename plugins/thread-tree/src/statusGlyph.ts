@@ -88,7 +88,7 @@ export function isIdleGlyph(glyph: RowGlyph<GlyphRowStatus>): boolean {
   return glyph.indicator === "none" && glyph.rowStatus === null;
 }
 
-/** The rollup states (overview, fold line, status groups) drawn with bb's glyphs; "done" and "stopped" draw nothing. */
+/** The rollup states (overview, fold line, status groups) drawn with bb's glyphs; "done" and "stopped" get the idle dot. */
 export const ROLLUP_GLYPH: Record<DotState, GlyphIndicator> = {
   input: "waiting-for-input",
   error: "unread-error",
