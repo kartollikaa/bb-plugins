@@ -152,6 +152,20 @@ test("a delegated child linked only by its lifecycle owner belongs to its orches
   assert.equal(shared.size, 0);
 });
 
+test("a hidden parent isn't drawn, so a child under its loaded lifecycle owner takes the owner's family", () => {
+  const rootOf = familyRootOf([
+    { id: "orch", parentThreadId: null, lifecycleOwnerThreadId: null, isHidden: false },
+    { id: "helper", parentThreadId: null, lifecycleOwnerThreadId: null, isHidden: true },
+    { id: "kid", parentThreadId: "helper", lifecycleOwnerThreadId: "orch", isHidden: false },
+  ]);
+  assert.equal(rootOf("kid"), "orch");
+  const shared = sharedBranchThreads([
+    bt("orch", { branchName: "feature/x" }),
+    bt("kid", { branchName: "feature/x" }, { parentThreadId: "helper" }),
+  ], rootOf);
+  assert.equal(shared.size, 0);
+});
+
 test("an orchestrator and its subthreads share a branch by design and never warn about each other", () => {
   const family: Record<string, string> = { root: "root", kid: "root", stranger: "stranger" };
   const shared = sharedBranchThreads([
