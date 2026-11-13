@@ -148,3 +148,16 @@ test("the status summary names the nonzero counts, or says nothing is going on",
   assert.equal(statusSummary({ input: 1, error: 0, running: 3, unread: 0 }), "1 need input, 3 running");
   assert.equal(statusSummary({ input: 0, error: 0, running: 0, unread: 0 }), "No threads need attention");
 });
+
+test("closing the flat list or search hands focus back to the control that opened it, only when focus was lost", async () => {
+  const { returnFocus } = await import("../src/statusFilters.ts");
+  const body = { name: "body" };
+  const focused: string[] = [];
+  const root = { querySelector: (selector: string) => ({ focus: () => focused.push(selector) }) };
+  assert.equal(returnFocus({ activeElement: body, body }, root, { filter: "running" }), true);
+  assert.equal(returnFocus({ activeElement: null, body }, root, { search: true }), true);
+  assert.deepEqual(focused, ['[data-status-filter="running"]', "[data-thread-search-open]"]);
+  assert.equal(returnFocus({ activeElement: { name: "elsewhere" }, body }, root, { filter: "input" }), false, "a click elsewhere keeps its focus");
+  assert.equal(returnFocus({ activeElement: body, body }, { querySelector: () => null }, { search: true }), false);
+  assert.equal(focused.length, 2);
+});

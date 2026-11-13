@@ -43,7 +43,7 @@ import { GithubSection, useGithubFolder } from "./GithubSection";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph } from "./statusGlyph";
 import { StatusLine } from "./StatusLine";
-import { countStatusFilters, filterThreads, isSearchKey, orchestrationTitle, runningContext, searchThreads, STATUS_FILTERS, type StatusFilter } from "./statusFilters";
+import { countStatusFilters, filterThreads, isSearchKey, orchestrationTitle, returnFocus, runningContext, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
 import type { rpcContract } from "../server";
 import {
   moveSection,
@@ -238,10 +238,23 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     setSearchOpen(true);
     searchInputRef.current?.focus();
   }, []);
+  const pendingFocus = useRef<ClosedView | null>(null);
   const closeSearch = useCallback(() => {
+    pendingFocus.current = { search: true };
     setSearchOpen(false);
     setQuery("");
   }, []);
+  const closeFlatList = useCallback(() => {
+    if (statusFilter) {
+      setStatusFilter(null);
+      pendingFocus.current = { filter: statusFilter };
+    } else closeSearch();
+  }, [statusFilter, closeSearch]);
+  useEffect(() => {
+    const closed = pendingFocus.current;
+    pendingFocus.current = null;
+    if (closed && sectionsRef.current) returnFocus(document, sectionsRef.current, closed);
+  });
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const origin = event.composedPath()[0];
@@ -331,8 +344,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         onKeyDown={(event) => {
           if (event.key !== "Escape" || !(statusFilter || searchOpen) || !event.currentTarget.contains(event.target as Node)) return;
           event.preventDefault();
-          setStatusFilter(null);
-          closeSearch();
+          closeFlatList();
         }}
       >
       <div className="-mb-2 flex h-5 items-center justify-between gap-2 px-1.5">
@@ -354,10 +366,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           heading={statusFilter ? STATUS_FILTERS.find((entry) => entry.id === statusFilter)!.heading : `Matching “${query.trim()}”`}
           count={flatList.length}
           emptyText={statusFilter ? "Nothing here." : "No threads match."}
-          onClear={() => {
-            setStatusFilter(null);
-            closeSearch();
-          }}
+          onClear={closeFlatList}
         >
           {flatList.map((thread) => renderRow(
             flatRow(thread),

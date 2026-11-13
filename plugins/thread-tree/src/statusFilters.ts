@@ -100,3 +100,18 @@ export interface SearchKeyEvent {
 export function isSearchKey(event: SearchKeyEvent): boolean {
   return event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !event.defaultPrevented && !event.isComposing && !event.typing && !event.modalOpen;
 }
+
+/** What just closed: a status filter's flat list, or the search box. */
+export type ClosedView = { filter: StatusFilter } | { search: true };
+
+/** Closing removes the focused control; without this, focus drops to `<body>` and Tab restarts from the page top. */
+export function returnFocus(
+  doc: { activeElement: unknown; body: unknown },
+  root: { querySelector(selector: string): { focus(): void } | null },
+  closed: ClosedView,
+): boolean {
+  if (doc.activeElement !== null && doc.activeElement !== doc.body) return false;
+  const control = root.querySelector("filter" in closed ? `[data-status-filter="${closed.filter}"]` : "[data-thread-search-open]");
+  control?.focus();
+  return control !== null;
+}
