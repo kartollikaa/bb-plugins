@@ -28,7 +28,7 @@ reason names its orchestration. Clicking an item opens its thread; a PR with no
 thread opens GitHub Folder's PR page, an automation with no run the Automations
 page. A failed turn offers Retry, a failed queued message Resend. Hovering an
 item shows Snooze, which hides it until it changes and offers Undo, and Mark
-read on a result. ⇧⌘I opens the next item, stepping on from the last one it
+read on a result; on a phone or touch screen both stay in the row. ⇧⌘I opens the next item, stepping on from the last one it
 opened, or past the open thread's items; it works anywhere in bb while the
 sidebar thread list is loaded, and Settings → Keyboard rebinds it. Each browser client keeps its own snoozes.
 

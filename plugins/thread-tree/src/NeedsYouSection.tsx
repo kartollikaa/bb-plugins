@@ -37,7 +37,7 @@ import { StillGlyph } from "./ThreadGlyph";
 import { StatusDot } from "./StatusDot";
 import { ResendButton, RetryButton } from "./RetryButton";
 import { formatAge } from "./time";
-import { ROW_ACTION_BUTTON, hoverActionsClass, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX } from "./rowActions";
+import { actionsInline, ROW_ACTION_BUTTON, hoverActionsClass, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX } from "./rowActions";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT } from "./rowStyles";
 
 const THREAD_GLYPH: Record<ThreadItemKind, PluginSidebarThreadIndicator> = {
@@ -165,6 +165,7 @@ export function NeedsYouSection({
   onToggle,
   activeThreadId,
   isCompactViewport,
+  canHover,
   reduceMotion,
   now,
   onOpen,
@@ -175,6 +176,7 @@ export function NeedsYouSection({
   onToggle: () => void;
   activeThreadId: string | null;
   isCompactViewport: boolean;
+  canHover: boolean;
   reduceMotion: boolean;
   now: number;
   onOpen: (item: NeedsYouItem, split: boolean) => void;
@@ -199,6 +201,7 @@ export function NeedsYouSection({
               item={item}
               isActive={item.threadId !== null && item.threadId === activeThreadId}
               isCompactViewport={isCompactViewport}
+              inlineActions={actionsInline({ isCompactViewport, canHover })}
               reduceMotion={reduceMotion}
               now={now}
               onOpen={(split) => onOpen(item, split)}
@@ -215,6 +218,7 @@ function NeedsYouRow({
   item,
   isActive,
   isCompactViewport,
+  inlineActions,
   reduceMotion,
   now,
   onOpen,
@@ -223,6 +227,7 @@ function NeedsYouRow({
   item: NeedsYouItem;
   isActive: boolean;
   isCompactViewport: boolean;
+  inlineActions: boolean;
   reduceMotion: boolean;
   now: number;
   onOpen: (split: boolean) => void;
@@ -236,6 +241,12 @@ function NeedsYouRow({
     ? () => void sdk.threads.markRead({ threadId: item.threadId }).catch((error: unknown) =>
         toast.error("Couldn't mark it read", { description: error instanceof Error ? error.message : String(error) }))
     : null;
+  const actionButtons = (
+    <>
+      {markRead ? <OverlayButton label="Mark read" icon="CheckCheck" fallback="Check" onClick={markRead} /> : null}
+      <OverlayButton label="Snooze until it changes" icon="BellOff" fallback="Clock" onClick={onSnooze} />
+    </>
+  );
   return (
     <div
       role="listitem"
@@ -274,15 +285,18 @@ function NeedsYouRow({
       </span>
       {item.kind === "failed" && item.canRetry ? <span className="relative z-[1] flex shrink-0"><RetryButton threadId={item.threadId} /></span> : null}
       {item.kind === "queued-failed" ? <span className="relative z-[1] flex shrink-0"><ResendButton threadId={item.threadId} /></span> : null}
-      {isCompactViewport ? null : (
+      {inlineActions ? (
+        <span data-inline-actions="" className="relative z-[1] flex shrink-0 items-center" style={{ gap: STRIP_GAP_PX }}>
+          {actionButtons}
+        </span>
+      ) : (
         <span
           data-hover-actions=""
           className={cn("absolute inset-y-0 right-0 flex items-center rounded-r-md", isActive ? ROW_FADE_ACTIVE : ROW_FADE_HOVER, hoverActionsClass(reduceMotion))}
         >
           <span aria-hidden className={cn("h-full w-6", ROW_FADE_GRADIENT)} />
           <span className={cn("flex h-full items-center", ROW_FADE_SOLID)} style={{ gap: STRIP_GAP_PX, paddingRight: STRIP_END_PAD_PX }}>
-            {markRead ? <OverlayButton label="Mark read" icon="CheckCheck" fallback="Check" onClick={markRead} /> : null}
-            <OverlayButton label="Snooze until it changes" icon="BellOff" fallback="Clock" onClick={onSnooze} />
+            {actionButtons}
           </span>
         </span>
       )}

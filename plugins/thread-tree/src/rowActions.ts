@@ -23,6 +23,10 @@ export function canStop(thread: Pick<TreeThread, "status" | "indicator" | "activ
 /** The same test `TOUCH_DIMMED` uses for a screen that never hovers. */
 export const NO_HOVER_QUERY = "(hover: none)";
 
+export function actionsInline(view: { isCompactViewport: boolean; canHover: boolean }): boolean {
+  return view.isCompactViewport || !view.canHover;
+}
+
 /** A parent's glyph is its fold toggle, and a tap on touch must not stop work; both keep Stop in the menus. */
 export function stopsFromGlyph(
   thread: Pick<TreeThread, "status" | "indicator" | "activity">,

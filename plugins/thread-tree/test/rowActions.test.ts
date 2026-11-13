@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canStop, END_SLOT_MIN_PX, hoverActionsClass, ROW_ACTION_BUTTON, ROW_ACTION_PX, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "../src/rowActions.ts";
+import { actionsInline, canStop, END_SLOT_MIN_PX, hoverActionsClass, ROW_ACTION_BUTTON, ROW_ACTION_PX, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "../src/rowActions.ts";
 import { headerChevronMotion, ROW_TINT } from "../src/rowStyles.ts";
 
 const idle = { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 };
@@ -89,4 +89,10 @@ test("a header chevron fades in within 80ms and animates its 150ms fold on the r
 
 test("a header chevron holds still under the plugin's Reduce motion setting", () => {
   assert.deepEqual(headerChevronMotion(true).split(" "), ["transition-none"]);
+});
+
+test("row actions sit inline where the hover strip can never show: a compact viewport or a screen without hover", () => {
+  assert.equal(actionsInline({ isCompactViewport: false, canHover: true }), false);
+  assert.equal(actionsInline({ isCompactViewport: true, canHover: true }), true);
+  assert.equal(actionsInline({ isCompactViewport: false, canHover: false }), true);
 });

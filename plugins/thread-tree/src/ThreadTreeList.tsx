@@ -391,6 +391,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         onToggle={() => collapsedGroups.toggle("needs-you")}
         activeThreadId={activeThreadId ?? null}
         isCompactViewport={isCompactViewport}
+        canHover={canHover}
         reduceMotion={view.reduceMotion}
         now={now}
         onOpen={needsYou.open}
