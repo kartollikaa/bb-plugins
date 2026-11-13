@@ -11,7 +11,12 @@ export interface BranchThread {
 export function familyRootOf(
   threads: readonly { id: string; parentThreadId: string | null; lifecycleOwnerThreadId: string | null }[],
 ): (threadId: string) => string {
-  const parentOf = new Map(threads.map((thread) => [thread.id, thread.parentThreadId ?? thread.lifecycleOwnerThreadId]));
+  const loaded = new Set(threads.map((thread) => thread.id));
+  // Same choice as displayParentId; with neither loaded, the missing id still groups its children.
+  const parentOf = new Map(threads.map((thread) => {
+    const candidates = [thread.parentThreadId, thread.lifecycleOwnerThreadId].filter((id): id is string => !!id && id !== thread.id);
+    return [thread.id, candidates.find((id) => loaded.has(id)) ?? candidates[0] ?? null];
+  }));
   return (threadId) => {
     const seen = new Set<string>();
     let id = threadId;

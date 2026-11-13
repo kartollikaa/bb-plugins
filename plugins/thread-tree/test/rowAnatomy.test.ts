@@ -143,6 +143,8 @@ test("a delegated child linked only by its lifecycle owner belongs to its orches
   const rootOf = familyRootOf(threads);
   assert.equal(rootOf("delegate"), "orch");
   assert.equal(rootOf("moved"), "orch");
+  const unloadedParent = familyRootOf([...threads, { id: "stray", parentThreadId: "not-loaded", lifecycleOwnerThreadId: "orch" }]);
+  assert.equal(unloadedParent("stray"), "orch", "the tree draws it under the loaded owner, so its family follows");
   const shared = sharedBranchThreads([
     bt("orch", { branchName: "feature/x" }),
     bt("delegate", { branchName: "feature/x" }),
