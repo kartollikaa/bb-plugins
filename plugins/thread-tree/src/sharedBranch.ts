@@ -9,9 +9,9 @@ export interface BranchThread {
 
 /**
  * For each live thread, the other live threads on its branch or worktree. A project's own checkout
- * (isWorktree false) is shared by design, so it never warns.
+ * (isWorktree false) and threads of one family (an orchestrator and its subthreads) share by design.
  */
-export function sharedBranchThreads<T extends BranchThread>(threads: readonly T[]): Map<string, T[]> {
+export function sharedBranchThreads<T extends BranchThread>(threads: readonly T[], familyOf: (threadId: string) => string = (id) => id): Map<string, T[]> {
   const byKey = new Map<string, T[]>();
   const keysOf = new Map<string, string[]>();
   for (const thread of threads) {
@@ -32,7 +32,7 @@ export function sharedBranchThreads<T extends BranchThread>(threads: readonly T[
   for (const thread of threads) {
     const others = new Map<string, T>();
     for (const key of keysOf.get(thread.id) ?? []) {
-      for (const other of byKey.get(key) ?? []) if (other.id !== thread.id) others.set(other.id, other);
+      for (const other of byKey.get(key) ?? []) if (familyOf(other.id) !== familyOf(thread.id)) others.set(other.id, other);
     }
     if (others.size > 0) result.set(thread.id, [...others.values()]);
   }
@@ -41,5 +41,6 @@ export function sharedBranchThreads<T extends BranchThread>(threads: readonly T[
 
 export function sharedBranchTooltip(branch: string | null, others: readonly { displayTitle: string }[]): string {
   const where = branch ? `Branch ${branch}` : "This worktree";
-  return `${where} is also used by ${others.map((other) => `“${other.displayTitle}”`).join(", ")}`;
+  const named = others.slice(0, 2).map((other) => `“${other.displayTitle}”`).join(", ");
+  return `${where} is also used by ${named}${others.length > 2 ? ` and ${others.length - 2} more` : ""}`;
 }

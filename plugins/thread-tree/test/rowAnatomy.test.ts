@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { providerTintClass, PROVIDER_MONOCHROME } from "../src/providerTint.ts";
+import { providerTintColor } from "../src/providerTint.ts";
 import { folderAttentionByUrl, prActionReason, prTooltip, rowPullRequest } from "../src/prAttention.ts";
 import { sharedBranchThreads, sharedBranchTooltip, type BranchThread } from "../src/sharedBranch.ts";
 import { createRefreshScheduler } from "../src/refreshScheduler.ts";
@@ -8,13 +8,13 @@ import type { ThreadPullRequest } from "../src/threadPullRequests.ts";
 import type { GithubFolderItem } from "../src/githubFolder.ts";
 
 test("each known provider has its own light and dark tint; monochrome and unknown use the text colour", () => {
-  const claude = providerTintClass("claude-code", "tint");
-  const codex = providerTintClass("codex", "tint");
-  assert.match(claude, /^text-\[#\w{6}\] dark:text-\[#\w{6}\]$/);
-  assert.match(codex, /^text-\[#\w{6}\] dark:text-\[#\w{6}\]$/);
+  const claude = providerTintColor("claude-code", "tint");
+  const codex = providerTintColor("codex", "tint");
+  assert.match(claude ?? "", /^light-dark\(#\w{6}, #\w{6}\)$/);
+  assert.match(codex ?? "", /^light-dark\(#\w{6}, #\w{6}\)$/);
   assert.notEqual(claude, codex);
-  assert.equal(providerTintClass("claude-code", "monochrome"), PROVIDER_MONOCHROME);
-  assert.equal(providerTintClass("someone-new", "tint"), PROVIDER_MONOCHROME);
+  assert.equal(providerTintColor("claude-code", "monochrome"), null);
+  assert.equal(providerTintColor("someone-new", "tint"), null);
 });
 
 const pr = (extra: Partial<ThreadPullRequest> = {}): ThreadPullRequest => ({
@@ -97,8 +97,21 @@ test("archived and hidden threads, other projects, the project checkout and miss
   assert.equal(shared.size, 0);
 });
 
-test("the warning names the other threads", () => {
+test("an orchestrator and its subthreads share a branch by design and never warn about each other", () => {
+  const family: Record<string, string> = { root: "root", kid: "root", stranger: "stranger" };
+  const shared = sharedBranchThreads([
+    bt("root", { branchName: "feature/x" }),
+    bt("kid", { branchName: "feature/x" }),
+    bt("stranger", { branchName: "feature/x" }),
+  ], (id) => family[id]!);
+  assert.deepEqual(shared.get("root")?.map((t) => t.id), ["stranger"]);
+  assert.deepEqual(shared.get("kid")?.map((t) => t.id), ["stranger"]);
+  assert.deepEqual(shared.get("stranger")?.map((t) => t.id), ["root", "kid"]);
+});
+
+test("the warning names the other threads, two at most", () => {
   assert.equal(sharedBranchTooltip("feature/x", [{ displayTitle: "Other" }]), "Branch feature/x is also used by “Other”");
+  assert.equal(sharedBranchTooltip(null, [{ displayTitle: "A" }, { displayTitle: "B" }, { displayTitle: "C" }]), "This worktree is also used by “A”, “B” and 1 more");
 });
 
 test("the PR refresh ticks only while shown and catches up once when shown again", () => {

@@ -1,19 +1,22 @@
 import type { ProviderIconStyle } from "./settings.ts";
 
-/** Brand tints per agent provider id, darker in light mode and lighter in dark so the mask keeps contrast. */
-const PROVIDER_TINT: Record<string, string> = {
-  "claude-code": "text-[#C15F3C] dark:text-[#E08A6D]",
-  claude: "text-[#C15F3C] dark:text-[#E08A6D]",
-  codex: "text-[#0F8A6C] dark:text-[#3CC3A0]",
-  openai: "text-[#0F8A6C] dark:text-[#3CC3A0]",
-  gemini: "text-[#3367D6] dark:text-[#8AB4F8]",
-  cursor: "text-[#6E56CF] dark:text-[#B4A6F5]",
+export interface Tint {
+  light: string;
+  dark: string;
+}
+
+/** Brand tints per agent provider id: darker on light themes, lighter on dark, so the mask keeps contrast. */
+const PROVIDER_TINT: Record<string, Tint> = {
+  "claude-code": { light: "#C15F3C", dark: "#E08A6D" },
+  claude: { light: "#C15F3C", dark: "#E08A6D" },
+  codex: { light: "#0F8A6C", dark: "#3CC3A0" },
+  openai: { light: "#0F8A6C", dark: "#3CC3A0" },
+  gemini: { light: "#3367D6", dark: "#8AB4F8" },
+  cursor: { light: "#6E56CF", dark: "#B4A6F5" },
 };
 
-/** Full contrast: the row's own text colour, for monochrome and for providers without a brand tint. */
-export const PROVIDER_MONOCHROME = "text-sidebar-foreground";
-
-export function providerTintClass(providerId: string, style: ProviderIconStyle): string {
-  if (style === "monochrome") return PROVIDER_MONOCHROME;
-  return PROVIDER_TINT[providerId] ?? PROVIDER_MONOCHROME;
+/** The icon's colour as an inline value following bb's colour scheme; null draws it in the row's full text colour. */
+export function providerTintColor(providerId: string, style: ProviderIconStyle): string | null {
+  const tint = style === "tint" ? PROVIDER_TINT[providerId] : undefined;
+  return tint ? `light-dark(${tint.light}, ${tint.dark})` : null;
 }

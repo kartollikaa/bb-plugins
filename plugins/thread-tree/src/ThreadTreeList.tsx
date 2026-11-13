@@ -31,7 +31,7 @@ import { useTapToOpenMenu } from "./useTapToOpenMenu";
 import { useThreadPullRequests } from "./useThreadPullRequests";
 import { excludeDescendantPullRequests, type ThreadPullRequest } from "./threadPullRequests";
 import { folderAttentionByUrl, PR_REASON_LOOK, prTooltip, rowPullRequest, type FolderAttention, type RowPullRequest } from "./prAttention";
-import { providerTintClass } from "./providerTint";
+import { providerTintColor } from "./providerTint";
 import { sharedBranchThreads, sharedBranchTooltip } from "./sharedBranch";
 import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
@@ -53,6 +53,7 @@ import {
 import { formatAge } from "./time";
 import {
   buildForest,
+  ancestorsOf,
   descendantsOf,
   type Forest,
   countStates,
@@ -218,7 +219,10 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     () => folderAttentionByUrl(folderItems ? [...folderItems.items, ...folderItems.snoozed] : []),
     [folderItems],
   );
-  const sharedBranches = useMemo(() => sharedBranchThreads(threads), [threads]);
+  const sharedBranches = useMemo(() => {
+    const familyOf = (id: string) => ancestorsOf(activeForest, id).at(-1) ?? id;
+    return sharedBranchThreads(threads, familyOf);
+  }, [threads, activeForest]);
   const { providers } = useProviders();
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
 
@@ -854,8 +858,13 @@ function ThreadRowView({
             </span>
           ) : null}
           {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
-          <span data-provider-icon={thread.providerId} title={providerName} className={cn("flex size-3.5 shrink-0 items-center justify-center", providerTintClass(thread.providerId, view.providerIconStyle))}>
-            <ProviderIcon providerKind="agent" provider={provider ?? { id: thread.providerId }} aria-label={providerName} className="size-3.5" />
+          <span
+            data-provider-icon={thread.providerId}
+            title={providerName}
+            className="flex size-3.5 shrink-0 items-center justify-center text-sidebar-foreground"
+            style={{ color: providerTintColor(thread.providerId, view.providerIconStyle) ?? undefined }}
+          >
+            <ProviderIcon providerKind="agent" provider={untinted(provider, thread.providerId)} aria-label={providerName} className="size-3.5" />
           </span>
           {/* Age shrinks away as the actions grow in, so the row's icons glide left and the title truncates. */}
           <span className="-mr-1 flex shrink-0 items-center">
@@ -1123,6 +1132,11 @@ function TreeGuides({
 }
 
 type RowProvider = ReturnType<typeof useProviders>["providers"][number];
+
+/** Without bb's own tint the logo mask takes the slot's colour, which the plugin sets. */
+function untinted(provider: RowProvider | undefined, id: string) {
+  return { id, logoUrl: provider?.logoUrl ?? null, icon: provider?.icon ?? null };
+}
 
 function toActionTarget(thread: PluginSidebarThread): PluginThreadActionTarget {
   const environmentId = thread.environment?.id ?? null;
