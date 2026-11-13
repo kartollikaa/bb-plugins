@@ -400,3 +400,26 @@ test("PR ownership follows nested displayed subthreads, including lifecycle owne
   assert.deepEqual(descendantsOf(forest, "kid").map((t) => t.id), ["nested"]);
   assert.deepEqual(descendantsOf(forest, "unrelated"), []);
 });
+
+test("queued-failed rolls up as failed and plan-mode as running", () => {
+  assert.equal(threadDotState(thread("t", { indicator: "queued-failed" })), "error");
+  assert.equal(threadDotState(thread("t", { indicator: "plan-mode" })), "running");
+});
+
+test("a queued message or a goal with no turn running waits: not running, not done", () => {
+  for (const indicator of ["queued-waiting", "goal"]) {
+    assert.equal(threadDotState(thread("t", { indicator })), "stopped", indicator);
+    assert.equal(threadDotState(thread("t", { indicator, status: "active" })), "running", indicator);
+  }
+  assert.deepEqual(countStates([thread("q", { indicator: "queued-waiting" }), thread("g", { indicator: "goal" })]), { stopped: 2 });
+});
+
+test("a waiting thread ranks below running and above done in status groups", () => {
+  const threads = [
+    thread("done", { updatedAt: 3 }),
+    thread("wait", { indicator: "queued-waiting", updatedAt: 2 }),
+    thread("run", { status: "active", updatedAt: 1 }),
+  ];
+  const groups = groupRows(buildForest(threads), new Set(), "status");
+  assert.deepEqual(groups.map((g) => g.key), ["status:running", "status:stopped", "status:done"]);
+});

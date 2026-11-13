@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { glyphMotionClass, isIdleGlyph, resolveRowGlyph, ROLLUP_GLYPH, type GlyphThread } from "../src/statusGlyph.ts";
-import { threadDotState, type TreeThread } from "../src/tree.ts";
 
 const idleActivity = { workflows: 0, backgroundAgents: 0, backgroundCommands: 0, planMode: 0 };
 
 const thread = (indicator: string, indicatorLabel: string | null = null, extra: Partial<GlyphThread> = {}): GlyphThread => ({
+  status: "idle",
   indicator,
   indicatorLabel,
   runtimeStatus: "idle",
@@ -62,6 +62,32 @@ test("a draft on a busy thread is the working-draft glyph", () => {
   assert.equal(resolveRowGlyph(thread("background-agent", null, { activity: { ...idleActivity, backgroundAgents: 1 } }), true, null).indicator, "working-draft");
 });
 
+test("a draft on a thread the host reports busy is the working-draft glyph, even when its own counts read idle", () => {
+  for (const indicator of ["runtime", "workflow", "background-agent", "background-command", "plan-mode"]) {
+    assert.equal(resolveRowGlyph(thread(indicator, "x"), true, null).indicator, "working-draft", indicator);
+  }
+});
+
+test("a read root thread whose last turn failed keeps the error glyph", () => {
+  assert.deepEqual(resolveRowGlyph(thread("none", null, { status: "error" }), false, null), {
+    indicator: "unread-error",
+    rowStatus: null,
+    label: "Last turn failed",
+  });
+});
+
+test("a failed subthread, which bb never marks unread, keeps the error glyph over a draft and a row status", () => {
+  const failed = thread("none", null, { status: "error" });
+  assert.equal(resolveRowGlyph(failed, true, null).indicator, "unread-error");
+  assert.deepEqual(resolveRowGlyph(failed, false, running), { indicator: "unread-error", rowStatus: null, label: "Last turn failed" });
+});
+
+test("a failed thread keeps the host's own error label, and a question still outranks the failure", () => {
+  assert.equal(resolveRowGlyph(thread("unread-error", "Unread thread failed", { status: "error" }), false, null).label, "Unread thread failed");
+  assert.equal(resolveRowGlyph(thread("queued-failed", "q", { status: "error" }), false, null).indicator, "unread-error");
+  assert.equal(resolveRowGlyph(thread("waiting-for-input", "w", { status: "error" }), false, null).indicator, "waiting-for-input");
+});
+
 test("a draft never hides a question or a failure, nor an idle thread's unread or queued state", () => {
   assert.equal(resolveRowGlyph(thread("waiting-for-input", "x", { runtimeStatus: "active" }), true, null).indicator, "waiting-for-input");
   assert.equal(resolveRowGlyph(thread("unread-error", "x"), true, null).indicator, "unread-error");
@@ -81,33 +107,6 @@ test("a running turn, a question and an unread failure outrank a row status", ()
     assert.equal(glyph.rowStatus, null, indicator);
     assert.equal(glyph.label, "host", indicator);
   }
-});
-
-const treeThread = (extra: Partial<TreeThread>): TreeThread => ({
-  id: "t",
-  projectId: "p",
-  parentThreadId: null,
-  lifecycleOwnerThreadId: null,
-  isPinned: false,
-  pinSortKey: null,
-  pinnedAt: null,
-  isHidden: false,
-  isArchived: false,
-  status: "idle",
-  indicator: "none",
-  hasPendingInteraction: false,
-  activity: { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 },
-  createdAt: 0,
-  updatedAt: 0,
-  ...extra,
-});
-
-test("queued-failed, plan-mode, goal and queued-waiting no longer roll up as done", () => {
-  assert.equal(threadDotState(treeThread({ indicator: "queued-failed" })), "error");
-  assert.equal(threadDotState(treeThread({ indicator: "plan-mode" })), "running");
-  assert.equal(threadDotState(treeThread({ indicator: "goal" })), "running");
-  assert.equal(threadDotState(treeThread({ indicator: "queued-waiting" })), "running");
-  assert.equal(threadDotState(treeThread({})), "done");
 });
 
 test("rollups draw bb glyphs, and the idle dot for done", () => {

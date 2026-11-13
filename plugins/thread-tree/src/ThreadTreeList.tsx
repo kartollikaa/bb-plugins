@@ -106,6 +106,7 @@ const STATUS_GROUP_TITLE: Record<string, string> = {
   input: "Needs input",
   error: "Error",
   running: "Working",
+  stopped: "Waiting",
   done: "Done",
 };
 
@@ -941,6 +942,7 @@ const FOLD_STATES: readonly { state: DotState; label: string }[] = [
   { state: "input", label: "needs input" },
   { state: "error", label: "failed" },
   { state: "running", label: "running" },
+  { state: "stopped", label: "waiting" },
   { state: "done", label: "done" },
 ];
 
