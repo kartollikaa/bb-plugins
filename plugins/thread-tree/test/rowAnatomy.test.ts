@@ -17,6 +17,11 @@ test("each known provider has its own light and dark tint; monochrome and unknow
   assert.equal(providerTintColor("someone-new", "tint"), null);
 });
 
+test("Codex uses its brand blue-violet, not ChatGPT green", () => {
+  assert.equal(providerTintColor("codex", "tint"), "light-dark(#3941FF, #7A9DFF)");
+  assert.equal(providerTintColor("openai", "tint"), providerTintColor("codex", "tint"));
+});
+
 const pr = (extra: Partial<ThreadPullRequest> = {}): ThreadPullRequest => ({
   number: 7,
   title: "Fix it",

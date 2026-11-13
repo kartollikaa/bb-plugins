@@ -9,8 +9,8 @@ export interface Tint {
 const PROVIDER_TINT: Record<string, Tint> = {
   "claude-code": { light: "#C15F3C", dark: "#E08A6D" },
   claude: { light: "#C15F3C", dark: "#E08A6D" },
-  codex: { light: "#0F8A6C", dark: "#3CC3A0" },
-  openai: { light: "#0F8A6C", dark: "#3CC3A0" },
+  codex: { light: "#3941FF", dark: "#7A9DFF" },
+  openai: { light: "#3941FF", dark: "#7A9DFF" },
   gemini: { light: "#3367D6", dark: "#8AB4F8" },
   cursor: { light: "#6E56CF", dark: "#B4A6F5" },
 };

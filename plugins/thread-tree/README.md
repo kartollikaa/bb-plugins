@@ -36,7 +36,7 @@ uses; its tooltip names the other thread. Threads in a project's own checkout
 never warn.
 
 The provider icon sits in a fixed slot before the age, in the provider's brand
-tint (Claude orange, Codex green), or in the text colour with the
+tint (Claude orange, Codex blue-violet), or in the text colour with the
 `providerIconStyle` setting set to `monochrome`.
 
 ## Redesign in progress
