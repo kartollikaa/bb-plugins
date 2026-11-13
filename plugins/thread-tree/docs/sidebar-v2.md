@@ -51,18 +51,21 @@ that don't move or change height while agents work.
 
 ### Needs you
 
-One queue above the other sections, hidden when empty, ⌘J jumps to the next item.
+One queue above the other sections, hidden when empty. ⇧⌘I ("inbox") opens the next item; ⌘J is
+bb's side chat (`panel.toggle`) and is not available.
 
 - **Items, in order:** threads asking a question (with the question and how long they waited,
-  longest first); failed turns; failed queued messages; running threads silent for several
-  minutes; finished threads not yet read ("review the result"); PRs of the user's own threads that
+  longest first); failed turns; failed queued messages; running threads silent for 10 minutes
+  (a setting) while no background agent, command or workflow of theirs is active; finished threads not yet read ("review the result"); PRs of the user's own threads that
   need action; failed automations.
 - A subthread's item names its orchestration ("under Orchestrate PR review…").
 - **Row click opens the thread.** Buttons only for actions that aren't navigation: Retry, Resend,
   Stop, Merge (with confirmation). Hover shows snooze ("until it changes") and, for results,
   Mark read.
-- **PRs in the queue:** only PRs linked to the user's threads by default; a setting can show all
-  GitHub Folder items or none. The owner doesn't act on PRs much, so they must not dominate.
+- **PRs in the queue:** by default only PRs linked to the user's threads, and only when an agent
+  can act on them: checks failing, conflicts, changes requested. Ready to merge stays a row icon,
+  not a queue item. A setting switches to all GitHub Folder items or none. The owner doesn't act
+  on PRs much, so they must not dominate.
 - Items are two lines (title, then reason). This is the only two-line list besides the Running
   filter.
 
@@ -147,12 +150,15 @@ and in folder there are gonna be the whole … with nested tree."
   whose subtree is quiet, and whose PRs are merged, closed or absent, and that are older than a
   day, fold into one line "N older". The full rule is the line's tooltip.
 - Expanding shows them and an "Archive these" button; archiving keeps the existing ⌘Z undo.
+- bb's archive can remove a thread's worktree, uncommitted changes included. "Archive these"
+  goes through bb's own archive and its confirmation, skips threads whose worktree has
+  uncommitted changes (they stay listed with a marker), and says how many it skipped.
 
 ### Recent Activity
 
-Not part of the default v2 layout: the status-line filters and Needs you cover what it was used
-for. It stays available under Sections until the owner decides whether to remove it
-(see open questions).
+Hidden by default in v2: the status-line filters and Needs you cover what it was used for, and
+bb's own back (⌘[) and previous/next thread (⇧⌘[ ⇧⌘]) cover jumping back. It stays in Sections,
+and a user who has it turned on keeps it. Removal is reconsidered after v2 has been used a while.
 
 ## Data and feasibility
 
@@ -171,7 +177,7 @@ for. It stays available under Sections until the owner decides whether to remove
 | PR attention on rows | Failing/Conflicts from bb GitHub PR Status and Thread Links; Changes/Ready need GitHub Folder's `attention` joined by URL | Medium |
 | Merge | bb GitHub PR Status merge over plugin RPC (unverified) | Medium |
 | Agent review of an unclaimed PR | `threads.spawn`; repo → project mapping unverified | Medium |
-| ⌘J | `app.commands.register`; shortcut conflict unverified | Low |
+| ⇧⌘I | `app.commands.register` with `defaultShortcut`; free in bb's own keymap (`bb settings keyboard list`), bb leaves colliding plugin defaults unbound | Low |
 | Context-window fill, rate limits | thread events only | High, later |
 
 Dependencies on other plugins degrade quietly: without GitHub Folder, Thread Links, bb GitHub PR
@@ -194,7 +200,7 @@ the live bb, and is released per [docs/workflow.md](../../../docs/workflow.md).
 4. **Status line filters and `/` search,** including the Running filter's flat list. Step text
    and timer can arrive later (slice 9).
 5. **Needs you.** Thread items first (input with question and wait, failed, queued-failed,
-   finished-unread), snooze, ⌘J; then PR items of the user's threads and failed automations.
+   finished-unread), snooze, ⇧⌘I; then PR items of the user's threads and failed automations.
 6. **Orchestrations.** Shortcut section, folded rollup glyph, fold-line bar from five subthreads,
    Archive on a finished fold line.
 7. **Section summaries.** PR and Automations collapsed by default with summary headers; PR rows
@@ -203,10 +209,12 @@ the live bb, and is released per [docs/workflow.md](../../../docs/workflow.md).
 9. **Later, costlier:** stuck-agent items, step text and turn timer, Merge, Agent review,
    context and rate-limit signals, diff stat for results to review.
 
-## Open questions for the owner
+## Settled questions
 
-- Remove Recent Activity for good, or keep it as an optional section?
-- Should Needs you include PRs of the user's threads by default, or start with none?
-- Is ⌘J free in bb, and is it the right key?
-- What counts as stuck: how many silent minutes?
-- Does archiving a thread remove its worktree? This decides how prominent "Archive these" can be.
+The owner delegated these; answers are folded into the sections above.
+
+- Recent Activity: hidden by default, still in Sections.
+- PRs in Needs you: linked PRs with failing checks, conflicts or changes requested.
+- Needs you shortcut: ⇧⌘I; check Settings → Keyboard for a clash with another plugin's command.
+- Stuck: 10 silent minutes, as a setting, ignoring threads with background work running.
+- Archiving can remove worktrees with uncommitted changes, so bulk archive skips dirty worktrees.
