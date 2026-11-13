@@ -4,6 +4,8 @@ import {
   automationItems,
   describeQuestion,
   isSnoozed,
+  itemTarget,
+  linkedPullRequests,
   nextItem,
   pruneSnoozes,
   pullRequestItems,
@@ -14,6 +16,7 @@ import {
   type NeedsYouThread,
   type PendingInteraction,
 } from "../src/needsYou.ts";
+import { openNextInboxItem, setInboxHandler } from "../src/inbox.ts";
 import type { ThreadPullRequest } from "../src/threadPullRequests.ts";
 import type { AutomationSummary } from "../src/automations.ts";
 import type { GithubFolderItem } from "../src/githubFolder.ts";
@@ -203,4 +206,32 @@ test("⇧⌘I opens the first item, then the one after the open thread, wrapping
   assert.equal(nextItem(items, "a")?.threadId, "b");
   assert.equal(nextItem(items, "c")?.threadId, "a");
   assert.equal(nextItem([], "a"), null);
+});
+
+test("a click opens the item's thread, else the PR page, else the Automations page", () => {
+  const [failed] = build([thread("f", { status: "error" })]);
+  assert.deepEqual(itemTarget(failed!), { kind: "thread", threadId: "f" });
+  const [linkedPr, folderOnly] = pullRequestItems("all", [{ threadId: "t1", pullRequests: [pr(8)] }], new Map(), [folderItem(8, ["ci_failed"]), folderItem(9, ["review"])]);
+  assert.deepEqual(itemTarget(linkedPr!), { kind: "thread", threadId: "t1" });
+  assert.deepEqual(itemTarget(folderOnly!), { kind: "pr", url: folderOnly!.url });
+  const [never] = automationItems([automation("a", { lastRunStatus: "failed" })]);
+  assert.deepEqual(itemTarget(never!), { kind: "automations" });
+});
+
+test("a thread's own PRs leave out the ones its subthreads link", () => {
+  const prs: Record<string, ThreadPullRequest[]> = { root: [pr(1), pr(2)], child: [pr(2)] };
+  const linked = linkedPullRequests(["root", "child"], (id) => prs[id] ?? [], (id) => (id === "root" ? ["child"] : []));
+  assert.deepEqual(linked.map(({ threadId, pullRequests }) => [threadId, pullRequests.map((entry) => entry.number)]), [["root", [1]], ["child", [2]]]);
+});
+
+test("⇧⌘I reaches the mounted sidebar, and an old sidebar unmounting doesn't drop a newer one", () => {
+  assert.equal(openNextInboxItem(null), false);
+  const calls: (string | null)[] = [];
+  const dropOld = setInboxHandler(() => { calls.push("old"); return true; });
+  const dropNew = setInboxHandler((threadId) => { calls.push(threadId); return true; });
+  dropOld();
+  assert.equal(openNextInboxItem("t1"), true);
+  assert.deepEqual(calls, ["t1"]);
+  dropNew();
+  assert.equal(openNextInboxItem("t1"), false);
 });
