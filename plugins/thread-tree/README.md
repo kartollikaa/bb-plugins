@@ -30,6 +30,7 @@ background work; a thread stuck stopping can be stopped again. A parent row's
 glyph folds its subtree, so a running parent offers Stop in ⋯ and the
 right-click menu, as every working row does. On touch screens the glyph stays a
 glyph, so a tap never stops a thread; a long press opens the row's menu.
+
 The PR icon appears only when one of the thread's pull requests needs action:
 checks failing (red), conflicts (orange), changes requested (amber) or ready to
 merge (green). Hover it for the number, title and reason; click it to open
