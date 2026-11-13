@@ -75,7 +75,7 @@ import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersist
 import { useDragReorder, useFlipOrder } from "./useReorder";
 import { ReduceMotionContext, useStill } from "./motion";
 import { Collapse } from "./Collapse";
-import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, TOUCH_DIMMED } from "./rowStyles";
+import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
 import { canStop, END_SLOT_MIN_PX, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
 
@@ -799,7 +799,7 @@ function ThreadRowView({
         data-thread-row=""
         className={cn(
           "group/row relative rounded-md text-sm text-sidebar-foreground/90",
-          isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60 data-[keyboard-focus]:bg-sidebar-accent/60",
+          isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : ROW_TINT,
         )}
         data-keyboard-focus={keyboardFocus || undefined}
         data-menu-open={menuOpen || undefined}

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { canStop, END_SLOT_MIN_PX, HOVER_ACTIONS_STRIP_PX, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, stopsFromGlyph } from "../src/rowActions.ts";
+import { ROW_TINT } from "../src/rowStyles.ts";
 
 const idle = { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 };
 const leaf = { glyph: { indicator: "runtime", rowStatus: null } };
@@ -64,4 +65,11 @@ test("the overlay lets clicks through to the row and its controls; only its own 
 
 test("the provider and age slot reserves the button strip's width, so Archive and ⋯ never cover Retry, a PR icon, ⚠ or the badge", () => {
   assert.ok(END_SLOT_MIN_PX + ROW_END_PAD_PX >= HOVER_ACTIONS_STRIP_PX);
+});
+
+test("every state that shows the overlay also tints the row, so its solid end never sits on an untinted row", () => {
+  const tint = ROW_TINT.split(" ");
+  for (const state of ["hover", "data-[keyboard-focus]", "data-[menu-open]"]) {
+    assert.ok(tint.includes(`${state}:bg-sidebar-accent/60`), state);
+  }
 });

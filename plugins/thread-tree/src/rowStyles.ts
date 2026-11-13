@@ -9,3 +9,6 @@ export const ROW_FADE_HOVER = "[--row-fade:color-mix(in_oklab,var(--sidebar-acce
 export const ROW_FADE_ACTIVE = "[--row-fade:var(--sidebar-accent)]";
 export const ROW_FADE_GRADIENT = "[background:linear-gradient(to_right,transparent,var(--row-fade))]";
 export const ROW_FADE_SOLID = "bg-[var(--row-fade)]";
+
+/** An inactive row's tint wherever its hover actions show. */
+export const ROW_TINT = "hover:bg-sidebar-accent/60 data-[keyboard-focus]:bg-sidebar-accent/60 data-[menu-open]:bg-sidebar-accent/60";
