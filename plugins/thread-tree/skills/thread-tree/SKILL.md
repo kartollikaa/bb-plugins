@@ -18,6 +18,15 @@ When the GitHub Folder plugin is installed, the list's top section is its
 folder of pull requests that need the user. Use that plugin's
 `bb github-folder list` to read it.
 
+The line at the top counts threads that need input, failed, are running, and
+finished but are not read yet. Each count is a toggle: it swaps the sections and
+the tree for a flat list of those threads, children included, most recently
+active first. Running rows add a second line with the project and the
+orchestration they run under. Click the count again, Clear, or press Escape to
+go back. `/` (outside a text field) or the search icon opens a search box that
+matches the title, branch, PR number (`#123`) and project of the threads the
+tree lists, archived ones when Archived is on. Escape clears it.
+
 Every thread row is one line and keeps one height whatever its state; rows are
 taller on a phone-sized viewport. Left to right: status glyph, title, Retry on a
 failed turn, PR icon, shared-branch warning, subagent counter, provider icon, age.

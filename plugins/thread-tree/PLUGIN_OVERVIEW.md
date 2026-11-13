@@ -3,6 +3,10 @@ under it, and the subagents it runs inside its own session show on its row.
 
 ## What you get
 
+- A status line counts threads that need input, failed, are running or are
+  unread. Click a count for a flat list of those threads; Running rows name
+  their project and orchestration. Press `/` to search title, branch, PR
+  number or project; Escape returns.
 - With the GitHub Folder plugin installed, its pull requests that need you sit
   at the top: review requests, changes requested, failing checks, conflicts,
   ready to merge.
@@ -32,7 +36,7 @@ under it, and the subagents it runs inside its own session show on its row.
   bb's confirmation and Undo. Cmd+Z or Ctrl+Z restores recently archived
   threads and their children.
 - Hover a running thread's spinner to stop it. Stop is also in the row's menu,
-  the only place on a phone, so a tap never stops a thread.
+  the only place on a touch screen, so a tap never stops a thread.
 - Provider subagents show a counter and status dot on the parent's row;
   hover for type, state, duration and tokens.
 - Hold Ctrl (or Cmd on a Mac) to see each row's jump key.
