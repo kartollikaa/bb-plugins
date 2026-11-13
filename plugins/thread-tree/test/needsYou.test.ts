@@ -270,3 +270,9 @@ test("with two sidebars mounted, unmounting the newer one hands ⇧⌘I back to 
   assert.deepEqual(calls, ["old"]);
   dropOld();
 });
+
+test("only a thread whose turn failed offers Retry; an unread failure that has moved on doesn't", () => {
+  const [errored, unreadError] = build([thread("e", { status: "error", updatedAt: 2 }), thread("u", { status: "idle", indicator: "unread-error", updatedAt: 1 })]);
+  assert.equal(errored!.kind === "failed" && errored!.canRetry, true);
+  assert.equal(unreadError!.kind === "failed" && unreadError!.canRetry, false);
+});

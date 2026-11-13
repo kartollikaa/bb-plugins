@@ -31,6 +31,8 @@ export interface ThreadItem extends BaseItem {
   /** When the thread started waiting on the user; only for questions. */
   since: number | null;
   orchestration: string | null;
+  /** The thread's turn failed and can be re-submitted; an unread failure may have moved on. */
+  canRetry: boolean;
 }
 
 export interface PullRequestItem extends BaseItem {
@@ -132,6 +134,7 @@ export function threadItems<T extends NeedsYouThread>({ threads, questions, firs
       reason: kind === "input" ? question?.text ?? "Needs your input" : THREAD_REASON[kind],
       since: kind === "input" ? question?.since ?? firstSeen.get(thread.id) ?? null : null,
       orchestration: orchestrationOf(thread.id),
+      canRetry: kind === "failed" && thread.status === "error",
       updatedAt: thread.updatedAt,
     });
   }

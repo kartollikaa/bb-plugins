@@ -262,7 +262,7 @@ function NeedsYouRow({
         </span>
         <span data-row-subtitle="" className="truncate text-2xs text-sidebar-foreground/50">{reason}</span>
       </span>
-      {item.kind === "failed" ? <span className="relative z-[1] flex shrink-0"><RetryButton threadId={item.threadId} /></span> : null}
+      {item.kind === "failed" && item.canRetry ? <span className="relative z-[1] flex shrink-0"><RetryButton threadId={item.threadId} /></span> : null}
       {item.kind === "queued-failed" ? <span className="relative z-[1] flex shrink-0"><ResendButton threadId={item.threadId} /></span> : null}
       {isCompactViewport ? null : (
         <span
