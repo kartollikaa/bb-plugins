@@ -28,9 +28,11 @@ Retry instead. The built-in GitHub PR Status plugin supplies the branch PR's
 checks and conflicts; with Thread Links installed, PRs linked in the session
 count too. Changes requested and ready to merge come from the GitHub Folder
 plugin, matched by PR URL; without it those two reasons never show. An
-orchestrator leaves PRs owned by its subthreads to their rows. The whole list
-refreshes PR status in one batch once a minute, plus a thread's own PRs when
-its turn ends; nothing refreshes while the sidebar is hidden.
+orchestrator leaves PRs owned by its subthreads to their rows. The list
+re-reads the PRs linked in sessions for all threads in one batch on a timer,
+and one thread's links when its turn settles; nothing is re-read while the
+sidebar is hidden. The branch PR's checks and conflicts update on GitHub PR
+Status's own schedule.
 
 A ⚠ marks a thread whose branch or worktree another unarchived thread also
 uses; its tooltip names the other thread. Threads in a project's own checkout,
