@@ -170,8 +170,10 @@ export function hasBackgroundWork(activity: TreeThread["activity"]): boolean {
   return activity.backgroundAgents > 0 || activity.backgroundCommands > 0 || activity.workflows > 0;
 }
 
-export function isWorking(thread: TreeThread): boolean {
-  if (thread.status === "active" || thread.status === "starting") return true;
+const RUNNING_STATUSES: ReadonlySet<string> = new Set(["active", "starting", "stopping"]);
+
+export function isWorking(thread: Pick<TreeThread, "status" | "indicator" | "activity">): boolean {
+  if (RUNNING_STATUSES.has(thread.status)) return true;
   return hasBackgroundWork(thread.activity) || WORKING_INDICATORS.has(thread.indicator);
 }
 

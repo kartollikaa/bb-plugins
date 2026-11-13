@@ -1,17 +1,10 @@
-import { descendantsOf, type Forest, type TreeThread } from "./tree.ts";
+import { descendantsOf, isWorking, type Forest, type TreeThread } from "./tree.ts";
 
-export interface ActivityThread {
-  id: string;
-  status: string;
-  updatedAt: string | number;
-}
+export type ActivityThread = Pick<TreeThread, "id" | "status" | "indicator" | "activity" | "updatedAt">;
 
-/** A running turn keeps one signature, so a streaming agent never triggers a PR refetch. */
+/** Running work keeps one signature, so a streaming agent never triggers a PR refetch. */
 export function activitySignatures(threads: readonly ActivityThread[]): Map<string, string> {
-  return new Map(threads.map((thread) => [
-    thread.id,
-    thread.status === "active" || thread.status === "starting" ? "running" : `${thread.status}|${thread.updatedAt}`,
-  ]));
+  return new Map(threads.map((thread) => [thread.id, isWorking(thread) ? "running" : `${thread.status}|${thread.updatedAt}`]));
 }
 
 /** New keys are left out: the keyed query loads them itself. */

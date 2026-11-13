@@ -30,6 +30,15 @@ test("a streaming agent's updates never mark its PRs for refetch; the turn endin
   assert.deepEqual(changedKeys(streaming, ended), ["a"]);
 });
 
+test("a stopping turn and background work on an idle thread count as running, so their updates refetch nothing", () => {
+  const busy = { backgroundAgents: 1, backgroundCommands: 0, workflows: 0 };
+  const start = activitySignatures([thread("stop", { status: "stopping", updatedAt: 1 }), thread("bg", { activity: busy, updatedAt: 1 })]);
+  const later = activitySignatures([thread("stop", { status: "stopping", updatedAt: 2 }), thread("bg", { activity: busy, updatedAt: 2 })]);
+  assert.deepEqual(changedKeys(start, later), []);
+  const settled = activitySignatures([thread("stop", { updatedAt: 3 }), thread("bg", { updatedAt: 3 })]);
+  assert.deepEqual(changedKeys(later, settled), ["stop", "bg"]);
+});
+
 test("only threads whose activity moved are refetched; new threads load on their own", () => {
   const before = activitySignatures([thread("a", { updatedAt: 1 }), thread("b", { updatedAt: 1 })]);
   const after = activitySignatures([thread("a", { updatedAt: 1 }), thread("b", { updatedAt: 5 }), thread("new", { updatedAt: 9 })]);
