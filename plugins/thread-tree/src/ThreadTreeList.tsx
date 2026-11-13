@@ -6,6 +6,7 @@ import {
   experimental_ShortcutHint as ShortcutHint,
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
   experimental_ThreadActionsMenu as ThreadActionsMenu,
+  experimental_THREAD_ACTION_GROUPS as THREAD_ACTION_GROUPS,
   experimental_ProviderIcon as ProviderIcon,
   experimental_useProviders as useProviders,
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
@@ -22,6 +23,7 @@ import {
   type PluginSidebarThread,
   type PluginSidebarThreadShortcut,
   type PluginThreadActionTarget,
+  type PluginThreadActionsInlineItem,
   type PluginThreadListProps,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
@@ -73,7 +75,8 @@ import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersist
 import { useDragReorder, useFlipOrder } from "./useReorder";
 import { ReduceMotionContext, useStill } from "./motion";
 import { Collapse } from "./Collapse";
-import { TOUCH_DIMMED } from "./rowStyles";
+import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, TOUCH_DIMMED } from "./rowStyles";
+import { canStop, hoverActionsClass, rowHeightPx, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
 
 const ROW_PAD_PX = 6;
@@ -81,7 +84,8 @@ const ROW_PAD_PX = 6;
 const INDENT_PX = 24;
 
 const ARCHIVE_ACTION_KEY = "bb--core/archive";
-const SWAP_TRANSITION = "transition-[max-width,opacity] duration-200 ease-out motion-reduce:transition-none";
+const ROW_ACTION_BUTTON =
+  "flex size-6 items-center justify-center rounded-md text-sidebar-foreground/60 outline-none hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring";
 
 const GROUP_MODES: readonly { id: GroupMode; label: string; chip: string; icon: React.ReactNode }[] = [
   { id: "project", label: "Project", chip: "Group: Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },
@@ -781,8 +785,11 @@ function ThreadRowView({
     `Updated ${age === "now" ? "just now" : `${age} ago`}`,
   ].filter(Boolean).join("\n");
 
+  const heightPx = rowHeightPx(isCompactViewport);
+  const stopInline = useStopInlineAction(thread);
+
   return (
-    <ThreadActionsContextMenu thread={target}>
+    <ThreadActionsContextMenu thread={target} inline={stopInline}>
       <div
         role={isTree ? "treeitem" : "listitem"}
         aria-level={isTree ? depth + 1 : undefined}
@@ -791,11 +798,12 @@ function ThreadRowView({
         title={tooltip}
         data-thread-row=""
         className={cn(
-          "group/row relative h-8 rounded-md pr-2 text-sm text-sidebar-foreground/90",
-          isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60",
+          "group/row relative rounded-md pr-2 text-sm text-sidebar-foreground/90",
+          isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60 data-[keyboard-focus]:bg-sidebar-accent/60",
         )}
         data-keyboard-focus={keyboardFocus || undefined}
-        style={{ paddingLeft: ROW_PAD_PX + depth * INDENT_PX }}
+        data-menu-open={menuOpen || undefined}
+        style={{ paddingLeft: ROW_PAD_PX + depth * INDENT_PX, height: heightPx }}
         onFocus={(event) => {
           if (event.currentTarget.contains(event.target)) setKeyboardFocus(event.target.matches(":focus-visible"));
         }}
@@ -809,8 +817,8 @@ function ThreadRowView({
           onOpen(thread, event);
         }}
       >
-        {isTree ? <TreeGuides depth={depth} guides={row.guides} hasOpenChildren={row.hasVisibleChildren || row.foldCounts !== null} isPeek={row.isPeek} /> : null}
-        <div className="relative flex h-8 min-w-0 items-center gap-2">
+        {isTree ? <TreeGuides depth={depth} guides={row.guides} hasOpenChildren={row.hasVisibleChildren || row.foldCounts !== null} isPeek={row.isPeek} centerY={heightPx / 2} /> : null}
+        <div className="relative flex h-full min-w-0 items-center gap-2">
           {isTree && row.hasChildren ? (
             <button
               type="button"
@@ -832,6 +840,8 @@ function ThreadRowView({
                 )}
               />
             </button>
+          ) : stopsFromGlyph(thread, row.hasChildren) ? (
+            <StopGlyphButton threadId={thread.id}>{dot}</StopGlyphButton>
           ) : (
             <span title={glyph.label ?? undefined} className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
           )}
@@ -863,49 +873,44 @@ function ThreadRowView({
           >
             <ProviderIcon providerKind="agent" provider={untinted(provider, thread.providerId)} aria-label={providerName} className="size-3.5" />
           </span>
-          {/* Age shrinks away as the actions grow in, so the row's icons glide left and the title truncates. */}
-          <span className="-mr-1 flex shrink-0 items-center">
-            {view.showAge ? (
-              <span
-                className={cn(
-                  "overflow-hidden whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45",
-                  !isCompactViewport && [!view.reduceMotion && SWAP_TRANSITION, "max-w-10 group-hover/row:max-w-0 group-hover/row:opacity-0 group-data-[keyboard-focus]/row:max-w-0 group-data-[keyboard-focus]/row:opacity-0"],
-                  menuOpen && "max-w-0 opacity-0",
-                )}
-              >
-                {age}
-              </span>
-            ) : null}
-            {isCompactViewport ? null : (
-              <span
-                className={cn(
-                  "flex items-center gap-0.5 overflow-hidden",
-                  !view.reduceMotion && SWAP_TRANSITION,
-                  menuOpen
-                    ? "max-w-12 opacity-100"
-                    : "max-w-0 opacity-0 group-hover/row:max-w-12 group-hover/row:opacity-100 group-data-[keyboard-focus]/row:max-w-12 group-data-[keyboard-focus]/row:opacity-100",
-                )}
-              >
-                <ArchiveButton thread={target} />
-                <ThreadActionsMenu
-                  thread={target}
-                  onOpenChange={setMenuOpen}
-                  align="start"
-                  trigger={(props) => (
-                    <button
-                      type="button"
-                      aria-label="Thread actions"
-                      {...props}
-                      className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                    >
-                      <Icon name="MoreHorizontal" fallback="Ellipsis" aria-hidden className="size-3.5" />
-                    </button>
-                  )}
-                />
-                </span>
-            )}
-          </span>
+          {view.showAge ? (
+            <span data-row-age="" className="-mr-1 shrink-0 whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45">
+              {age}
+            </span>
+          ) : null}
         </div>
+        {isCompactViewport ? null : (
+          <span
+            data-hover-actions=""
+            className={cn(
+              "absolute inset-y-0 right-0 flex items-center rounded-r-md",
+              isActive ? ROW_FADE_ACTIVE : ROW_FADE_HOVER,
+              hoverActionsClass(view.reduceMotion),
+            )}
+          >
+            <span aria-hidden className={cn("h-full w-6", ROW_FADE_GRADIENT)} />
+            <span className={cn("flex h-full items-center gap-0.5 pr-1", ROW_FADE_SOLID)}>
+              <ArchiveButton thread={target} />
+              <ThreadActionsMenu
+                thread={target}
+                inline={stopInline}
+                onOpenChange={setMenuOpen}
+                align="start"
+                trigger={(props) => (
+                  <button
+                    type="button"
+                    aria-label="Thread actions"
+                    title="Thread actions"
+                    {...props}
+                    className={ROW_ACTION_BUTTON}
+                  >
+                    <Icon name="MoreHorizontal" fallback="Ellipsis" aria-hidden className="size-3.5" />
+                  </button>
+                )}
+              />
+            </span>
+          </span>
+        )}
       </div>
     </ThreadActionsContextMenu>
   );
@@ -995,10 +1000,53 @@ function ArchiveButton({ thread }: { thread: PluginThreadActionTarget }) {
         event.stopPropagation();
         void action.run();
       }}
-      className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+      className={ROW_ACTION_BUTTON}
     >
       <Icon name={action.icon ?? "Archive"} fallback="Archive" aria-hidden className="size-3.5" />
     </button>
+  );
+}
+
+async function stopThread(sdk: ReturnType<typeof useSdk>, threadId: string) {
+  try {
+    await sdk.threads.stop({ threadId });
+  } catch (error) {
+    toast.error("Stop failed", { description: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+/** The running glyph turns into Stop under the pointer, away from Archive at the row's other end. */
+function StopGlyphButton({ threadId, children }: { threadId: string; children: React.ReactNode }) {
+  const sdk = useSdk();
+  const [pending, setPending] = useState(false);
+  return (
+    <button
+      type="button"
+      data-stop-glyph=""
+      aria-label="Stop"
+      title="Stop"
+      disabled={pending}
+      onClick={async (event) => {
+        event.stopPropagation();
+        setPending(true);
+        await stopThread(sdk, threadId);
+        setPending(false);
+      }}
+      className="group/stop -m-1 flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-foreground outline-none hover:bg-sidebar-foreground/10 focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+    >
+      <span className="flex group-hover/stop:hidden group-focus-visible/stop:hidden group-disabled/stop:flex">{children}</span>
+      <Icon name="Square" fallback="CircleStop" aria-hidden className="hidden size-3 fill-current group-hover/stop:block group-focus-visible/stop:block group-disabled/stop:hidden" />
+    </button>
+  );
+}
+
+/** Stop in the row's menus too: the only place a parent row offers it, and reachable by keyboard and touch. */
+function useStopInlineAction(thread: PluginSidebarThread): PluginThreadActionsInlineItem[] | undefined {
+  const sdk = useSdk();
+  const running = canStop(thread);
+  return useMemo(
+    () => running ? [{ key: "thread-tree/stop", group: THREAD_ACTION_GROUPS.lifecycle, action: { label: "Stop", icon: "Square", run: () => stopThread(sdk, thread.id) } }] : undefined,
+    [running, sdk, thread.id],
   );
 }
 
@@ -1122,7 +1170,7 @@ function TreeGuides({
         );
       })}
       {hasOpenChildren ? (
-        <span aria-hidden className={cn(line, "top-[23px] border-l")} style={{ left: lineX(depth), bottom: -ROW_GAP_PX }} />
+        <span aria-hidden className={cn(line, "border-l")} style={{ left: lineX(depth), top: centerY + 7, bottom: -ROW_GAP_PX }} />
       ) : null}
     </>
   );
