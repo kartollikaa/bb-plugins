@@ -64,7 +64,6 @@ export function searchThreads<T extends FilterThread>(threads: readonly T[], que
     .sort(byActivity);
 }
 
-/** The step text joins this line once the server reports it. */
 export function runningContext(projectName: string | null, parentTitle: string | null): string {
   return [projectName, parentTitle ? `under ${parentTitle}` : null].filter(Boolean).join(" · ");
 }
@@ -78,8 +77,10 @@ export interface SearchKeyEvent {
   isComposing: boolean;
   /** Focus is in a text field, where `/` is a character. */
   typing: boolean;
+  /** A modal dialog has the page; the key belongs to it. */
+  modalOpen: boolean;
 }
 
 export function isSearchKey(event: SearchKeyEvent): boolean {
-  return event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !event.defaultPrevented && !event.isComposing && !event.typing;
+  return event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !event.defaultPrevented && !event.isComposing && !event.typing && !event.modalOpen;
 }

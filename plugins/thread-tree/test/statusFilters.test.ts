@@ -113,7 +113,7 @@ test("a two-line row is taller than a one-line row on every viewport", () => {
 });
 
 const key = (key: string, extra: Partial<Parameters<typeof isSearchKey>[0]> = {}) => ({
-  key, metaKey: false, ctrlKey: false, altKey: false, defaultPrevented: false, isComposing: false, typing: false, ...extra,
+  key, metaKey: false, ctrlKey: false, altKey: false, defaultPrevented: false, isComposing: false, typing: false, modalOpen: false, ...extra,
 });
 
 test("/ opens search only outside text fields, without modifiers, when nothing else took the key", () => {
@@ -125,4 +125,5 @@ test("/ opens search only outside text fields, without modifiers, when nothing e
   assert.equal(isSearchKey(key("/", { defaultPrevented: true })), false);
   assert.equal(isSearchKey(key("/", { isComposing: true })), false);
   assert.equal(isSearchKey(key("?")), false);
+  assert.equal(isSearchKey(key("/", { modalOpen: true })), false);
 });

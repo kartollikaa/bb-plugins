@@ -243,11 +243,14 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   }, []);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target instanceof HTMLElement ? event.target : null;
+      const origin = event.composedPath()[0];
+      const target = origin instanceof HTMLElement ? origin : null;
       const typing = !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+      const sidebar = sectionsRef.current;
+      const modalOpen = Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"], [aria-modal="true"]')).some((dialog) => !sidebar || !dialog.contains(sidebar));
       const { key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing } = event;
-      if (!isSearchKey({ key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing, typing })) return;
-      if ((sectionsRef.current?.getClientRects().length ?? 0) === 0) return;
+      if (!isSearchKey({ key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing, typing, modalOpen })) return;
+      if ((sidebar?.getClientRects().length ?? 0) === 0) return;
       event.preventDefault();
       openSearch();
     };
