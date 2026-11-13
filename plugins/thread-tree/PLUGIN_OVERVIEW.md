@@ -12,7 +12,7 @@ under it, and the subagents it runs inside its own session show on its row.
   own Automations plugin and hides itself when that plugin is off.
 - Recent Activity: the most recently active threads, child threads included,
   newest first. Show more extends it.
-- Threads grouped by Project, by Status (needs input, error, working, done) or
+- Threads grouped by Project, by Status (needs input, error, working, waiting, done) or
   not at all, with Pinned on top. Projects keep a fixed order you set by
   dragging their headers, or follow recent activity. The + on a project header
   starts a new thread there; on touch screens header icons show dimmed.

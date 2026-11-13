@@ -88,7 +88,7 @@ and folder overrides persist in this browser, including after a reload:
 
 - Last activity (default): most recently active first.
 - Creation date: newest first; message activity keeps rows in place.
-- Status: needs input, errors, working, then done, using the most urgent state
+- Status: needs input, errors, working, waiting (a queued message or a goal between turns), then done, using the most urgent state
   in each thread's subtree. Within a status, newest threads come first.
 
 This applies to project folders, status groups, and All threads in both active

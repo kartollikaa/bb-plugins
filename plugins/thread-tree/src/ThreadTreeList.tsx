@@ -3,6 +3,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { toast } from "sonner";
 import {
   ThreadTitle,
+  experimental_ShortcutHint as ShortcutHint,
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
   experimental_ThreadActionsMenu as ThreadActionsMenu,
   experimental_ProviderIcon as ProviderIcon,
@@ -19,6 +20,7 @@ import {
   useSidebarThreadShortcut,
   type PluginSidebarProject,
   type PluginSidebarThread,
+  type PluginSidebarThreadShortcut,
   type PluginThreadActionTarget,
   type PluginThreadListProps,
 } from "@get-bb/plugin-sdk/app";
@@ -744,9 +746,6 @@ function ThreadRowView({
   const isTree = variant === "tree";
   const { hasUnsubmittedDraft } = useSidebarThreadDraft(thread.id);
   const rowStatus = useSidebarThreadRowStatus(thread.id);
-  const treeShortcut = useSidebarThreadShortcut(thread.id);
-  // bb numbers only the tree's rows; a Recent Activity copy of the same thread would repeat its key.
-  const shortcut = isTree ? treeShortcut : null;
   const glyph = resolveRowGlyph(thread, hasUnsubmittedDraft, rowStatus);
   const dot = <RowStatusGlyph glyph={glyph} />;
   const providerName = provider?.displayName ?? thread.providerId;
@@ -780,7 +779,6 @@ function ThreadRowView({
       >
         {isTree ? <TreeGuides depth={depth} guides={row.guides} hasOpenChildren={row.hasVisibleChildren || row.foldCounts !== null} isPeek={row.isPeek} /> : null}
         <div className="relative flex h-8 min-w-0 items-center gap-2">
-          {shortcut ? <ShortcutPill label={shortcut.label} /> : null}
           {isTree && row.hasChildren ? (
             <button
               type="button"
@@ -792,7 +790,7 @@ function ThreadRowView({
               title={row.isExpanded ? "Collapse subthreads" : "Expand subthreads"}
               className="group/toggle relative flex size-4 shrink-0 items-center justify-center rounded text-sidebar-foreground/60 outline-none hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring"
             >
-              <span title={glyph.label ?? undefined} className="flex group-hover/row:hidden group-focus-visible/toggle:hidden">{dot}</span>
+              <span className="flex group-hover/row:hidden group-focus-visible/toggle:hidden">{dot}</span>
               <Icon
                 name="ChevronRight"
                 aria-hidden
@@ -805,20 +803,11 @@ function ThreadRowView({
           ) : (
             <span title={glyph.label ?? undefined} className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
           )}
-          <a
-            href={thread.href}
-            {...(isTree ? { "data-sidebar-thread-shortcut-target": "", "data-sidebar-thread-id": thread.id } : {})}
-            aria-current={isActive ? "page" : undefined}
-            aria-label={glyph.label ? `${thread.displayTitle}, ${glyph.label}` : thread.displayTitle}
-            aria-keyshortcuts={shortcut?.ariaKeyshortcuts}
-            {...splitProps}
-            onClick={(event) => onOpen(thread, event)}
-            className="flex min-w-0 items-center gap-1.5 self-stretch outline-none"
-          >
-            <span className={cn("min-w-0 truncate", thread.isUnread && "font-semibold text-sidebar-foreground")}>
-              <ThreadTitle threadId={thread.id} />
-            </span>
-          </a>
+          {isTree ? (
+            <TreeRowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
+          ) : (
+            <RowLink thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} isTree={false} shortcut={null} />
+          )}
           <span aria-hidden className="min-w-0 flex-1" />
           {thread.status === "error" && !thread.isArchived ? <RetryButton threadId={thread.id} /> : null}
           {view.showProviderIcon ? (
@@ -876,16 +865,51 @@ function ThreadRowView({
   );
 }
 
-/** bb's jump-key hint while the command modifier is held; it covers the row's right end instead of reflowing it. */
-function ShortcutPill({ label }: { label: string }) {
+interface RowLinkProps {
+  thread: PluginSidebarThread;
+  isActive: boolean;
+  stateLabel: string | null;
+  splitProps: ReturnType<typeof useSidebarThreadSplit>["splitProps"];
+  onOpen: (thread: PluginSidebarThread, event: MouseEvent) => void;
+}
+
+/** Only tree rows subscribe: bb numbers them, and every subscriber re-renders when the modifier is pressed. */
+function TreeRowLink(props: RowLinkProps) {
+  const shortcut = useSidebarThreadShortcut(props.thread.id);
+  return <RowLink {...props} isTree shortcut={shortcut} />;
+}
+
+function RowLink({
+  thread,
+  isActive,
+  stateLabel,
+  splitProps,
+  onOpen,
+  isTree,
+  shortcut,
+}: RowLinkProps & { isTree: boolean; shortcut: PluginSidebarThreadShortcut | null }) {
   return (
-    <kbd
-      aria-hidden
-      data-shortcut-hint=""
-      className="pointer-events-none absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded border border-sidebar-border bg-sidebar px-1 font-sans text-2xs tabular-nums leading-4 text-sidebar-foreground/70 shadow-sm"
-    >
-      {label}
-    </kbd>
+    <>
+      <a
+        href={thread.href}
+        {...(isTree ? { "data-sidebar-thread-shortcut-target": "", "data-sidebar-thread-id": thread.id } : {})}
+        aria-current={isActive ? "page" : undefined}
+        aria-label={stateLabel ? `${thread.displayTitle}, ${stateLabel}` : thread.displayTitle}
+        aria-keyshortcuts={shortcut?.ariaKeyshortcuts}
+        {...splitProps}
+        onClick={(event) => onOpen(thread, event)}
+        className="flex min-w-0 items-center gap-1.5 self-stretch outline-none"
+      >
+        <span className={cn("min-w-0 truncate", thread.isUnread && "font-semibold text-sidebar-foreground")}>
+          <ThreadTitle threadId={thread.id} />
+        </span>
+      </a>
+      {shortcut ? (
+        <span data-shortcut-hint="" className="pointer-events-none absolute right-0 top-1/2 z-10 flex -translate-y-1/2 rounded bg-sidebar">
+          <ShortcutHint shortcut={shortcut} />
+        </span>
+      ) : null}
+    </>
   );
 }
 
