@@ -62,6 +62,7 @@ import {
   type Forest,
   groupRows,
   recentThreads,
+  threadsOnScreen,
   readFolderSorts,
   rememberProjectFolders,
   type ThreadSort,
@@ -187,17 +188,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     () => recentThreads(threads, showMoreRecent ? view.recentMoreLimit : view.recentLimit),
     [threads, showMoreRecent, view.recentLimit, view.recentMoreLimit],
   );
-  const visibleThreads = useMemo(() => {
-    const byId = new Map<string, PluginSidebarThread>();
-    if (!view.showSubagents) return [];
-    if (!recentHidden) for (const thread of recent) byId.set(thread.id, thread);
-    for (const group of groups) {
-      if (collapsedGroups.values.has(group.key)) continue;
-      for (const row of group.rows) byId.set(row.thread.id, row.thread);
-    }
-    return [...byId.values()];
-  }, [groups, recent, recentHidden, view.showSubagents, collapsedGroups.values]);
-  const subagents = useSubagents(visibleThreads);
   const filterCounts = useMemo(() => countStatusFilters(threads), [threads]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -237,6 +227,11 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       pullRequestNumbers: pullRequestsOf(thread).map((pr) => pr.number),
     }));
   }, [statusFilter, threads, searchOpen, query, searchPool, projectById, pullRequestsOf]);
+  const shownThreads = useMemo(
+    () => (view.showSubagents ? threadsOnScreen({ flatList, recent, recentHidden, groups, collapsed: collapsedGroups.values }) : []),
+    [flatList, recent, recentHidden, groups, view.showSubagents, collapsedGroups.values],
+  );
+  const subagents = useSubagents(shownThreads);
   const openSearch = useCallback(() => {
     setStatusFilter(null);
     setSearchOpen(true);

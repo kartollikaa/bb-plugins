@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ancestorsOf, buildForest, descendantsOf, countStates, effectiveState, groupRows, placeNear, readFolderSorts, rememberProjectFolders, recentThreads, resolveProjectOrder, summarize, threadDotState, type TreeThread } from "../src/tree.ts";
+import { ancestorsOf, buildForest, descendantsOf, countStates, effectiveState, groupRows, placeNear, readFolderSorts, rememberProjectFolders, recentThreads, resolveProjectOrder, summarize, threadDotState, threadsOnScreen, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
@@ -423,4 +423,17 @@ test("a waiting thread ranks below running and above done in status groups", () 
   ];
   const groups = groupRows(buildForest(threads), new Set(), "status");
   assert.deepEqual(groups.map((g) => g.key), ["status:running", "status:waiting", "status:done"]);
+});
+
+test("threads on screen are the flat list's while it replaces the tree, else Recent's and open groups' once each", () => {
+  const a = thread("a");
+  const b = thread("b");
+  const c = thread("c");
+  const groups = [
+    { key: "p1", rows: [{ thread: a }, { thread: b }] },
+    { key: "p2", rows: [{ thread: c }] },
+  ];
+  assert.deepEqual(threadsOnScreen({ flatList: [c], recent: [a], recentHidden: false, groups, collapsed: new Set() }).map((t) => t.id), ["c"]);
+  assert.deepEqual(threadsOnScreen({ flatList: null, recent: [b], recentHidden: false, groups, collapsed: new Set(["p2"]) }).map((t) => t.id), ["b", "a"]);
+  assert.deepEqual(threadsOnScreen({ flatList: null, recent: [c], recentHidden: true, groups, collapsed: new Set(["p1"]) }).map((t) => t.id), ["c"]);
 });

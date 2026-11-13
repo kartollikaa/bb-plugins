@@ -344,6 +344,30 @@ export function countStates(threads: readonly TreeThread[]): StateCounts {
 }
 
 /** The most recently active visible threads, children included, newest first. */
+/** Each thread drawn on screen once: the filter or search list while it replaces the tree, else Recent Activity and the open groups. */
+export function threadsOnScreen<T extends TreeThread>({
+  flatList,
+  recent,
+  recentHidden,
+  groups,
+  collapsed,
+}: {
+  flatList: readonly T[] | null;
+  recent: readonly T[];
+  recentHidden: boolean;
+  groups: readonly { key: string; rows: readonly { thread: T }[] }[];
+  collapsed: ReadonlySet<string>;
+}): T[] {
+  if (flatList) return [...flatList];
+  const byId = new Map<string, T>();
+  if (!recentHidden) for (const thread of recent) byId.set(thread.id, thread);
+  for (const group of groups) {
+    if (collapsed.has(group.key)) continue;
+    for (const row of group.rows) byId.set(row.thread.id, row.thread);
+  }
+  return [...byId.values()];
+}
+
 export function recentThreads<T extends TreeThread>(threads: readonly T[], limit: number): T[] {
   return threads
     .filter((thread) => !thread.isHidden && !thread.isArchived)
