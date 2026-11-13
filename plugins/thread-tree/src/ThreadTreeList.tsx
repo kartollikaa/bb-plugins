@@ -743,7 +743,9 @@ function ThreadRowView({
   const isTree = variant === "tree";
   const { hasUnsubmittedDraft } = useSidebarThreadDraft(thread.id);
   const rowStatus = useSidebarThreadRowStatus(thread.id);
-  const shortcut = useSidebarThreadShortcut(thread.id);
+  const treeShortcut = useSidebarThreadShortcut(thread.id);
+  // bb numbers only the tree's rows; a Recent Activity copy of the same thread would repeat its key.
+  const shortcut = isTree ? treeShortcut : null;
   const glyph = resolveRowGlyph(thread, hasUnsubmittedDraft, rowStatus);
   const dot = <RowStatusGlyph glyph={glyph} />;
   const providerName = provider?.displayName ?? thread.providerId;
