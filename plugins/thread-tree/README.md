@@ -15,17 +15,21 @@ the indicator the way bb's own list does.
 The subagent counter opens a list that fits the available screen space, including
 on mobile. Longer lists scroll inside the card while the summary stays visible.
 
-The GitHub and Automations sections start folded, with a summary in the header
-instead of a bare count: GitHub's leads with failing checks, conflicts and changes
+The Pull requests and Automations sections start folded, with a right-aligned
+summary in the header instead of a bare count: Pull requests' leads with failing checks, conflicts and changes
 requested, then the total ("1 failing · 1 conflicts · 5"); Automations' gives
 failed and running automations and the soonest next run ("1 failed · next in
 12m"). An expanded PR row draws its most urgent reason as a tinted icon, then the
 title and repo; the number and reasons are in the tooltip. Hover offers "Open its
 thread" when one of your threads links the PR, Open on GitHub, and Snooze.
+Recent Activity is off by default (`showRecent`); the layers icon in the Threads
+heading turns it back on.
 `src/sectionSummaries.ts` holds the summaries, the reason glyphs and which
 sections start folded.
 
-Needs you sits above the sections and hides when nothing waits. In order:
+Needs you sits above the sections in an amber card and hides when nothing
+waits. The card lists the first five items and "N more" opens the rest
+(`QUEUE_PREVIEW` in `src/needsYou.ts`). In order:
 threads asking a question (the question and how long they have waited, longest
 first), failed turns, failed queued messages, and finished results not read
 yet; then pull requests of the user's threads with failing checks, conflicts or
@@ -85,7 +89,7 @@ uses; its tooltip names the other thread. Threads in a project's own checkout,
 and an orchestrator with its subthreads, never warn.
 
 An orchestrator is any thread with unarchived subthreads. The Orchestrations
-section under the Threads heading has a shortcut for each top-level one that
+section under the Threads heading, after Pinned and before the project folders, has a shortcut for each top-level one that
 still has work going: something in its tree runs, waits, needs input, failed or
 finished unread. The shortcut's glyph is the most urgent of these, and its
 second line gives the projects it spans and its progress, such as
@@ -156,8 +160,8 @@ this one under Settings → Appearance → Sidebar, or run
 ## Layout
 
 - `server.ts`: RPC `subagents`, `undoArchive`, `archiveScope`, `archiveClaim` and `archiveRelease`, the Automations and GitHub Folder proxies, and the `bb thread-tree` command.
-- `src/githubFolder.ts`: the slice of the GitHub Folder plugin's view that the GitHub section draws.
-- `src/sectionSummaries.ts`: the GitHub and Automations header summaries, PR reason glyphs, sections folded by default.
+- `src/githubFolder.ts`: the slice of the GitHub Folder plugin's view that the Pull requests section draws.
+- `src/sectionSummaries.ts`: the Pull requests and Automations header summaries, PR reason glyphs, sections folded by default.
 - `src/subagents.ts`: folds a thread's event log into its subagents.
 - `src/tree.ts`: pure tree, grouping and subagent state logic.
 - `src/orchestrations.ts`: the Orchestrations shortcuts, the folded rollup and bar, and the archive plan.
@@ -190,10 +194,9 @@ Escape to close them. Changes apply immediately.
 ## Empty project folders
 
 Once a project has had a visible thread, its folder stays in the active Project
-view even after its last thread is archived or deleted. The folder shows zero
-threads and keeps its + button for starting a new chat. When expanded, an empty
-folder shows a clickable “Start a new thread” row that opens the composer in
-that project. Collapsing the folder hides this row. Used projects are stored
+view even after its last thread is archived or deleted. An empty folder draws
+only its header, with no count and no rows; hovering the header shows its +
+button, which starts a new chat in that project. Used projects are stored
 on the bb server and seeded from existing active and archived threads, so the
 folders survive reloads and appear on other clients. A browser cache keeps them
 visible during a failed history read. Deleting a project removes its folder;

@@ -14,7 +14,7 @@
   },
   "bb": {
     "name": "Thread Tree",
-    "description": "A sidebar thread list that shows automations, recent activity and archived threads, nests child threads under their parent and shows each thread's provider subagents as a counter with a status dot.",
+    "description": "A sidebar thread list that shows what needs you, pull requests, automations and archived threads, nests child threads under their parent and shows each thread's provider subagents as a counter with a status dot.",
     "branding": {
       "icon": "Network",
       "experimental_icons": {

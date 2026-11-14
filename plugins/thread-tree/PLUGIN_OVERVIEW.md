@@ -11,11 +11,10 @@ under it, and the subagents it runs inside its own session show on its row.
   they waited), failed turns and queued messages, unread results, then failing
   PRs of your threads and failed automations. Retry or Resend in place; hover
   to snooze an item until it changes. ⇧⌘I opens the next one.
-- GitHub (from the GitHub Folder plugin) and Automations start folded, with a
+- Pull requests (from GitHub Folder) and Automations start folded, with a
   summary in the header: "1 failing · 5", "1 failed · next in 12m". A PR's
   reason is its icon; hover to snooze or open its thread. Hover an automation
   to run, pause or resume it; click to open its last run.
-- Recent Activity: the latest active threads, children included.
 - Threads grouped by Project, by Status or not at all, with Pinned on top.
   Projects keep the order you drag them into, or follow recent activity. The +
   on a project header starts a new thread there.
@@ -47,8 +46,8 @@ under it, and the subagents it runs inside its own session show on its row.
 
 ## Arranging the sidebar
 
-Right-click the GitHub, Automations or Recent Activity header to remove it;
-Sections at the top of the list brings it back. Drag a header, or use Move up
+Right-click a section header to remove it; the layers icon above the threads
+brings it back, as well as Recent Activity, off by default. Drag a header, or use Move up
 and Move down in its menu, to reorder sections. While you drag, the blocks fold
 to their headers and reopen on drop.
 

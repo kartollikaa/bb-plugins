@@ -14,10 +14,11 @@ row's link reads the state after the title for screen readers.
 The counter's card fits the available screen space on mobile and desktop;
 longer lists scroll inside it while the summary stays visible.
 
-When the GitHub Folder plugin is installed, the GitHub section lists its
+When the GitHub Folder plugin is installed, the Pull requests section lists its
 folder of pull requests that need the user. Use that plugin's
-`bb github-folder list` to read it. The GitHub and Automations sections start
-folded; their header carries a summary instead of a bare count. GitHub's leads
+`bb github-folder list` to read it. The Pull requests and Automations sections
+start folded; their header carries a right-aligned summary instead of a bare
+count. Pull requests' leads
 with the problems ("1 failing · 1 conflicts · 1 changes"), then the total;
 Automations' gives failed and running automations and the soonest next run
 ("1 failed · next in 12m"), or the active count when nothing is scheduled. An
@@ -28,7 +29,9 @@ links the PR (⌘/Ctrl-click opens that thread in a split), Open on GitHub, and
 Snooze. A middle-click on these buttons does nothing, so it never opens GitHub.
 Paused automations stay behind "N paused".
 
-Needs you sits above the sections and hides when nothing waits. In order:
+Needs you sits above the sections in an amber card and hides when nothing
+waits. Its header shows the count and the ⇧⌘I hint; the card lists the first
+five items and "N more" opens the rest. In order:
 threads asking a question (the question and how long they have waited, longest
 first), failed turns, failed queued messages, and finished results not read
 yet; then pull requests of the user's threads with failing checks, conflicts or
@@ -88,7 +91,7 @@ uses; its tooltip names the other thread. Threads in a project's own checkout,
 and an orchestrator with its subthreads, never warn.
 
 An orchestrator is any thread with unarchived subthreads. The Orchestrations
-section under the Threads heading has a shortcut for each top-level one that
+section under the Threads heading, after Pinned and before the project folders, has a shortcut for each top-level one that
 still has work going: something in its tree runs, waits, needs input, failed or
 finished unread. The shortcut's glyph is the most urgent of these, and its
 second line gives the projects it spans and its progress, such as
@@ -166,15 +169,17 @@ the keystroke stays a text undo once the user has typed there since the archive.
 ## Settings
 
 `bb plugin config thread-tree` lists them; `bb plugin config thread-tree set <key> <value>` changes one.
-Booleans: `showGithub`, `showAutomations`, `showRecent`, `showSubagents`, `showAge`,
+Booleans: `showGithub`, `showAutomations`, `showRecent` (Recent Activity, off by default), `showSubagents`, `showAge`,
 `foldOnDrag` (fold every block while a section or project is dragged), `reduceMotion` (no folder, reorder, hover or status-spinner animation).
 Select: `providerIconStyle` (`tint` or `monochrome`); `needsYouPullRequests` (`linked`, the default:
 PRs of the user's threads with failing checks, conflicts or changes requested; `all`: every GitHub
 Folder item; `none`).
 Numbers (1–50): `recentLimit` (Recent Activity rows), `recentMoreLimit` (rows after Show more).
-The order of GitHub, Automations and Recent Activity, the project order, and which groups are
+The order of Pull requests, Automations and Recent Activity, the project order, and which groups are
 folded are not settings: each browser client keeps them itself. The user changes them in the
-sidebar by dragging a header or from its right-click menu.
+sidebar by dragging a header or from its right-click menu; the layers icon in the
+Threads heading lists hidden sections. A section header's actions (such as +)
+appear on hover over the end of the header.
 
 ## Making a subagent you can talk to
 
@@ -206,10 +211,9 @@ Escape to close them. Changes apply immediately.
 ## Empty project folders
 
 Once a project has had a visible thread, its folder stays in the active Project
-view even after its last thread is archived or deleted. The folder shows zero
-threads and keeps its + button for starting a new chat. When expanded, an empty
-folder shows a clickable “Start a new thread” row that opens the composer in
-that project. Collapsing the folder hides this row. Used projects are stored
+view even after its last thread is archived or deleted. An empty folder draws
+only its header, with no count and no rows; hovering the header shows its +
+button, which starts a new chat in that project. Used projects are stored
 on the bb server and seeded from existing active and archived threads, so the
 folders survive reloads and appear on other clients. A browser cache keeps them
 visible during a failed history read. Deleting a project removes its folder;

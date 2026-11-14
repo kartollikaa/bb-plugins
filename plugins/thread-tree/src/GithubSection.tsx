@@ -110,7 +110,7 @@ export function GithubSection({
   const rows = showSnoozed ? [...view.items, ...view.snoozed] : view.items;
 
   return (
-    <section aria-label="GitHub pull requests">
+    <section aria-label="Pull requests">
       <GroupHeader
         title="Pull requests"
         icon={<Icon name="Github" aria-hidden className="size-3.5" />}
