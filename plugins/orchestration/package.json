@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-orchestration",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -18,7 +18,8 @@
     "branding": {
       "icon": "./assets/network.svg",
       "experimental_icons": {
-        "network": "./assets/network.svg"
+        "network": "./assets/network.svg",
+        "toggle-off": "./assets/toggle-off.svg"
       }
     },
     "server": "./server.ts",

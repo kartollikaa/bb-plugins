@@ -2,7 +2,6 @@ import { useRef, useState, type ReactNode } from "react";
 import { useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { askIdentity, type Ask, type Row, type RowKind, type View } from "./view.ts";
 import { useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
-import { useOpenChat, useOpenView, useViewSwitch } from "./surface.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 
@@ -197,43 +196,6 @@ function History({ view }: { view: View }) {
   );
 }
 
-function ViewSwitch({ threadId, variant }: { threadId: string; variant: "tab" | "page" }) {
-  const { on, set } = useViewSwitch();
-  const openChat = useOpenChat();
-  const openView = useOpenView();
-  // In bb's thread view the view isn't showing, so the switch reads off there and turning it on opens the view.
-  const shown = variant === "page" && on;
-  return (
-    <label className="flex shrink-0 cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
-      Orchestration view
-      <button
-        type="button"
-        role="switch"
-        aria-checked={shown}
-        onClick={() => {
-          const next = !shown;
-          void set(next);
-          if (variant === "page" && !next) openChat(threadId);
-          if (variant === "tab" && next) openView(threadId, true);
-        }}
-        className={cx(
-          "relative h-[18px] w-[30px] rounded-full transition-colors duration-150 ease-out motion-reduce:transition-none",
-          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-          shown ? "bg-primary" : "bg-border",
-        )}
-      >
-        <span
-          aria-hidden
-          className={cx(
-            "absolute left-[2px] top-[2px] size-[14px] rounded-full bg-background shadow-sm transition-transform duration-150 ease-out motion-reduce:transition-none",
-            shown && "translate-x-[12px]",
-          )}
-        />
-      </button>
-    </label>
-  );
-}
-
 export function Message({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col gap-1 px-4 pb-4 pt-5">
@@ -280,10 +242,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   return (
     <div className={cx("flex flex-col gap-6 text-sm leading-[1.45] text-foreground", variant === "tab" ? "h-full overflow-y-auto px-4 pb-4 pt-5" : "mx-auto w-full max-w-[680px] px-6 pb-6 pt-6")}>
       <section>
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="m-0 min-w-0 text-base font-semibold leading-[1.35] tracking-[-0.01em] [text-wrap:balance]">{view.heading}</h2>
-          <ViewSwitch threadId={threadId} variant={variant} />
-        </div>
+        <h2 className="m-0 text-base font-semibold leading-[1.35] tracking-[-0.01em] [text-wrap:balance]">{view.heading}</h2>
         <p className="m-0 mt-1 text-muted-foreground [text-wrap:pretty]">{view.subline}</p>
         {view.nudge && (
           <div className="mt-2.5">

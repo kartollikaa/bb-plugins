@@ -3,7 +3,7 @@ import { ThreadChat, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Button, Message, OrchestrationTab } from "./OrchestrationTab.tsx";
 import { clampRailWidth, RAIL, railMode, railOpen, threadFromSubPath, type RailChoice, type RailMode } from "./route.ts";
 import { useOrchestratorMembership } from "./useOrchestration.ts";
-import { useOpenChat } from "./surface.ts";
+import { useOpenChat, useViewSwitch } from "./surface.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 const WIDTH_KEY = "orchestration.railWidth";
@@ -78,6 +78,31 @@ function PanelIcon() {
   );
 }
 
+/** Sits last in the title bar, where bb's thread header puts the matching "Orchestration view" action. */
+function ViewSwitch({ onOff }: { onOff: () => void }) {
+  const { on, set } = useViewSwitch();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => {
+        void set(!on);
+        if (on) onOff();
+      }}
+      className={cx(
+        "ml-1 flex h-[26px] items-center gap-2 rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-accent",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+      )}
+    >
+      Orchestration view
+      <span aria-hidden className={cx("relative h-[14px] w-[24px] rounded-full transition-colors duration-150 ease-out motion-reduce:transition-none", on ? "bg-primary" : "bg-border")}>
+        <span className={cx("absolute left-[2px] top-[2px] size-[10px] rounded-full bg-background transition-transform duration-150 ease-out motion-reduce:transition-none", on && "translate-x-[10px]")} />
+      </span>
+    </button>
+  );
+}
+
 export function OrchestratorHeader({ subPath }: PluginNavPanelProps) {
   const threadId = threadFromSubPath(subPath);
   const open = useRailOpen();
@@ -100,6 +125,7 @@ export function OrchestratorHeader({ subPath }: PluginNavPanelProps) {
         Chat
       </button>
       <Button variant="quiet" onClick={() => openChat(threadId)}>Full chat</Button>
+      <ViewSwitch onOff={() => openChat(threadId)} />
     </div>
   );
 }
