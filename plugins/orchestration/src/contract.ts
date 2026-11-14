@@ -3,12 +3,18 @@ import { z } from "zod";
 export const subtaskSchema = z.object({
   id: z.string(),
   name: z.string().nullable(),
+  delivery: z.string().nullable().optional(),
+  version: z.string().nullable().optional(),
+  areas: z.string().nullable().optional(),
+  criteria: z.array(z.string()).optional(),
+  evidence: z.array(z.object({ label: z.string(), text: z.string() })).optional(),
   /** The bb thread id of the subtask's current session, when the ledger names one. */
   threadId: z.string().nullable(),
   status: z.string().nullable(),
   statusRaw: z.string().nullable(),
   modelRaw: z.string().nullable(),
   dependsOn: z.array(z.string()),
+  dependencyNote: z.string().nullable().optional(),
   /** One line for the row detail, null when the subtask has no gate entry. */
   gateLine: z.string().nullable(),
   /** Failed checks/review/done-when/conflicts stages across the subtask's open gates. */

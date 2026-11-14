@@ -83,12 +83,26 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
     const status = obj(row.status);
     return [{
       id,
-      name: str(row.name),
+      name: str(row.name) ?? str(row.delivery),
+      delivery: str(row.delivery),
+      version: str(row.version),
+      areas: str(row.areas),
+      criteria: Object.entries(obj(root.done_when)).flatMap(([key, value]) => {
+        const range = /^([A-Z]+)(\d+)[–-]([A-Z]+)(\d+)$/.exec(key);
+        const task = /^([A-Z]+)(\d+)$/.exec(id);
+        const shared = range && task && range[1] === task[1] && range[3] === task[1] && Number(task[2]) >= Number(range[2]) && Number(task[2]) <= Number(range[4]);
+        return key === id || shared ? arr(value).flatMap((line) => typeof line === "string" ? [shared ? `Shared criterion (${key}): ${line}` : line] : []) : [];
+      }),
+      evidence: arr(latestGate?.stages).map(obj).flatMap((stage) => {
+        const text = str(stage.text);
+        return text && !["pending", "unknown", "—"].includes(text) ? [{ label: str(stage.name) ?? "Evidence", text }] : [];
+      }),
       threadId: threadIdOf(row.session) ?? threadIdOf(roleHandovers.at(-1)?.to_id),
       status: str(status.value) ?? statusFromRaw(str(status.raw)),
       statusRaw: str(status.raw),
       modelRaw: str(obj(row.model_effort).raw),
-      dependsOn: arr(row.depends_on).flatMap((d) => (typeof d === "string" ? [d] : [])),
+      dependsOn: arr(row.depends_on).flatMap((d) => typeof d === "string" && (arr(root.subtasks).some((task) => obj(task).id === d) || /^[A-Z]+\d+[a-z]*$/.test(d)) ? [d] : []),
+      dependencyNote: arr(row.depends_on).filter((d) => typeof d === "string" && !arr(root.subtasks).some((task) => obj(task).id === d) && !/^[A-Z]+\d+[a-z]*$/.test(d)).join(" ") || null,
       gateLine: latestGate ? gateLine(obj(latestGate.summary), failures) : null,
       gateFailures: failures,
       lastFailedKind,

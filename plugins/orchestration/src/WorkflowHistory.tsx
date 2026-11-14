@@ -1,69 +1,65 @@
 import { useState } from "react";
-import type { LedgerSummary } from "./contract.ts";
+import type { LedgerSummary, Subtask } from "./contract.ts";
+import { recentEvents } from "./history.ts";
 import type { View } from "./view.ts";
 
-export function WorkflowHistory({ ledger, view, openThread }: { ledger: LedgerSummary; view: View; openThread: (id: string) => void }) {
+const labels: Record<string, string> = { planned: "Planned", "waiting-dependency": "Queued", working: "In progress", briefed: "Starting", gate: "In review", delivered: "Delivered", ready: "Ready", question: "Needs input", card: "Needs input", blocked: "Blocked", landed: "Landed", verified: "Verified", dropped: "Dropped" };
+const finished = (task: Subtask) => ["landed", "verified", "dropped"].includes(task.status ?? "");
+const control = "rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary";
+
+export function WorkflowHistory({ ledger, view, openThread, mode }: { ledger: LedgerSummary; view: View; openThread: (id: string) => void; mode: "work" | "activity" }) {
+  const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
-  const [taskId, setTaskId] = useState("");
-  const [limit, setLimit] = useState(20);
-  const completed = ledger.subtasks.filter((task) => task.status === "landed" || task.status === "verified").length;
-  const dropped = ledger.subtasks.filter((task) => task.status === "dropped").length;
-  const liveRows = new Map([...view.active, ...view.done].map((row) => [row.id, row]));
-  const events = (ledger.workflow ?? []).map((event, key) => ({ ...event, key })).filter((event) => (filter === "all" || event.kind === filter) && (!taskId || event.task === taskId));
+  const [limit, setLimit] = useState(12);
+  const rows = new Map([...view.active, ...view.done].map((row) => [row.id, row]));
+  const title = (task: Subtask) => task.name ?? task.delivery ?? (rows.get(task.id)?.name !== task.id ? rows.get(task.id)?.name : null) ?? "Task description not recorded";
+  const asking = (task: Subtask) => view.asks.some((ask) => ask.key === task.id || ask.subtask === task.id);
+  const activeAgain = (task: Subtask) => finished(task) && (asking(task) || !!rows.get(task.id) && rows.get(task.id)!.kind !== "done");
+  const isFinished = (task: Subtask) => finished(task) && !activeAgain(task);
+  const done = ledger.subtasks.filter(isFinished).length;
+  const tasks = ledger.subtasks.filter((task) => filter === "all" || (filter === "done" ? isFinished(task) : !isFinished(task)));
+  const events = recentEvents((ledger.workflow ?? []).map((event, key) => ({ ...event, key })).filter((event) => !selected || event.task === selected));
   return (
-    <section aria-label="Task breakdown and workflow" className="flex min-w-0 flex-col gap-3 border-t border-border pt-4">
-      <h2 className="m-0 text-sm font-semibold">Task breakdown</h2>
-      <p className="m-0 text-xs text-muted-foreground">{ledger.subtasks.length} tasks · {completed} completed · {dropped} dropped · {ledger.subtasks.length - completed - dropped} remaining</p>
-      <p className="m-0 text-xs text-subtle-foreground">All sessions, in plan order. Dependencies show what each task starts after.</p>
-      {ledger.subtasks.length === 0 && <p className="m-0 text-xs text-muted-foreground">No tasks recorded yet.</p>}
-      <ol className="m-0 list-none divide-y divide-border p-0">
-        {ledger.subtasks.map((task) => {
-          const row = liveRows.get(task.id);
-          return (
-            <li key={task.id} className="py-2 text-xs [overflow-wrap:anywhere]">
-              <details>
-                <summary className="cursor-pointer focus-visible:outline-primary">
-                  <span className="font-medium">{task.id}{task.name ? ` · ${task.name}` : ""}</span>
-                  <span className="ml-2 text-muted-foreground">{task.status ?? "Status not recorded"}</span>
-                </summary>
-                <div className="flex flex-col gap-1.5 pb-1 pl-4 pt-2 text-muted-foreground">
-                  <span>{task.statusRaw ?? "No ledger status recorded"}</span>
-                  {row && <span>Now: {row.step}</span>}
-                  <span>{task.dependsOn.length ? `Starts after: ${task.dependsOn.join(", ")}` : "No recorded dependencies"}</span>
-                  {task.gateLine && <span>{task.gateLine}</span>}
-                  <div className="flex flex-wrap gap-3">
-                    {(view.threadIds[task.id] ?? task.threadId) && <button type="button" className="text-foreground underline" onClick={() => openThread((view.threadIds[task.id] ?? task.threadId)!)}>Open thread</button>}
-                    <button type="button" className="text-foreground underline" onClick={() => { setTaskId(task.id); setFilter("all"); setLimit(20); }}>Show workflow</button>
-                  </div>
-                </div>
-              </details>
-            </li>
-          );
-        })}
-      </ol>
-      <h2 className="m-0 mt-2 text-sm font-semibold">Workflow history</h2>
-      <p className="m-0 text-xs text-subtle-foreground">Recorded decisions, gate stages and handovers, oldest first. Undated entries follow; task statuses above are current ledger values.</p>
-      <div className="flex flex-wrap gap-2 text-xs">
-        <select aria-label="Workflow task" value={taskId} onChange={(event) => { setTaskId(event.target.value); setLimit(20); }} className="min-w-0 max-w-full rounded border border-border bg-background p-1.5">
-          <option value="">All tasks and orchestrator</option>
-          {ledger.subtasks.map((task) => <option key={task.id} value={task.id}>{task.id}{task.name ? ` · ${task.name}` : ""}</option>)}
-        </select>
-        <select aria-label="Workflow event type" value={filter} onChange={(event) => { setFilter(event.target.value); setLimit(20); }} className="rounded border border-border bg-background p-1.5">
-          <option value="all">All events</option><option value="decision">Decisions</option><option value="gate">Gate stages</option><option value="handover">Handovers</option>
-        </select>
-      </div>
-      {!events.length && <p className="m-0 text-xs text-muted-foreground">No recorded events for this selection.</p>}
-      <ol className="m-0 list-none border-l border-border pl-4 text-xs">
-        {events.slice(0, limit).map((event) => (
-          <li key={event.key} className="pb-3 [overflow-wrap:anywhere]">
-            <details>
-              <summary className="cursor-pointer"><span className="text-muted-foreground">{event.at ?? "Undated"}</span><span className="ml-2">{event.task ? `${event.task} · ` : ""}{event.title}</span></summary>
-              {event.detail && <p className="m-0 pt-1 text-muted-foreground whitespace-pre-wrap">{event.detail}</p>}
-            </details>
-          </li>
-        ))}
-      </ol>
-      {events.length > limit && <button type="button" className="self-start text-xs underline" onClick={() => setLimit(limit + 20)}>Show more ({events.length - limit} remaining)</button>}
+    <section aria-label={mode === "work" ? "Work breakdown" : "Activity"} className="flex min-w-0 flex-col gap-4">
+      {mode === "work" ? <>
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <div className="flex rounded-lg bg-sidebar p-0.5" aria-label="Work filter">{[["all", "All work"], ["active", "Remaining"], ["done", "Finished"]].map(([value, label]) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value!)} className={`${control} ${filter === value ? "bg-accent text-foreground" : ""}`}>{label}</button>)}</div>
+          <span className="shrink-0 text-subtle-foreground tabular-nums">{done} / {ledger.subtasks.length} finished</span>
+        </div>
+        <div className="h-1 overflow-hidden rounded-full bg-border" aria-label={`${done} of ${ledger.subtasks.length} tasks finished`}><div className="h-full bg-muted-foreground" style={{ width: `${ledger.subtasks.length ? done / ledger.subtasks.length * 100 : 0}%` }} /></div>
+        {!tasks.length && <p className="m-0 text-sm text-muted-foreground">No tasks in this view.</p>}
+        <div className="-mx-2 flex flex-col gap-1">{tasks.map((task) => {
+          const open = selected === task.id;
+          const row = rows.get(task.id);
+          const resumed = activeAgain(task);
+          const state = resumed ? (asking(task) ? "Needs input again" : "Active again") : labels[task.status ?? ""] ?? "Status not recorded";
+          const thread = view.threadIds[task.id] ?? task.threadId;
+          return <article key={task.id} className={`rounded-lg ${open ? "bg-sidebar" : ""}`}>
+            <button type="button" aria-expanded={open} onClick={() => setSelected(open ? null : task.id)} className="flex w-full items-start gap-3 rounded-lg px-2 py-3 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary">
+              <span aria-hidden className={`mt-1.5 size-1.5 shrink-0 rounded-full ${isFinished(task) ? "bg-border" : "bg-foreground"}`} />
+              <span className="min-w-0 flex-1"><span className="block text-sm font-medium leading-snug [overflow-wrap:anywhere]">{title(task)}</span><span className="mt-1 block text-xs text-subtle-foreground">{task.id} · {state}{task.dependsOn.length ? ` · After ${task.dependsOn.join(", ")}` : ""}</span></span>
+              <span aria-hidden className="text-xs text-subtle-foreground">{open ? "−" : "+"}</span>
+            </button>
+            {open && <div className="flex flex-col gap-4 pb-4 pl-[26px] pr-3 text-xs">
+              {task.statusRaw && <p className="m-0 text-muted-foreground [overflow-wrap:anywhere]">{task.statusRaw}</p>}
+              {resumed && row && <p className="m-0 text-muted-foreground">{row.step}</p>}
+              {task.dependencyNote && <p className="m-0 text-muted-foreground">Dependency conditions: {task.dependencyNote}</p>}
+              {task.areas && <div><h3 className="m-0 mb-1 font-medium">Scope</h3><p className="m-0 text-muted-foreground [overflow-wrap:anywhere]">{task.areas}</p></div>}
+              {!!task.criteria?.length && <div><h3 className="m-0 mb-2 font-medium">Acceptance criteria</h3><ul className="m-0 list-disc space-y-2 pl-4 text-muted-foreground">{task.criteria.map((text, index) => <li key={index}>{text}</li>)}</ul></div>}
+              {!!task.evidence?.length && <div><h3 className="m-0 mb-2 font-medium">Delivery evidence</h3><dl className="m-0 space-y-3">{task.evidence.map((item, index) => <div key={index}><dt className="capitalize text-subtle-foreground">{item.label}</dt><dd className="m-0 mt-0.5 text-muted-foreground [overflow-wrap:anywhere]">{item.text}</dd></div>)}</dl></div>}
+              {!task.criteria?.length && !task.evidence?.length && <p className="m-0 text-subtle-foreground">Coverage and delivery evidence have not been recorded for this task yet.</p>}
+              {task.version && !["pending", "—"].includes(task.version) && <p className="m-0 text-subtle-foreground [overflow-wrap:anywhere]">Revision {task.version}</p>}
+              {thread && <button type="button" onClick={() => openThread(thread)} className={`${control} self-start border border-border`}>Open task conversation ↗</button>}
+            </div>}
+          </article>;
+        })}</div>
+      </> : <>
+        <div className="flex items-center justify-between gap-3"><h2 className="m-0 text-sm font-medium">Decisions & delivery</h2><select aria-label="Activity task" value={selected ?? ""} onChange={(event) => { setSelected(event.target.value || null); setLimit(12); }} className="max-w-[55%] rounded-md border border-border bg-background px-2 py-1.5 text-xs"><option value="">All work</option>{ledger.subtasks.map((task) => <option key={task.id} value={task.id}>{task.id} · {title(task)}</option>)}</select></div>
+        <p className="m-0 text-xs text-subtle-foreground">Latest recorded activity first. Open a delivery to read its checks, review and outcome.</p>
+        {!events.length && <p className="m-0 text-sm text-muted-foreground">No activity recorded for this selection.</p>}
+        <div className="flex flex-col gap-2">{events.slice(0, limit).map((event) => <article key={event.key} className="rounded-lg bg-sidebar px-3 py-3 text-xs"><div className="mb-1 text-subtle-foreground">{event.task ? `${event.task} · ` : ""}{event.kind === "gate" ? "Delivery" : event.kind === "handover" ? "Session handover" : "Decision"}{event.at ? ` · ${event.at}` : " · Date not recorded"}</div><p className="m-0 text-sm leading-snug [overflow-wrap:anywhere]">{event.title}</p>{event.detail && <details className="mt-2"><summary className="cursor-pointer text-muted-foreground focus-visible:outline-primary">{event.kind === "gate" ? "Read delivery evidence" : "Read context"}</summary><p className="m-0 mt-2 whitespace-pre-wrap leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">{event.detail}</p></details>}</article>)}</div>
+        {events.length > limit && <button type="button" onClick={() => setLimit(limit + 12)} className={`${control} self-start`}>Earlier activity</button>}
+      </>}
     </section>
   );
 }

@@ -16,8 +16,8 @@ one question: does anything need you, and is the team moving?
 - The team: one row per subtask with its state and latest step. A row opens to show the model,
   context use, rotations and the gate.
 - The same sentence as a row in the thread's context card.
-- Every ledger task with its status and dependencies, plus workflow history across sessions:
-  decisions, gate stages, archived gate references and handovers, filterable by task and type.
+- Now, Work and Activity views: live attention, a named work plan with scope, acceptance criteria
+  and delivery evidence, and decisions and delivery history across sessions.
 
 ## How it works
 

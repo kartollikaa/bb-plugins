@@ -130,15 +130,20 @@ bb plugin reload orchestration
 
 MIT.
 
-## Task breakdown and workflow history
+## Work and activity
 
-The view and side-panel tab show every ledger task in plan order, including completed and
-dropped tasks from earlier sessions. Expand a task for its full ledger status, current team
-state, dependencies and thread link. Landed and verified tasks count as completed; dropped
-tasks have their own count.
+Now keeps the existing attention cards and live team. Work shows the plan with meaningful
+task names (the delivery description when no name was recorded), status, dependencies and
+filters for remaining or finished work. Expand a task for its scope, acceptance criteria,
+delivery evidence, revision and conversation. Shared criteria stay labeled with their group;
+criteria are requirements, not proof that each point passed. Delivery narrative is the evidence.
 
-Workflow history lists recorded decisions, delivery-gate stages (including archived gates)
-and handovers in timestamp order, oldest first. Undated entries follow in source order.
-Filter by task or event type, expand an entry for its evidence, and use Show more for the
-rest. These are ledger records, not a reconstructed history of every status transition;
-missing events and dates are not inferred. Task statuses show the latest ledger values.
+Activity shows decisions, deliveries and session handovers, latest recorded activity first.
+Gate stages are grouped into one delivery with readable evidence rather than repeated
+unknown-state rows. Placeholder stages are omitted; substantive evidence is retained even
+when no state or date could be inferred. Undated records remain undated. Archived gates
+keep their reference. Filter by task and use Earlier activity for older records.
+
+Task names, coverage and outcomes come from the ledger; missing facts are not invented.
+A finished task running again is labeled Active again (Needs input again for an approval).
+It moves back to Remaining. Finished includes dropped tasks, whose status remains visible.

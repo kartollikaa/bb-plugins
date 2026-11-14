@@ -321,6 +321,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   const navigate = useBbNavigate();
   const [sent, setSent] = useState<string | null>(null);
   const [showAllAsks, setShowAllAsks] = useState(false);
+  const [section, setSection] = useState<"now" | "work" | "activity">("now");
   const replyMutation = experimental_useRpcMutation({ contract, method: "reply" });
   useSyncExternalStore(replies.subscribe, replies.version);
   const liveAsks = state.kind === "ready" ? [...state.view.asks, ...state.view.answered].filter((ask) => ask.replies.length).map(replyKeyOf) : null;
@@ -367,6 +368,10 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
     <div className={cx("flex flex-col gap-6 text-sm leading-[1.45] text-foreground", variant === "tab" ? "h-full overflow-y-auto px-4 pb-4 pt-5" : "mx-auto w-full max-w-[680px] px-6 pb-6 pt-6")}>
       <Recap view={view} threadId={threadId} withTitle={variant === "page"} />
 
+      <nav aria-label="Orchestration sections" className="flex gap-1 border-b border-border pb-2">
+        {(["now", "work", "activity"] as const).map((item) => <button key={item} type="button" aria-pressed={section === item} onClick={() => setSection(item)} className={cx("rounded-md px-3 py-1.5 text-xs capitalize hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary", section === item ? "bg-accent font-medium text-foreground" : "text-muted-foreground")}>{item === "now" ? `Now${view.asks.length ? ` · ${view.asks.length}` : ""}` : item}</button>)}
+      </nav>
+      {section === "now" ? <>
       <section>
         <h2 className="m-0 text-base font-semibold leading-[1.35] tracking-[-0.01em] [text-wrap:balance]">{view.heading}</h2>
         <p className="m-0 mt-1 text-muted-foreground [text-wrap:pretty]">{view.subline}</p>
@@ -399,8 +404,8 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
       )}
 
       <Team view={view} actions={actions} threadIds={threadIds} />
-      <WorkflowHistory key={threadId} ledger={state.ledger} view={view} openThread={actions.openThread} />
       {view.state !== "planning" && <History view={view} />}
+      </> : <WorkflowHistory key={`${threadId}:${section}`} ledger={state.ledger} view={view} openThread={actions.openThread} mode={section} />}
     </div>
   );
 }

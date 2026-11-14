@@ -23,10 +23,13 @@ export function workflowEvents(data: unknown): WorkflowEvent[] {
     if (gate.archived && !rows(gate.stages).length) {
       events.push({ kind: "gate", task: str(gate.subtask), title: `${str(gate.id) ?? "Gate"} · archived`, detail: str(gate.archived), at: null });
     }
-    for (const stage of rows(gate.stages)) {
-      const name = str(stage.name) ?? str(stage.kind);
-      if (!name) continue;
-      events.push({ kind: "gate", task: str(gate.subtask), title: `${str(gate.id) ?? "Gate"} · ${name} · ${str(stage.state) ?? "unknown"}`, detail: [str(stage.text), str(gate.version), gate.archived ? "Archived gate" : null].filter(Boolean).join(" · ") || null, at: time(stage.time) });
+    const stages = rows(gate.stages).filter((stage) => {
+      const text = str(stage.text);
+      return text && !["pending", "unknown", "—"].includes(text);
+    });
+    if (stages.length) {
+      const dated = stages.map((stage) => time(stage.time)).filter((at): at is string => !!at && Number.isFinite(Date.parse(at))).sort((a, b) => Date.parse(a) - Date.parse(b));
+      events.push({ kind: "gate", task: str(gate.subtask), title: `Delivery review · ${str(gate.id) ?? "Gate"}`, detail: [str(gate.version) ? `Revision ${str(gate.version)}` : null, ...stages.map((stage) => `${str(stage.name) ?? "Evidence"}: ${str(stage.text)}`)].filter(Boolean).join("\n\n"), at: dated.at(-1) ?? null });
     }
   }
   for (const row of rows(root.handovers)) {
@@ -34,4 +37,14 @@ export function workflowEvents(data: unknown): WorkflowEvent[] {
   }
   const stamp = (event: WorkflowEvent) => event.at && Number.isFinite(Date.parse(event.at)) ? Date.parse(event.at) : Infinity;
   return events.sort((a, b) => stamp(a) - stamp(b));
+}
+
+export function recentEvents<T extends WorkflowEvent>(events: T[]): T[] {
+  const stamp = (event: WorkflowEvent) => event.at && Number.isFinite(Date.parse(event.at)) ? Date.parse(event.at) : null;
+  return [...events].sort((a, b) => {
+    const left = stamp(a), right = stamp(b);
+    if (left === null) return right === null ? 0 : 1;
+    if (right === null) return -1;
+    return right - left;
+  });
 }
