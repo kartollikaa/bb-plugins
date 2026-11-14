@@ -113,6 +113,18 @@ confirmation…" toast shows. Cancelling bb's confirmation stops the rest, as do
 the toast's Stop when no dialog covers it and closing the sidebar; a run that
 ends early says why. One Cmd/Ctrl+Z restores everything that Archive took.
 
+In each project folder, top-level threads that are idle and read, hold no draft
+or pending question, aren't pinned or open, have only such subthreads, whose
+pull requests are merged, closed or absent, and where nothing changed for over a
+day fold into one "N older" line at the folder's end; its tooltip states that
+rule. A thread whose PR state isn't known yet stays out. Clicking the line shows
+them above it and turns it into "Hide older" with an "Archive these" button.
+That button works like a finished fold's Archive across all of them: bb's own
+Archive with its confirmation and Undo, worktrees with changes skipped, and a
+skip count before it starts. A thread skipped for uncommitted changes stays
+listed with a pencil marker. The Pinned group, Status and flat grouping, and
+the archived view don't fold older threads.
+
 The provider icon sits in a fixed slot before the age, in the provider's brand
 tint (Claude orange, Codex blue-violet), or in the text colour with the
 `providerIconStyle` setting set to `monochrome`. This setting replaces
@@ -147,6 +159,7 @@ this one under Settings → Appearance → Sidebar, or run
 - `src/subagents.ts`: folds a thread's event log into its subagents.
 - `src/tree.ts`: pure tree, grouping and subagent state logic.
 - `src/orchestrations.ts`: the Orchestrations shortcuts, the folded rollup and bar, and the archive plan.
+- `src/olderThreads.ts`: which of a folder's threads fold into "N older".
 - `src/archiveRun.ts`: runs bb's Archive on each clean root in turn.
 - `src/archiveUndo.ts`: which recent archives one Cmd/Ctrl+Z brings back.
 - `src/ThreadTreeList.tsx`, `src/SubagentBadge.tsx`, `src/GithubSection.tsx`: the sidebar UI.

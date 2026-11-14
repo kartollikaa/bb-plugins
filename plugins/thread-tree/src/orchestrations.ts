@@ -107,10 +107,11 @@ export interface FoldArchivePlan {
 /** `scopes`: what archiving each visible thread takes along, itself included; a thread without one counts as unsafe. */
 export function foldArchivePlan<T extends TreeThread>(
   forest: Forest<T>,
-  rootId: string,
+  rootIds: string | readonly string[],
   scopes: ReadonlyMap<string, readonly string[]>,
   dirty: ReadonlySet<string>,
 ): FoldArchivePlan {
+  const tops = typeof rootIds === "string" ? [rootIds] : rootIds;
   const roots: string[] = [];
   const covered = new Set<string>();
   const visit = (id: string) => {
@@ -122,8 +123,8 @@ export function foldArchivePlan<T extends TreeThread>(
     }
     for (const kid of forest.children.get(id) ?? []) visit(kid.id);
   };
-  visit(rootId);
-  const fold = [...new Set([...orchestrationTreeIds(forest, rootId), ...(scopes.get(rootId) ?? [])])];
+  tops.forEach(visit);
+  const fold = [...new Set(tops.flatMap((id) => [...orchestrationTreeIds(forest, id), ...(scopes.get(id) ?? [])]))];
   return {
     roots,
     archiveCount: covered.size,

@@ -137,6 +137,12 @@ test("a dirty root still lets its clean subtrees go; a hidden thread left behind
   assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["root"])), { roots: ["a", "b"], archiveCount: 5, skipped: 1, kept: 1 });
 });
 
+test("several roots plan together: each clean one goes, a dirty one stays and counts once", () => {
+  const forest = buildForest([thread("x"), thread("y"), thread("y1", { parentThreadId: "y" })]);
+  const twoRoots = new Map([["x", ["x"]], ["y", ["y", "y1"]], ["y1", ["y1"]]]);
+  assert.deepEqual(foldArchivePlan(forest, ["x", "y"], twoRoots, new Set(["y1"])), { roots: ["x"], archiveCount: 1, skipped: 1, kept: 1 });
+});
+
 test("a thread missing from the scope check counts as unsafe", () => {
   const partial = new Map([...scopes].filter(([id]) => id !== "b"));
   assert.deepEqual(foldArchivePlan(archiveTree(), "root", partial, new Set(["h1"])).roots, ["b1"]);

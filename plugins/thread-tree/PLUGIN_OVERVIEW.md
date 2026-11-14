@@ -15,16 +15,18 @@ under it, and the subagents it runs inside its own session show on its row.
   summary in the header: "1 failing · 5", "1 failed · next in 12m". A PR's
   reason is its icon; hover to snooze or open its thread. Hover an automation
   to run, pause or resume it; click to open its last run.
-- Recent Activity: the most recently active threads, child threads included.
+- Recent Activity: the latest active threads, children included.
 - Threads grouped by Project, by Status or not at all, with Pinned on top.
   Projects keep the order you drag them into, or follow recent activity. The +
   on a project header starts a new thread there.
 - Sort by last activity, creation date or status, globally or per folder.
-- The Archived toggle shows archived threads in the same grouping and nesting.
+- Archived shows archived threads in the same grouping and nesting.
 - Each child thread sits under the thread that spawned it, at any depth, even
   in another project. Fold a parent into one line counting its subtree by
   state; its glyph shows the most urgent state below. A finished fold offers
   Archive, skipping worktrees with uncommitted changes.
+- Per project, threads idle, read and quiet for a day fold into "N older";
+  expanded, it offers Archive these with the same skips.
 - Orchestrations: a shortcut for each orchestrator with work going, with its
   projects and progress.
 - Before each title, bb's own status glyph: a spinner while the agent works, a
@@ -37,8 +39,8 @@ under it, and the subagents it runs inside its own session show on its row.
 - Hovering or focusing a row fades Archive and ⋯ in over its end; Archive keeps
   bb's confirmation and Undo. Cmd+Z or Ctrl+Z restores recently archived
   threads and their children.
-- Hover a running thread's spinner to stop it; on a touch screen Stop is only
-  in the row's menu.
+- Hover a running thread's spinner to stop it; on touch, Stop is in the row's
+  menu.
 - Provider subagents show a counter and status dot on the parent's row;
   hover for type, state, duration and tokens.
 - Hold Ctrl (or Cmd on a Mac) to see each row's jump key.
@@ -54,7 +56,7 @@ to their headers and reopen on drop.
 ## Settings
 
 Thread Tree's settings hold the section switches, Recent
-Activity row counts, which PRs Needs you lists, provider icon colour (brand tint or monochrome), and
+Activity row counts, which PRs Needs you lists, provider icon colour, and
 switches for the subagent counters and the age label. Reduce motion stops the
 sidebar animations and holds spinners still; so does the system's
 reduced-motion preference.

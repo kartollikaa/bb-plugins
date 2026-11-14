@@ -17,6 +17,7 @@ import {
   useSdk,
   useSettings,
   useSidebarThreadDraft,
+  useSidebarThreadDraftIds,
   useSidebarThreadRowStatus,
   useSidebarThreadShortcut,
   type PluginSidebarProject,
@@ -90,6 +91,7 @@ import { Collapse } from "./Collapse";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
 import { canStop, END_SLOT_MIN_PX, NO_HOVER_QUERY, ROW_ACTION_BUTTON, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
+import { OLDER_RULE, olderRoots } from "./olderThreads";
 import { RetryButton } from "./RetryButton";
 
 const ROW_PAD_PX = 6;
@@ -189,10 +191,20 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const canReorder = groupMode === "project" && projectOrder !== null;
   const projectDrag = useDragReorder(projectOrder ?? [], setSavedProjectOrder);
   const shownProjectOrder = projectOrder && projectDrag.order;
+  const sectionsRef = useRef<HTMLDivElement>(null);
+  const prThreads = useMemo(() => pullRequestThreads(activeForest, forest), [activeForest, forest]);
+  const { pullRequestsOf, isLoading: pullRequestsLoading } = useThreadPullRequests(prThreads, sectionsRef);
+  const draftIds = useSidebarThreadDraftIds();
+  const isOlder = useMemo(() => {
+    if (showArchived || pullRequestsLoading) return undefined;
+    const context = { now, activeThreadId: activeThreadId ?? null, draftIds, pullRequestStates: (thread: PluginSidebarThread) => pullRequestsOf(thread).map((pr) => pr.state) };
+    return (root: PluginSidebarThread) => olderRoots(forest, [root], context).length > 0;
+  }, [showArchived, pullRequestsLoading, now, activeThreadId, draftIds, pullRequestsOf, forest]);
   const groups = useMemo(
-    () => groupRows(forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId ?? null, folderSorts, threadSort, showArchived ? [] : retainedProjectIds),
-    [forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId, folderSorts, threadSort, showArchived, retainedProjectIds],
+    () => groupRows(forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId ?? null, folderSorts, threadSort, showArchived ? [] : retainedProjectIds, isOlder),
+    [forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId, folderSorts, threadSort, showArchived, retainedProjectIds, isOlder],
   );
+  const olderShown = useCallback((groupKey: string) => flags.has(`older:${groupKey}`), [flags]);
   const showMoreRecent = flags.has("recent-more");
   const recentHidden = !view.showRecent || collapsedGroups.has("recent");
   const recent = useMemo(
@@ -214,14 +226,11 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     [githubFolder.view],
   );
   const shownSections = shownSectionIds(sectionDrag.order, view, presentSections);
-  const sectionsRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   useFlipOrder(sectionsRef, shownSections.join(), view.reduceMotion);
   useFlipOrder(treeRef, groups.map((group) => group.key).join(), view.reduceMotion);
   const moveSectionBy = (id: SectionId, step: -1 | 1) => setSavedSectionOrder(moveSection(sectionOrder, shownSections, id, step));
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
-  const prThreads = useMemo(() => pullRequestThreads(activeForest, forest), [activeForest, forest]);
-  const { pullRequestsOf, isLoading: pullRequestsLoading } = useThreadPullRequests(prThreads, sectionsRef);
   const folderItems = githubFolder.view;
   const folderAttention = useMemo(
     () => folderAttentionByUrl(folderItems ? [...folderItems.items, ...folderItems.snoozed] : []),
@@ -256,8 +265,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     }));
   }, [statusFilter, threads, searchOpen, query, searchPool, projectById, pullRequestsOf]);
   const shownThreads = useMemo(
-    () => (view.showSubagents ? threadsOnScreen({ flatList, recent, recentHidden, groups, collapsed: collapsedGroups.values }) : []),
-    [flatList, recent, recentHidden, groups, view.showSubagents, collapsedGroups.values],
+    () => (view.showSubagents ? threadsOnScreen({ flatList, recent, recentHidden, groups: groups.map((group) => group.older && olderShown(group.key) ? { ...group, rows: [...group.rows, ...group.older.rows] } : group), collapsed: collapsedGroups.values }) : []),
+    [flatList, recent, recentHidden, groups, olderShown, view.showSubagents, collapsedGroups.values],
   );
   const subagents = useSubagents(shownThreads);
   const openSearch = useCallback(() => {
@@ -329,7 +338,13 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       },
     })),
   }), []);
-  const archiveFold = useCallback((root: PluginSidebarThread) => prepareFoldArchive(rpc, activeForest, root, archiveRunner), [rpc, activeForest, archiveRunner]);
+  const archiveFold = useCallback((roots: readonly PluginSidebarThread[]) => prepareFoldArchive(rpc, activeForest, roots, archiveRunner), [rpc, activeForest, archiveRunner]);
+  const [uncommittedIds, setUncommittedIds] = useState<ReadonlySet<string>>(new Set());
+  const archiveOlder = useCallback(async (roots: readonly PluginSidebarThread[]) => {
+    const prepared = await archiveFold(roots);
+    if (prepared) setUncommittedIds((current) => new Set([...current, ...prepared.dirty]));
+    return prepared;
+  }, [archiveFold]);
 
   if (status === "loading" && threads.length === 0) {
     return <div className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</div>;
@@ -370,6 +385,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         pullRequestsOf={pullRequestsOf}
         folderAttention={folderAttention}
         sharesBranchWith={sharedBranches.get(row.thread.id)}
+        hasUncommittedChanges={uncommittedIds.has(row.thread.id)}
         view={view}
         now={now}
         onToggle={() => collapsedThreads.toggle(row.thread.id)}
@@ -383,7 +399,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           own={foldState(row.thread)}
           total={row.descendantCount}
           onExpand={() => collapsedThreads.toggle(row.thread.id)}
-          onArchive={showArchived ? undefined : () => archiveFold(row.thread)}
+          onArchive={showArchived ? undefined : () => archiveFold([row.thread])}
         />
       ) : null}
     </Fragment>
@@ -615,7 +631,17 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
               <Collapse open={!isCollapsed}>
                 <div role="group" className="mt-0.5 flex flex-col gap-0.5">
                   {group.rows.map((row) => renderRow(row, "tree"))}
-                  {group.rows.length === 0 && startThread ? (
+                  {group.older ? (
+                    <OlderThreads
+                      count={group.older.rootCount}
+                      isOpen={olderShown(group.key)}
+                      onToggle={() => flags.toggle(`older:${group.key}`)}
+                      onArchive={() => archiveOlder(group.older!.rows.filter((row) => row.depth === 0).map((row) => row.thread))}
+                    >
+                      {group.older.rows.map((row) => renderRow(row, "tree"))}
+                    </OlderThreads>
+                  ) : null}
+                  {group.rows.length === 0 && !group.older && startThread ? (
                     <button
                       type="button"
                       onClick={startThread}
@@ -935,6 +961,7 @@ function ThreadRowView({
   pullRequestsOf,
   folderAttention,
   sharesBranchWith,
+  hasUncommittedChanges = false,
   view,
   now,
   onToggle,
@@ -958,6 +985,8 @@ function ThreadRowView({
   pullRequestsOf: (thread: PluginSidebarThread) => ThreadPullRequest[];
   folderAttention: FolderAttention;
   sharesBranchWith: readonly PluginSidebarThread[] | undefined;
+  /** Left behind by "Archive these" because its worktree has uncommitted changes. */
+  hasUncommittedChanges?: boolean;
   view: ViewSettings;
   now: number;
   onToggle: () => void;
@@ -1073,6 +1102,17 @@ function ThreadRowView({
                 className="flex size-4 shrink-0 items-center justify-center text-amber-600 dark:text-amber-400"
               >
                 <Icon name="TriangleAlert" fallback="AlertTriangle" aria-hidden className="size-3.5" />
+              </span>
+            ) : null}
+            {hasUncommittedChanges ? (
+              <span
+                data-uncommitted=""
+                role="img"
+                aria-label={UNCOMMITTED_LABEL}
+                title={UNCOMMITTED_LABEL}
+                className="flex size-4 shrink-0 items-center justify-center text-amber-600 dark:text-amber-400"
+              >
+                <Icon name="FilePen" fallback="Pencil" aria-hidden className="size-3.5" />
               </span>
             ) : null}
             {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
@@ -1337,13 +1377,52 @@ function FoldLine({
   );
 }
 
+const UNCOMMITTED_LABEL = "Kept: its worktree has uncommitted changes";
+
+/** A folder's quiet threads behind one line; expanded, they sit above it and the line offers Archive these. */
+function OlderThreads({
+  count,
+  isOpen,
+  onToggle,
+  onArchive,
+  children,
+}: {
+  count: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  onArchive: () => Promise<PreparedFoldArchive | null>;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <Collapse open={isOpen}>
+        <div role="group" aria-label="Older threads" className="flex flex-col gap-0.5">{isOpen ? children : null}</div>
+      </Collapse>
+      <div role="none" data-older-line="" className="flex h-6 items-center gap-1 pr-2" style={{ paddingLeft: ROW_PAD_PX + GLYPH_CENTER_PX * 2 + 4 }}>
+        <button
+          type="button"
+          aria-expanded={isOpen}
+          title={`${OLDER_RULE}.`}
+          onClick={onToggle}
+          className={cn("-ml-1 flex h-5 min-w-0 items-center rounded-md px-1 text-2xs tabular-nums text-sidebar-foreground/50 outline-none hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring", ROW_TINT)}
+        >
+          {isOpen ? "Hide older" : `${count} older`}
+        </button>
+        {isOpen ? <FoldArchiveButton label="Archive these" onArchive={onArchive} /> : null}
+      </div>
+    </>
+  );
+}
+
 interface PreparedFoldArchive {
   plan: FoldArchivePlan;
+  /** Threads whose worktrees have changes, so the run leaves them. */
+  dirty: ReadonlySet<string>;
   run(): Promise<void>;
 }
 
 /** Reads the fold's archive scope first; bb's own Archive then confirms each clean root, so a split tree gets the counts inline before that. */
-function FoldArchiveButton({ onArchive }: { onArchive: () => Promise<PreparedFoldArchive | null> }) {
+function FoldArchiveButton({ label = "Archive", onArchive }: { label?: string; onArchive: () => Promise<PreparedFoldArchive | null> }) {
   const [step, setStep] = useState<"idle" | "pending" | { prepared: PreparedFoldArchive }>("idle");
   const button = "flex h-5 shrink-0 items-center gap-1 rounded-md px-1.5 text-2xs outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring disabled:opacity-60";
   const run = async (prepared: PreparedFoldArchive) => {
@@ -1372,7 +1451,7 @@ function FoldArchiveButton({ onArchive }: { onArchive: () => Promise<PreparedFol
         className={cn(button, "ml-auto text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground")}
       >
         <Icon name="Archive" aria-hidden className="size-3" />
-        {step === "pending" ? "Archiving…" : "Archive"}
+        {step === "pending" ? "Archiving…" : label}
       </button>
     );
   }
@@ -1413,10 +1492,10 @@ interface BbArchiveJob {
 async function prepareFoldArchive(
   rpc: ReturnType<typeof useRpc<typeof rpcContract>>,
   forest: Forest<PluginSidebarThread>,
-  root: PluginSidebarThread,
+  roots: readonly PluginSidebarThread[],
   runner: BbArchiveRunner,
 ): Promise<PreparedFoldArchive | null> {
-  const subtree = new Map([root, ...descendantsOf(forest, root.id)].map((thread) => [thread.id, thread]));
+  const subtree = new Map(roots.flatMap((root) => [root, ...descendantsOf(forest, root.id)]).map((thread) => [thread.id, thread]));
   const ids = [...subtree.keys()];
   const scopes = new Map<string, string[]>();
   const dirty = new Set<string>();
@@ -1430,10 +1509,11 @@ async function prepareFoldArchive(
     toast.error("Archive failed", { description: `Couldn't check worktrees for changes: ${error instanceof Error ? error.message : String(error)}` });
     return null;
   }
-  const plan = foldArchivePlan(forest, root.id, scopes, dirty);
+  const plan = foldArchivePlan(forest, roots.map((root) => root.id), scopes, dirty);
   const isStillClean = (id: string) => rpc.call("archiveScope", { threadIds: [id] }).then(({ dirty }) => dirty.length === 0);
   return {
     plan,
+    dirty,
     async run() {
       const claimed = [...new Set(plan.roots.flatMap((id) => scopes.get(id) ?? [id]))];
       const result = await runClaimedArchive({
