@@ -5,7 +5,7 @@ export const EXPORT_SCHEMA = "orchestrate-ledger-export";
 export const EXPORT_VERSION = 1;
 
 const THREAD_ID = /\bthr_[a-z0-9]+\b/;
-const STATUSES = new Set(["planned", "card", "briefed", "waiting-dependency", "working", "question", "delivered", "gate", "ready", "landed", "verified", "dropped"]);
+const STATUSES = new Set(["planned", "card", "briefed", "waiting-dependency", "working", "question", "blocked", "delivered", "gate", "ready", "landed", "verified", "dropped"]);
 const FAILURE_KINDS = new Set(["checks", "review", "done_when", "conflicts"]);
 const GATE_LINE_KINDS = ["checks", "review", "done_when", "conflicts", "landing", "after_landing"] as const;
 const KIND_LABEL: Record<string, string> = {
@@ -95,6 +95,9 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
     }];
   });
 
+  const checkpoint = obj(root.current_checkpoint);
+  const checkpointText = str(checkpoint.text);
+  const lastJournal = arr(root.decision_journal).map(obj).filter((row) => str(row.decision)).at(-1);
   const orchestratorHandovers = handovers.filter((h) => h.role === "orchestrator");
   const last = orchestratorHandovers.at(-1);
   return {
@@ -106,5 +109,7 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
     orchestratorSessions: orchestratorHandovers.length + 1,
     lastHandover: last ? { why: str(last.why), at: str(obj(last.time).at) } : null,
     warnings,
+    checkpoint: checkpointText ? { text: checkpointText, at: str(obj(checkpoint.time).at) } : null,
+    lastDecision: lastJournal ? { text: str(lastJournal.decision)!, at: str(obj(obj(lastJournal.when).time).at) } : null,
   };
 }

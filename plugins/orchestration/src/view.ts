@@ -33,10 +33,14 @@ export interface Row {
 export interface Ask {
   key: string;
   who: string;
+  /** The subtask a «For the owner» line names first (`ask: T2: …`); its thread opens from the card. */
+  subtask: string | null;
   age: string;
   since: number | null;
-  /** What is asked, when the ledger line says it in the structured format. */
+  /** What is asked, when the ledger line says it in the structured format, without its subtask id. */
   title: string | null;
+  /** The title as the ledger writes it: replies quote it and the sent-marker keys on it. */
+  replyTitle: string | null;
   text: string;
   links: Link[];
   threads: string[];
@@ -46,8 +50,15 @@ export interface Ask {
   drafts: { primary: string; secondary?: string } | null;
 }
 
+export interface RecapLine {
+  text: string;
+  age: string;
+}
+
 export interface View {
   state: "planning" | "done" | "needs" | "stuck" | "moving";
+  /** The goal, where the orchestrator is now, and its latest decision: the context before the status. */
+  recap: { goal: string | null; now: RecapLine | null; last: RecapLine | null };
   heading: string;
   subline: string;
   /** The context-card row: the heading, plus the stuck agent when an ask holds the heading. */
@@ -58,7 +69,6 @@ export interface View {
   activeLabel: string;
   active: Row[];
   done: Row[];
-  goal: string | null;
   history: { sessions: string; handover: string | null; ledger: string; warnings: string[]; notes: string[] };
 }
 
@@ -114,7 +124,7 @@ const capitalize = (text: string) => text[0]!.toUpperCase() + text.slice(1);
 interface Classified {
   subtask: Subtask;
   kind: RowKind;
-  reason: "quiet" | "circles" | null;
+  reason: "quiet" | "circles" | "blocked" | null;
   lastReport: number | null;
   agent: Agent | null;
   live: LiveThread | null;
@@ -129,6 +139,7 @@ function classify(subtask: Subtask, input: ViewInput): Classified {
   if (DONE.has(status)) return { ...base, kind: "done" };
   if (ASKING.has(status) || live?.hasPendingInteraction) return { ...base, kind: "you" };
   if (subtask.gateFailures >= FAILURES_STUCK) return { ...base, kind: "stuck", reason: "circles" };
+  if (status === "blocked") return { ...base, kind: "stuck", reason: "blocked" };
   if (QUIET_WATCHED.has(status) && reported !== null && input.now - reported >= QUIET_MS) {
     return { ...base, kind: "stuck", reason: "quiet" };
   }
@@ -141,6 +152,7 @@ function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
   const said = firstLine(agent?.lastOutput ?? null);
   if (c.reason === "quiet") return `Quiet for ${longAge(now - c.lastReport!)}${said ? ` · last: ${said}` : ""}`;
   if (c.reason === "circles") return `${capitalize(subtask.lastFailedKind ?? "gate")} failed ${subtask.gateFailures} times`;
+  if (c.reason === "blocked") return blockedLine(subtask);
   switch (subtask.status) {
     case "question": return "Waiting on your answer";
     case "ready": return "Passed the gate, waiting on your word";
@@ -159,6 +171,14 @@ function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
   if (c.kind === "done") return firstLine(subtask.statusRaw, 90) ?? capitalize(subtask.status ?? "done");
   return firstLine(subtask.statusRaw, 90) ?? "Status unknown";
 }
+
+/** «blocked — no access to the registry» → «Blocked: no access to the registry». */
+function blockedLine(subtask: Subtask): string {
+  const note = firstLine(subtask.statusRaw?.replace(/^\s*blocked\b[\s:;,—–-]*/i, "") ?? null, 90);
+  return note ? `Blocked: ${note}` : "Blocked";
+}
+
+const STUCK_ORDER = { circles: 0, blocked: 1, quiet: 2 } as const;
 
 function toRow(c: Classified, doneIds: Set<string>, now: number): Row {
   const { subtask, agent } = c;
@@ -182,7 +202,7 @@ function askOf(c: Classified, now: number): Ask {
   const { subtask, agent } = c;
   const who = subtask.name ? `${subtask.id} · ${subtask.name}` : subtask.id;
   const since = c.lastReport;
-  const base = { key: subtask.id, who, since, age: since === null ? "" : shortAge(now - since), title: null, links: [], threads: [], replies: [] };
+  const base = { key: subtask.id, who, subtask: subtask.id, since, age: since === null ? "" : shortAge(now - since), title: null, replyTitle: null, links: [], threads: [], replies: [] };
   if (subtask.status === "ready") {
     return {
       ...base,
@@ -201,6 +221,20 @@ function askOf(c: Classified, now: number): Ask {
   return { ...base, kind: "question", text, drafts: { primary: `Re ${subtask.id}: ` } };
 }
 
+/** `T2: Approve the draft` → T2 and «Approve the draft», when T2 is a subtask of this ledger. */
+function subtaskNamed(text: string, byId: Map<string, Subtask>): { subtask: Subtask; rest: string } | null {
+  const match = /^\s*([^\s:|]+):\s+(\S[\s\S]*)$/.exec(text);
+  const subtask = match ? byId.get(match[1]!) : undefined;
+  return subtask ? { subtask, rest: match![2]!.trim() } : null;
+}
+
+function recapLine(entry: { text: string; at: string | null } | null, now: number): RecapLine | null {
+  const text = firstLine(entry?.text ?? null, 220);
+  if (!text) return null;
+  const at = entry?.at ? Date.parse(entry.at) : NaN;
+  return { text, age: Number.isFinite(at) && at <= now ? shortAge(now - at) : "" };
+}
+
 export function buildView(input: ViewInput): View {
   const { ledger, now } = input;
   const classified = ledger.subtasks.map((s) => classify(s, input));
@@ -216,9 +250,11 @@ export function buildView(input: ViewInput): View {
     asks.push({
       key: "orchestrator",
       who: "Orchestrator",
+      subtask: null,
       since: orchestrator.latestAttentionAt || null,
       age: orchestrator.latestAttentionAt ? shortAge(now - orchestrator.latestAttentionAt) : "",
       title: null,
+      replyTitle: null,
       text: "The orchestrator waits on an approval or a question in this chat.",
       links: [],
       threads: [],
@@ -228,24 +264,28 @@ export function buildView(input: ViewInput): View {
     });
   }
   const notes: string[] = [];
+  const byId = new Map(ledger.subtasks.map((s) => [s.id, s]));
   ledger.forTheOwner.forEach((line, i) => {
     const item = parseOwnerItem(line);
     if (item.kind === "note") {
       notes.push(item.text);
       return;
     }
-    const base = { key: `owner-${i}`, who: "For you, from the ledger", since: null, age: "", kind: "owner" as const, links: item.links, threads: item.threads };
+    const named = subtaskNamed(item.kind === "ask" ? item.title : item.text, byId);
+    const who = named ? `${named.subtask.id}${named.subtask.name ? ` · ${named.subtask.name}` : ""}` : "For you, from the ledger";
+    const threads = named?.subtask.threadId && !item.threads.includes(named.subtask.threadId) ? [...item.threads, named.subtask.threadId] : item.threads;
+    const base = { key: `owner-${i}`, who, subtask: named?.subtask.id ?? null, since: null, age: "", kind: "owner" as const, links: item.links, threads };
     if (item.kind === "ask") {
-      asks.push({ ...base, title: item.title, text: item.why ?? "", drafts: { primary: replyPrefix(item.title) }, replies: item.options.map((label) => ({ label, draft: replyDraft(item.title, label) })) });
+      asks.push({ ...base, title: named?.rest ?? item.title, replyTitle: item.title, text: item.why ?? "", drafts: { primary: replyPrefix(item.title) }, replies: item.options.map((label) => ({ label, draft: replyDraft(item.title, label) })) });
     } else {
-      asks.push({ ...base, title: null, text: item.text, drafts: { primary: replyPrefix(firstLine(item.text, 60) ?? "") }, replies: [] });
+      asks.push({ ...base, title: null, replyTitle: null, text: named?.rest ?? item.text, drafts: { primary: replyPrefix(firstLine(item.text, 60) ?? "") }, replies: [] });
     }
   });
   asks.sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));
 
   const active = rows.filter((r) => r.kind !== "done" && r.kind !== "you");
   const stuck = classified.filter((c) => c.kind === "stuck")
-    .sort((a, b) => (a.reason === b.reason ? (a.lastReport ?? 0) - (b.lastReport ?? 0) : a.reason === "circles" ? -1 : 1));
+    .sort((a, b) => STUCK_ORDER[a.reason!] - STUCK_ORDER[b.reason!] || (a.lastReport ?? 0) - (b.lastReport ?? 0));
   active.sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || stuck.findIndex((c) => c.subtask.id === a.id) - stuck.findIndex((c) => c.subtask.id === b.id));
   const working = rows.filter((r) => r.kind === "work");
   const done = rows.filter((r) => r.kind === "done");
@@ -260,7 +300,8 @@ export function buildView(input: ViewInput): View {
     warnings: ledger.warnings,
     notes,
   };
-  const common = { asks, active, done, goal: ledger.goal, history, activeLabel: `${active.length} active`, teamLabel: asks.length ? "Rest of the team" : "Team" };
+  const recap = { goal: ledger.goal, now: recapLine(ledger.checkpoint, now), last: recapLine(ledger.lastDecision, now) };
+  const common = { recap, asks, active, done, history, activeLabel: `${active.length} active`, teamLabel: asks.length ? "Rest of the team" : "Team" };
 
   if (total === 0) {
     return { ...common, state: "planning", heading: "Planning the work", subline: "The orchestrator is splitting the goal into subtasks.", rowLabel: "Planning the work", nudge: null };
@@ -269,13 +310,13 @@ export function buildView(input: ViewInput): View {
   const head = stuck[0];
   const stuckId = head?.subtask.id;
   const failedKind = head?.subtask.lastFailedKind ?? "the gate";
-  const quiet = head && head.reason !== "circles" ? longAge(now - head.lastReport!) : "";
-  const stuckNote = head ? `${stuckId} ${head.reason === "circles" ? "is going in circles" : "has gone quiet"}` : null;
-  const stuckNudge = head
-    ? head.reason === "circles"
-      ? { label: `Ask the orchestrator about ${stuckId}`, draft: `${stuckId} has failed ${failedKind} ${head.subtask.gateFailures} times. What's the plan?` }
-      : { label: `Ask the orchestrator about ${stuckId}`, draft: `What is ${stuckId} doing? It hasn't reported for ${quiet}.` }
-    : null;
+  const quiet = head?.reason === "quiet" ? longAge(now - head.lastReport!) : "";
+  const stuckNote = head ? `${stuckId} ${head.reason === "circles" ? "is going in circles" : head.reason === "blocked" ? "is blocked" : "has gone quiet"}` : null;
+  const askAbout = `Ask the orchestrator about ${stuckId}`;
+  const stuckNudge = !head ? null
+    : head.reason === "circles" ? { label: askAbout, draft: `${stuckId} has failed ${failedKind} ${head.subtask.gateFailures} times. What's the plan?` }
+    : head.reason === "blocked" ? { label: askAbout, draft: `What is ${stuckId} blocked on, and what would unblock it?` }
+    : { label: askAbout, draft: `What is ${stuckId} doing? It hasn't reported for ${quiet}.` };
   const more = stuck.length > 1 ? ` ${plural(stuck.length - 1, "other agent looks", "other agents look")} stuck too.` : "";
 
   if (asks.length) {
@@ -307,6 +348,9 @@ export function buildView(input: ViewInput): View {
     if (head.reason === "circles") {
       return { ...common, state: "stuck", heading, subline: `${capitalize(failedKind)} failed ${head.subtask.gateFailures} times.${more}`, rowLabel: heading, nudge: stuckNudge };
     }
+    if (head.reason === "blocked") {
+      return { ...common, state: "stuck", heading, subline: `${blockedLine(head.subtask)}.${more}`, rowLabel: heading, nudge: stuckNudge };
+    }
     const others = classified.filter((c) => c.kind === "work" && c.lastReport !== null).map((c) => now - c.lastReport!);
     const othersLine = others.length ? ` Everyone else reported in the last ${longAge(Math.max(...others))}.` : "";
     return { ...common, state: "stuck", heading, subline: `No report from ${stuckId} for ${quiet}.${stuck.length > 1 ? more : othersLine}`, rowLabel: heading, nudge: stuckNudge };
@@ -321,5 +365,5 @@ export function buildView(input: ViewInput): View {
 
 /** What a «sent» marker sticks to: a new question, decision or ledger line under the same key is a new ask. */
 export function askIdentity(ask: Ask): string {
-  return [ask.key, ask.kind, ask.since ?? "", ask.title ?? "", ask.text].join("\u0000");
+  return [ask.key, ask.kind, ask.since ?? "", ask.replyTitle ?? "", ask.text].join("\u0000");
 }

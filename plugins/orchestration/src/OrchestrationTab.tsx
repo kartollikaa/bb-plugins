@@ -1,16 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { experimental_useRpcMutation, Markdown, UrlLink, useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
+import { experimental_useRpcMutation, Markdown, ThreadTitle, UrlLink, useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { contract } from "./contract.ts";
 import { createReplyTracker, replyKey, replyStatus, type ReplyState } from "./reply.ts";
-import { askIdentity, type Ask, type Row, type RowKind, type View } from "./view.ts";
+import { askIdentity, type Ask, type RecapLine, type Row, type RowKind, type View } from "./view.ts";
 import { useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 import { localStore } from "./storage.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 
 const replies = createReplyTracker(localStore());
-const replyKeyOf = (ask: Ask) => replyKey(ask.title ?? "", ask.replies.map((r) => r.label));
+const replyKeyOf = (ask: Ask) => replyKey(ask.replyTitle ?? "", ask.replies.map((r) => r.label));
 
 /** Puts text into the orchestrator's composer and focuses it; never sends. Keeps a draft the owner already started. */
 function fillComposer(composers: readonly PluginComposerApi[], threadId: string, text: string): boolean {
@@ -236,11 +236,10 @@ function History({ view }: { view: View }) {
   return (
     <section className="border-t border-border pt-3">
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-xs text-subtle-foreground hover:text-foreground">
-        {open ? "Hide" : "Goal and history"}
+        {open ? "Hide history" : "History"}
       </button>
       <Reveal open={open}>
         <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 pt-2.5 text-xs">
-          {view.goal && <><dt className="text-subtle-foreground">Goal</dt><dd className="m-0 [overflow-wrap:anywhere]">{view.goal}</dd></>}
           <dt className="text-subtle-foreground">Sessions</dt><dd className="m-0">{history.sessions}</dd>
           {history.handover && <><dt className="text-subtle-foreground">Handover</dt><dd className="m-0 [overflow-wrap:anywhere]">{history.handover}</dd></>}
           <dt className="text-subtle-foreground">Ledger</dt><dd className="m-0 [overflow-wrap:anywhere]">{history.ledger.replace(/^\/(Users|home)\/[^/]+/, "~")}</dd>
@@ -253,6 +252,40 @@ function History({ view }: { view: View }) {
         </dl>
       </Reveal>
     </section>
+  );
+}
+
+function RecapRow({ label, line }: { label: string; line: RecapLine }) {
+  return (
+    <div className="flex min-w-0 gap-2">
+      <dt className="w-10 shrink-0 text-subtle-foreground">{label}</dt>
+      <dd className="m-0 min-w-0 flex-1 [overflow-wrap:anywhere]">
+        {line.text}
+        {line.age && <span className="ml-1.5 whitespace-nowrap tabular-nums text-subtle-foreground">{line.age === "now" ? "just now" : `${line.age} ago`}</span>}
+      </dd>
+    </div>
+  );
+}
+
+/** Which orchestration this is and where it stands, so the status below reads in context. */
+function Recap({ view, threadId, withTitle }: { view: View; threadId: string; withTitle: boolean }) {
+  const { goal, now, last } = view.recap;
+  if (!withTitle && !goal && !now && !last) return null;
+  return (
+    <header className="flex flex-col gap-2 border-b border-border pb-4">
+      {withTitle && (
+        <h1 className="m-0 min-w-0 text-lg font-semibold leading-[1.3] tracking-[-0.015em] [overflow-wrap:anywhere] [text-wrap:balance]">
+          <ThreadTitle threadId={threadId} />
+        </h1>
+      )}
+      {goal && <p className="m-0 text-muted-foreground [overflow-wrap:anywhere] [text-wrap:pretty]">{goal}</p>}
+      {(now || last) && (
+        <dl className="m-0 flex flex-col gap-1 text-xs leading-[1.45]">
+          {now && <RecapRow label="Now" line={now} />}
+          {last && <RecapRow label="Last" line={last} />}
+        </dl>
+      )}
+    </header>
   );
 }
 
@@ -320,6 +353,8 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   const askThread = (ask: Ask) => (ask.key in threadIds ? threadIds[ask.key]! : null);
   return (
     <div className={cx("flex flex-col gap-6 text-sm leading-[1.45] text-foreground", variant === "tab" ? "h-full overflow-y-auto px-4 pb-4 pt-5" : "mx-auto w-full max-w-[680px] px-6 pb-6 pt-6")}>
+      <Recap view={view} threadId={threadId} withTitle={variant === "page"} />
+
       <section>
         <h2 className="m-0 text-base font-semibold leading-[1.35] tracking-[-0.01em] [text-wrap:balance]">{view.heading}</h2>
         <p className="m-0 mt-1 text-muted-foreground [text-wrap:pretty]">{view.subline}</p>
@@ -331,13 +366,6 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
           </div>
         )}
       </section>
-
-      {view.state === "planning" && view.goal && (
-        <section>
-          <div className="px-0.5 pb-1.5 text-xs text-subtle-foreground">Goal</div>
-          <div className="[overflow-wrap:anywhere]">{view.goal}</div>
-        </section>
-      )}
 
       {first && (
         <section className="flex flex-col gap-2">

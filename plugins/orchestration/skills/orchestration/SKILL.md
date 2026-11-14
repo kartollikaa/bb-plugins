@@ -31,12 +31,15 @@ several name the thread, the newest wins.
 
 ## What it shows
 
+- **Recap**, on top: in the view the orchestrator thread's title, then the ledger's goal, its
+  «Current checkpoint» as Now and its newest «Decision journal» row as Last, each with its age.
 - **Needs you:** subtasks at `question`, `ready` or `card`, a pending approval in any subtask's
   thread or the orchestrator's own, and every ask under the ledger's «For the owner» (`note:` lines
   and «Nothing waiting.»-style status lines are not asks).
 - **Stuck:** a `working` or `briefed` subtask that hasn't reported for `QUIET_MS` (a report is the
   end of the thread's latest turn), or `FAILURES_STUCK` failed checks, review, done-when or conflicts
-  stages across its open gates; both constants are in `src/view.ts`. A subtask at `gate` is waiting
+  stages across its open gates; both constants are in `src/view.ts`. A `blocked` subtask is stuck
+  too, with the note after the status word as its cause. A subtask at `gate` is waiting
   on the orchestrator and never counts as quiet. While something needs you, the subline and the
   context-card row still name a stuck agent.
 - **Done:** `landed`, `verified`, `dropped`, or the ledger's status `closed`.
@@ -61,6 +64,8 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
 - note: Store PR get-bb/marketplace#958 waits on a maintainer label
 ```
 
+- An `ask:` whose title starts with a subtask id (`ask: T2: Approve the draft`, orchestrate 0.13+)
+  shows as that subtask's card, with its thread as a button; the reply still quotes the full title.
 - `ask:` is the card's title: what the owner is asked to do or decide. The other fields are
   optional, separated by ` | `, in any order: `why:` (one line of context), `link:` (URLs or
   `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
@@ -68,7 +73,7 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
   `Re «<title>»: `.
 - `note:`, and a status line that opens with «Nothing», «Nothing waiting», «Nothing pending» or
   «Nothing waits on the owner» followed by a full stop or the end, is information, not an ask: it
-  shows under Goal and history and never counts as needs you. «Nothing lands until you approve…» is
+  shows under History and never counts as needs you. «Nothing lands until you approve…» is
   still an ask; when in doubt, write `note:` or `ask:`.
 - A ` | ` segment without one of the keys above stays with the field before it, so a title or a
   `why:` may contain ` | `.

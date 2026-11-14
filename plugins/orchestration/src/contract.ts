@@ -28,6 +28,9 @@ export const ledgerSummarySchema = z.object({
   orchestratorSessions: z.number().int(),
   lastHandover: z.object({ why: z.string().nullable(), at: z.string().nullable() }).nullable(),
   warnings: z.array(z.string()),
+  /** «Current checkpoint» and the newest «Decision journal» row: what the recap says is happening now. */
+  checkpoint: z.object({ text: z.string(), at: z.string().nullable() }).nullable(),
+  lastDecision: z.object({ text: z.string(), at: z.string().nullable() }).nullable(),
 });
 export type LedgerSummary = z.infer<typeof ledgerSummarySchema>;
 

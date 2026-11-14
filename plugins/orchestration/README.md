@@ -19,8 +19,10 @@ question: does anything need you, and is the team moving?
   the plugin setting `orchestrationView` (on by default), so the switch and Settings → Plugins are
   one value. Full chat stays a per-thread choice.
 - **Orchestration tab.** The same content as a fixed side-panel tab, shown only on a thread that a ledger's first line
-  (`Orchestrator: thr_…`) names. On top: one status sentence. Below it: a card per thing that waits
-  on you, then the team with one row per subtask, then a fold with the goal and history.
+  (`Orchestrator: thr_…`) names. On top: a recap (in the view, the orchestrator thread's title
+  first), the goal, the ledger's current checkpoint as Now and its latest journal decision as Last.
+  Then one status sentence, a card per thing that waits on you, the team with one row per subtask,
+  and a History fold.
 - **Context-card row.** The same status sentence in the thread's context card. A click opens the view.
 - **Quick replies send.** A click on an ask's option (Merge it, Not now) sends
   `Re «<title>»: <option>` to the orchestrator at once, as you asked: «when I click on the button
@@ -55,8 +57,8 @@ same title bar.
   any subtask's thread or the orchestrator's own, and each ask under the ledger's «For the owner»
   (notes there are not asks; see the format below).
 - **Stuck:** a `working` or `briefed` subtask that hasn't reported for too long, or one whose
-  checks, review, done-when or conflict stages keep failing. A report is the end of the thread's
-  latest turn. Both limits are the owner's and live in `src/view.ts` (`QUIET_MS`, `FAILURES_STUCK`).
+  checks, review, done-when or conflict stages keep failing, or one at `blocked` (orchestrate
+  0.13+), which shows its cause. A report is the end of the thread's latest turn. Both limits are the owner's and live in `src/view.ts` (`QUIET_MS`, `FAILURES_STUCK`).
   A stuck agent is named even while something else needs you.
 - **Done:** `landed`, `verified` or `dropped`.
 
@@ -69,6 +71,8 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
 - note: Store PR get-bb/marketplace#958 waits on a maintainer label
 ```
 
+- An `ask:` whose title starts with a subtask id (`ask: T2: Approve the draft`, orchestrate 0.13+)
+  shows as that subtask's card, with its thread as a button; the reply still quotes the full title.
 - `ask:` is the card's title: what the owner is asked to do or decide. The other fields are
   optional, separated by ` | `, in any order: `why:` (one line of context), `link:` (URLs or
   `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
@@ -76,7 +80,7 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
   `Re «<title>»: `.
 - `note:`, and a status line that opens with «Nothing», «Nothing waiting», «Nothing pending» or
   «Nothing waits on the owner» followed by a full stop or the end, is information, not an ask: it
-  shows under Goal and history and never counts as needs you. «Nothing lands until you approve…» is
+  shows under History and never counts as needs you. «Nothing lands until you approve…» is
   still an ask; when in doubt, write `note:` or `ask:`.
 - A ` | ` segment without one of the keys above stays with the field before it, so a title or a
   `why:` may contain ` | `.

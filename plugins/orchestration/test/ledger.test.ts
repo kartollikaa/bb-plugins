@@ -20,6 +20,8 @@ test("summarizes the export sample", () => {
   assert.deepEqual(summary.forTheOwner, ["Confirm the release window for T1"]);
   assert.equal(summary.orchestratorSessions, 1);
   assert.deepEqual(summary.warnings, []);
+  assert.deepEqual(summary.checkpoint, { text: "G1 waits on review of 9f1c2ab, since 2026-11-14T10:40+03:00.", at: "2026-11-14T10:40+03:00" });
+  assert.deepEqual(summary.lastDecision, { text: "Review by R1", at: "2026-11-14T10:41:07Z" });
   const [t1, t2] = summary.subtasks;
   assert.equal(t1!.status, "gate");
   assert.equal(t1!.gateLine, "Checks passed · review running");
@@ -74,4 +76,9 @@ test("orchestrator handovers count sessions and give the last reason", () => {
   const summary = summarizeExport(data, "/x.md");
   assert.equal(summary.orchestratorSessions, 3);
   assert.deepEqual(summary.lastHandover, { why: "session budget", at: null });
+});
+
+test("reads blocked, the status orchestrate 0.13 added", () => {
+  const data = { ...fixture, subtasks: [{ ...fixture.subtasks[0], status: { value: null, raw: "blocked — no registry access" } }] };
+  assert.equal(summarizeExport(data, "/x.md").subtasks[0]!.status, "blocked");
 });

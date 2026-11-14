@@ -13,7 +13,7 @@ function subtask(id: string, status: string, extra: Partial<Subtask> = {}): Subt
   };
 }
 function ledger(subtasks: Subtask[], extra: Partial<LedgerSummary> = {}): LedgerSummary {
-  return { path: "/l.md", goal: "Goal", status: "active", subtasks, forTheOwner: [], orchestratorSessions: 1, lastHandover: null, warnings: [], ...extra };
+  return { path: "/l.md", goal: "Goal", status: "active", subtasks, forTheOwner: [], orchestratorSessions: 1, lastHandover: null, warnings: [], checkpoint: null, lastDecision: null, ...extra };
 }
 function live(minutesAgo: number, extra: Partial<LiveThread> = {}): LiveThread {
   return { status: "idle", hasPendingInteraction: false, latestAttentionAt: NOW - minutesAgo * MIN, createdAt: NOW - 600 * MIN, ...extra };
@@ -217,4 +217,41 @@ test("a free «For the owner» line keeps its full text and gets its links and t
   assert.deepEqual(ask.links.map((l) => l.label), ["bb-plugins#12"]);
   assert.deepEqual(ask.threads, ["thr_q1"]);
   assert.deepEqual(ask.replies, []);
+});
+
+test("a blocked subtask is stuck with its cause, and the nudge asks what unblocks it", () => {
+  const v = view([subtask("T2", "blocked", { statusRaw: "blocked — no access to the registry" }), subtask("T3", "working")], { thr_t2: live(5), thr_t3: live(2) });
+  assert.equal(v.state, "stuck");
+  assert.equal(v.heading, "Nothing needs you, but T2 is blocked");
+  assert.equal(v.subline, "Blocked: no access to the registry.");
+  assert.equal(v.active[0]!.step, "Blocked: no access to the registry");
+  assert.equal(v.nudge!.draft, "What is T2 blocked on, and what would unblock it?");
+  assert.equal(view([subtask("T2", "blocked")], {}).active[0]!.step, "Blocked");
+});
+
+test("a subtask going in circles outranks a blocked one", () => {
+  const v = view([subtask("T2", "blocked"), subtask("T3", "gate", { gateFailures: 3, lastFailedKind: "review" })], {});
+  assert.equal(v.heading, "Nothing needs you, but T3 is going in circles");
+});
+
+test("an owner line that names a subtask first is that subtask's ask, with its thread", () => {
+  const v = view([subtask("T2", "delivered")], {}, {}, { forTheOwner: ["ask: T2: Approve the draft | options: Approve / Rework", "ask: X9: Not a subtask"] });
+  const [named, other] = v.asks;
+  assert.equal(named!.who, "T2 · T2 name");
+  assert.equal(named!.subtask, "T2");
+  assert.equal(named!.title, "Approve the draft");
+  assert.equal(named!.replyTitle, "T2: Approve the draft");
+  assert.equal(named!.replies[0]!.draft, "Re «T2: Approve the draft»: Approve");
+  assert.deepEqual(named!.threads, ["thr_t2"]);
+  assert.equal(other!.who, "For you, from the ledger");
+  assert.equal(other!.title, "X9: Not a subtask");
+});
+
+test("the recap carries the goal, the checkpoint and the latest decision with their ages", () => {
+  const v = view([subtask("T1", "working")], {}, {}, {
+    checkpoint: { text: "G1 waits on review of 9f1c2ab.\nmore", at: new Date(NOW - 40 * MIN).toISOString() },
+    lastDecision: { text: "Review by R1", at: null },
+  });
+  assert.deepEqual(v.recap, { goal: "Goal", now: { text: "G1 waits on review of 9f1c2ab.", age: "40m" }, last: { text: "Review by R1", age: "" } });
+  assert.deepEqual(view([], {}).recap, { goal: "Goal", now: null, last: null });
 });
