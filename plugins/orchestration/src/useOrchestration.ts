@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { experimental_useRpcKeyedQuery, experimental_useRpcQuery, experimental_useSidebarThreads } from "@get-bb/plugin-sdk/app";
-import { mergeAnswers } from "./answered.ts";
+import { combineAnswers } from "./answered.ts";
 import { contract } from "./contract.ts";
 import { createReplyTracker } from "./reply.ts";
 import { localStore } from "./storage.ts";
@@ -87,7 +87,7 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
     }
     if (data.state === "none") return { kind: "none" };
     if (data.state === "error") return { kind: "error", message: data.message, retry: () => void query.refetch() };
-    const answered = mergeAnswers(data.answered, replies.answers(threadId));
+    const answered = combineAnswers(data.answered, replies.answers(threadId), data.askFirstSeen);
     const view = buildView({ ledger: data.ledger, agents: data.agents, live, orchestratorThreadId: threadId, now: Math.max(now, data.readAt), answered });
     return { kind: "ready", view, threadIds: view.threadIds };
   }, [query.data, query.error, query.refetch, live, threadId, now, repliesVersion]);

@@ -221,6 +221,8 @@ test("an answered ledger ask stops needing you at once and waits on the orchestr
   const done = at({ [title]: { answer: "keep both", at: NOW - MIN } });
   assert.deepEqual(done.asks, []);
   assert.equal(done.state, "done");
+  assert.match(done.subline, /1 answer waits on the orchestrator\.$/);
+  assert.doesNotMatch(open.subline, /waits on the orchestrator/);
   assert.deepEqual(done.answered.map((a) => [a.title, a.answered]), [[title, { answer: "keep both", at: NOW - MIN }]]);
   assert.equal(at({ "Another ask": { answer: "x", at: NOW } }).asks.length, 1, "an answer to another title changes nothing");
 });

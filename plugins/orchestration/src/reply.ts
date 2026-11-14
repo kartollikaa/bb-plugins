@@ -155,7 +155,6 @@ export function createReplyTracker(
       for (const ask of m.keys()) if (!live.has(ask)) changed = m.delete(ask) || changed;
       if (changed) emit();
     },
-    /** Ask title → the quick reply sent from this client, before the orchestrator chat shows it. */
     answers(threadId: string): Record<string, Answer> {
       const found: Record<string, Answer> = {};
       for (const [ask, entry] of states.get(threadId) ?? []) {

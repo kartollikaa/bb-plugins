@@ -108,6 +108,7 @@ function AnsweredCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; 
       <div className="flex flex-wrap items-center gap-1.5">
         <span role="status" className="text-xs text-muted-foreground">{answeredStatus(ask.answered!, Date.now())}</span>
         {ask.drafts && <Button variant="quiet" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.primary)}>Other answer</Button>}
+        {ask.links.map((l) => <UrlLink key={l.href} href={l.href} title={l.title} className={linkButton}>Open {l.label}</UrlLink>)}
         {threads.map((t) => <Button key={t} variant="quiet" onClick={() => actions.openThread(t)}>{threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
       </div>
     </div>

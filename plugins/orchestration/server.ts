@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { contract, type Agent, type LedgerSummary, type Snapshot } from "./src/contract.ts";
-import { answeredAsks, sameFirstSeen, trackFirstSeen, type Answer, type OwnerMessage } from "./src/answered.ts";
+import { answeredAsks, askFirstSeen, collectOwnerMessages, observe, sameLines, type Answer, type Observation, type OwnerMessage } from "./src/answered.ts";
 import { summarizeExport } from "./src/ledger.ts";
 import { exportScriptCandidates, ledgerFor, scanLedgers, type LedgerFile } from "./src/locate.ts";
 import { quickReplies, REPLY_MODE, replySender, toDelivery } from "./src/reply.ts";
@@ -16,7 +16,10 @@ const AGENT_TTL_MS = 15_000;
 const FINISHED_AGENT_TTL_MS = 10 * 60_000;
 const OUTPUT_LIMIT = 1_200;
 const REPLY_DEDUPE_MS = 5_000;
-const OWNER_MESSAGES = 40;
+const OWNER_MESSAGES = 20;
+const EVENT_PAGE = 100;
+const EVENT_PAGES = 5;
+const OBSERVATION_SAVE_MS = 60_000;
 const FINISHED_STATUSES = new Set(["landed", "verified", "dropped"]);
 const LIVE_STATUSES = new Set(["working", "briefed", "question", "delivered", "gate", "ready", "card"]);
 
@@ -120,36 +123,37 @@ export default async function plugin(bb: BbPluginApi) {
     return agent;
   }
 
-  const firstSeen = new Map<string, Record<string, number> | null>();
-  async function ownerLinesFirstSeen(path: string, lines: string[]): Promise<Record<string, number>> {
-    const key = `firstSeen:${path}`;
-    if (!firstSeen.has(path)) firstSeen.set(path, (await bb.storage.kv.get<Record<string, number>>(key).catch(() => undefined)) ?? null);
-    const previous = firstSeen.get(path) ?? null;
-    const { mtimeMs } = await stat(path);
-    const next = trackFirstSeen(previous, lines, Math.floor(mtimeMs));
-    if (!sameFirstSeen(previous, next)) {
-      firstSeen.set(path, next);
-      await bb.storage.kv.set(key, next).catch((error) => bb.log.warn(`can't save first-seen asks: ${String(error)}`));
+  const observations = new Map<string, { observation: Observation | null; savedAt: number }>();
+  async function observeOwnerLines(path: string, lines: string[]): Promise<Record<string, number>> {
+    const key = `observed:${path}`;
+    let known = observations.get(path);
+    if (!known) {
+      let saved: Observation | undefined;
+      try {
+        saved = await bb.storage.kv.get<Observation>(key);
+      } catch (error) {
+        bb.log.warn(`can't read «For the owner» observations: ${String(error)}`);
+        return observe(null, lines, Date.now()).firstSeen;
+      }
+      known = { observation: saved ?? null, savedAt: saved?.observedAt ?? 0 };
     }
-    return next;
+    const previous = known.observation;
+    const next = observe(previous, lines, Date.now());
+    const save = !sameLines(previous, next) || next.observedAt - known.savedAt > OBSERVATION_SAVE_MS;
+    observations.set(path, { observation: next, savedAt: save ? next.observedAt : known.savedAt });
+    if (save) await bb.storage.kv.set(key, next).catch((error) => bb.log.warn(`can't save «For the owner» observations: ${String(error)}`));
+    return next.firstSeen;
   }
 
-  async function ownerMessages(threadId: string): Promise<OwnerMessage[]> {
-    const events = await bb.sdk.threads.events.list({ threadId, order: "desc", limit: String(OWNER_MESSAGES), types: ["client/turn/requested"] }).catch(() => []);
-    return events.flatMap((event) => {
-      const data = obj(obj(event).data);
-      if (data.initiator !== "user") return [];
-      const text = (Array.isArray(data.input) ? data.input : []).map((part) => str(obj(part).text) ?? "").join("\n");
-      const at = num(obj(event).createdAt);
-      return text && at !== null ? [{ text, at }] : [];
-    });
-  }
+  const ownerMessages = (threadId: string) => collectOwnerMessages(
+    (beforeSeq) => bb.sdk.threads.events.list({ threadId, order: "desc", limit: String(EVENT_PAGE), types: ["client/turn/requested"], beforeSeq }),
+    { want: OWNER_MESSAGES, pageSize: EVENT_PAGE, pages: EVENT_PAGES },
+  );
 
-  async function answersFor(threadId: string, ledger: LedgerSummary): Promise<Record<string, Answer>> {
-    const lines = ledger.forTheOwner;
-    const seen = await ownerLinesFirstSeen(ledger.path, lines);
-    if (!lines.some((line) => /^\s*ask:/i.test(line))) return {};
-    return answeredAsks(lines, seen, await ownerMessages(threadId));
+  async function answersFor(threadId: string, ledger: LedgerSummary): Promise<{ answered: Record<string, Answer>; askFirstSeen: Record<string, number> }> {
+    const since = askFirstSeen(ledger.forTheOwner, await observeOwnerLines(ledger.path, ledger.forTheOwner));
+    if (Object.keys(since).length === 0) return { answered: {}, askFirstSeen: since };
+    return { answered: answeredAsks(since, await ownerMessages(threadId)), askFirstSeen: since };
   }
 
   async function snapshot(threadId: string): Promise<Snapshot> {
@@ -162,16 +166,18 @@ export default async function plugin(bb: BbPluginApi) {
       return { state: "error", message: error instanceof Error ? error.message : String(error) };
     }
     const agents: Record<string, Agent> = {};
-    await Promise.all(summary.subtasks.map(async (subtask) => {
-      if (!subtask.threadId) return;
-      const live = LIVE_STATUSES.has(subtask.status ?? "");
-      agents[subtask.threadId] = await readAgent(subtask.threadId, live, FINISHED_STATUSES.has(subtask.status ?? ""));
-    }));
-    const answered = await answersFor(threadId, summary).catch((error) => {
-      bb.log.warn(`can't read the owner's answers: ${String(error)}`);
-      return {};
-    });
-    return { state: "ledger", ledger: summary, agents, answered, readAt: Date.now() };
+    const [answers] = await Promise.all([
+      answersFor(threadId, summary).catch((error) => {
+        bb.log.warn(`can't read the owner's answers: ${String(error)}`);
+        return { answered: {}, askFirstSeen: {} };
+      }),
+      ...summary.subtasks.map(async (subtask) => {
+        if (!subtask.threadId) return;
+        const live = LIVE_STATUSES.has(subtask.status ?? "");
+        agents[subtask.threadId] = await readAgent(subtask.threadId, live, FINISHED_STATUSES.has(subtask.status ?? ""));
+      }),
+    ]);
+    return { state: "ledger", ledger: summary, agents, ...answers, readAt: Date.now() };
   }
 
   const sendReply = replySender(async (threadId, text) => {

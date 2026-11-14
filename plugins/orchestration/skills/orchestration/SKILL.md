@@ -62,13 +62,15 @@ change: «when I click on the button on the suggestion it just puts the text in 
 that it should send the message by itself».
 
 An answered `ask:` stops needing the owner at once: after a quick reply is sent from the card, or
-once the orchestrator thread has a user message `Re «<title>»: <non-empty answer>` sent after that
-ask line first appeared (the server keeps first-seen times per ledger in plugin storage), the ask
+once the orchestrator thread has a user message line `Re «<title>»: <non-empty answer>` (one message
+may answer several asks, one line each) sent after that ask line appeared — dated from the server's
+last read of the ledger without it, kept per ledger in plugin storage; the browser's remembered
+quick replies obey the same date — the ask
 leaves «needs you», the heading and the context-card dot, and shows as a quiet card «Answered
 «answer» <age> ago · waiting for the orchestrator» with Other answer. It stays that way until the
 line changes or leaves «For the owner». So on an answer, drop the ask line or replace it with a
-`note:`; for a re-ask, reword the line (e.g. «Merge PR #12 (again)?») — an identical line keeps
-reading as answered. Answer, Other answer, Release and Not yet only put a draft
+`note:`; for a re-ask, reword the line (e.g. «Merge PR #12 (again)?»): an identical line re-added
+between two reads keeps reading as answered. A done view's subline counts such pending answers. Answer, Other answer, Release and Not yet only put a draft
 into the orchestrator's composer and focus it, wherever the composer currently is (rail, sheet or
 dock); they never send. Keep ledger statuses and «For the owner» current: the tab reads nothing else.
 

@@ -56,7 +56,6 @@ export interface Ask {
   /** question → Answer; decision → Release / Not yet; owner → a «For the owner» line; thread → the answer lives in a thread, not in a message. */
   kind: "question" | "decision" | "owner" | "thread";
   drafts: { primary: string; secondary?: string } | null;
-  /** The owner's reply to this ledger ask, while the orchestrator hasn't rewritten the line yet. */
   answered: Answer | null;
 }
 
@@ -92,7 +91,6 @@ export interface ViewInput {
   live: Record<string, LiveThread>;
   orchestratorThreadId: string;
   now: number;
-  /** Ask title → the owner's reply, from the orchestrator chat and from this client's quick replies. */
   answered?: Record<string, Answer>;
 }
 
@@ -408,13 +406,14 @@ export function buildView(input: ViewInput): View {
     return { ...common, state: "needs", heading, subline, rowLabel: heading, nudge: null };
   }
 
+  const pending = answered.length ? ` ${plural(answered.length, "answer waits", "answers wait")} on the orchestrator.` : "";
   if (ledger.status === "closed" || (doneCount === total && active.length === 0)) {
     const heading = doneCount === total ? (total === 1 ? "The only subtask is done" : `All ${total} subtasks are done`) : "The orchestration is closed";
     return {
       ...common,
       state: "done",
       heading,
-      subline: ledger.status === "closed" ? (doneCount === total ? "The ledger is closed." : `The ledger is closed · ${progress}`) : "The orchestrator is wrapping up.",
+      subline: (ledger.status === "closed" ? (doneCount === total ? "The ledger is closed." : `The ledger is closed · ${progress}`) : "The orchestrator is wrapping up.") + pending,
       rowLabel: heading,
       nudge: null,
     };

@@ -39,10 +39,13 @@ question: does anything need you, and is the team moving?
 - **An answered ask stops waiting on you at once.** Once a quick reply is sent, or a
   `Re «<title>»: <answer>` from you shows in the orchestrator chat after that ask line appeared,
   the ask leaves «needs you» and shows as a quiet card, «Answered «answer» 2m ago · waiting for the
-  orchestrator», with Other answer, until the orchestrator rewrites or removes the line. Owner, on the
-  change: «The dialog keep showing even when i answered». The server keeps when it first saw each
-  ask line in plugin storage, so an old answer doesn't close a re-asked line; an identical line
-  re-added after an answer still reads as answered, so a re-ask should be reworded.
+  orchestrator», with Other answer and its links, until the orchestrator rewrites or removes the
+  line. Owner, on the change: «The dialog keep showing even when i answered». One message may answer
+  several asks, one `Re «…»:` line each. The server dates each ask line from the last time it read
+  the ledger without it (kept in plugin storage), so an answer from before a re-ask doesn't close it,
+  the server's or one this browser remembers. A line re-added between two reads can still look
+  answered; reword a re-ask. When all subtasks are done, the subline counts answers still waiting
+  on the orchestrator.
 
 ## Why this layout
 
