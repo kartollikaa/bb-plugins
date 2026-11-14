@@ -3,18 +3,11 @@ import { z } from "zod";
 
 export const GIT_PLUGIN_ID = "bb--git";
 
-const sideSchema = z.object({
-  insertions: z.number(),
-  deletions: z.number(),
-  lineStatsComplete: z.boolean(),
-  fileCount: z.number(),
-  files: z.array(z.object({ path: z.string() })),
-});
-type Side = z.infer<typeof sideSchema>;
-
 const rowSchema = z.object({
   outcome: z.literal("available"),
-  workspace: z.object({ workingTree: sideSchema, mergeBase: sideSchema.nullable().optional() }),
+  workspace: z.object({
+    allChanges: z.object({ insertions: z.number(), deletions: z.number(), lineStatsComplete: z.boolean(), fileCount: z.number() }),
+  }),
 });
 
 export interface DiffStat {
@@ -24,25 +17,12 @@ export interface DiffStat {
   linesComplete: boolean;
 }
 
-function fileCount(sides: readonly Side[]): number {
-  if (sides.some((side) => side.files.length < side.fileCount)) return sides.reduce((sum, side) => sum + side.fileCount, 0);
-  return new Set(sides.flatMap((side) => side.files.map((file) => file.path))).size;
-}
-
-/** The branch's commits since its merge base plus uncommitted work; null when there is no diff or no readable row. */
+/** The net diff from the merge base to the worktree, commits and uncommitted work together; null when there is none. */
 export function diffStatOf(row: unknown): DiffStat | null {
   const parsed = rowSchema.safeParse(row);
   if (!parsed.success) return null;
-  const { workingTree, mergeBase } = parsed.data.workspace;
-  const sides = mergeBase ? [workingTree, mergeBase] : [workingTree];
-  const files = fileCount(sides);
-  if (files === 0) return null;
-  return {
-    insertions: sides.reduce((sum, side) => sum + side.insertions, 0),
-    deletions: sides.reduce((sum, side) => sum + side.deletions, 0),
-    files,
-    linesComplete: sides.every((side) => side.lineStatsComplete),
-  };
+  const { insertions, deletions, lineStatsComplete, fileCount } = parsed.data.workspace.allChanges;
+  return fileCount === 0 ? null : { insertions, deletions, files: fileCount, linesComplete: lineStatsComplete };
 }
 
 export function formatDiffStat(stat: DiffStat): string {

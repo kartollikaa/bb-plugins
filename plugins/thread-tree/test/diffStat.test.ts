@@ -2,32 +2,26 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { diffStatEnvironmentOf, diffStatOf, formatDiffStat, type DiffStatThread } from "../src/diffStat.ts";
 
-const files = (...paths: string[]) => paths.map((path) => ({ path, status: "M", insertions: 1, deletions: 0 }));
-const side = (insertions: number, deletions: number, paths: string[], extra: Record<string, unknown> = {}) => ({
-  insertions, deletions, lineStatsComplete: true, fileCount: paths.length, files: files(...paths), ...extra,
-});
-const row = (workingTree: unknown, mergeBase: unknown) => ({ outcome: "available", workspace: { workingTree, mergeBase } });
+const all = (insertions: number, deletions: number, fileCount: number, lineStatsComplete = true) => ({ insertions, deletions, fileCount, lineStatsComplete });
+const side = (insertions: number, deletions: number, fileCount: number) => ({ insertions, deletions, lineStatsComplete: true, fileCount, files: [] });
+const row = (allChanges: unknown, extra: Record<string, unknown> = {}) => ({ outcome: "available", workspace: { workingTree: side(0, 2, 1), mergeBase: side(4, 0, 1), allChanges, ...extra } });
 
-test("a result's diff is its committed branch plus what is still uncommitted, each file counted once", () => {
-  assert.deepEqual(diffStatOf(row(side(5, 1, ["a.ts", "new.ts"]), side(820, 35, ["a.ts", "b.ts", "c.ts"]))), { insertions: 825, deletions: 36, files: 4, linesComplete: true });
-  assert.deepEqual(diffStatOf(row(side(91, 0, ["notes.md"]), null)), { insertions: 91, deletions: 0, files: 1, linesComplete: true }, "no merge base: the working tree alone");
+test("a result's diff is the net change from its merge base to the worktree, not committed plus uncommitted", () => {
+  assert.deepEqual(diffStatOf(row(all(2, 0, 1))), { insertions: 2, deletions: 0, files: 1, linesComplete: true }, "4 lines committed, 2 of them deleted uncommitted");
+  assert.deepEqual(diffStatOf(row(all(825, 36, 4))), { insertions: 825, deletions: 36, files: 4, linesComplete: true });
 });
 
 test("no diff, an unavailable read or a malformed row shows nothing", () => {
-  assert.equal(diffStatOf(row(side(0, 0, []), side(0, 0, []))), null);
+  assert.equal(diffStatOf(row(all(0, 0, 0))), null);
   assert.equal(diffStatOf({ outcome: "unavailable", failure: "offline" }), null);
   assert.equal(diffStatOf({ outcome: "not_applicable" }), null);
   assert.equal(diffStatOf(undefined), null);
-  assert.equal(diffStatOf({ outcome: "available", workspace: { workingTree: { insertions: "x" } } }), null);
-});
-
-test("a file list cut short counts files by the reported totals", () => {
-  const stat = diffStatOf(row(side(1, 0, ["a.ts"], { fileCount: 3 }), side(2, 0, ["a.ts"])));
-  assert.equal(stat?.files, 4);
+  assert.equal(diffStatOf(row({ insertions: "x" })), null);
+  assert.equal(diffStatOf(row(undefined)), null, "a row without allChanges isn't read from its parts");
 });
 
 test("incomplete line stats keep the file count and drop the lines", () => {
-  const stat = diffStatOf(row(side(0, 0, []), side(10, 2, ["a.ts", "b.ts"], { lineStatsComplete: false })))!;
+  const stat = diffStatOf(row(all(10, 2, 2, false)))!;
   assert.equal(stat.linesComplete, false);
   assert.equal(formatDiffStat(stat), "2 files");
   assert.equal(formatDiffStat({ insertions: 825, deletions: 36, files: 4, linesComplete: true }), "+825 −36 · 4 files");

@@ -49,7 +49,7 @@ reason names its orchestration. Clicking an item opens its thread; a PR with no
 thread opens GitHub Folder's PR page, an automation with no run the Automations
 page. A result on a worktree of its own (no thread outside its subtree
 uses it) shows its diff instead of "review the result": "Finished · +825 −36 ·
-4 files", the branch's commits since its merge base plus uncommitted work, read
+4 files", the net change from its merge base to the worktree, commits and uncommitted work together, read
 from bb's Git plugin. A plain checkout or a shared worktree holds other threads'
 work, so it shows no diff. PR items carry the same Merge or Review button as
 the Pull requests section; with the default PR setting neither applies, since
