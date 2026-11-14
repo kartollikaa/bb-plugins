@@ -93,12 +93,10 @@ export interface SearchKeyEvent {
   isComposing: boolean;
   /** Focus is in a text field, where `/` is a character. */
   typing: boolean;
-  /** A modal dialog has the page; the key belongs to it. */
-  modalOpen: boolean;
 }
 
 export function isSearchKey(event: SearchKeyEvent): boolean {
-  return event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !event.defaultPrevented && !event.isComposing && !event.typing && !event.modalOpen;
+  return event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !event.defaultPrevented && !event.isComposing && !event.typing;
 }
 
 export type ClosedView = { filter: StatusFilter } | { search: true };
@@ -154,7 +152,7 @@ export function handleSearchKey(
   const origin = event.composedPath()[0] as { isContentEditable?: boolean; tagName?: string } | undefined;
   const typing = !!origin && (origin.isContentEditable === true || /^(INPUT|TEXTAREA|SELECT)$/.test(origin.tagName ?? ""));
   const { key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing } = event;
-  if (!isSearchKey({ key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing, typing, modalOpen: false })) return false;
+  if (!isSearchKey({ key, metaKey, ctrlKey, altKey, defaultPrevented, isComposing, typing })) return false;
   if (env.modalOpen() || !env.sidebarShown()) return false;
   event.preventDefault();
   env.open();

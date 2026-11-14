@@ -129,7 +129,7 @@ test("a two-line row is taller than a one-line row on every viewport", () => {
 });
 
 const key = (key: string, extra: Partial<Parameters<typeof isSearchKey>[0]> = {}) => ({
-  key, metaKey: false, ctrlKey: false, altKey: false, defaultPrevented: false, isComposing: false, typing: false, modalOpen: false, ...extra,
+  key, metaKey: false, ctrlKey: false, altKey: false, defaultPrevented: false, isComposing: false, typing: false, ...extra,
 });
 
 test("/ opens search only outside text fields, without modifiers, when nothing else took the key", () => {
@@ -141,7 +141,6 @@ test("/ opens search only outside text fields, without modifiers, when nothing e
   assert.equal(isSearchKey(key("/", { defaultPrevented: true })), false);
   assert.equal(isSearchKey(key("/", { isComposing: true })), false);
   assert.equal(isSearchKey(key("?")), false);
-  assert.equal(isSearchKey(key("/", { modalOpen: true })), false);
 });
 
 test("the status summary names the nonzero counts, or says nothing is going on", () => {
@@ -190,6 +189,10 @@ test("the / listener ignores every other key before touching the DOM", async () 
   assert.equal(handleSearchKey(slash.event, env), true);
   assert.deepEqual(queries, ["modal", "sidebar", "open"]);
   assert.deepEqual(slash.calls, ["composedPath", "preventDefault"]);
+  const behindModal = keyEvent("/");
+  const opened: string[] = [];
+  assert.equal(handleSearchKey(behindModal.event, { modalOpen: () => true, sidebarShown: () => true, open: () => opened.push("open") }), false);
+  assert.deepEqual([...behindModal.calls, ...opened], ["composedPath"], "a modal keeps / and search stays shut");
 });
 
 test("only a modal dialog takes / away; a non-modal popover's role=dialog does not", async () => {
