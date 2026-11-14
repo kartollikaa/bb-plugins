@@ -8,6 +8,7 @@ interface ArchiveEntry {
   threadId: string;
   title: string;
   at: number;
+  batch?: number;
 }
 
 export interface ArchiveBatch {
@@ -16,6 +17,8 @@ export interface ArchiveBatch {
 }
 
 export interface ArchiveHistory {
+  /** Archives of these threads, until released, are one undo however far apart they land. */
+  claim(threadIds: readonly string[]): { release(threadIds?: readonly string[]): void };
   record(threadId: string, title: string): void;
   forget(threadId: string): void;
   takeLatestBatch(): ArchiveBatch | null;
@@ -23,6 +26,8 @@ export interface ArchiveHistory {
 
 export function createArchiveHistory(now: () => number = Date.now): ArchiveHistory {
   let entries: ArchiveEntry[] = [];
+  let batches = 0;
+  const claims = new Map<string, number>();
 
   const prune = () => {
     const oldest = now() - ARCHIVE_UNDO_WINDOW_MS;
@@ -30,9 +35,16 @@ export function createArchiveHistory(now: () => number = Date.now): ArchiveHisto
   };
 
   return {
+    claim(threadIds) {
+      const batch = ++batches;
+      threadIds.forEach((id) => claims.set(id, batch));
+      return { release: (ids = threadIds) => ids.forEach((id) => claims.get(id) === batch && claims.delete(id)) };
+    },
     record(threadId, title) {
+      const batch = claims.get(threadId);
+      claims.delete(threadId);
       entries = entries.filter((entry) => entry.threadId !== threadId);
-      entries.push({ threadId, title, at: now() });
+      entries.push({ threadId, title, at: now(), batch });
       prune();
     },
     forget(threadId) {
@@ -42,7 +54,11 @@ export function createArchiveHistory(now: () => number = Date.now): ArchiveHisto
       prune();
       if (entries.length === 0) return null;
       let start = entries.length - 1;
-      while (start > 0 && entries[start]!.at - entries[start - 1]!.at <= ARCHIVE_BATCH_GAP_MS) start -= 1;
+      const together = (earlier: ArchiveEntry, later: ArchiveEntry) =>
+        earlier.batch !== undefined || later.batch !== undefined
+          ? earlier.batch === later.batch
+          : later.at - earlier.at <= ARCHIVE_BATCH_GAP_MS;
+      while (start > 0 && together(entries[start - 1]!, entries[start]!)) start -= 1;
       const batch = entries.slice(start).reverse();
       entries = entries.slice(0, start);
       return { threads: batch.map(({ threadId, title }) => ({ threadId, title })) };

@@ -92,7 +92,8 @@ subthread are done and read, the fold line says "all done" and offers Archive.
 It asks once, then archives the tree leaves first. A thread whose worktree has
 uncommitted or untracked changes, or whose git status can't be read, is skipped
 along with the threads above it, and the toast says how many were skipped.
-Cmd/Ctrl+Z restores the archived ones.
+Hidden subthreads count too, since archiving a parent takes them along. One
+Cmd/Ctrl+Z restores everything that Archive took.
 
 The provider icon sits in a fixed slot before the age, in the provider's brand
 tint (Claude orange, Codex blue-violet), or in the text colour with the
@@ -122,7 +123,7 @@ this one under Settings → Appearance → Sidebar, or run
 
 ## Layout
 
-- `server.ts`: RPC `subagents`, `undoArchive` and `dirtyWorktrees`, the Automations and GitHub Folder proxies, and the `bb thread-tree` command.
+- `server.ts`: RPC `subagents`, `undoArchive`, `dirtyWorktrees` and `archiveThreads`, the Automations and GitHub Folder proxies, and the `bb thread-tree` command.
 - `src/githubFolder.ts`: the slice of the GitHub Folder plugin's view that the GitHub section draws.
 - `src/subagents.ts`: folds a thread's event log into its subagents.
 - `src/tree.ts`: pure tree, grouping and subagent state logic.

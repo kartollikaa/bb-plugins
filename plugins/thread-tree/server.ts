@@ -20,7 +20,7 @@ import { sectionPatchSchema, SETTINGS } from "./src/settings";
 import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/threadPullRequests";
 import { createProjectFolderHistory } from "./src/projectFolders";
 import { createArchiveHistory } from "./src/archiveUndo";
-import { dirtyEnvironmentIds } from "./src/orchestrations";
+import { dirtyEnvironmentIds, holdForHiddenChanges, unlistedDescendantIds } from "./src/orchestrations";
 
 const MAX_THREADS_PER_CALL = 200;
 
@@ -77,6 +77,21 @@ export const rpcContract = defineRpcContract({
     input: z.object({ environmentIds: z.array(z.string().min(1)).min(1).max(200) }).strict(),
     output: z.object({ dirty: z.array(z.string()) }),
   },
+  /**
+   * Archives `threadIds` in order (leaves first) as one undo, holding back any thread with a hidden
+   * subthread whose worktree has changes. Stops at the first failure.
+   */
+  archiveThreads: {
+    input: z.object({ threadIds: z.array(z.string().min(1)).min(1).max(1000) }).strict(),
+    output: z.object({
+      archived: z.number(),
+      /** Listed threads kept because a hidden thread below them has changes. */
+      held: z.array(z.string()),
+      /** Hidden threads with changes. */
+      skipped: z.number(),
+      error: z.string().optional(),
+    }),
+  },
   /** Shows or hides sidebar sections from the sidebar itself. */
   setSections: {
     input: sectionPatchSchema,
@@ -119,6 +134,32 @@ export default async function plugin(bb: BbPluginApi) {
   const readSessionPullRequests = createThreadPullRequestReader((method, input, outputSchema) =>
     bb.sdk.plugins.callRpc({ pluginId: "thread-links", method, input, outputSchema }));
 
+  const inChunks = async <T,>(ids: readonly string[], read: (chunk: string[]) => Promise<T[]>) => {
+    const out: T[] = [];
+    for (let index = 0; index < ids.length; index += MAX_THREADS_PER_CALL) out.push(...await read(ids.slice(index, index + MAX_THREADS_PER_CALL)));
+    return out;
+  };
+  const readDirtyEnvironments = async (environmentIds: string[]) => {
+    try {
+      const statuses = await bb.sdk.plugins.callRpc({ pluginId: "bb--git", method: "status", input: { keys: environmentIds }, outputSchema: z.record(z.string(), z.unknown()) });
+      return dirtyEnvironmentIds(environmentIds, statuses);
+    } catch (error) {
+      bb.log.warn(`git status for archive failed: ${error instanceof Error ? error.message : String(error)}`);
+      return environmentIds;
+    }
+  };
+  const dirtyThreadIds = async (threadIds: string[]) => {
+    if (threadIds.length === 0) return [];
+    const threads = await inChunks(threadIds, (chunk) => bb.sdk.threads.list({ threadIds: chunk, includeHidden: true, archived: false }));
+    const environmentIds = [...new Set(threads.flatMap((thread) => thread.environmentId ? [thread.environmentId] : []))];
+    const worktrees = (await Promise.all(environmentIds.map(async (environmentId) => {
+      const environment = await bb.sdk.environments.get({ environmentId }).catch(() => null);
+      return environment?.isWorktree === false ? [] : [environmentId];
+    }))).flat();
+    const dirty = new Set(await inChunks(worktrees, readDirtyEnvironments));
+    return threads.filter((thread) => thread.environmentId && dirty.has(thread.environmentId)).map((thread) => thread.id);
+  };
+
   bb.rpc.register(rpcContract, {
     threadPullRequests: async ({ keys }) => Object.fromEntries(await Promise.all(keys.map(async (threadId) =>
       [threadId, await readSessionPullRequests(threadId)],
@@ -138,14 +179,30 @@ export default async function plugin(bb: BbPluginApi) {
       }
       return { restored, failed };
     },
-    dirtyWorktrees: async ({ environmentIds }) => {
-      try {
-        const statuses = await bb.sdk.plugins.callRpc({ pluginId: "bb--git", method: "status", input: { keys: environmentIds }, outputSchema: z.record(z.string(), z.unknown()) });
-        return { dirty: dirtyEnvironmentIds(environmentIds, statuses) };
-      } catch (error) {
-        bb.log.warn(`git status for archive failed: ${error instanceof Error ? error.message : String(error)}`);
-        return { dirty: environmentIds };
+    dirtyWorktrees: async ({ environmentIds }) => ({ dirty: await readDirtyEnvironments(environmentIds) }),
+    archiveThreads: async ({ threadIds }) => {
+      const listed = await inChunks(threadIds, async (chunk) =>
+        (await bb.sdk.threads.experimental_listDescendants({ threadIds: chunk, includeHidden: true })).threads);
+      const descendants = new Map(listed.map((thread) => [thread.threadId, thread.descendantIds]));
+      const dirtyHidden = new Set(await dirtyThreadIds(unlistedDescendantIds(threadIds, descendants)));
+      const plan = holdForHiddenChanges(threadIds, descendants, dirtyHidden);
+      const claimed = [...new Set(plan.archive.flatMap((id) => [id, ...(descendants.get(id) ?? [])]))];
+      const claim = archives.claim(claimed);
+      const done = new Set<string>();
+      let archived = 0;
+      let error: string | undefined;
+      for (const threadId of plan.archive) {
+        try {
+          const result = await bb.sdk.threads.archive({ threadId });
+          [threadId, ...result.archivedThreadIds].forEach((id) => done.add(id));
+          archived += 1;
+        } catch (cause) {
+          error = cause instanceof Error ? cause.message : String(cause);
+          break;
+        }
       }
+      claim.release(claimed.filter((id) => !done.has(id)));
+      return { archived, held: plan.held, skipped: plan.skipped.length, ...(error ? { error } : {}) };
     },
     setSections: async (patch) => {
       await settings.experimental_set(patch);

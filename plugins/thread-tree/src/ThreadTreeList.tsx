@@ -328,7 +328,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       clearTimeout(clear);
     };
   }, [revealed, view.reduceMotion]);
-  const archiveFold = useCallback((root: PluginSidebarThread) => archiveFinishedFold(sdk, rpc, activeForest, root), [sdk, rpc, activeForest]);
+  const archiveFold = useCallback((root: PluginSidebarThread) => archiveFinishedFold(rpc, activeForest, root), [rpc, activeForest]);
 
   if (status === "loading" && threads.length === 0) {
     return <div className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</div>;
@@ -1377,9 +1377,8 @@ function FoldArchiveButton({ count, onArchive }: { count: number; onArchive: () 
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
-/** Archives the tree leaves first, one thread at a time, skipping any worktree with changes and the threads above it. */
+/** Archives the tree leaves first as one undo, skipping any worktree with changes and the threads above it. */
 async function archiveFinishedFold(
-  sdk: ReturnType<typeof useSdk>,
   rpc: ReturnType<typeof useRpc<typeof rpcContract>>,
   forest: Forest<PluginSidebarThread>,
   root: PluginSidebarThread,
@@ -1402,18 +1401,22 @@ async function archiveFinishedFold(
   }
   const dirtyThreads = new Set([...environmentOf].filter(([, environmentId]) => dirty.has(environmentId)).map(([threadId]) => threadId));
   const plan = archivePlan(forest, root.id, dirtyThreads);
-  let archived = 0;
-  for (const threadId of plan.archive) {
+  let result = { archived: 0, held: [] as string[], skipped: 0, error: undefined as string | undefined };
+  if (plan.archive.length > 0) {
     try {
-      await sdk.threads.archive({ threadId });
-      archived += 1;
+      result = { error: undefined, ...await rpc.call("archiveThreads", { threadIds: plan.archive }) };
     } catch (error) {
-      toast.error(`Archived ${plural(archived, "thread")}, then failed`, { description: error instanceof Error ? error.message : String(error) });
-      return;
+      result.error = error instanceof Error ? error.message : String(error);
     }
   }
-  const held = plan.skipped.length + plan.kept.length;
-  const skipped = held > 0 ? `Skipped ${plural(plan.skipped.length, "thread")} with uncommitted changes${plan.kept.length ? ` and ${plural(plan.kept.length, "thread")} above them` : ""}` : null;
+  const { archived } = result;
+  if (result.error) {
+    toast.error(archived ? `Archived ${plural(archived, "thread")}, then failed` : "Archive failed", { description: result.error });
+    return;
+  }
+  const skippedCount = plan.skipped.length + result.skipped;
+  const keptCount = plan.kept.length + result.held.length;
+  const skipped = skippedCount + keptCount > 0 ? `Skipped ${plural(skippedCount, "thread")} with uncommitted changes${keptCount ? ` and ${plural(keptCount, "thread")} above them` : ""}` : null;
   if (archived === 0) toast.warning("Nothing archived", { description: skipped ?? undefined });
   else toast.success(`Archived ${plural(archived, "thread")}`, { description: skipped ?? "⌘Z to undo" });
 }

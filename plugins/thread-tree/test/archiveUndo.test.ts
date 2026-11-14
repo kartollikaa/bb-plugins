@@ -74,6 +74,41 @@ test("re-archiving a thread keeps one entry, at its latest time", () => {
   assert.equal(history.takeLatestBatch(), null);
 });
 
+test("one action's archives stay one undo however slowly they land", () => {
+  const c = clock();
+  const history = createArchiveHistory(c.now);
+  history.record("old", "Old");
+  c.advance(10);
+  history.claim(["leaf", "root"]);
+  history.record("leaf", "Leaf");
+  c.advance(ARCHIVE_BATCH_GAP_MS * 3);
+  history.record("root", "Root");
+  assert.deepEqual(ids(history.takeLatestBatch()), ["root", "leaf"]);
+  assert.deepEqual(ids(history.takeLatestBatch()), ["old"]);
+});
+
+test("a claim covers one archive: the thread archived again later is its own undo", () => {
+  const c = clock();
+  const history = createArchiveHistory(c.now);
+  history.claim(["a", "b"]);
+  history.record("a", "A");
+  history.record("b", "B");
+  c.advance(ARCHIVE_BATCH_GAP_MS * 3);
+  history.record("a", "A");
+  assert.deepEqual(ids(history.takeLatestBatch()), ["a"]);
+  assert.deepEqual(ids(history.takeLatestBatch()), ["b"]);
+});
+
+test("a released claim no longer groups", () => {
+  const c = clock();
+  const history = createArchiveHistory(c.now);
+  history.record("a", "A");
+  c.advance(ARCHIVE_BATCH_GAP_MS * 3);
+  history.claim(["a", "b"]).release();
+  history.record("b", "B");
+  assert.deepEqual(ids(history.takeLatestBatch()), ["b"]);
+});
+
 test("undo key is Cmd+Z or Ctrl+Z, not redo", () => {
   const key = { key: "z", metaKey: false, ctrlKey: false, shiftKey: false, altKey: false };
   assert.equal(isUndoKey({ ...key, ctrlKey: true }), true);

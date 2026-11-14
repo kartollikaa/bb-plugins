@@ -107,6 +107,29 @@ export function archivePlan<T extends TreeThread>(forest: Forest<T>, rootId: str
   return plan;
 }
 
+/** Threads below the listed ones that aren't listed themselves: hidden from the sidebar, so the client couldn't check them. */
+export function unlistedDescendantIds(order: readonly string[], descendants: ReadonlyMap<string, readonly string[]>): string[] {
+  const listed = new Set(order);
+  return [...new Set(order.flatMap((id) => descendants.get(id) ?? []))].filter((id) => !listed.has(id));
+}
+
+/** Archiving a thread takes its hidden subthreads along, so one with changes holds back every listed thread above it. */
+export function holdForHiddenChanges(
+  order: readonly string[],
+  descendants: ReadonlyMap<string, readonly string[]>,
+  dirtyHidden: ReadonlySet<string>,
+): { archive: string[]; held: string[]; skipped: string[] } {
+  const result = { archive: [] as string[], held: [] as string[], skipped: [] as string[] };
+  const skipped = new Set<string>();
+  for (const id of order) {
+    const below = (descendants.get(id) ?? []).filter((kid) => dirtyHidden.has(kid));
+    below.forEach((kid) => skipped.add(kid));
+    (below.length > 0 ? result.held : result.archive).push(id);
+  }
+  result.skipped = [...skipped];
+  return result;
+}
+
 const NOTHING_TO_LOSE = new Set(["path_not_found"]);
 
 /** Environments whose worktree archiving could lose work: uncommitted or untracked changes, or a status that couldn't be read. */

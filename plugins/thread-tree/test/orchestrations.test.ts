@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { buildForest, groupRows, type TreeThread } from "../src/tree.ts";
 import {
   archivePlan,
+  holdForHiddenChanges,
+  unlistedDescendantIds,
   dirtyEnvironmentIds,
   foldBarSegments,
   isFinishedFold,
@@ -121,6 +123,18 @@ test("archiving a finished fold goes leaves first and keeps dirty threads and th
   assert.deepEqual(dirty.skipped, ["a1"]);
   assert.deepEqual(dirty.kept.sort(), ["a", "root"]);
   assert.deepEqual(dirty.archive, ["b1", "b"]);
+});
+
+test("threads below the archive list that the sidebar didn't show are found for a worktree check", () => {
+  const descendants = new Map([["a1", ["h1"]], ["a", ["a1", "h1"]], ["b", []], ["root", ["a", "a1", "h1", "b", "h2"]]]);
+  assert.deepEqual(unlistedDescendantIds(["a1", "a", "b", "root"], descendants).sort(), ["h1", "h2"]);
+});
+
+test("a hidden subthread with changes holds back every listed thread above it", () => {
+  const order = ["a1", "a", "b", "root"];
+  const descendants = new Map([["a1", ["h1"]], ["a", ["a1", "h1"]], ["b", []], ["root", ["a", "a1", "h1", "b"]]]);
+  assert.deepEqual(holdForHiddenChanges(order, descendants, new Set()), { archive: order, held: [], skipped: [] });
+  assert.deepEqual(holdForHiddenChanges(order, descendants, new Set(["h1"])), { archive: ["b"], held: ["a1", "a", "root"], skipped: ["h1"] });
 });
 
 test("a worktree counts as dirty when it has changes or untracked files, or its status can't be read", () => {

@@ -95,7 +95,8 @@ subthread are done and read, the fold line says "all done" and offers Archive.
 It asks once, then archives the tree leaves first. A thread whose worktree has
 uncommitted or untracked changes, or whose git status can't be read, is skipped
 along with the threads above it, and the toast says how many were skipped.
-Cmd/Ctrl+Z restores the archived ones.
+Hidden subthreads count too, since archiving a parent takes them along. One
+Cmd/Ctrl+Z restores everything that Archive took.
 
 The provider icon sits in a fixed slot before the age, in the provider's brand
 tint (Claude orange, Codex blue-violet), or in the text colour with the
