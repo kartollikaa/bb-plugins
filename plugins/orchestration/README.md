@@ -6,7 +6,10 @@ question: does anything need you, and is the team moving?
 
 - **Orchestration view.** Opening an orchestrator's thread lands on a full-page view of its team,
   with the thread's chat in a rail on the right. **Chat** in the title bar folds the rail away;
-  on a narrow page it becomes a drawer that Esc closes. **Full chat** goes back to bb's normal
+  on a narrow page the chat opens as a sheet from the bottom that Esc or a tap above it closes.
+  Whenever the chat is folded, bb's composer stays docked under the view, so a task can be
+  delegated without opening the chat. The composer is never shown twice: it lives in the rail or
+  sheet while that is open, and in the dock otherwise. **Full chat** goes back to bb's normal
   thread view and remembers that choice for the thread; the context-card row there brings the view
   back. The redirect happens only when the thread opens, and never while threads are split side by
   side.
@@ -29,8 +32,11 @@ the chat open in a rail beside it. bb doesn't let a plugin replace or shrink a t
 conversation, so the view is a plugin page (`/plugins/orchestration/orchestrator/<thread>`) that the
 orchestrator's thread redirects to, and it embeds that thread's chat with bb's `ThreadChat`. The
 rail is the plugin's own column, not bb's side panel, so Answer can always open it and focus the
-composer. A bottom sheet was rejected because chat and the team list both need height; bb's own side
-panel was rejected because a plugin can't guarantee to reveal it from Answer.
+composer. bb's own side panel was rejected because a plugin can't guarantee to reveal it from Answer.
+
+On a phone the rail doesn't fit, so the chat folds into a dock that shows only bb's composer. It is
+the same `ThreadChat` as the rail and the sheet, so a draft, its attachments and the model choice
+survive opening and folding the chat. A homemade input was rejected because it would lose them.
 
 bb's thread header only takes plugin actions as outline buttons with a label (no switch, no icon),
 placed after the workspace's Open button and folded into the thread menu at compact width. So the

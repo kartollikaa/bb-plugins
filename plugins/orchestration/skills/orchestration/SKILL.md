@@ -19,8 +19,10 @@ several name the thread, the newest wins.
 - No redirect while threads are split side by side (bb has no plugin slot for a thread's main area,
   so the view would replace the whole split), and none when a thread becomes an orchestrator while
   it is open.
-- **Chat** in the view's title bar shows or hides the rail. On a narrow page the rail is a drawer;
-  Esc closes it. The rail's width can be dragged and is remembered.
+- **Chat** in the view's title bar shows or hides the rail. On a narrow page it opens as a sheet
+  from the bottom; Esc or a tap above it closes it. The rail's width can be dragged and is remembered.
+- While the chat is folded, its composer stays docked under the view (the owner can delegate from
+  there). The composer shows in one place only: the rail or sheet when open, the dock otherwise.
 - The view for a thread no ledger names says so and offers **Open chat**.
 - **Orchestration view** switch, last in the view's title bar: off goes to bb's thread view and
   stops the redirect for all orchestrators. bb's thread header shows an **Orchestration view** button
@@ -39,7 +41,7 @@ several name the thread, the newest wins.
 - **Done:** `landed`, `verified`, `dropped`, or the ledger's status `closed`.
 
 The Answer, Release and Not yet buttons only put a draft into the orchestrator's composer and focus
-it; on the view they open the rail first. They never send. Keep ledger statuses and «For the owner» current: the tab reads nothing else.
+it, wherever the composer currently is (rail, sheet or dock). They never send. Keep ledger statuses and «For the owner» current: the tab reads nothing else.
 
 ## Settings
 
