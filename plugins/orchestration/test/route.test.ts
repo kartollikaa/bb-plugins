@@ -114,3 +114,16 @@ test("the dock is as tall as bb's composer, with a fallback before it is measure
   assert.equal(dockHeight(700, 900), 450);
   assert.equal(dockHeight(117.4, 900), 118);
 });
+
+test("the chat sheet follows a flick, else flips once dragged a quarter of the way", async () => {
+  const { sheetSettles, sheetHeightWhileDragging } = await import("../src/route.ts");
+  assert.equal(sheetSettles({ wasOpen: false, dy: -30, velocity: -0.8, span: 600 }), true, "a quick flick up opens");
+  assert.equal(sheetSettles({ wasOpen: true, dy: 20, velocity: 0.9, span: 600 }), false, "a quick flick down closes");
+  assert.equal(sheetSettles({ wasOpen: false, dy: -100, velocity: -0.1, span: 600 }), false, "a slow short drag snaps back");
+  assert.equal(sheetSettles({ wasOpen: false, dy: -200, velocity: -0.1, span: 600 }), true);
+  assert.equal(sheetSettles({ wasOpen: true, dy: 200, velocity: 0.1, span: 600 }), false);
+  assert.equal(sheetSettles({ wasOpen: true, dy: -200, velocity: -0.1, span: 600 }), true, "dragging an open sheet up keeps it open");
+  assert.equal(sheetHeightWhileDragging(140, -1000, 140, 700), 700);
+  assert.equal(sheetHeightWhileDragging(700, 1000, 140, 700), 140);
+  assert.equal(sheetHeightWhileDragging(140, -60, 140, 700), 200);
+});

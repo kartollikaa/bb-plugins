@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { experimental_useRpcMutation, Markdown, ThreadTitle, UrlLink, useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
+import { experimental_useRpcMutation, experimental_useSidebarThreads, Markdown, UrlLink, useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { contract } from "./contract.ts";
 import { createReplyTracker, replyKey, replyStatus, type ReplyState } from "./reply.ts";
@@ -270,13 +270,12 @@ function RecapRow({ label, line }: { label: string; line: RecapLine }) {
 /** Which orchestration this is and where it stands, so the status below reads in context. */
 function Recap({ view, threadId, withTitle }: { view: View; threadId: string; withTitle: boolean }) {
   const { goal, now, last } = view.recap;
-  if (!withTitle && !goal && !now && !last) return null;
+  const title = experimental_useSidebarThreads().threads.find((t) => t.id === threadId)?.displayTitle ?? null;
+  if (!(withTitle && title) && !goal && !now && !last) return null;
   return (
     <header className="flex flex-col gap-2 border-b border-border pb-4">
-      {withTitle && (
-        <h1 className="m-0 min-w-0 text-lg font-semibold leading-[1.3] tracking-[-0.015em] [overflow-wrap:anywhere] [text-wrap:balance]">
-          <ThreadTitle threadId={threadId} />
-        </h1>
+      {withTitle && title && (
+        <h1 className="m-0 min-w-0 text-lg font-semibold leading-[1.3] tracking-[-0.015em] [overflow-wrap:anywhere] [text-wrap:balance]">{title}</h1>
       )}
       {goal && <p className="m-0 text-muted-foreground [overflow-wrap:anywhere] [text-wrap:pretty]">{goal}</p>}
       {(now || last) && (

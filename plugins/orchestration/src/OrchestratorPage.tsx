@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { ThreadChat, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Button, Message, OrchestrationTab } from "./OrchestrationTab.tsx";
-import { chatPlacement, clampRailWidth, dockHeight, RAIL, railMode, railOpen, threadFromSubPath, type ChatPlacement, type RailChoice, type RailMode } from "./route.ts";
+import { chatPlacement, clampRailWidth, dockHeight, RAIL, railMode, railOpen, SHEET, sheetHeightWhileDragging, sheetSettles, threadFromSubPath, type ChatPlacement, type RailChoice, type RailMode } from "./route.ts";
 import { useOrchestratorMembership } from "./useOrchestration.ts";
 import { useOpenChat, useViewSwitch } from "./surface.ts";
 import { localStore } from "./storage.ts";
@@ -78,6 +78,8 @@ function ViewSwitch({ onOff }: { onOff: () => void }) {
       type="button"
       role="switch"
       aria-checked={on}
+      aria-label="Orchestration view"
+      title="Orchestration view"
       onClick={() => {
         void set(!on);
         if (on) onOff();
@@ -87,7 +89,7 @@ function ViewSwitch({ onOff }: { onOff: () => void }) {
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
       )}
     >
-      Orchestration view
+      <span className="max-sm:hidden">Orchestration view</span>
       <span aria-hidden className={cx("relative h-[14px] w-[24px] rounded-full transition-colors duration-150 ease-out motion-reduce:transition-none", on ? "bg-primary" : "bg-border")}>
         <span className={cx("absolute left-[2px] top-[2px] size-[10px] rounded-full bg-background transition-transform duration-150 ease-out motion-reduce:transition-none", on && "translate-x-[10px]")} />
       </span>
@@ -106,6 +108,7 @@ export function OrchestratorHeader({ subPath }: PluginNavPanelProps) {
         type="button"
         aria-pressed={open}
         title={open ? "Hide chat" : "Show chat"}
+        aria-label="Chat"
         onClick={() => rail.set(!open)}
         className={cx(
           "flex h-[26px] items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -114,7 +117,7 @@ export function OrchestratorHeader({ subPath }: PluginNavPanelProps) {
         )}
       >
         <PanelIcon />
-        Chat
+        <span className="max-sm:hidden">Chat</span>
       </button>
       <Button variant="quiet" onClick={() => openChat(threadId)}>Full chat</Button>
       <ViewSwitch onOff={() => openChat(threadId)} />
@@ -215,18 +218,61 @@ function useDockedComposer(ref: RefObject<HTMLElement | null>, docked: boolean) 
   return height;
 }
 
-const GRABBER = 16;
+const GRABBER = 24;
+const TAP_SLOP = 6;
 
-function Grabber({ placement }: { placement: ChatPlacement }) {
+interface SheetDrag {
+  from: number;
+  min: number;
+  max: number;
+  onMove: (height: number | null) => void;
+}
+
+/** Tap toggles the chat; on touch the grabber also drags it up into a sheet and back down. */
+function Grabber({ placement, drag }: { placement: ChatPlacement; drag: SheetDrag }) {
   const expand = placement === "docked";
+  const dragged = useRef(false);
+  const gesture = useRef<{ y: number; t: number; lastY: number; lastT: number; v: number; moved: boolean } | null>(null);
+  const end = (e: ReactPointerEvent<HTMLButtonElement>, cancelled: boolean) => {
+    const g = gesture.current;
+    if (!g) return;
+    gesture.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    drag.onMove(null);
+    if (!g.moved || cancelled) return;
+    rail.set(sheetSettles({ wasOpen: !expand, dy: g.lastY - g.y, velocity: g.v, span: drag.max - drag.min }));
+  };
   return (
     <button
       type="button"
       aria-label={expand ? "Show chat" : "Hide chat"}
       title={expand ? "Show chat" : "Hide chat"}
-      onClick={() => rail.set(expand)}
+      onClick={(e) => {
+        if (!dragged.current) rail.set(expand);
+        dragged.current = false;
+      }}
+      onPointerDown={(e) => {
+        dragged.current = false;
+        if (e.pointerType === "mouse") return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        gesture.current = { y: e.clientY, t: e.timeStamp, lastY: e.clientY, lastT: e.timeStamp, v: 0, moved: false };
+      }}
+      onPointerMove={(e) => {
+        const g = gesture.current;
+        if (!g) return;
+        if (!g.moved && Math.abs(e.clientY - g.y) < TAP_SLOP) return;
+        g.moved = true;
+        dragged.current = true;
+        const dt = e.timeStamp - g.lastT;
+        if (dt > 0) g.v = (e.clientY - g.lastY) / dt;
+        g.lastY = e.clientY;
+        g.lastT = e.timeStamp;
+        drag.onMove(sheetHeightWhileDragging(drag.from, e.clientY - g.y, drag.min, drag.max));
+      }}
+      onPointerUp={(e) => end(e, false)}
+      onPointerCancel={(e) => end(e, true)}
       style={{ height: GRABBER }}
-      className="group flex w-full shrink-0 items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+      className="group flex w-full shrink-0 touch-none items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
     >
       <span aria-hidden className="h-1 w-9 rounded-full bg-border group-hover:bg-muted-foreground" />
     </button>
@@ -236,6 +282,7 @@ function Grabber({ placement }: { placement: ChatPlacement }) {
 function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDockHeight }: { threadId: string; placement: ChatPlacement; pageWidth: number; pageHeight: number; focusRequest: number; onDockHeight: (h: number) => void }) {
   const [saved, setSaved] = useState(readWidth);
   const [dragging, setDragging] = useState<number | null>(null);
+  const [sheetHeight, setSheetHeight] = useState<number | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
   const composer = useDockedComposer(chatRef, placement === "docked");
   const width = clampRailWidth(dragging ?? saved, pageWidth);
@@ -250,10 +297,13 @@ function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDock
       // Width just isn't remembered.
     }
   };
+  const docked = dock + GRABBER;
+  const open = Math.max(docked, (pageHeight || 800) - SHEET.topGap);
   const style =
     placement === "rail" ? { width }
-    : placement === "sheet" ? { height: "calc(100% - 48px)" }
-    : { height: `calc(${dock + GRABBER}px + env(safe-area-inset-bottom))` };
+    : sheetHeight !== null ? { height: sheetHeight }
+    : placement === "sheet" ? { height: `calc(100% - ${SHEET.topGap}px)` }
+    : { height: `calc(${docked}px + env(safe-area-inset-bottom))` };
   return (
     <aside
       aria-label="Orchestrator chat"
@@ -261,14 +311,15 @@ function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDock
       style={style}
       className={cx(
         "flex shrink-0 flex-col overflow-hidden bg-sidebar",
-        dragging === null && "motion-safe:transition-[width,height] motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]",
+        dragging === null && sheetHeight === null && "motion-safe:transition-[width,height] motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]",
         placement === "rail" && "relative h-full border-l border-border",
         placement === "sheet" && "absolute inset-x-0 bottom-0 z-20 rounded-t-xl border-t border-border pb-[env(safe-area-inset-bottom)] shadow-xl",
+        placement === "docked" && sheetHeight !== null && "z-20 rounded-t-xl shadow-xl",
         placement === "docked" && "absolute inset-x-0 bottom-0 z-10 border-t border-border pb-[env(safe-area-inset-bottom)]",
       )}
     >
       {placement === "rail" && <ResizeHandle width={width} onDrag={setDragging} onDone={persist} />}
-      {placement !== "rail" && <Grabber placement={placement} />}
+      {placement !== "rail" && <Grabber placement={placement} drag={{ from: placement === "sheet" ? open : docked, min: docked, max: open, onMove: setSheetHeight }} />}
       <div ref={chatRef} className={cx("flex min-h-0 flex-1 flex-col", placement === "rail" ? "min-w-[340px]" : "mx-auto w-full max-w-[720px]")}>
         <ThreadChat threadId={threadId} variant="compact" layout="contained" focusRequest={focusRequest} className="min-h-0 flex-1" />
       </div>
@@ -310,7 +361,7 @@ function View({ threadId }: { threadId: string }) {
 
   return (
     <div ref={ref} className="relative flex h-full min-h-0 w-full overflow-hidden bg-background">
-      <div inert={placement === "sheet"} style={{ paddingBottom: placement === "docked" ? `calc(${dockSpace}px + env(safe-area-inset-bottom))` : 0 }} className="min-w-0 flex-1 overflow-y-auto">
+      <div inert={placement === "sheet"} style={{ paddingBottom: placement === "docked" ? `calc(${dockSpace}px + env(safe-area-inset-bottom))` : 0 }} className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
         <OrchestrationTab
           key={threadId}
           threadId={threadId}

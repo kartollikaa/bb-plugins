@@ -7,6 +7,8 @@ question: does anything need you, and is the team moving?
 - **Orchestration view.** Opening an orchestrator's thread lands on a full-page view of its team,
   with the thread's chat in a rail on the right. **Chat** in the title bar folds the rail away;
   on a narrow page the chat opens as a sheet from the bottom that Esc or a tap above it closes.
+  On a touch screen the handle above the docked composer drags the sheet up and back down; a
+  flick or a quarter of the way flips it. On a phone the title bar shows Chat and the switch as icons.
   Whenever the chat is folded, bb's composer stays docked under the view, so a task can be
   delegated without opening the chat. The composer is never shown twice: it lives in the rail or
   sheet while that is open, and in the dock otherwise. **Full chat** goes back to bb's normal

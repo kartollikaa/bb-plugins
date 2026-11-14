@@ -96,3 +96,16 @@ export function dockHeight(measured: number | null, pageHeight: number): number 
   const height = measured && Number.isFinite(measured) && measured > 0 ? Math.ceil(measured) : DOCK.fallback;
   return Math.min(height, Math.floor(pageHeight / 2));
 }
+
+export const SHEET = { topGap: 48, flick: 0.5, travel: 0.25 } as const;
+
+/** Where a finger's drag on the chat's grabber leaves it: a flick, or a quarter of the way, flips it. */
+export function sheetSettles({ wasOpen, dy, velocity, span }: { wasOpen: boolean; dy: number; velocity: number; span: number }): boolean {
+  if (Math.abs(velocity) >= SHEET.flick) return velocity < 0;
+  const moved = wasOpen ? dy : -dy;
+  return moved > Math.max(40, span * SHEET.travel) ? !wasOpen : wasOpen;
+}
+
+export function sheetHeightWhileDragging(start: number, dy: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(start - dy)));
+}
