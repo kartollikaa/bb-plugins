@@ -1,21 +1,18 @@
-Keep a todo list beside the work it belongs to, in the sidebar and in
-your agent threads.
+An Orchestration tab for a thread that runs other threads with the orchestrate plugin. It answers
+one question: does anything need you, and is the team moving?
 
 ## What you get
 
-- An **Example todos** page in the left sidebar that adds, completes, and
-  removes todos.
-- A `bb orchestration` command that does the same from a terminal.
-- Live updates, so a change made in one place reaches every open page at once.
+- One status sentence on top: "Nothing needs you", "One decision for you", or "S5 has gone quiet".
+- A card for each thing that waits on you: a subtask's question, a delivery ready to land, a pending
+  approval, a line the ledger keeps for the owner. Answer and Release start a reply in the
+  orchestrator's composer; you send it yourself.
+- The team: one row per subtask with its state and latest step. A row opens to show the model,
+  context use, rotations and the gate.
+- The same sentence as a row in the thread's context card.
 
 ## How it works
 
-The todos live in this plugin's own storage on the BB server, one list per
-installation. Nothing leaves the machine, and the plugin needs no account, API
-key, or external service.
-
-## For agents
-
-The bundled skill tells an agent to read the list with `bb orchestration list`, add
-one todo at a time with `bb orchestration add`, and close finished work with
-`bb orchestration done`.
+The plugin reads the orchestrate ledger through its export script and combines it with bb's live
+thread state. A subtask is stuck after 30 minutes without a report while working, or after a third
+failed gate stage. Everything stays on the machine that runs bb.
