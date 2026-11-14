@@ -14,5 +14,4 @@ one question: does anything need you, and is the team moving?
 ## How it works
 
 The plugin reads the orchestrate ledger through its export script and combines it with bb's live
-thread state. A subtask is stuck after 30 minutes without a report while working, or after a third
-failed gate stage. Everything stays on the machine that runs bb.
+thread state. A subtask counts as stuck when it stops reporting while working, or when its gate keeps failing. Everything stays on the machine that runs bb.

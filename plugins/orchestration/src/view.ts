@@ -7,7 +7,6 @@ export const FAILURES_STUCK = 3;
 
 export type RowKind = "you" | "stuck" | "work" | "wait" | "done";
 
-/** What bb's sidebar knows about a thread right now. */
 export interface LiveThread {
   status: string;
   hasPendingInteraction: boolean;
@@ -41,6 +40,8 @@ export interface View {
   state: "planning" | "done" | "needs" | "stuck" | "moving";
   heading: string;
   subline: string;
+  /** The context-card row: the heading, plus the stuck agent when an ask holds the heading. */
+  rowLabel: string;
   asks: Ask[];
   nudge: { label: string; draft: string } | null;
   teamLabel: string;
@@ -90,7 +91,6 @@ export function prettyModel(model: string | null): string | null {
   return `${match[1]![0]!.toUpperCase()}${match[1]!.slice(1)} ${match[2]}.${match[3]}`;
 }
 
-/** The first readable line of an agent's message, without markdown marks. */
 export function firstLine(text: string | null, max = 140): string | null {
   if (!text) return null;
   for (const raw of text.split("\n")) {
@@ -254,56 +254,63 @@ export function buildView(input: ViewInput): View {
   const common = { asks, active, done, goal: ledger.goal, history, activeLabel: `${active.length} active`, teamLabel: asks.length ? "Rest of the team" : "Team" };
 
   if (total === 0) {
-    return { ...common, state: "planning", heading: "Planning the work", subline: "The orchestrator is splitting the goal into subtasks.", nudge: null };
+    return { ...common, state: "planning", heading: "Planning the work", subline: "The orchestrator is splitting the goal into subtasks.", rowLabel: "Planning the work", nudge: null };
   }
+
+  const head = stuck[0];
+  const stuckId = head?.subtask.id;
+  const failedKind = head?.subtask.lastFailedKind ?? "the gate";
+  const quiet = head && head.reason !== "circles" ? longAge(now - head.lastReport!) : "";
+  const stuckNote = head ? `${stuckId} ${head.reason === "circles" ? "is going in circles" : "has gone quiet"}` : null;
+  const stuckNudge = head
+    ? head.reason === "circles"
+      ? { label: `Ask the orchestrator about ${stuckId}`, draft: `${stuckId} has failed ${failedKind} ${head.subtask.gateFailures} times. What's the plan?` }
+      : { label: `Ask the orchestrator about ${stuckId}`, draft: `What is ${stuckId} doing? It hasn't reported for ${quiet}.` }
+    : null;
+  const more = stuck.length > 1 ? ` ${plural(stuck.length - 1, "other agent looks", "other agents look")} stuck too.` : "";
 
   if (asks.length) {
     const first = asks[0]!;
     const heading = asks.length > 1 ? `${asks.length} things need you`
       : first.kind === "decision" ? "One decision for you" : first.kind === "owner" ? "One thing waits on you" : "One question for you";
+    if (stuckNote) {
+      const note = stuck.length > 1 ? `${stuckNote}, ${plural(stuck.length - 1, "other", "others")} stuck too` : stuckNote;
+      return { ...common, state: "needs", heading, subline: `${capitalize(note)} · ${progress}`, rowLabel: `${heading} · ${note}`, nudge: stuckNudge };
+    }
     const subline = working.length ? `The rest of the team is moving · ${progress}` : progress;
-    return { ...common, state: "needs", heading, subline, nudge: null };
+    return { ...common, state: "needs", heading, subline, rowLabel: heading, nudge: null };
   }
 
   if (ledger.status === "closed" || doneCount === total) {
+    const heading = doneCount === total ? (total === 1 ? "The only subtask is done" : `All ${total} subtasks are done`) : "The orchestration is closed";
     return {
       ...common,
       state: "done",
-      heading: `All ${total} subtasks are done`,
-      subline: ledger.status === "closed" ? "The ledger is closed." : "The orchestrator is wrapping up.",
+      heading,
+      subline: ledger.status === "closed" ? (doneCount === total ? "The ledger is closed." : `The ledger is closed · ${progress}`) : "The orchestrator is wrapping up.",
+      rowLabel: heading,
       nudge: null,
     };
   }
 
-  if (stuck.length) {
-    const head = stuck[0]!;
-    const id = head.subtask.id;
-    const more = stuck.length > 1 ? ` ${plural(stuck.length - 1, "other agent looks", "other agents look")} stuck too.` : "";
+  if (head) {
+    const heading = `Nothing needs you, but ${stuckNote}`;
     if (head.reason === "circles") {
-      const kind = head.subtask.lastFailedKind ?? "the gate";
-      return {
-        ...common,
-        state: "stuck",
-        heading: `Nothing needs you, but ${id} is going in circles`,
-        subline: `${capitalize(kind)} failed ${head.subtask.gateFailures} times.${more}`,
-        nudge: { label: `Ask the orchestrator about ${id}`, draft: `${id} has failed ${kind} ${head.subtask.gateFailures} times. What's the plan?` },
-      };
+      return { ...common, state: "stuck", heading, subline: `${capitalize(failedKind)} failed ${head.subtask.gateFailures} times.${more}`, rowLabel: heading, nudge: stuckNudge };
     }
-    const quiet = longAge(now - head.lastReport!);
     const others = classified.filter((c) => c.kind === "work" && c.lastReport !== null).map((c) => now - c.lastReport!);
     const othersLine = others.length ? ` Everyone else reported in the last ${longAge(Math.max(...others))}.` : "";
-    return {
-      ...common,
-      state: "stuck",
-      heading: `Nothing needs you, but ${id} has gone quiet`,
-      subline: `No report from ${id} for ${quiet}.${stuck.length > 1 ? more : othersLine}`,
-      nudge: { label: `Ask the orchestrator about ${id}`, draft: `What is ${id} doing? It hasn't reported for ${quiet}.` },
-    };
+    return { ...common, state: "stuck", heading, subline: `No report from ${stuckId} for ${quiet}.${stuck.length > 1 ? more : othersLine}`, rowLabel: heading, nudge: stuckNudge };
   }
 
   const reports = classified.filter((c) => c.kind !== "done" && c.lastReport !== null).map((c) => c.lastReport!);
   const latest = reports.length ? ` · latest report ${shortAge(now - Math.max(...reports)) === "now" ? "just now" : `${shortAge(now - Math.max(...reports))} ago`}` : "";
   const waiting = rows.filter((r) => r.kind === "wait").length;
   const lead = working.length ? `${plural(working.length, "agent", "agents")} working` : `${waiting} waiting`;
-  return { ...common, state: "moving", heading: "Nothing needs you", subline: `${lead} · ${progress}${latest}`, nudge: null };
+  return { ...common, state: "moving", heading: "Nothing needs you", subline: `${lead} · ${progress}${latest}`, rowLabel: "Nothing needs you", nudge: null };
+}
+
+/** What a «sent» marker sticks to: a new question, decision or ledger line under the same key is a new ask. */
+export function askIdentity(ask: Ask): string {
+  return [ask.key, ask.kind, ask.since ?? "", ask.text].join("\u0000");
 }

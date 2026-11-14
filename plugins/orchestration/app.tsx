@@ -20,7 +20,7 @@ function StatusRow({ threadId }: ExperimentalThreadContextCardProps) {
   return (
     <ThreadContextCardRow
       leading={<span aria-hidden className={`size-[7px] rounded-full ${attention ? "bg-attention" : "bg-foreground"}`} />}
-      label={view.heading}
+      label={view.rowLabel}
       title={`${view.heading}. ${view.subline}`}
       onClick={() => panel.openTab({ tab: TAB })}
     />

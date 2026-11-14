@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { experimental_useRpcKeyedQuery, experimental_useRpcQuery, experimental_useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import { contract } from "./contract.ts";
 import { buildView, type LiveThread, type View } from "./view.ts";
@@ -7,7 +7,6 @@ const SNAPSHOT_REFRESH_MS = 20_000;
 const MEMBERSHIP_REFRESH_MS = 60_000;
 const CLOCK_MS = 30_000;
 
-/** Calls `tick` every `ms` while the page is visible, and once when it becomes visible again. */
 function useVisibleInterval(tick: () => void, ms: number, enabled = true) {
   useEffect(() => {
     if (!enabled) return;
@@ -25,7 +24,6 @@ function useVisibleInterval(tick: () => void, ms: number, enabled = true) {
   }, [tick, ms, enabled]);
 }
 
-/** A thread is an orchestrator when a ledger's first line names it. */
 export function useIsOrchestrator(threadId: string): boolean {
   const keys = useMemo(() => [threadId], [threadId]);
   const query = experimental_useRpcKeyedQuery({ contract, method: "isOrchestrator", keys });
@@ -35,7 +33,8 @@ export function useIsOrchestrator(threadId: string): boolean {
 
 function useNow(): number {
   const [now, setNow] = useState(() => Date.now());
-  useVisibleInterval(() => setNow(Date.now()), CLOCK_MS);
+  const tick = useCallback(() => setNow(Date.now()), []);
+  useVisibleInterval(tick, CLOCK_MS);
   return now;
 }
 

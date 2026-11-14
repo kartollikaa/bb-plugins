@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Agent, LedgerSummary, Subtask } from "../src/contract.ts";
-import { buildView, firstLine, longAge, prettyModel, shortAge, type LiveThread } from "../src/view.ts";
+import { askIdentity, buildView, firstLine, longAge, prettyModel, shortAge, type LiveThread } from "../src/view.ts";
 
 const NOW = Date.UTC(2026, 10, 14, 12, 0);
 const MIN = 60_000;
@@ -97,6 +97,32 @@ test("each «For the owner» line needs you, after the timed asks", () => {
   assert.equal(only.state, "needs");
 });
 
+test("an open ask doesn't hide a stuck agent: the subline and the context row name it", () => {
+  const v = view([subtask("S5", "working"), subtask("S6", "working"), subtask("S1", "landed")], { thr_s5: live(52), thr_s6: live(2) }, {},
+    { forTheOwner: ["Waiting: owner merge of hub#38"] });
+  assert.equal(v.state, "needs");
+  assert.equal(v.heading, "One thing waits on you");
+  assert.equal(v.subline, "S5 has gone quiet · 1 of 3 done");
+  assert.equal(v.rowLabel, "One thing waits on you · S5 has gone quiet");
+  assert.equal(v.nudge!.draft, "What is S5 doing? It hasn't reported for 52 min.");
+  const calm = view([subtask("S6", "working")], { thr_s6: live(2) }, {}, { forTheOwner: ["x"] });
+  assert.equal(calm.subline, "The rest of the team is moving · 0 of 1 done");
+  assert.equal(calm.rowLabel, "One thing waits on you");
+  assert.equal(calm.nudge, null);
+});
+
+test("a new ask under the same key has a new identity, so a «sent» marker doesn't carry over", () => {
+  const first = view([subtask("S4", "question")], { thr_s4: live(5) }, { thr_s4: agent({ lastOutput: "Which badge?" }) }).asks[0]!;
+  const again = view([subtask("S4", "question")], { thr_s4: live(5) }, { thr_s4: agent({ lastOutput: "Which badge?" }) }).asks[0]!;
+  const next = view([subtask("S4", "question")], { thr_s4: live(1) }, { thr_s4: agent({ lastOutput: "And the color?" }) }).asks[0]!;
+  const ready = view([subtask("S4", "ready")], { thr_s4: live(5) }).asks[0]!;
+  assert.equal(askIdentity(first), askIdentity(again));
+  assert.notEqual(askIdentity(first), askIdentity(next));
+  assert.notEqual(askIdentity(first), askIdentity(ready));
+  const owner = (lines: string[]) => view([], {}, {}, { forTheOwner: lines }).asks[0]!;
+  assert.notEqual(askIdentity(owner(["Merge hub#38"])), askIdentity(owner(["Confirm the window", "Merge hub#38"])));
+});
+
 test("quiet for 30 min while working is stuck; 29 min is not", () => {
   const quiet = view([subtask("S5", "working"), subtask("S6", "working")], { thr_s5: live(52), thr_s6: live(4) },
     { thr_s5: agent({ lastOutput: "## Writing tests for the fold threshold\nmore" }) });
@@ -106,6 +132,7 @@ test("quiet for 30 min while working is stuck; 29 min is not", () => {
   assert.equal(quiet.active[0]!.id, "S5");
   assert.equal(quiet.active[0]!.step, "Quiet for 52 min · last: Writing tests for the fold threshold");
   assert.equal(quiet.nudge!.draft, "What is S5 doing? It hasn't reported for 52 min.");
+  assert.equal(quiet.rowLabel, quiet.heading);
   assert.equal(view([subtask("S5", "working")], { thr_s5: live(29) }).state, "moving");
   const edge = buildView({ ledger: ledger([subtask("S5", "working")]), agents: {}, orchestratorThreadId: "x", now: NOW,
     live: { thr_s5: { ...live(0), latestAttentionAt: NOW - 30 * MIN } } });
@@ -128,7 +155,10 @@ test("everything landed, or a closed ledger: done", () => {
   const v = view([subtask("S1", "verified"), subtask("S2", "dropped")], {});
   assert.equal(v.state, "done");
   assert.equal(v.heading, "All 2 subtasks are done");
-  assert.equal(view([subtask("S1", "working")], {}, {}, { status: "closed" }).subline, "The ledger is closed.");
+  const closed = view([subtask("S1", "verified"), subtask("S2", "working")], {}, {}, { status: "closed" });
+  assert.equal(closed.heading, "The orchestration is closed");
+  assert.equal(closed.subline, "The ledger is closed · 1 of 2 done");
+  assert.equal(view([subtask("S1", "landed")], {}).heading, "The only subtask is done");
 });
 
 test("row detail: model, effort, context and rotations", () => {

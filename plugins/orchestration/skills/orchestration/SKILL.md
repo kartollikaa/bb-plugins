@@ -14,9 +14,11 @@ several name the thread, the newest wins.
 
 - **Needs you:** subtasks at `question`, `ready` or `card`, a pending approval in any subtask's
   thread or the orchestrator's own, and every line under the ledger's «For the owner».
-- **Stuck:** a `working` or `briefed` subtask with no report for 30 minutes (a report is the end of
-  the thread's latest turn), or a third failed checks, review, done-when or conflicts stage across
-  its open gates. A subtask at `gate` is waiting on the orchestrator and never counts as quiet.
+- **Stuck:** a `working` or `briefed` subtask that hasn't reported for `QUIET_MS` (a report is the
+  end of the thread's latest turn), or `FAILURES_STUCK` failed checks, review, done-when or conflicts
+  stages across its open gates; both constants are in `src/view.ts`. A subtask at `gate` is waiting
+  on the orchestrator and never counts as quiet. While something needs you, the subline and the
+  context-card row still name a stuck agent.
 - **Done:** `landed`, `verified`, `dropped`, or the ledger's status `closed`.
 
 The Answer, Release and Not yet buttons only put a draft into the orchestrator's composer and focus
@@ -25,8 +27,8 @@ it. They never send. Keep ledger statuses and «For the owner» current: the tab
 ## Setting
 
 `exportScript`: path to orchestrate's `scripts/orchestration_ledger.py`. Empty means auto-discovery
-in `~/.claude/plugins/cache/*/orchestrate/<version>/scripts/`, newest first. The export needs
-orchestrate 0.11 or later.
+in `~/.claude/plugins/cache/*/orchestrate/<version>/scripts/`, newest first. Only orchestrate versions that ship the `export` command work. A failed export is
+retried only after the ledger or this setting changes.
 
 ```sh
 bb plugin config orchestration set exportScript /path/to/orchestration_ledger.py

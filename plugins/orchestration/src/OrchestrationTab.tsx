@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
-import type { Ask, Row, RowKind, View } from "./view.ts";
+import { askIdentity, type Ask, type Row, type RowKind, type View } from "./view.ts";
 import { useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
@@ -46,7 +46,6 @@ function Button({ variant, onClick, children, tabIndex }: { variant: "primary" |
   );
 }
 
-/** Expands with the row-detail motion from the prototype: grid rows 0fr → 1fr. */
 function Reveal({ open, children }: { open: boolean; children: ReactNode }) {
   return (
     <div className={cx("grid transition-[grid-template-rows] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
@@ -62,7 +61,7 @@ interface Actions {
 }
 
 function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
-  const sent = actions.sent === ask.key;
+  const sent = actions.sent === askIdentity(ask);
   return (
     <div className="flex flex-col gap-2 rounded-[10px] border border-[color-mix(in_oklab,var(--attention)_35%,transparent)] bg-[color-mix(in_oklab,var(--attention)_12%,var(--background))] px-3 pb-2.5 pt-3">
       <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -76,12 +75,12 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
           <span className="text-xs text-muted-foreground">Reply started in the chat composer</span>
         ) : ask.kind === "decision" && ask.drafts ? (
           <>
-            <Button variant="primary" onClick={() => actions.fill(ask.key, ask.drafts!.primary)}>Release</Button>
-            <Button variant="quiet" onClick={() => actions.fill(ask.key, ask.drafts!.secondary!)}>Not yet</Button>
+            <Button variant="primary" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.primary)}>Release</Button>
+            <Button variant="quiet" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.secondary!)}>Not yet</Button>
           </>
         ) : (ask.kind === "question" || ask.kind === "owner") && ask.drafts ? (
           <>
-            <Button variant="primary" onClick={() => actions.fill(ask.key, ask.drafts!.primary)}>Answer</Button>
+            <Button variant="primary" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.primary)}>Answer</Button>
             {threadId && <Button variant="quiet" onClick={() => actions.openThread(threadId)}>Open thread</Button>}
           </>
         ) : threadId ? (
@@ -241,9 +240,9 @@ export function OrchestrationTab({ threadId }: { threadId: string }) {
         <p className="m-0 mt-1 text-muted-foreground [text-wrap:pretty]">{view.subline}</p>
         {view.nudge && (
           <div className="mt-2.5">
-            {sent === "nudge"
+            {sent === `nudge\u0000${view.nudge.label}`
               ? <span className="text-xs text-muted-foreground">Question started in the chat composer</span>
-              : <Button variant="outline" onClick={() => actions.fill("nudge", view.nudge!.draft)}>{view.nudge.label}</Button>}
+              : <Button variant="outline" onClick={() => actions.fill(`nudge\u0000${view.nudge!.label}`, view.nudge!.draft)}>{view.nudge.label}</Button>}
           </div>
         )}
       </section>

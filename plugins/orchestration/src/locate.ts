@@ -49,7 +49,6 @@ export async function scanLedgers(projectsDir: string): Promise<LedgerFile[]> {
   return found;
 }
 
-/** The newest ledger naming this thread on its first line, or null. */
 export function ledgerFor(ledgers: readonly LedgerFile[], threadId: string): LedgerFile | null {
   let best: LedgerFile | null = null;
   for (const ledger of ledgers) {

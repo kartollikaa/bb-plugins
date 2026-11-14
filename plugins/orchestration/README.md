@@ -15,14 +15,16 @@ question: does anything need you, and is the team moving?
 
 - **Needs you:** a subtask at `question` or `ready`, one waiting for its card, a pending approval in
   any subtask's thread or the orchestrator's own, and each line under the ledger's «For the owner».
-- **Stuck:** a `working` or `briefed` subtask with no report for 30 minutes, or a third failed
-  check, review, done-when or conflict stage. A report is the end of the thread's latest turn.
+- **Stuck:** a `working` or `briefed` subtask that hasn't reported for too long, or one whose
+  checks, review, done-when or conflict stages keep failing. A report is the end of the thread's
+  latest turn. Both limits are the owner's and live in `src/view.ts` (`QUIET_MS`, `FAILURES_STUCK`).
+  A stuck agent is named even while something else needs you.
 - **Done:** `landed`, `verified` or `dropped`.
 
 ## Data
 
 - The ledger comes from `orchestration_ledger.py export` (schema `orchestrate-ledger-export` v1),
-  which ships with orchestrate 0.11. The plugin finds the script in Claude Code's plugin cache, or
+  in orchestrate versions that have the export command. The plugin finds the script in Claude Code's plugin cache, or
   takes the path from the `exportScript` setting.
 - Ledgers are read from `~/.claude/projects/*/orchestrate/*.md`; the newest one naming the thread wins.
 - Live state (status, pending approvals, last report, model, effort, context use, last reply) comes

@@ -11,7 +11,9 @@ import { exportScriptCandidates, ledgerFor, scanLedgers, type LedgerFile } from 
 const run = promisify(execFile);
 const SCAN_TTL_MS = 10_000;
 const AGENT_TTL_MS = 15_000;
+const FINISHED_AGENT_TTL_MS = 10 * 60_000;
 const OUTPUT_LIMIT = 1_200;
+const FINISHED_STATUSES = new Set(["landed", "verified", "dropped"]);
 const LIVE_STATUSES = new Set(["working", "briefed", "question", "delivered", "gate", "ready", "card"]);
 
 const obj = (value: unknown): Record<string, unknown> => (value && typeof value === "object" ? (value as Record<string, unknown>) : {});
@@ -38,15 +40,31 @@ export default async function plugin(bb: BbPluginApi) {
 
   let workingScript: { configured: string; path: string } | null = null;
   const exports = new Map<string, { mtimeMs: number; summary: LedgerSummary }>();
+  const failures = new Map<string, { key: string; error: Error }>();
+
+  async function scriptsToTry(configured: string): Promise<string[]> {
+    const all = await exportScriptCandidates(configured, claudeDir);
+    if (workingScript?.configured !== configured) return all;
+    const known = workingScript.path;
+    const exists = await stat(known).then(() => true, () => false);
+    return exists ? [known, ...all.filter((path) => path !== known)] : all;
+  }
 
   async function exportLedger(path: string): Promise<LedgerSummary> {
     const { mtimeMs } = await stat(path);
     const cached = exports.get(path);
     if (cached && cached.mtimeMs === mtimeMs) return cached.summary;
     const configured = (await settings.get()).exportScript;
-    const candidates = workingScript?.configured === configured ? [workingScript.path] : await exportScriptCandidates(configured, claudeDir);
+    const failureKey = `${mtimeMs}\u0000${configured}`;
+    const failed = failures.get(path);
+    if (failed && failed.key === failureKey) throw failed.error;
+    const fail = (error: Error): never => {
+      failures.set(path, { key: failureKey, error });
+      throw error;
+    };
+    const candidates = await scriptsToTry(configured);
     if (candidates.length === 0) {
-      throw new Error("The orchestrate plugin is not installed here. Install it, or set the ledger export script in this plugin's settings.");
+      fail(new Error("The orchestrate plugin is not installed here. Install it, or set the ledger export script in this plugin's settings."));
     }
     let lastError = "";
     for (const script of candidates) {
@@ -55,6 +73,7 @@ export default async function plugin(bb: BbPluginApi) {
         const summary = summarizeExport(JSON.parse(stdout), path);
         workingScript = { configured, path: script };
         exports.set(path, { mtimeMs, summary });
+        failures.delete(path);
         return summary;
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error);
@@ -62,13 +81,14 @@ export default async function plugin(bb: BbPluginApi) {
     }
     workingScript = null;
     bb.log.warn(`ledger export failed for ${path}: ${lastError}`);
-    throw new Error("No installed orchestrate plugin could export this ledger; the export needs orchestrate 0.11 or later. Update it, or set the ledger export script in this plugin's settings.");
+    return fail(new Error("No installed orchestrate plugin could export this ledger; the export command is newer than the installed versions. Update orchestrate, or set the ledger export script in this plugin's settings."));
   }
 
   const agentCache = new Map<string, { at: number; agent: Agent }>();
-  async function readAgent(threadId: string, withOutput: boolean): Promise<Agent> {
+  async function readAgent(threadId: string, withOutput: boolean, finished: boolean): Promise<Agent> {
     const cached = agentCache.get(threadId);
-    if (cached && Date.now() - cached.at < AGENT_TTL_MS && (!withOutput || cached.agent.lastOutput !== null)) return cached.agent;
+    const ttl = finished ? FINISHED_AGENT_TTL_MS : AGENT_TTL_MS;
+    if (cached && Date.now() - cached.at < ttl && (!withOutput || cached.agent.lastOutput !== null)) return cached.agent;
     const [thread, context, turns, output] = await Promise.all([
       bb.sdk.threads.get({ threadId }).catch(() => null),
       bb.sdk.threads.context({ threadId }).catch(() => null),
@@ -103,7 +123,7 @@ export default async function plugin(bb: BbPluginApi) {
     await Promise.all(summary.subtasks.map(async (subtask) => {
       if (!subtask.threadId) return;
       const live = LIVE_STATUSES.has(subtask.status ?? "");
-      agents[subtask.threadId] = await readAgent(subtask.threadId, live);
+      agents[subtask.threadId] = await readAgent(subtask.threadId, live, FINISHED_STATUSES.has(subtask.status ?? ""));
     }));
     return { state: "ledger", ledger: summary, agents, readAt: Date.now() };
   }
