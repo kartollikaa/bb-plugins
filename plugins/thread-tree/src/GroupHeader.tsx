@@ -47,7 +47,7 @@ export function GroupHeader({
         onClick={onToggle}
         aria-expanded={!isCollapsed}
         aria-label={tailText ? `${title}, ${tailText}` : title}
-        className="peer/toggle flex min-w-0 flex-1 items-center gap-[7px] self-stretch rounded-md text-left text-xs font-medium text-muted-foreground hover:text-sidebar-foreground"
+        className="flex min-w-0 flex-1 items-center gap-[7px] self-stretch rounded-md text-left text-xs font-medium text-muted-foreground hover:text-sidebar-foreground"
       >
         <span className="flex w-3.5 shrink-0 items-center justify-center text-sidebar-foreground/50">{icon}</span>
         <span className={cn("min-w-0 truncate", summary && "shrink-0")}>{title}</span>
@@ -70,7 +70,7 @@ export function GroupHeader({
                   title={action.label}
                   className={cn(
                     "flex size-5 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                    "opacity-0 focus-visible:opacity-100 group-hover/header:opacity-100",
+                    "opacity-0 focus-visible:opacity-100 group-hover/header:opacity-100 group-data-[menu-open]/actions:opacity-100",
                     TOUCH_DIMMED,
                   )}
                 >
@@ -113,8 +113,9 @@ export function GroupHeader({
 
 /** Hover controls overlay the title's end over a fade, leaving the count clickable; touch keeps them inline. */
 const HEADER_ACTIONS = cn(
-  "absolute inset-y-0 right-full flex items-center gap-1 pl-6 pr-0.5 [background:linear-gradient(to_right,transparent,var(--row-base,var(--sidebar))_20px)]",
-  "pointer-events-none opacity-0 transition-opacity duration-75 group-hover/header:opacity-100 focus-within:opacity-100 data-[menu-open]:opacity-100 [&>*]:pointer-events-auto",
+  "group/actions absolute inset-y-0 right-full flex items-center gap-1 pl-6 pr-0.5 [background:linear-gradient(to_right,transparent,var(--row-base,var(--sidebar))_20px)]",
+  "pointer-events-none opacity-0 transition-opacity duration-75 group-hover/header:opacity-100 focus-within:opacity-100 data-[menu-open]:opacity-100",
+  "group-hover/header:[&>*]:pointer-events-auto focus-within:[&>*]:pointer-events-auto data-[menu-open]:[&>*]:pointer-events-auto",
   "[@media(hover:none)]:pointer-events-auto [@media(hover:none)]:static [@media(hover:none)]:bg-none [@media(hover:none)]:p-0 [@media(hover:none)]:opacity-100",
 );
 
