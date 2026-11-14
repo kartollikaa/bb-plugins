@@ -1509,10 +1509,15 @@ async function prepareFoldArchive(
     return null;
   }
   const plan = foldArchivePlan(forest, roots.map((root) => root.id), scopes, dirty);
-  const isStillClean = (id: string) => rpc.call("archiveScope", { threadIds: [id] }).then(({ dirty }) => dirty.length === 0);
+  const lateDirty = new Set<string>();
+  const isStillClean = (id: string) => rpc.call("archiveScope", { threadIds: [id] }).then(({ dirty }) => {
+    dirty.forEach((each) => lateDirty.add(each));
+    return dirty.length === 0;
+  });
+  const checked = [...new Set([...ids, ...[...scopes.values()].flat()])];
   return {
     plan,
-    markSkipped: () => updateUncommitted((current) => uncommittedAfterRun(current, { checked: ids, dirty: [...dirty], changed: [], stop: null })),
+    markSkipped: () => updateUncommitted((current) => uncommittedAfterRun(current, { checked, dirty: [...dirty], changed: [], stop: null })),
     async run() {
       const claimed = [...new Set(plan.roots.flatMap((id) => scopes.get(id) ?? [id]))];
       const result = await runClaimedArchive({
@@ -1522,7 +1527,7 @@ async function prepareFoldArchive(
         unclaim: (claimId) => rpc.call("archiveRelease", { claimId }).then(() => undefined, () => undefined),
         archive: () => runner.run(plan.roots.map((id) => toActionTarget(subtree.get(id)!)), isStillClean),
       });
-      updateUncommitted((current) => uncommittedAfterRun(current, { checked: ids, dirty: [...dirty], changed: result.changed.flatMap((id) => scopes.get(id) ?? [id]), stop: result.stop }));
+      updateUncommitted((current) => uncommittedAfterRun(current, { checked, dirty: [...dirty], changed: [...lateDirty], stop: result.stop }));
       const threadCount = (roots: readonly string[]) => new Set(roots.flatMap((id) => scopes.get(id) ?? [id])).size;
       const outcome = foldArchiveOutcome({ archived: threadCount(result.archived), skipped: plan.skipped, kept: plan.kept, changed: threadCount(result.changed), unchecked: threadCount(result.unchecked), stop: result.stop, error: result.error });
       if (outcome) toast[outcome.tone](outcome.title, { description: outcome.description });
