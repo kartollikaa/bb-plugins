@@ -117,3 +117,29 @@ test("subscribers hear every change", () => {
   tracker.begin("thr_o", "b", "x");
   assert.equal(heard, 3);
 });
+
+function memory() {
+  const data = new Map<string, string>();
+  return { data, getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k) };
+}
+
+test("a sent reply survives a reload until the ledger drops the ask; a send in flight does not", () => {
+  const storage = memory();
+  const first = createReplyTracker(storage);
+  first.begin("thr_o", "ask-1", "Merge it");
+  first.done("thr_o", "ask-1", "queued");
+  first.begin("thr_o", "ask-2", "Yes");
+  const reloaded = createReplyTracker(storage);
+  assert.deepEqual(reloaded.get("thr_o", "ask-1"), { kind: "sent", option: "Merge it", delivery: "queued" });
+  assert.equal(reloaded.get("thr_o", "ask-2"), null);
+  reloaded.prune("thr_o", []);
+  assert.equal(createReplyTracker(storage).get("thr_o", "ask-1"), null);
+});
+
+test("unreadable or throwing storage leaves the tracker in memory", () => {
+  const broken = { getItem: () => "{not json", setItem: () => { throw new Error("quota"); }, removeItem: () => {} };
+  const tracker = createReplyTracker(broken);
+  assert.equal(tracker.begin("thr_o", "a", "x"), true);
+  tracker.done("thr_o", "a", "sent");
+  assert.deepEqual(tracker.get("thr_o", "a"), { kind: "sent", option: "x", delivery: "sent" });
+});

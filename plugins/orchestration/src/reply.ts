@@ -1,4 +1,5 @@
 import { parseOwnerItem } from "./owner.ts";
+import type { PreferenceStorage } from "./route.ts";
 
 export type Delivery = "sent" | "queued";
 
@@ -44,13 +45,43 @@ export function replySender(
 
 export type ReplyState = { kind: "sending"; option: string } | { kind: "sent"; option: string; delivery: Delivery };
 
-/** Per orchestrator thread and ask: one click in flight, and the sent state until the ledger drops the ask. */
-export function createReplyTracker() {
+const STORAGE_KEY = "orchestration.sentReplies.v1";
+
+type Saved = Record<string, Record<string, { option: string; delivery: Delivery }>>;
+
+function load(storage: PreferenceStorage | null): Map<string, Map<string, ReplyState>> {
   const states = new Map<string, Map<string, ReplyState>>();
+  try {
+    const saved = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "{}") as Saved;
+    for (const [threadId, asks] of Object.entries(saved)) {
+      states.set(threadId, new Map(Object.entries(asks).map(([ask, { option, delivery }]) => [ask, { kind: "sent", option, delivery }])));
+    }
+  } catch {
+    states.clear();
+  }
+  return states;
+}
+
+/** Per orchestrator thread and ask: one click in flight, and the sent state, kept across reloads, until the ledger drops the ask. */
+export function createReplyTracker(storage: PreferenceStorage | null = null) {
+  const states = load(storage);
   const listeners = new Set<() => void>();
   let version = 0;
+  const save = () => {
+    const saved: Saved = {};
+    for (const [threadId, asks] of states) {
+      for (const [ask, state] of asks) {
+        if (state.kind === "sent") (saved[threadId] ??= {})[ask] = { option: state.option, delivery: state.delivery };
+      }
+    }
+    try {
+      storage?.setItem(STORAGE_KEY, JSON.stringify(saved));
+    } catch {
+    }
+  };
   const emit = () => {
     version++;
+    save();
     listeners.forEach((l) => l());
   };
   const of = (threadId: string) => {

@@ -8,7 +8,15 @@ import { useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 
-const replies = createReplyTracker();
+function storage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+const replies = createReplyTracker(storage());
 
 /** Puts text into the orchestrator's composer and focuses it; never sends. Keeps a draft the owner already started. */
 function fillComposer(composers: readonly PluginComposerApi[], threadId: string, text: string): boolean {
