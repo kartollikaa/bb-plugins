@@ -13,6 +13,10 @@ can find it by the error text.
 - **A frontend import from the server SDK can pass a local build and fail Git installation.**
   Git installs omit dev dependencies. Keep shared RPC contracts as plain schema objects and use
   type-only SDK imports; verify with an isolated production dependency build.
+- **A bound thread action's `run()` settles before its effect lands.** `useThreadActions(target)`
+  gives `entry.action.run`; for bb's Archive it resolves at once, while bb's confirmation dialog is
+  still open. Don't read "not archived right after `run()`" as a cancel: wait on the thread itself
+  (`threads.get` → `archivedAt`) for as long as a dialog is open, then allow a short grace.
 - **CLI subcommand names** must match `[a-z0-9-]+`. Otherwise install fails with
   `cli command commands[0] must be { name: [a-z0-9-]+ ... }`.
 - **Message directives** (`app.slots.messageDirective({ id, component })`): the component gets
