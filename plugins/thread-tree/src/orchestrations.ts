@@ -1,4 +1,5 @@
 // Orchestrators (threads with subthreads): the Orchestrations shortcuts, the folded rollup and fold bar, and archiving a finished fold.
+import type { SummaryPart } from "./sectionSummaries.ts";
 import { addFoldState, descendantsOf, FOLD_PRIORITY, foldState, type FoldCounts, type FoldState, type Forest, type RollupState, type TreeThread } from "./tree.ts";
 
 const rank = (state: FoldState) => FOLD_PRIORITY.indexOf(state);
@@ -41,12 +42,10 @@ export interface Orchestration<T extends TreeThread> {
   running: number;
 }
 
-/**
- * Every orchestrator: a top-level thread with at least one unarchived subthread, at any depth.
- * Most urgent first, ties by the tree's latest activity; finished ones (all done and read) last.
- */
+/** Every top-level thread with an unarchived subthread at any depth; most urgent first, then latest activity. */
 export function orchestrations<T extends TreeThread>(forest: Forest<T>): Orchestration<T>[] {
-  const out: (Orchestration<T> & { latest: number })[] = [];
+  const out: Orchestration<T>[] = [];
+  const latest = new Map<string, number>();
   for (const root of forest.roots) {
     if (root.isArchived) continue;
     const subtree = descendantsOf(forest, root.id).filter((kid) => !kid.isArchived);
@@ -60,19 +59,17 @@ export function orchestrations<T extends TreeThread>(forest: Forest<T>): Orchest
       thread: root,
       state,
       rollup,
-      finished: state === "done",
+      finished: isFinishedFold(own, counts),
       projectIds: [...new Set([root.projectId, ...inTreeOrder(forest, root.id).filter((kid) => !kid.isArchived).map((kid) => kid.projectId)])],
       total: subtree.length,
       done: (counts.done ?? 0) + (counts.unread ?? 0),
       needsYou: counts.input ?? 0,
       failed: counts.error ?? 0,
       running: counts.running ?? 0,
-      latest: Math.max(root.updatedAt, ...subtree.map((kid) => kid.updatedAt)),
     });
+    latest.set(root.id, Math.max(root.updatedAt, ...subtree.map((kid) => kid.updatedAt)));
   }
-  return out
-    .sort((a, b) => rank(a.state) - rank(b.state) || b.latest - a.latest || a.thread.id.localeCompare(b.thread.id))
-    .map(({ latest: _latest, ...orchestration }) => orchestration);
+  return out.sort((a, b) => rank(a.state) - rank(b.state) || latest.get(b.thread.id)! - latest.get(a.thread.id)! || a.thread.id.localeCompare(b.thread.id));
 }
 
 function inTreeOrder<T extends TreeThread>(forest: Forest<T>, rootId: string): T[] {
@@ -92,26 +89,17 @@ export function orchestrationTreeIds<T extends TreeThread>(forest: Forest<T>, ro
   return [rootId, ...descendantsOf(forest, rootId).map((thread) => thread.id)];
 }
 
-export interface SubtitlePart {
-  text: string;
-  tone: "muted" | "attention" | "bad";
-}
-
 /** The shortcut's second line; what needs the user or failed carries its state's colour. */
-export function orchestrationSubtitleParts(orchestration: Orchestration<TreeThread>, projectName: (projectId: string) => string | null): SubtitlePart[] {
+export function orchestrationSubtitleParts(orchestration: Orchestration<TreeThread>, projectName: (projectId: string) => string | null): SummaryPart[] {
   const projects = orchestration.projectIds.map(projectName).filter((name): name is string => !!name).join(" + ");
-  const parts: (SubtitlePart | null)[] = [
+  const parts: (SummaryPart | null)[] = [
     projects ? { text: projects, tone: "muted" } : null,
     { text: `${orchestration.done}/${orchestration.total} done`, tone: "muted" },
     orchestration.needsYou ? { text: `${orchestration.needsYou} needs you`, tone: "attention" } : null,
     orchestration.failed ? { text: `${orchestration.failed} failed`, tone: "bad" } : null,
     orchestration.running ? { text: `${orchestration.running} running`, tone: "muted" } : null,
   ];
-  return parts.filter((part): part is SubtitlePart => part !== null);
-}
-
-export function orchestrationSubtitle(orchestration: Orchestration<TreeThread>, projectName: (projectId: string) => string | null): string {
-  return orchestrationSubtitleParts(orchestration, projectName).map((part) => part.text).join(" · ");
+  return parts.filter((part): part is SummaryPart => part !== null);
 }
 
 export interface FoldArchivePlan {

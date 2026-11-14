@@ -8,7 +8,6 @@ import {
   dirtyEnvironmentIds,
   foldBarSegments,
   isFinishedFold,
-  orchestrationSubtitle,
   orchestrationSubtitleParts,
   orchestrations,
   rollupOver,
@@ -96,8 +95,8 @@ test("Orchestrations lists every root with subthreads, most urgent first, with t
   assert.equal(unreadOnly!.state, "unread");
   assert.deepEqual(list.map((o) => o.rollup), ["input", null, "unread", null]);
   assert.deepEqual(list.map((o) => o.finished), [false, false, false, true]);
-  assert.equal(orchestrationSubtitle(live!, (id) => ({ bb: "bb-plugins", web: "web" })[id] ?? null), "bb-plugins + web · 2/5 done · 1 needs you · 1 failed · 1 running");
-  assert.equal(orchestrationSubtitle(unreadOnly!, () => "bb-plugins"), "bb-plugins · 1/1 done");
+  assert.equal(subtitle(live!, (id) => ({ bb: "bb-plugins", web: "web" })[id] ?? null), "bb-plugins + web · 2/5 done · 1 needs you · 1 failed · 1 running");
+  assert.equal(subtitle(unreadOnly!, () => "bb-plugins"), "bb-plugins · 1/1 done");
   assert.deepEqual(
     orchestrationSubtitleParts(live!, (id) => ({ bb: "bb-plugins", web: "web" })[id] ?? null).map((part) => part.tone),
     ["muted", "muted", "attention", "bad", "muted"],
@@ -129,6 +128,8 @@ test("same urgency sorts by the tree's latest activity, finished ones always las
   ];
   assert.deepEqual(orchestrations(buildForest(threads)).map((o) => o.thread.id), ["old", "new", "doneRecent"]);
 });
+
+const subtitle = (...args: Parameters<typeof orchestrationSubtitleParts>) => orchestrationSubtitleParts(...args).map((part) => part.text).join(" · ");
 
 test("a waiting subthread keeps its orchestration in the section", () => {
   const threads = [thread("root"), thread("k", { parentThreadId: "root", indicator: "queued-waiting" })];

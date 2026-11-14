@@ -46,7 +46,7 @@ under it, and the subagents it runs inside its own session show on its row.
 
 ## Arranging the sidebar
 
-Right-click a section header to remove it; the layers icon above the threads
+Right-click a section header to remove it; the sliders icon beside search
 brings it back, as well as Recent Activity, off by default. Drag a header, or use Move up
 and Move down in its menu, to reorder sections. While you drag, the blocks fold
 to their headers and reopen on drop.

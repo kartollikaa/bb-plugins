@@ -22,8 +22,9 @@ failed and running automations and the soonest next run ("1 failed · next in
 12m"). An expanded PR row draws its most urgent reason as a tinted icon, then the
 title and repo; the number and reasons are in the tooltip. Hover offers "Open its
 thread" when one of your threads links the PR, Open on GitHub, and Snooze.
-Recent Activity is off by default (`showRecent`); the layers icon in the Threads
-heading turns it back on.
+Recent Activity is off by default (`showRecent`); the Sections menu (the sliders
+icon in the status line, beside search) turns it back on, and its tooltip counts
+hidden sections.
 `src/sectionSummaries.ts` holds the summaries, the reason glyphs and which
 sections start folded.
 

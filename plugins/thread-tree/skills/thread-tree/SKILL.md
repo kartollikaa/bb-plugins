@@ -30,7 +30,7 @@ Snooze. A middle-click on these buttons does nothing, so it never opens GitHub.
 Paused automations stay behind "N paused".
 
 Needs you sits above the sections in an amber card and hides when nothing
-waits. Its header shows the count and the ⇧⌘I hint; the card lists the first
+waits. Its header shows the count and the next-item key (⇧⌘I on macOS, Ctrl+Shift+I elsewhere); the card lists the first
 five items and "N more" opens the rest. In order:
 threads asking a question (the question and how long they have waited, longest
 first), failed turns, failed queued messages, and finished results not read
@@ -181,9 +181,10 @@ Folder item; `none`).
 Numbers (1–50): `recentLimit` (Recent Activity rows), `recentMoreLimit` (rows after Show more).
 The order of Pull requests, Automations and Recent Activity, the project order, and which groups are
 folded are not settings: each browser client keeps them itself. The user changes them in the
-sidebar by dragging a header or from its right-click menu; the layers icon in the
-Threads heading lists hidden sections. A section header's actions (such as +)
-appear on hover over the end of the header.
+sidebar by dragging a header or from its right-click menu; the Sections menu (the
+sliders icon in the status line, beside search) turns hidden ones back on, and its
+tooltip counts them. A section header's actions (such as +) appear on hover just
+before its count; clicking the count or summary folds the section like its title.
 
 ## Making a subagent you can talk to
 

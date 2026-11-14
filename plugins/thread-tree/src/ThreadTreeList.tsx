@@ -43,7 +43,7 @@ import { AutomationsSection, useAutomations } from "./AutomationsSection";
 import { NeedsYouSection, useNeedsYou } from "./NeedsYouSection";
 import { pullRequestSourcesSettled } from "./needsYou";
 import { GithubSection, useGithubFolder } from "./GithubSection";
-import { isSectionCollapsed, sectionToggleKey } from "./sectionSummaries";
+import { isSectionCollapsed, sectionToggleKey, toneClass, type SummaryPart } from "./sectionSummaries";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph, rollupGlyph } from "./statusGlyph";
 import { StatusLine } from "./StatusLine";
@@ -80,7 +80,7 @@ import {
   foldState,
   type TreeRow,
 } from "./tree";
-import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitleParts, rollupOver, type SubtitlePart, MAX_THREADS_PER_CALL } from "./orchestrations";
+import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitleParts, rollupOver, MAX_THREADS_PER_CALL } from "./orchestrations";
 import { archiveInTurn, archiveRunLifecycle, dialogOutsideSidebar, foldArchiveOutcome, runClaimedArchive, skippedSummary, uncommittedAfterRun, waitForArchive, type ArchiveRunResult } from "./archiveRun";
 import { ARCHIVE_CONFIRM_WAIT_MS } from "./archiveUndo";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
@@ -426,7 +426,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const renderRow = (
     row: TreeRow<PluginSidebarThread>,
     variant: "tree" | "flat",
-    { subtitle, numbered = variant === "tree", rollup, muted = false }: { subtitle?: string | readonly SubtitlePart[]; numbered?: boolean; rollup?: RollupState | null; muted?: boolean } = {},
+    { subtitle, numbered = variant === "tree", rollup, muted = false }: { subtitle?: string | readonly SummaryPart[]; numbered?: boolean; rollup?: RollupState | null; muted?: boolean } = {},
   ) => (
     <Fragment key={row.thread.id}>
       <ThreadRowView
@@ -828,16 +828,17 @@ function SectionsMenu({
 }) {
   const portalProps = usePortalScopeProps();
   const menu = useTapToOpenMenu();
+  const hidden = order.filter((id) => !view[SECTION_BY_ID[id].key]).length;
   return (
     <DropdownMenu.Root {...menu.rootProps}>
       <DropdownMenu.Trigger asChild {...menu.triggerProps}>
         <button
           type="button"
-          aria-label="Sections"
-          title="Sections: choose what the sidebar shows"
+          aria-label={hidden > 0 ? `Sections, ${hidden} hidden` : "Sections"}
+          title={hidden > 0 ? `Sections: choose what the sidebar shows (${hidden} hidden)` : "Sections: choose what the sidebar shows"}
           className="flex h-5 items-center rounded-md px-1 text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
         >
-          <Icon name="Layers" aria-hidden className="size-3" />
+          <Icon name="SlidersHorizontal" fallback="Eye" aria-hidden className="size-3" />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -973,8 +974,7 @@ function ThreadRowView({
   numbered: boolean;
   context?: string;
   /** A second line under the title: the Running filter's context or an orchestration's progress. */
-  subtitle?: string | readonly SubtitlePart[];
-  /** A finished orchestration's shortcut. */
+  subtitle?: string | readonly SummaryPart[];
   muted?: boolean;
   isActive: boolean;
   /** The subtree's state drawn in place of the thread's own; a folded tree row works it out itself. */
@@ -1088,7 +1088,7 @@ function ThreadRowView({
                 {typeof subtitle === "string" ? subtitle : subtitle.map((part, index) => (
                   <Fragment key={part.text}>
                     {index > 0 ? " · " : null}
-                    <span className={cn(part.tone === "attention" && "text-amber-600 dark:text-amber-400", part.tone === "bad" && "text-red-600/90 dark:text-red-400/90")}>{part.text}</span>
+                    <span className={toneClass(part.tone)}>{part.text}</span>
                   </Fragment>
                 ))}
               </span>
@@ -1660,7 +1660,6 @@ function TreeGuides({
 
 type RowProvider = ReturnType<typeof useProviders>["providers"][number];
 
-/** Without bb's own tint the logo mask takes the slot's colour, which the plugin sets. */
 /** The provider logo in its fixed slot, brand-tinted unless the user picked monochrome. */
 function ProviderSlot({ providerId, provider, style }: { providerId: string; provider: RowProvider | undefined; style: ViewSettings["providerIconStyle"] }) {
   const name = provider?.displayName ?? providerId;
@@ -1676,6 +1675,7 @@ function ProviderSlot({ providerId, provider, style }: { providerId: string; pro
   );
 }
 
+/** Without bb's own tint the logo mask takes the slot's colour, which the plugin sets. */
 function untinted(provider: RowProvider | undefined, id: string) {
   return { id, logoUrl: provider?.logoUrl ?? null, icon: provider?.icon ?? null };
 }
