@@ -65,7 +65,15 @@ same title bar.
   checks, review, done-when or conflict stages keep failing, or one at `blocked` (orchestrate
   0.13+), which shows its cause. A report is the end of the thread's latest turn. Both limits are the owner's and live in `src/view.ts` (`QUIET_MS`, `FAILURES_STUCK`).
   A stuck agent is named even while something else needs you.
-- **Done:** `landed`, `verified` or `dropped`.
+- **Done:** `landed`, `verified` or `dropped`. A done subtask whose thread runs a turn again shows
+  in the team as working («Running again»), and the view isn't «done» while it runs.
+- **Running children.** The orchestrator's own child threads (bb's parent link) join the team even
+  before the ledger lists them, since the ledger lags behind spawns: a child whose title ends with a
+  ledger row's id (`… · S11`) and that row has no session yet becomes that row's thread; any other
+  child shows as its own row, labelled by that id, while bb runs a turn in it, and as a card while it
+  waits on an approval. An idle child the ledger doesn't list stays out, so finished reviewers don't
+  pile up. Running rows pulse their dot. Owner, on the change: «I don't see active Chile threads on
+  orchestrator view, they just show as a island above prompt bar».
 
 ## «For the owner» format
 

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Agent, LedgerSummary, Subtask } from "../src/contract.ts";
-import { askIdentity, buildView, firstLine, longAge, prettyModel, shortAge, type LiveThread } from "../src/view.ts";
+import { askIdentity, buildView, childLabel, firstLine, longAge, prettyModel, shortAge, type LiveThread } from "../src/view.ts";
 
 const NOW = Date.UTC(2026, 10, 14, 12, 0);
 const MIN = 60_000;
@@ -254,4 +254,50 @@ test("the recap carries the goal, the checkpoint and the latest decision with th
   });
   assert.deepEqual(v.recap, { goal: "Goal", now: { text: "G1 waits on review of 9f1c2ab.", age: "40m" }, last: { text: "Review by R1", age: "" } });
   assert.deepEqual(view([], {}).recap, { goal: "Goal", now: null, last: null });
+});
+
+test("a running child thread the ledger doesn't list shows in the team, labelled by its title's id", () => {
+  const child = (title: string, extra: Partial<LiveThread> = {}) => live(5, { parentThreadId: "thr_orch", title, status: "active", ...extra });
+  const v = view([subtask("S1", "landed"), subtask("S2", "working")], {
+    thr_s2: live(3),
+    thr_kid: child("orch · S11"),
+    thr_free: child("Fix the build"),
+    thr_idle: child("orch · R3", { status: "idle" }),
+    thr_other: live(1, { parentThreadId: "thr_else", title: "x · S12", status: "active" }),
+    thr_hidden: child("orch · H1", { hidden: true }),
+  });
+  assert.deepEqual(v.active.map((r) => [r.id, r.label, r.name, r.kind, r.running]), [
+    ["S2", "S2", "S2 name", "work", false],
+    ["thr_kid", "S11", "", "work", true],
+    ["thr_free", "", "Fix the build", "work", true],
+  ]);
+  assert.equal(v.active[1]!.step, "Running, not in the ledger yet");
+  assert.equal(v.threadIds.thr_kid, "thr_kid");
+  assert.equal(v.subline, "3 agents working · 1 of 2 done · latest report 3m ago", "children work but don't count as planned subtasks");
+});
+
+test("a child that names a session-less ledger row becomes that row's thread", () => {
+  const v = view([subtask("S11", "briefed", { threadId: null })], { thr_kid: live(2, { parentThreadId: "thr_orch", title: "orch · S11", status: "active" }) });
+  assert.deepEqual(v.active.map((r) => [r.id, r.running, r.step]), [["S11", true, "Briefed, no reply yet"]]);
+  assert.equal(v.threadIds.S11, "thr_kid");
+});
+
+test("a child waiting on approval is an ask; a landed subtask running again is active, not done", () => {
+  const v = view([subtask("S1", "landed", { statusRaw: "landed abc; follow-up working" })], {
+    thr_s1: live(1, { status: "active" }),
+    thr_kid: live(4, { parentThreadId: "thr_orch", title: "orch · R2", hasPendingInteraction: true }),
+  });
+  assert.deepEqual(v.asks.map((a) => [a.key, a.who, a.kind]), [["thr_kid", "R2", "thread"]]);
+  assert.equal(v.threadIds.thr_kid, "thr_kid");
+  assert.deepEqual(v.active.map((r) => [r.id, r.kind, r.step]), [["S1", "work", "Running again · landed abc; follow-up working"]]);
+  assert.equal(v.state, "needs");
+  assert.equal(view([subtask("S1", "landed")], { thr_s1: live(1, { status: "active" }) }).state, "moving", "not «done» while a landed subtask runs");
+});
+
+test("child labels: an id after the last « · », else none", () => {
+  assert.equal(childLabel("thread-tree-sidebar-v2 · O8"), "O8");
+  assert.equal(childLabel("a · S9a"), "S9a");
+  assert.equal(childLabel("S11"), null);
+  assert.equal(childLabel("a · review of the thing"), null);
+  assert.equal(childLabel(null), null);
 });

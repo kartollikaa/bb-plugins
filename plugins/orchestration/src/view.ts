@@ -17,12 +17,19 @@ export interface LiveThread {
   hasPendingInteraction: boolean;
   latestAttentionAt: number;
   createdAt: number;
+  parentThreadId?: string | null;
+  title?: string | null;
+  hidden?: boolean;
 }
 
 export interface Row {
   id: string;
+  /** What the row shows before its name: the subtask id, or the id a child's title ends with. */
+  label: string;
   name: string;
   kind: RowKind;
+  /** bb has a turn running in the row's thread. */
+  running: boolean;
   step: string;
   age: string;
   runs: string;
@@ -69,6 +76,8 @@ export interface View {
   activeLabel: string;
   active: Row[];
   done: Row[];
+  /** Row or ask key → the bb thread its Open thread button opens. */
+  threadIds: Record<string, string>;
   history: { sessions: string; handover: string | null; ledger: string; warnings: string[]; notes: string[] };
 }
 
@@ -84,6 +93,8 @@ const DONE = new Set(["landed", "verified", "dropped"]);
 const ASKING = new Set(["question", "ready", "card"]);
 const WAITING = new Set(["waiting-dependency", "planned"]);
 const QUIET_WATCHED = new Set(["working", "briefed"]);
+const BUSY = new Set(["starting", "active", "stopping"]);
+const isBusy = (live: LiveThread | null | undefined) => !!live && BUSY.has(live.status);
 const ORDER: Record<RowKind, number> = { you: 0, stuck: 1, work: 2, wait: 3, done: 4 };
 
 export function longAge(ms: number): string {
@@ -123,6 +134,8 @@ const capitalize = (text: string) => text[0]!.toUpperCase() + text.slice(1);
 
 interface Classified {
   subtask: Subtask;
+  /** A child thread of the orchestrator that no ledger row names: shown while it runs or asks. */
+  child: { label: string; title: string } | null;
   kind: RowKind;
   reason: "quiet" | "circles" | "blocked" | null;
   lastReport: number | null;
@@ -134,9 +147,9 @@ function classify(subtask: Subtask, input: ViewInput): Classified {
   const live = subtask.threadId ? input.live[subtask.threadId] ?? null : null;
   const agent = subtask.threadId ? input.agents[subtask.threadId] ?? null : null;
   const reported = live?.latestAttentionAt || agent?.lastReportAt || live?.createdAt || null;
-  const base = { subtask, live, agent, lastReport: reported, reason: null };
+  const base = { subtask, child: null, live, agent, lastReport: reported, reason: null };
   const status = subtask.status ?? "";
-  if (DONE.has(status)) return { ...base, kind: "done" };
+  if (DONE.has(status)) return { ...base, kind: isBusy(live) ? "work" : "done" };
   if (ASKING.has(status) || live?.hasPendingInteraction) return { ...base, kind: "you" };
   if (subtask.gateFailures >= FAILURES_STUCK) return { ...base, kind: "stuck", reason: "circles" };
   if (status === "blocked") return { ...base, kind: "stuck", reason: "blocked" };
@@ -150,6 +163,8 @@ function classify(subtask: Subtask, input: ViewInput): Classified {
 function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
   const { subtask, agent } = c;
   const said = firstLine(agent?.lastOutput ?? null);
+  if (c.child) return c.kind === "you" ? "Waiting on you in its thread" : "Running, not in the ledger yet";
+  if (c.kind === "work" && DONE.has(subtask.status ?? "")) return `Running again · ${firstLine(subtask.statusRaw, 90) ?? subtask.status}`;
   if (c.reason === "quiet") return `Quiet for ${longAge(now - c.lastReport!)}${said ? ` · last: ${said}` : ""}`;
   if (c.reason === "circles") return `${capitalize(subtask.lastFailedKind ?? "gate")} failed ${subtask.gateFailures} times`;
   if (c.reason === "blocked") return blockedLine(subtask);
@@ -188,8 +203,10 @@ function toRow(c: Classified, doneIds: Set<string>, now: number): Row {
   const context = [percent, rotations(subtask.rotations)].filter(Boolean).join(" · ") || "—";
   return {
     id: subtask.id,
-    name: subtask.name ?? "",
+    label: c.child ? c.child.label : subtask.id,
+    name: c.child ? (c.child.label ? "" : c.child.title) : subtask.name ?? "",
     kind: c.kind,
+    running: isBusy(c.live),
     step: stepOf(c, doneIds, now),
     age: c.kind === "wait" || c.lastReport === null ? "" : shortAge(now - c.lastReport),
     runs,
@@ -200,7 +217,7 @@ function toRow(c: Classified, doneIds: Set<string>, now: number): Row {
 
 function askOf(c: Classified, now: number): Ask {
   const { subtask, agent } = c;
-  const who = subtask.name ? `${subtask.id} · ${subtask.name}` : subtask.id;
+  const who = c.child ? c.child.label || c.child.title : subtask.name ? `${subtask.id} · ${subtask.name}` : subtask.id;
   const since = c.lastReport;
   const base = { key: subtask.id, who, subtask: subtask.id, since, age: since === null ? "" : shortAge(now - since), title: null, replyTitle: null, links: [], threads: [], replies: [] };
   if (subtask.status === "ready") {
@@ -235,12 +252,56 @@ function recapLine(entry: { text: string; at: string | null } | null, now: numbe
   return { text, age: Number.isFinite(at) && at <= now ? shortAge(now - at) : "" };
 }
 
+/** «thread-tree-sidebar-v2 · S11» → S11: the id an orchestrator puts after its children's titles. */
+export function childLabel(title: string | null | undefined): string | null {
+  const last = title?.split(" · ").at(-1)?.trim() ?? "";
+  return title?.includes(" · ") && /^[A-Za-z]{1,4}\d+[a-z]?$/.test(last) ? last : null;
+}
+
+const childSubtask = (id: string, threadId: string): Subtask => ({
+  id, name: null, threadId, status: null, statusRaw: null, modelRaw: null, dependsOn: [], gateLine: null, gateFailures: 0, lastFailedKind: null, rotations: 0,
+});
+
+/**
+ * The orchestrator's child threads, bound to the ledger: a child whose title ends with the id of a
+ * session-less ledger row becomes that row's thread; any other child that runs or asks gets its own row.
+ */
+function withChildren(input: ViewInput): { subtasks: Subtask[]; children: Classified[] } {
+  const subtasks = [...input.ledger.subtasks];
+  const named = new Set(subtasks.flatMap((s) => (s.threadId ? [s.threadId] : [])));
+  const children: Classified[] = [];
+  const own = Object.entries(input.live)
+    .filter(([id, t]) => t.parentThreadId === input.orchestratorThreadId && !t.hidden && !named.has(id))
+    .sort(([, a], [, b]) => a.createdAt - b.createdAt);
+  for (const [threadId, live] of own) {
+    const label = childLabel(live.title);
+    const row = label ? subtasks.findIndex((s) => s.id === label && !s.threadId) : -1;
+    if (row >= 0) {
+      subtasks[row] = { ...subtasks[row]!, threadId };
+      continue;
+    }
+    if (!isBusy(live) && !live.hasPendingInteraction) continue;
+    children.push({
+      subtask: childSubtask(threadId, threadId),
+      child: { label: label ?? "", title: live.title ?? threadId },
+      kind: live.hasPendingInteraction ? "you" : "work",
+      reason: null,
+      lastReport: live.latestAttentionAt || live.createdAt || null,
+      agent: null,
+      live,
+    });
+  }
+  return { subtasks, children };
+}
+
 export function buildView(input: ViewInput): View {
   const { ledger, now } = input;
-  const classified = ledger.subtasks.map((s) => classify(s, input));
-  const doneIds = new Set(classified.filter((c) => c.kind === "done").map((c) => c.subtask.id));
+  const { subtasks, children } = withChildren(input);
+  const planned = subtasks.map((s) => classify(s, input));
+  const classified = [...planned, ...children];
+  const doneIds = new Set(planned.filter((c) => DONE.has(c.subtask.status ?? "")).map((c) => c.subtask.id));
   const rows = classified.map((c) => toRow(c, doneIds, now));
-  const total = rows.length;
+  const total = planned.length;
   const doneCount = doneIds.size;
   const progress = `${doneCount} of ${total} done`;
 
@@ -264,7 +325,7 @@ export function buildView(input: ViewInput): View {
     });
   }
   const notes: string[] = [];
-  const byId = new Map(ledger.subtasks.map((s) => [s.id, s]));
+  const byId = new Map(subtasks.map((s) => [s.id, s]));
   ledger.forTheOwner.forEach((line, i) => {
     const item = parseOwnerItem(line);
     if (item.kind === "note") {
@@ -301,7 +362,8 @@ export function buildView(input: ViewInput): View {
     notes,
   };
   const recap = { goal: ledger.goal, now: recapLine(ledger.checkpoint, now), last: recapLine(ledger.lastDecision, now) };
-  const common = { recap, asks, active, done, history, activeLabel: `${active.length} active`, teamLabel: asks.length ? "Rest of the team" : "Team" };
+  const threadIds = Object.fromEntries(classified.flatMap((c) => (c.subtask.threadId ? [[c.subtask.id, c.subtask.threadId]] : [])));
+  const common = { recap, asks, active, done, threadIds, history, activeLabel: `${active.length} active`, teamLabel: asks.length ? "Rest of the team" : "Team" };
 
   if (total === 0) {
     return { ...common, state: "planning", heading: "Planning the work", subline: "The orchestrator is splitting the goal into subtasks.", rowLabel: "Planning the work", nudge: null };
@@ -331,7 +393,7 @@ export function buildView(input: ViewInput): View {
     return { ...common, state: "needs", heading, subline, rowLabel: heading, nudge: null };
   }
 
-  if (ledger.status === "closed" || doneCount === total) {
+  if (ledger.status === "closed" || (doneCount === total && active.length === 0)) {
     const heading = doneCount === total ? (total === 1 ? "The only subtask is done" : `All ${total} subtasks are done`) : "The orchestration is closed";
     return {
       ...common,

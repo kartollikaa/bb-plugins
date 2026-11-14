@@ -64,6 +64,9 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
         hasPendingInteraction: thread.hasPendingInteraction,
         latestAttentionAt: thread.latestAttentionAt,
         createdAt: thread.createdAt,
+        parentThreadId: thread.parentThreadId,
+        title: thread.displayTitle,
+        hidden: thread.isHidden,
       };
     }
     return map;
@@ -78,7 +81,6 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
     if (data.state === "none") return { kind: "none" };
     if (data.state === "error") return { kind: "error", message: data.message, retry: () => void query.refetch() };
     const view = buildView({ ledger: data.ledger, agents: data.agents, live, orchestratorThreadId: threadId, now: Math.max(now, data.readAt) });
-    const threadIds = Object.fromEntries(data.ledger.subtasks.flatMap((s) => (s.threadId ? [[s.id, s.threadId]] : [])));
-    return { kind: "ready", view, threadIds };
+    return { kind: "ready", view, threadIds: view.threadIds };
   }, [query.data, query.error, query.refetch, live, threadId, now]);
 }

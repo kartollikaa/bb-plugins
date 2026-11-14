@@ -157,9 +157,9 @@ function TeamRow({ row, open, onToggle, actions, threadId }: { row: Row; open: b
         onClick={onToggle}
         className="grid w-full grid-cols-[7px_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-lg px-2 py-[7px] text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <Dot kind={row.kind} className="mt-1.5" />
+        <Dot kind={row.kind} className={cx("mt-1.5", row.running && "animate-pulse motion-reduce:animate-none")} />
         <span className={cx("truncate text-sm", row.kind === "done" && "text-muted-foreground")}>
-          <span className="mr-1.5 tabular-nums text-subtle-foreground">{row.id}</span>
+          {row.label && <span className="mr-1.5 tabular-nums text-subtle-foreground">{row.label}</span>}
           {row.name}
         </span>
         <span className="text-xs leading-[1.6] tabular-nums text-subtle-foreground">{row.age}</span>
@@ -203,6 +203,7 @@ function Team({ view, actions, threadIds }: { view: View; actions: Actions; thre
       <section>
         <div className="px-0.5 pb-1.5 text-xs text-subtle-foreground">Team</div>
         <div className="px-0.5 text-xs text-muted-foreground">Subtasks appear here once the orchestrator writes its plan.</div>
+        {view.active.length > 0 && <div className="-mx-2 mt-1.5 flex flex-col">{view.active.map(row)}</div>}
       </section>
     );
   }

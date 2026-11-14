@@ -45,7 +45,13 @@ several name the thread, the newest wins.
   too, with the note after the status word as its cause. A subtask at `gate` is waiting
   on the orchestrator and never counts as quiet. While something needs you, the subline and the
   context-card row still name a stuck agent.
-- **Done:** `landed`, `verified`, `dropped`, or the ledger's status `closed`.
+- **Done:** `landed`, `verified`, `dropped`, or the ledger's status `closed`. A done subtask whose
+  thread is running again shows as working («Running again · …») and keeps the view out of «done».
+- **Running children:** child threads of the orchestrator (bb's `parentThreadId`) the ledger doesn't
+  name. One titled `… · <id>` fills that ledger row's empty session; otherwise it gets its own row
+  («Running, not in the ledger yet») while a turn runs, or a card while it waits on an approval.
+  Idle unlisted children are left out. To have a child show under its subtask, end its title with
+  ` · <subtask id>` or record its thread in the Subtasks table.
 
 A quick-reply option button sends `Re «<title>»: <option>` to the orchestrator thread itself, once
 per click, with `queue-if-active`: mid-turn it waits in bb's queue. The server sends only texts the
