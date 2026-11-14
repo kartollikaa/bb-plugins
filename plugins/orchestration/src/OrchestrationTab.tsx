@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { askIdentity, type Ask, type Row, type RowKind, type View } from "./view.ts";
 import { useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
@@ -27,7 +27,7 @@ function Dot({ kind, className }: { kind: RowKind; className?: string }) {
   return <span aria-hidden className={cx("size-[7px] shrink-0 rounded-full", DOT[kind], className)} />;
 }
 
-function Button({ variant, onClick, children, tabIndex }: { variant: "primary" | "quiet" | "outline"; onClick: () => void; children: ReactNode; tabIndex?: number }) {
+export function Button({ variant, onClick, children, tabIndex }: { variant: "primary" | "quiet" | "outline"; onClick: () => void; children: ReactNode; tabIndex?: number }) {
   return (
     <button
       type="button"
@@ -196,7 +196,7 @@ function History({ view }: { view: View }) {
   );
 }
 
-function Message({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
+export function Message({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col gap-1 px-4 pb-4 pt-5">
       <h2 className="m-0 text-base font-semibold leading-[1.35]">{title}</h2>
@@ -206,10 +206,13 @@ function Message({ title, body, action }: { title: string; body: string; action?
   );
 }
 
-export function OrchestrationTab({ threadId }: { threadId: string }) {
+/** `revealComposer` makes the chat composer visible before a draft goes in; the page's rail uses it. */
+export function OrchestrationTab({ threadId, revealComposer, className, noneAction }: { threadId: string; revealComposer?: () => Promise<void>; className?: string; noneAction?: ReactNode }) {
   const isOrchestrator = useIsOrchestrator(threadId);
   const state = useOrchestration(threadId, isOrchestrator);
   const composers = useComposers();
+  const composersRef = useRef(composers);
+  composersRef.current = composers;
   const navigate = useBbNavigate();
   const [sent, setSent] = useState<string | null>(null);
   const [showAllAsks, setShowAllAsks] = useState(false);
@@ -217,7 +220,10 @@ export function OrchestrationTab({ threadId }: { threadId: string }) {
   const actions: Actions = {
     sent,
     fill(key, text) {
-      if (fillComposer(composers, threadId, text)) setSent(key);
+      void (async () => {
+        await revealComposer?.();
+        if (fillComposer(composersRef.current, threadId, text)) setSent(key);
+      })();
     },
     openThread(childId) {
       if (childId) navigate.toThread(childId, { split: true });
@@ -225,7 +231,7 @@ export function OrchestrationTab({ threadId }: { threadId: string }) {
   };
 
   if (state.kind === "loading") return <Message title="Reading the ledger" body="One moment." />;
-  if (state.kind === "none") return <Message title="No orchestration here" body="This thread is not named on the first line of any orchestrate ledger on this computer." />;
+  if (state.kind === "none") return <Message title="No orchestration here" body="This thread is not named on the first line of any orchestrate ledger on this computer." action={noneAction} />;
   if (state.kind === "error") {
     return <Message title="Can't read the ledger" body={state.message} action={<Button variant="outline" onClick={state.retry}>Try again</Button>} />;
   }
@@ -234,7 +240,7 @@ export function OrchestrationTab({ threadId }: { threadId: string }) {
   const [first, ...rest] = view.asks;
   const askThread = (ask: Ask) => (ask.key in threadIds ? threadIds[ask.key]! : null);
   return (
-    <div className="flex h-full flex-col gap-6 overflow-y-auto px-4 pb-4 pt-5 text-sm leading-[1.45] text-foreground">
+    <div className={cx("flex h-full flex-col gap-6 overflow-y-auto px-4 pb-4 pt-5 text-sm leading-[1.45] text-foreground", className)}>
       <section>
         <h2 className="m-0 text-base font-semibold leading-[1.35] tracking-[-0.01em] [text-wrap:balance]">{view.heading}</h2>
         <p className="m-0 mt-1 text-muted-foreground [text-wrap:pretty]">{view.subline}</p>

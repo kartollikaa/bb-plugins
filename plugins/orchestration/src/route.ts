@@ -47,3 +47,15 @@ export function chatPreference(storage: PreferenceStorage | null) {
 export function shouldOpenView({ isOrchestrator, prefersChat }: { isOrchestrator: boolean; prefersChat: boolean }): boolean {
   return isOrchestrator && !prefersChat;
 }
+
+export const RAIL = { default: 400, min: 340, max: 560, drawerBelow: 900 } as const;
+
+export function railMode(pageWidth: number): "rail" | "drawer" {
+  return pageWidth < RAIL.drawerBelow ? "drawer" : "rail";
+}
+
+export function clampRailWidth(width: number, pageWidth: number): number {
+  if (!Number.isFinite(width)) return RAIL.default;
+  const max = Math.max(RAIL.min, Math.min(RAIL.max, Math.floor(pageWidth / 2)));
+  return Math.min(max, Math.max(RAIL.min, Math.round(width)));
+}
