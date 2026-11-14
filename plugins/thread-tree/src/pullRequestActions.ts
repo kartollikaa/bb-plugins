@@ -62,9 +62,10 @@ export function pullRequestActions({ attention, threadId, mergeEnvironmentId, re
   };
 }
 
-export function agentReviewPrompt({ url, number, title }: { url: string; number: number; title: string }): string {
+/** The PR's title stays out: it is the author's text, and the agent reads the PR itself. */
+export function agentReviewPrompt({ url, number }: { url: string; number: number }): string {
   return [
-    `Review pull request #${number} (${JSON.stringify(title)}): ${url}`,
+    `Review pull request #${number}: ${url}`,
     "",
     "Read it with `gh pr view` and `gh pr diff`, and read the repository's own review guidance (CLAUDE.md, AGENTS.md, docs) first.",
     "Don't check out its branch in this checkout, and don't post anything to GitHub.",

@@ -55,7 +55,7 @@ test("Merge needs GitHub's ready signal and an environment; Agent review needs n
 });
 
 test("the review prompt names the PR and keeps the agent off GitHub and off the checkout's branch", () => {
-  const prompt = agentReviewPrompt({ url: "https://github.com/o/r/pull/7", number: 7, title: "Fix it" });
+  const prompt = agentReviewPrompt({ url: "https://github.com/o/r/pull/7", number: 7 });
   assert.match(prompt, /https:\/\/github\.com\/o\/r\/pull\/7/);
   assert.match(prompt, /#7/);
   assert.match(prompt, /don't post/i);

@@ -203,7 +203,6 @@ function PullRequestRow({
 }: {
   item: GithubFolderItem;
   onOpenThread?: (split: boolean) => void;
-  /** Merge or Agent review, drawn with the strip's button class. */
   action: (className: string) => React.ReactNode;
   isSnoozed: boolean;
   now: number;

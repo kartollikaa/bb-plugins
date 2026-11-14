@@ -30,7 +30,7 @@ const SIGNAL_REFRESH_MS = 2_000;
 const signalTag = (threadId: string) => `signals:${threadId}`;
 
 
-const pullRequestUrlSchema = z.string().max(400).regex(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*$/i);
+const pullRequestUrlSchema = z.string().max(400).regex(/^https:\/\/(?:www\.)?github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*$/i);
 
 export const rpcContract = defineRpcContract({
   /** The project an agent review of a repo's PR starts in, keyed by `owner/repo`; null when no project has that remote. */
@@ -38,7 +38,6 @@ export const rpcContract = defineRpcContract({
     input: z.object({ keys: z.array(z.string().min(1).max(200)).min(1).max(200) }),
     output: z.record(z.string(), z.object({ projectId: z.string(), name: z.string() }).nullable()),
   },
-  /** Starts a thread that reviews a PR in its repo's project. */
   agentReview: {
     input: z.object({ url: pullRequestUrlSchema, number: z.number().int().positive(), title: z.string().max(400) }).strict(),
     output: z.object({ threadId: z.string(), projectId: z.string() }),
@@ -221,7 +220,7 @@ export default async function plugin(bb: BbPluginApi) {
         projectId: project.projectId,
         environment: { type: "project-default" },
         title: `Review #${number} ${title}`.slice(0, 200),
-        prompt: agentReviewPrompt({ url, number, title }),
+        prompt: agentReviewPrompt({ url, number }),
       });
       return { threadId: thread.id, projectId: project.projectId };
     },

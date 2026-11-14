@@ -88,15 +88,16 @@ export function usePending(pendingKey: string): boolean {
   return useSyncExternalStore(pendingActions.subscribe, () => pendingActions.has(pendingKey));
 }
 
-export function ActionPill({ label, pendingKey, ariaLabel, icon, errorTitle, run, tone = "danger" }: { label: string; pendingKey: string; ariaLabel: string; icon: string; errorTitle: string; run: () => Promise<unknown>; tone?: keyof typeof PILL_TONE }) {
+export function ActionPill({ label, pendingKey, ariaLabel, icon, errorTitle, confirm, run, tone = "danger" }: { label: string; pendingKey: string; ariaLabel: string; icon: string; errorTitle: string; confirm?: () => Promise<boolean>; run: () => Promise<unknown>; tone?: keyof typeof PILL_TONE }) {
   const pending = usePending(pendingKey);
   return (
     <button
       type="button"
       disabled={pending}
-      onClick={(event) => {
+      onClick={async (event) => {
         event.stopPropagation();
-        void runPending(pendingKey, errorTitle, run);
+        if (confirm && !(await confirm())) return;
+        await runPending(pendingKey, errorTitle, run);
       }}
       aria-label={ariaLabel}
       title={ariaLabel}

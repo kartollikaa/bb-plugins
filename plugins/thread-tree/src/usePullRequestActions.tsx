@@ -26,13 +26,19 @@ export interface ActionablePullRequest {
   threadId: string | null;
 }
 
-/** Resolves true only on the toast's Merge; closing or ignoring it cancels. */
+const confirming = new Set<string>();
+
+/** Resolves true only on the toast's Merge; closing or ignoring it cancels, and a second click while it is up does nothing. */
 function confirmMerge(pr: ActionablePullRequest): Promise<boolean> {
+  const key = pr.url.toLowerCase();
+  if (confirming.has(key)) return Promise.resolve(false);
+  confirming.add(key);
   return new Promise((resolve) => {
     let settled = false;
     const settle = (value: boolean) => {
       if (settled) return;
       settled = true;
+      confirming.delete(key);
       resolve(value);
     };
     toast(`Merge #${pr.number}?`, {
@@ -68,7 +74,6 @@ export function usePullRequestActions({ repos, mergeEnvironmentOf, onMerged, onN
   }), [mergeEnvironmentOf, projects.data, startedReviews]);
 
   const merge = useCallback(async (pr: ActionablePullRequest, environmentId: string) => {
-    if (!(await confirmMerge(pr))) return;
     const { message } = await rpc.call("mergePullRequest", { environmentId, url: pr.url });
     toast.success(`Merged #${pr.number}`, { description: message || pr.title });
     onMerged();
@@ -92,13 +97,15 @@ interface ResolvedAction {
   ariaLabel: string;
   icon: string;
   errorTitle: string;
+  /** Asked before the action starts, so the button doesn't spin while the user decides. */
+  confirm?: () => Promise<boolean>;
   run: () => Promise<unknown>;
 }
 
 function resolveAction(pr: ActionablePullRequest, handlers: PullRequestActionHandlers): ResolvedAction | null {
   const { mergeEnvironmentId, reviewProject } = handlers.actionsOf(pr);
   if (mergeEnvironmentId) {
-    return { key: `merge:${pr.url}`, label: "Merge", ariaLabel: `Merge #${pr.number}`, icon: "GitMerge", errorTitle: "Merge failed", run: () => handlers.merge(pr, mergeEnvironmentId) };
+    return { key: `merge:${pr.url}`, label: "Merge", ariaLabel: `Merge #${pr.number}`, icon: "GitMerge", errorTitle: "Merge failed", confirm: () => confirmMerge(pr), run: () => handlers.merge(pr, mergeEnvironmentId) };
   }
   if (reviewProject) {
     return { key: `review:${pr.url}`, label: "Review", ariaLabel: `Agent review of #${pr.number} in ${reviewProject.name}`, icon: "Bot", errorTitle: "Couldn't start the review", run: () => handlers.review(pr) };
@@ -106,10 +113,15 @@ function resolveAction(pr: ActionablePullRequest, handlers: PullRequestActionHan
   return null;
 }
 
+async function runConfirmed(action: ResolvedAction) {
+  if (action.confirm && !(await action.confirm())) return;
+  await runPending(action.key, action.errorTitle, action.run);
+}
+
 /** Needs you's button for a PR item, beside Snooze like Retry on a failed turn. */
 export function PullRequestActionPill({ pr, handlers }: { pr: ActionablePullRequest; handlers: PullRequestActionHandlers }) {
   const action = resolveAction(pr, handlers);
-  return action ? <ActionPill label={action.label} pendingKey={action.key} ariaLabel={action.ariaLabel} icon={action.icon} errorTitle={action.errorTitle} tone="neutral" run={action.run} /> : null;
+  return action ? <ActionPill label={action.label} pendingKey={action.key} ariaLabel={action.ariaLabel} icon={action.icon} errorTitle={action.errorTitle} tone="neutral" confirm={action.confirm} run={action.run} /> : null;
 }
 
 /** The PR section's hover-strip form of the same action. */
@@ -125,7 +137,7 @@ export function PullRequestActionIcon({ pr, handlers, className }: { pr: Actiona
       disabled={pending}
       onClick={(event) => {
         event.stopPropagation();
-        void runPending(action.key, action.errorTitle, action.run);
+        void runConfirmed(action);
       }}
       className={className}
     >
