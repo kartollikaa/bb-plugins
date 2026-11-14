@@ -387,7 +387,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       <>
       <NeedsYouSection
         items={needsYou.items}
-        isCollapsed={collapsedGroups.has("needs-you")}
+        isCollapsed={foldSections || collapsedGroups.has("needs-you")}
         onToggle={() => collapsedGroups.toggle("needs-you")}
         activeThreadId={activeThreadId ?? null}
         isCompactViewport={isCompactViewport}
