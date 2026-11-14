@@ -366,7 +366,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const renderRow = (
     row: TreeRow<PluginSidebarThread>,
     variant: "tree" | "flat",
-    { subtitle, numbered = variant === "tree", rollup }: { subtitle?: string | readonly SubtitlePart[]; numbered?: boolean; rollup?: RollupState | null } = {},
+    { subtitle, numbered = variant === "tree", rollup, muted = false }: { subtitle?: string | readonly SubtitlePart[]; numbered?: boolean; rollup?: RollupState | null; muted?: boolean } = {},
   ) => (
     <Fragment key={row.thread.id}>
       <ThreadRowView
@@ -376,6 +376,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         numbered={numbered}
         context={variant === "flat" ? projectById.get(row.thread.projectId)?.name : undefined}
         subtitle={subtitle}
+        muted={muted}
         isActive={row.thread.id === activeThreadId}
         rollup={rollup}
         isCompactViewport={isCompactViewport}
@@ -595,6 +596,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                       numbered: false,
                       subtitle: orchestrationSubtitleParts(entry, (projectId) => projectById.get(projectId)?.name ?? null),
                       rollup: entry.rollup,
+                      muted: entry.finished,
                     }))}
                   </div>
                 </Collapse>
@@ -944,6 +946,7 @@ function ThreadRowView({
   numbered,
   context,
   subtitle,
+  muted = false,
   isActive,
   rollup,
   isCompactViewport,
@@ -967,6 +970,8 @@ function ThreadRowView({
   context?: string;
   /** A second line under the title: the Running filter's context or an orchestration's progress. */
   subtitle?: string | readonly SubtitlePart[];
+  /** A finished orchestration's shortcut. */
+  muted?: boolean;
   isActive: boolean;
   /** The subtree's state drawn in place of the thread's own; a folded tree row works it out itself. */
   rollup?: RollupState | null;
@@ -1073,7 +1078,7 @@ function ThreadRowView({
             <span title={glyph.label ?? undefined} className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
           )}
           {subtitle ? (
-            <span className="flex min-w-0 flex-1 flex-col justify-center">
+            <span data-row-muted={muted ? "" : undefined} className={cn("flex min-w-0 flex-1 flex-col justify-center", muted && "text-muted-foreground")}>
               <Link thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
               <span data-row-subtitle="" className="truncate text-2xs text-sidebar-foreground/50">
                 {typeof subtitle === "string" ? subtitle : subtitle.map((part, index) => (

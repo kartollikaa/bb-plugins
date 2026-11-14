@@ -26,8 +26,8 @@ under it, and the subagents it runs inside its own session show on its row.
   Archive, skipping worktrees with uncommitted changes.
 - Per project, threads idle, read and quiet for a day fold into "N older";
   expanded, it offers Archive these, skipping uncommitted worktrees.
-- Orchestrations: a shortcut for each orchestrator with work going, with its
-  projects and progress.
+- Orchestrations: a shortcut for each thread with live subthreads, most
+  urgent first, with its projects and progress; finished ones go last, muted.
 - Before each title, bb's own status glyph: a spinner while the agent works, a
   question mark when it needs input, a red cross for a failure, a dot for an
   unread result, a pencil for a draft. A failed thread gets a Retry button.

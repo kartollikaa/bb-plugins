@@ -124,15 +124,20 @@ orchestration section there are only [threads] of orchestration without nested [
 and in folder there are gonna be the whole … with nested tree."
 
 - **Project folders stay the home.** An orchestrator keeps its full nested tree in its folder.
-- **An Orchestrations section** under the Threads heading lists one shortcut row per orchestrator
-  that still has work going (anything running, needing input, failed, or finished-unread in its
-  subtree). No subthreads in the section.
+- **What is an orchestrator.** A top-level thread (no visible parent) with at least one unarchived
+  subthread, at any depth. Nothing else: no title or name heuristics. Owner, when an idle
+  orchestrator dropped out of the section: «define and make a rule that what threads should be
+  considered and how they can be considered as orchestrators».
+- **An Orchestrations section** under the Threads heading, after Pinned, lists one shortcut row per
+  orchestrator for as long as it is one: until the orchestrator or its last subthread is archived.
+  Idle and read does not hide it. Order: most urgent rolled-up state first (FOLD_PRIORITY), ties by
+  the tree's latest activity; finished ones (everything done and read) last, drawn muted, with no
+  extra action. No subthreads in the section.
 - **Shortcut row:** most urgent state of the subtree as the glyph, title, provider, age; second
   line with the projects it spans and progress ("bb-plugins · 2/4 done · 1 needs you").
 - Click opens the orchestrator like a normal row: no scrolling, unfolding or highlighting in the tree.
-- Finished orchestrations leave the section by themselves; archiving happens in the folder. The
-  section hides when empty.
-- An orchestrator is any thread with unarchived subthreads, detected automatically.
+- An orchestration leaves the section when its subthreads are archived (the orchestrate workflow
+  does that when it finishes); archiving happens in the folder. The section hides when empty.
 
 ### Orchestrator progress
 

@@ -30,6 +30,8 @@ export interface Orchestration<T extends TreeThread> {
   state: FoldState;
   /** The subtree's state when it outranks the orchestrator's own. */
   rollup: RollupState | null;
+  /** The orchestrator and every subthread are done and read: drawn muted, listed last. */
+  finished: boolean;
   /** The orchestrator's project first, then its subthreads' in tree order. */
   projectIds: string[];
   total: number;
@@ -39,31 +41,38 @@ export interface Orchestration<T extends TreeThread> {
   running: number;
 }
 
-/** One entry per top-level thread with subthreads that still has work going: anything but done and read. */
+/**
+ * Every orchestrator: a top-level thread with at least one unarchived subthread, at any depth.
+ * Most urgent first, ties by the tree's latest activity; finished ones (all done and read) last.
+ */
 export function orchestrations<T extends TreeThread>(forest: Forest<T>): Orchestration<T>[] {
-  const out: Orchestration<T>[] = [];
+  const out: (Orchestration<T> & { latest: number })[] = [];
   for (const root of forest.roots) {
-    const subtree = descendantsOf(forest, root.id);
+    if (root.isArchived) continue;
+    const subtree = descendantsOf(forest, root.id).filter((kid) => !kid.isArchived);
     if (subtree.length === 0) continue;
     const counts: FoldCounts = {};
     subtree.forEach((kid) => addFoldState(counts, kid));
     const own = foldState(root);
     const rollup = rollupOver(own, counts);
     const state = rollup ?? own;
-    if (state === "done") continue;
     out.push({
       thread: root,
       state,
       rollup,
-      projectIds: [...new Set([root.projectId, ...inTreeOrder(forest, root.id).map((kid) => kid.projectId)])],
+      finished: state === "done",
+      projectIds: [...new Set([root.projectId, ...inTreeOrder(forest, root.id).filter((kid) => !kid.isArchived).map((kid) => kid.projectId)])],
       total: subtree.length,
       done: (counts.done ?? 0) + (counts.unread ?? 0),
       needsYou: counts.input ?? 0,
       failed: counts.error ?? 0,
       running: counts.running ?? 0,
+      latest: Math.max(root.updatedAt, ...subtree.map((kid) => kid.updatedAt)),
     });
   }
-  return out;
+  return out
+    .sort((a, b) => rank(a.state) - rank(b.state) || b.latest - a.latest || a.thread.id.localeCompare(b.thread.id))
+    .map(({ latest: _latest, ...orchestration }) => orchestration);
 }
 
 function inTreeOrder<T extends TreeThread>(forest: Forest<T>, rootId: string): T[] {

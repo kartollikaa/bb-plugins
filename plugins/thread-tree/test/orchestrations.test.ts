@@ -70,7 +70,7 @@ test("the fold bar shows only from five subthreads, segments sized by state, mos
   ]);
 });
 
-test("Orchestrations lists roots with subthreads that still have work going, with their progress", () => {
+test("Orchestrations lists every root with subthreads, most urgent first, with their progress", () => {
   const threads = [
     thread("live", { updatedAt: 9, projectId: "bb" }),
     thread("l1", { parentThreadId: "live", ...input }),
@@ -87,20 +87,47 @@ test("Orchestrations lists roots with subthreads that still have work going, wit
     thread("lone", { updatedAt: 10, ...running }),
   ];
   const list = orchestrations(buildForest(threads));
-  assert.deepEqual(list.map((o) => o.thread.id), ["live", "unreadOnly", "selfRunning"]);
-  const [live, unreadOnly] = list;
+  assert.deepEqual(list.map((o) => o.thread.id), ["live", "selfRunning", "unreadOnly", "finished"]);
+  const [live, , unreadOnly] = list;
   assert.deepEqual(
     { state: live!.state, projectIds: live!.projectIds, total: live!.total, done: live!.done, needsYou: live!.needsYou, failed: live!.failed, running: live!.running },
     { state: "input", projectIds: ["bb", "p1", "web"], total: 5, done: 2, needsYou: 1, failed: 1, running: 1 },
   );
   assert.equal(unreadOnly!.state, "unread");
-  assert.deepEqual(list.map((o) => o.rollup), ["input", "unread", null]);
+  assert.deepEqual(list.map((o) => o.rollup), ["input", null, "unread", null]);
+  assert.deepEqual(list.map((o) => o.finished), [false, false, false, true]);
   assert.equal(orchestrationSubtitle(live!, (id) => ({ bb: "bb-plugins", web: "web" })[id] ?? null), "bb-plugins + web · 2/5 done · 1 needs you · 1 failed · 1 running");
   assert.equal(orchestrationSubtitle(unreadOnly!, () => "bb-plugins"), "bb-plugins · 1/1 done");
   assert.deepEqual(
     orchestrationSubtitleParts(live!, (id) => ({ bb: "bb-plugins", web: "web" })[id] ?? null).map((part) => part.tone),
     ["muted", "muted", "attention", "bad", "muted"],
   );
+});
+
+test("an idle, read orchestrator stays listed as finished", () => {
+  const threads = [thread("orch"), thread("k1", { parentThreadId: "orch" }), thread("k2", { parentThreadId: "k1" })];
+  const [entry, ...rest] = orchestrations(buildForest(threads));
+  assert.equal(rest.length, 0);
+  assert.deepEqual({ id: entry!.thread.id, state: entry!.state, finished: entry!.finished, total: entry!.total }, { id: "orch", state: "done", finished: true, total: 2 });
+});
+
+test("an orchestrator leaves the list once it or its last subthread is archived", () => {
+  const allKidsArchived = [thread("a"), thread("a1", { parentThreadId: "a", isArchived: true }), thread("a2", { parentThreadId: "a1", isArchived: true })];
+  const rootArchived = [thread("b", { isArchived: true }), thread("b1", { parentThreadId: "b" })];
+  const oneLeft = [thread("c"), thread("c1", { parentThreadId: "c", isArchived: true }), thread("c2", { parentThreadId: "c", ...running })];
+  assert.deepEqual(orchestrations(buildForest([...allKidsArchived, ...rootArchived, ...oneLeft])).map((o) => [o.thread.id, o.total]), [["c", 1]]);
+});
+
+test("same urgency sorts by the tree's latest activity, finished ones always last", () => {
+  const threads = [
+    thread("doneRecent", { updatedAt: 100 }),
+    thread("d1", { parentThreadId: "doneRecent" }),
+    thread("old", { updatedAt: 1 }),
+    thread("o1", { parentThreadId: "old", updatedAt: 50, ...running }),
+    thread("new", { updatedAt: 20 }),
+    thread("n1", { parentThreadId: "new", ...running }),
+  ];
+  assert.deepEqual(orchestrations(buildForest(threads)).map((o) => o.thread.id), ["old", "new", "doneRecent"]);
 });
 
 test("a waiting subthread keeps its orchestration in the section", () => {

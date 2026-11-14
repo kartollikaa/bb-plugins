@@ -88,14 +88,18 @@ A ⚠ marks a thread whose branch or worktree another unarchived thread also
 uses; its tooltip names the other thread. Threads in a project's own checkout,
 and an orchestrator with its subthreads, never warn.
 
-An orchestrator is any thread with unarchived subthreads. The Orchestrations
-section under the Threads heading, after Pinned and before the project folders, has a shortcut for each top-level one that
-still has work going: something in its tree runs, waits, needs input, failed or
-finished unread. The shortcut's glyph is the most urgent of these, and its
-second line gives the projects it spans and its progress, such as
+An orchestrator is a top-level thread (no visible parent) with at least one
+unarchived subthread at any depth; nothing else counts, not a title or a name.
+The Orchestrations section under the Threads heading, after Pinned and before
+the project folders, has a shortcut for every orchestrator, idle and read ones
+included, until the orchestrator or its last subthread is archived. Shortcuts
+go most urgent first (needs input, failed, running, waiting, unread), ties by
+the tree's latest activity; finished ones (everything done and read) go last
+and draw muted. The shortcut's glyph is the most urgent state in the tree, and
+its second line gives the projects it spans and its progress, such as
 `bb-plugins · 2/4 done · 1 needs you`. Clicking it opens the orchestrator like
 any row, leaving the tree below as it is.
-Finished orchestrations drop out by themselves; the section hides when empty
+Archiving the subthreads closes an orchestration; the section hides when empty
 and in the archived view.
 
 A folded parent's glyph shows its subtree's state when that is more urgent than
