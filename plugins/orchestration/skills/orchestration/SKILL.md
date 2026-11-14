@@ -37,8 +37,8 @@ several name the thread, the newest wins.
 - **Recap**, on top: in the view the orchestrator thread's title, then the ledger's goal, its
   «Current checkpoint» as Now and its newest «Decision journal» row as Last, each with its age.
 - **Needs you:** subtasks at `question`, `ready` or `card`, a pending approval in any subtask's
-  thread or the orchestrator's own, and every ask under the ledger's «For the owner» (`note:` lines
-  and «Nothing waiting.»-style status lines are not asks).
+  thread or the orchestrator's own, and every `ask:` line under the ledger's «For the owner» (any
+  other line there is a note).
 - **Stuck:** a `working` or `briefed` subtask that hasn't reported for `QUIET_MS` (a report is the
   end of the thread's latest turn), or `FAILURES_STUCK` failed checks, review, done-when or conflicts
   stages across its open gates; both constants are in `src/view.ts`. A `blocked` subtask is stuck
@@ -82,14 +82,11 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
   `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
   ` / `). A GitHub link reads `repo#N` on its button. Each option sends `Re «<title>»: <option>` to the orchestrator; Other answer fills the composer with
   `Re «<title>»: `.
-- `note:`, and a status line that opens with «Nothing», «Nothing waiting», «Nothing pending» or
-  «Nothing waits on the owner» followed by a full stop or the end, is information, not an ask: it
-  shows under History and never counts as needs you. «Nothing lands until you approve…» is
-  still an ask; when in doubt, write `note:` or `ask:`.
+- Only `ask:` is an ask. `note:` and every other line («Nothing waiting.», «answered 2026-11-14:
+  …») is information: it shows under History as a note and never counts as needs you. An `ask:`
+  with no title is a note too. Owner, on the change: «The dialog keep showing even when i answered».
 - A ` | ` segment without one of the keys above stays with the field before it, so a title or a
   `why:` may contain ` | `.
-- Any other line stays a card with its full text, expandable, with its URLs, `owner/repo#N` refs and
-  thread ids as buttons.
 
 ## Settings
 

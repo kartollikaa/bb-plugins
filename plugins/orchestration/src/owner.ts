@@ -8,15 +8,12 @@ export interface Link {
 
 export type OwnerItem =
   | { kind: "ask"; title: string; why: string | null; links: Link[]; threads: string[]; options: string[] }
-  | { kind: "note"; text: string }
-  | { kind: "free"; text: string; links: Link[]; threads: string[] };
+  | { kind: "note"; text: string };
 
 const URL = /https?:\/\/[^\s<>()|]+[^\s<>()|.,;:!?'"»]/g;
 const GITHUB_REF = /(?<![\w./-])([A-Za-z0-9][\w.-]*)\/([\w.-]+)#(\d+)\b/g;
 const GITHUB_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:pull|issues)\/(\d+)(\/[^?#]*)?/;
 const THREAD = /\bthr_[a-z0-9]+\b/gi;
-/** «Nothing», «Nothing waiting.», «Nothing waits on owner input.» — but not «Nothing lands until you approve». */
-const NOTHING_STATUS = /^nothing(?:\s+(?:waiting|pending|to ask|left|(?:needs|waits on|for)\s+(?:you|the owner|owner)(?:\s+input)?))?\s*(?:[.;:!—–-]|$)/i;
 const ASK_KEYS = new Set(["why", "link", "links", "thread", "threads", "option", "options"]);
 
 function urlLink(href: string): Link {
@@ -66,13 +63,9 @@ function parseAsk(text: string): OwnerItem | null {
   };
 }
 
+/** The ledger schema has only `ask:` and `note:`; any other line («answered …», «Nothing waiting») is a note. */
 export function parseOwnerItem(raw: string): OwnerItem {
   const text = raw.trim();
-  if (/^note:/i.test(text)) return { kind: "note", text: text.replace(/^note:\s*/i, "") };
-  if (NOTHING_STATUS.test(text)) return { kind: "note", text };
-  if (/^ask:/i.test(text)) {
-    const ask = parseAsk(text);
-    if (ask) return ask;
-  }
-  return { kind: "free", text, links: linksIn(text), threads: threadsIn(text) };
+  const ask = /^ask:/i.test(text) ? parseAsk(text) : null;
+  return ask ?? { kind: "note", text: text.replace(/^note:\s*/i, "") };
 }

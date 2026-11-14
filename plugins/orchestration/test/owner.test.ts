@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseOwnerItem } from "../src/owner.ts";
+import { linksIn, parseOwnerItem } from "../src/owner.ts";
 
 test("a structured ask names what is asked, why, its links, its thread and its quick replies", () => {
   const item = parseOwnerItem("ask: Merge kartollika-ai-hub#38 | why: S5 passed review and checks | link: https://github.com/kartollikaa/kartollika-ai-hub/pull/38 | thread: thr_abc123 | options: Go as you recommend / Not now");
@@ -33,29 +33,21 @@ test("a note, and a «Nothing waiting» status line, never need the owner", () =
   assert.equal(parseOwnerItem("Nothing waits on owner input.").kind, "note");
 });
 
-test("free text stays a full ask, with its links and threads pulled out as actions", () => {
-  const item = parseOwnerItem("Waiting: owner merge of kartollikaa/bb-plugins#12, see https://github.com/kartollikaa/bb-plugins/pull/12 and thread thr_x9.");
-  assert.equal(item.kind, "free");
-  if (item.kind !== "free") return;
-  assert.equal(item.text, "Waiting: owner merge of kartollikaa/bb-plugins#12, see https://github.com/kartollikaa/bb-plugins/pull/12 and thread thr_x9.");
-  assert.deepEqual(item.links, [{ label: "bb-plugins#12", title: "kartollikaa/bb-plugins#12", href: "https://github.com/kartollikaa/bb-plugins/pull/12" }]);
-  assert.deepEqual(item.threads, ["thr_x9"]);
+test("only `ask:` makes an ask: an «answered …» record or any other line is a note", () => {
+  const answered = "answered 2026-11-14: Remove orchestration bits from thread-tree? → «keep both (recommended)»";
+  assert.deepEqual(parseOwnerItem(answered), { kind: "note", text: answered });
+  assert.equal(parseOwnerItem("Waiting: owner merge of kartollikaa/bb-plugins#12").kind, "note");
+  assert.equal(parseOwnerItem("Nothing lands until you approve the DB migration").kind, "note");
+  assert.equal(parseOwnerItem("ask: Approve the migration").kind, "ask", "positive control: a real ask still parses");
 });
 
-test("a free line without links has none, and a bare #38 or an unowned hub#38 is not a link", () => {
-  const item = parseOwnerItem("Confirm the release window, see #38 and hub#38");
-  assert.deepEqual(item, { kind: "free", text: "Confirm the release window, see #38 and hub#38", links: [], threads: [] });
+test("an ask without a title is a note", () => {
+  assert.equal(parseOwnerItem("ask:  | why: nothing to say").kind, "note");
 });
 
-test("an ask without a title falls back to free text", () => {
-  assert.equal(parseOwnerItem("ask:  | why: nothing to say").kind, "free");
-});
-
-test("a line that only starts with the word «Nothing» is still an ask", () => {
-  assert.equal(parseOwnerItem("Nothing lands until you approve the DB migration").kind, "free");
-  assert.equal(parseOwnerItem("Nothing waiting on the deploy until you pick a window").kind, "free");
-  assert.equal(parseOwnerItem("Nothing.").kind, "note");
-  assert.equal(parseOwnerItem("nothing for the owner").kind, "note");
+test("links come out of free text, and a bare #38 or an unowned hub#38 is not a link", () => {
+  assert.deepEqual(linksIn("owner merge of kartollikaa/bb-plugins#12, see https://github.com/kartollikaa/bb-plugins/pull/12"), [{ label: "bb-plugins#12", title: "kartollikaa/bb-plugins#12", href: "https://github.com/kartollikaa/bb-plugins/pull/12" }]);
+  assert.deepEqual(linksIn("Confirm the release window, see #38 and hub#38"), []);
 });
 
 test("an unkeyed ` | ` segment stays with the field before it, and a bare URL segment is kept as a link", () => {
@@ -70,9 +62,7 @@ test("an unkeyed ` | ` segment stays with the field before it, and a bare URL se
 
 test("links are deduplicated by address, not by label", () => {
   const long = "https://example.com/" + "a".repeat(60);
-  const item = parseOwnerItem(`See ${long}1 and ${long}2 and https://github.com/o/r/pull/3 and https://github.com/o/r/pull/3/files and o/r#3`);
-  assert.equal(item.kind, "free");
-  if (item.kind !== "free") return;
-  assert.deepEqual(item.links.map((l) => l.href), [`${long}1`, `${long}2`, "https://github.com/o/r/pull/3", "https://github.com/o/r/pull/3/files"]);
-  assert.deepEqual(item.links.slice(2).map((l) => l.label), ["r#3", "r#3/files"]);
+  const links = linksIn(`See ${long}1 and ${long}2 and https://github.com/o/r/pull/3 and https://github.com/o/r/pull/3/files and o/r#3`);
+  assert.deepEqual(links.map((l) => l.href), [`${long}1`, `${long}2`, "https://github.com/o/r/pull/3", "https://github.com/o/r/pull/3/files"]);
+  assert.deepEqual(links.slice(2).map((l) => l.label), ["r#3", "r#3/files"]);
 });

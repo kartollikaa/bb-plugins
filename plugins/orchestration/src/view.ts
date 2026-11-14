@@ -335,15 +335,14 @@ export function buildView(input: ViewInput): View {
       notes.push(item.text);
       return;
     }
-    const named = subtaskNamed(item.kind === "ask" ? item.title : item.text, byId);
+    const named = subtaskNamed(item.title, byId);
     const who = named ? `${named.subtask.id}${named.subtask.name ? ` · ${named.subtask.name}` : ""}` : "For you, from the ledger";
     const threads = named?.subtask.threadId && !item.threads.includes(named.subtask.threadId) ? [...item.threads, named.subtask.threadId] : item.threads;
-    const base = { key: `owner-${i}`, who, subtask: named?.subtask.id ?? null, since: null, age: "", kind: "owner" as const, links: item.links, threads };
-    if (item.kind === "ask") {
-      asks.push({ ...base, title: named?.rest ?? item.title, replyTitle: item.title, text: item.why ?? "", drafts: { primary: replyPrefix(item.title) }, replies: item.options.map((label) => ({ label, draft: replyDraft(item.title, label) })) });
-    } else {
-      asks.push({ ...base, title: null, replyTitle: null, text: named?.rest ?? item.text, drafts: { primary: replyPrefix(firstLine(item.text, 60) ?? "") }, replies: [] });
-    }
+    asks.push({
+      key: `owner-${i}`, who, subtask: named?.subtask.id ?? null, since: null, age: "", kind: "owner", links: item.links, threads,
+      title: named?.rest ?? item.title, replyTitle: item.title, text: item.why ?? "", drafts: { primary: replyPrefix(item.title) },
+      replies: item.options.map((label) => ({ label, draft: replyDraft(item.title, label) })),
+    });
   });
   asks.sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));
 

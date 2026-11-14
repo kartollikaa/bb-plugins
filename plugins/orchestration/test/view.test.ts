@@ -86,26 +86,26 @@ test("the orchestrator's own pending question needs you too", () => {
   assert.equal(v.asks[0]!.who, "Orchestrator");
 });
 
-test("each «For the owner» line needs you, after the timed asks", () => {
+test("each «For the owner» ask needs you, after the timed asks", () => {
   const v = view([subtask("S7", "ready"), subtask("S2", "working")], { thr_s7: live(5), thr_s2: live(1) }, {},
-    { forTheOwner: ["Waiting: owner merge of hub#38"] });
+    { forTheOwner: ["ask: Merge hub#38"] });
   assert.equal(v.heading, "2 things need you");
   assert.deepEqual(v.asks.map((a) => a.key), ["S7", "owner-0"]);
-  assert.equal(v.asks[1]!.drafts!.primary, "Re «Waiting: owner merge of hub#38»: ");
-  const only = view([subtask("S2", "working")], { thr_s2: live(1) }, {}, { forTheOwner: ["Confirm the window"] });
+  assert.equal(v.asks[1]!.drafts!.primary, "Re «Merge hub#38»: ");
+  const only = view([subtask("S2", "working")], { thr_s2: live(1) }, {}, { forTheOwner: ["ask: Confirm the window"] });
   assert.equal(only.heading, "One thing waits on you");
   assert.equal(only.state, "needs");
 });
 
 test("an open ask doesn't hide a stuck agent: the subline and the context row name it", () => {
   const v = view([subtask("S5", "working"), subtask("S6", "working"), subtask("S1", "landed")], { thr_s5: live(52), thr_s6: live(2) }, {},
-    { forTheOwner: ["Waiting: owner merge of hub#38"] });
+    { forTheOwner: ["ask: Merge hub#38"] });
   assert.equal(v.state, "needs");
   assert.equal(v.heading, "One thing waits on you");
   assert.equal(v.subline, "S5 has gone quiet · 1 of 3 done");
   assert.equal(v.rowLabel, "One thing waits on you · S5 has gone quiet");
   assert.equal(v.nudge!.draft, "What is S5 doing? It hasn't reported for 52 min.");
-  const calm = view([subtask("S6", "working")], { thr_s6: live(2) }, {}, { forTheOwner: ["x"] });
+  const calm = view([subtask("S6", "working")], { thr_s6: live(2) }, {}, { forTheOwner: ["ask: x"] });
   assert.equal(calm.subline, "The rest of the team is moving · 0 of 1 done");
   assert.equal(calm.rowLabel, "One thing waits on you");
   assert.equal(calm.nudge, null);
@@ -120,7 +120,7 @@ test("a new ask under the same key has a new identity, so a «sent» marker does
   assert.notEqual(askIdentity(first), askIdentity(next));
   assert.notEqual(askIdentity(first), askIdentity(ready));
   const owner = (lines: string[]) => view([], {}, {}, { forTheOwner: lines }).asks[0]!;
-  assert.notEqual(askIdentity(owner(["Merge hub#38"])), askIdentity(owner(["Confirm the window", "Merge hub#38"])));
+  assert.notEqual(askIdentity(owner(["ask: Merge hub#38"])), askIdentity(owner(["ask: Confirm the window", "ask: Merge hub#38"])));
 });
 
 test("quiet for 30 min while working is stuck; 29 min is not", () => {
@@ -210,13 +210,13 @@ test("notes from «For the owner» stay out of what needs you and show in the hi
   assert.deepEqual(v.history.notes, ["Nothing waiting. Store PR get-bb/marketplace#958 waits on a maintainer.", "T4 accepted the pager slide"]);
 });
 
-test("a free «For the owner» line keeps its full text and gets its links and threads as actions", () => {
-  const ask = view([], {}, {}, { forTheOwner: ["Waiting: owner merge of kartollikaa/bb-plugins#12 (thread thr_q1)"] }).asks[0]!;
-  assert.equal(ask.title, null);
-  assert.equal(ask.text, "Waiting: owner merge of kartollikaa/bb-plugins#12 (thread thr_q1)");
-  assert.deepEqual(ask.links.map((l) => l.label), ["bb-plugins#12"]);
-  assert.deepEqual(ask.threads, ["thr_q1"]);
-  assert.deepEqual(ask.replies, []);
+test("a «For the owner» line that is not `ask:` is a note, never a card", () => {
+  const answered = "answered 2026-11-14: Remove orchestration bits from thread-tree? → «keep both (recommended)»";
+  const v = view([subtask("S2", "landed")], {}, {}, { forTheOwner: [answered, "Waiting: owner merge of kartollikaa/bb-plugins#12"] });
+  assert.deepEqual(v.asks, []);
+  assert.notEqual(v.heading, "One thing waits on you");
+  assert.deepEqual(v.history.notes, [answered, "Waiting: owner merge of kartollikaa/bb-plugins#12"]);
+  assert.equal(view([], {}, {}, { forTheOwner: [`ask: ${answered}`] }).asks.length, 1, "positive control: the same text as an ask is a card");
 });
 
 test("a blocked subtask is stuck with its cause, and the nudge asks what unblocks it", () => {
