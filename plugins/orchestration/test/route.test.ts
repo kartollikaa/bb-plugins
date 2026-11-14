@@ -127,3 +127,16 @@ test("the chat sheet follows a flick, else flips once dragged a quarter of the w
   assert.equal(sheetHeightWhileDragging(700, 1000, 140, 700), 140);
   assert.equal(sheetHeightWhileDragging(140, -60, 140, 700), 200);
 });
+
+test("folded, a vertical drag anywhere on the dock moves the sheet; open, the transcript scrolls until its top", async () => {
+  const { sheetGestureOwner } = await import("../src/route.ts");
+  const g = (o: Partial<Parameters<typeof sheetGestureOwner>[0]>) => sheetGestureOwner({ open: false, dx: 0, dy: -40, inHandle: false, scrollTop: 300, ...o });
+  assert.equal(g({ dy: -3 }), null, "under the slop it is still a tap");
+  assert.equal(g({}), "sheet", "the folded dock drags from anywhere, transcript or not");
+  assert.equal(g({ dx: 60, dy: -20 }), "content", "a sideways swipe stays with the content");
+  assert.equal(g({ open: true, dy: 40, inHandle: true }), "sheet", "header and composer drag the open sheet");
+  assert.equal(g({ open: true, dy: 40, scrollTop: 300 }), "content", "a scrolled transcript scrolls back first");
+  assert.equal(g({ open: true, dy: 40, scrollTop: 0 }), "sheet", "at its top, pulling down closes");
+  assert.equal(g({ open: true, dy: -40, scrollTop: 0 }), "content", "pushing up at the top scrolls the transcript");
+  assert.equal(g({ open: true, dy: 40, scrollTop: null }), "sheet", "outside any scroller the sheet moves");
+});

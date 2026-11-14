@@ -79,7 +79,7 @@ function useSwitchData({ threadIds }: { threadIds: readonly string[] }): SwitchD
 function usePageTitle({ subPath }: PluginNavPanelProps) {
   const threadId = threadFromSubPath(subPath);
   const title = experimental_useSidebarThreads().threads.find((t) => t.id === threadId)?.displayTitle;
-  return threadId && title ? { title, windowTitle: `${title} — Orchestration` } : null;
+  return threadId && title ? { breadcrumbs: [], windowTitle: `${title} — Orchestration` } : null;
 }
 
 export default definePluginApp((app) => {

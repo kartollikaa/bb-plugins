@@ -109,3 +109,16 @@ export function sheetSettles({ wasOpen, dy, velocity, span }: { wasOpen: boolean
 export function sheetHeightWhileDragging(start: number, dy: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(start - dy)));
 }
+
+export const SHEET_SLOP = 8;
+
+/**
+ * Who takes a vertical drag inside the chat. Folded, the whole dock drags the sheet. Open, the
+ * header and the composer drag it; the transcript scrolls first and hands over at its top.
+ */
+export function sheetGestureOwner({ open, dx, dy, inHandle, scrollTop }: { open: boolean; dx: number; dy: number; inHandle: boolean; scrollTop: number | null }): "sheet" | "content" | null {
+  if (Math.abs(dx) < SHEET_SLOP && Math.abs(dy) < SHEET_SLOP) return null;
+  if (Math.abs(dx) > Math.abs(dy)) return "content";
+  if (!open || inHandle || scrollTop === null) return "sheet";
+  return dy > 0 && scrollTop <= 0 ? "sheet" : "content";
+}

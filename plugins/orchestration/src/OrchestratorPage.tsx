@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { ThreadChat, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Button, Message, OrchestrationTab } from "./OrchestrationTab.tsx";
-import { chatPlacement, clampRailWidth, dockHeight, RAIL, railMode, railOpen, SHEET, sheetHeightWhileDragging, sheetSettles, threadFromSubPath, type ChatPlacement, type RailChoice, type RailMode } from "./route.ts";
+import { chatPlacement, clampRailWidth, dockHeight, RAIL, railMode, railOpen, SHEET, sheetGestureOwner, sheetHeightWhileDragging, sheetSettles, threadFromSubPath, type ChatPlacement, type RailChoice, type RailMode } from "./route.ts";
 import { useOrchestratorMembership } from "./useOrchestration.ts";
 import { useOpenChat, useViewSwitch } from "./surface.ts";
 import { localStore } from "./storage.ts";
@@ -85,11 +85,11 @@ function ViewSwitch({ onOff }: { onOff: () => void }) {
         if (on) onOff();
       }}
       className={cx(
-        "ml-1 flex h-[26px] items-center gap-2 rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-accent",
+        "ml-1 flex h-[26px] items-center gap-2 rounded-md border max-sm:hidden border-border px-2 text-xs font-medium text-foreground hover:bg-accent",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
       )}
     >
-      <span className="max-sm:hidden">Orchestration view</span>
+      Orchestration view
       <span aria-hidden className={cx("relative h-[14px] w-[24px] rounded-full transition-colors duration-150 ease-out motion-reduce:transition-none", on ? "bg-primary" : "bg-border")}>
         <span className={cx("absolute left-[2px] top-[2px] size-[10px] rounded-full bg-background transition-transform duration-150 ease-out motion-reduce:transition-none", on && "translate-x-[10px]")} />
       </span>
@@ -111,13 +111,13 @@ export function OrchestratorHeader({ subPath }: PluginNavPanelProps) {
         aria-label="Chat"
         onClick={() => rail.set(!open)}
         className={cx(
-          "flex h-[26px] items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground",
+          "flex h-[26px] items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground max-sm:hidden hover:bg-accent hover:text-foreground",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
           open && "text-foreground",
         )}
       >
         <PanelIcon />
-        <span className="max-sm:hidden">Chat</span>
+        Chat
       </button>
       <Button variant="quiet" onClick={() => openChat(threadId)}>Full chat</Button>
       <ViewSwitch onOff={() => openChat(threadId)} />
@@ -219,7 +219,7 @@ function useDockedComposer(ref: RefObject<HTMLElement | null>, docked: boolean) 
 }
 
 const GRABBER = 24;
-const TAP_SLOP = 6;
+const SHEET_HEADER = 44;
 
 interface SheetDrag {
   from: number;
@@ -228,54 +228,110 @@ interface SheetDrag {
   onMove: (height: number | null) => void;
 }
 
-/** Tap toggles the chat; on touch the grabber also drags it up into a sheet and back down. */
-function Grabber({ placement, drag }: { placement: ChatPlacement; drag: SheetDrag }) {
-  const expand = placement === "docked";
-  const dragged = useRef(false);
-  const gesture = useRef<{ y: number; t: number; lastY: number; lastT: number; v: number; moved: boolean } | null>(null);
-  const end = (e: ReactPointerEvent<HTMLButtonElement>, cancelled: boolean) => {
-    const g = gesture.current;
-    if (!g) return;
-    gesture.current = null;
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-    drag.onMove(null);
-    if (!g.moved || cancelled) return;
-    rail.set(sheetSettles({ wasOpen: !expand, dy: g.lastY - g.y, velocity: g.v, span: drag.max - drag.min }));
-  };
+function scrollerOf(target: Element, root: Element): HTMLElement | null {
+  for (let el: Element | null = target; el && el !== root; el = el.parentElement) {
+    if (el instanceof HTMLElement && el.scrollHeight > el.clientHeight && /(auto|scroll)/.test(getComputedStyle(el).overflowY)) return el;
+  }
+  return null;
+}
+
+/** Touch drags anywhere on the folded dock or the open sheet move it; see `sheetGestureOwner`. */
+function useSheetTouch(ref: RefObject<HTMLElement | null>, placement: ChatPlacement, drag: SheetDrag) {
+  const latest = useRef(drag);
+  latest.current = drag;
+  useEffect(() => {
+    const root = ref.current;
+    if (!root || placement === "rail") return;
+    const open = placement === "sheet";
+    let g: { x: number; y: number; lastY: number; lastT: number; v: number; inHandle: boolean; scroller: HTMLElement | null; owner: "sheet" | "content" | null } | null = null;
+    const start = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (e.touches.length !== 1 || !t) {
+        g = null;
+        return;
+      }
+      const target = e.target as Element;
+      const inHandle = !!target.closest("[data-sheet-handle]") || !!target.closest('[class~="sticky"][class~="bottom-0"]');
+      g = { x: t.clientX, y: t.clientY, lastY: t.clientY, lastT: e.timeStamp, v: 0, inHandle, scroller: scrollerOf(target, root), owner: null };
+    };
+    const move = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!g || !t || g.owner === "content") return;
+      if (g.owner === null) {
+        g.owner = sheetGestureOwner({ open, dx: t.clientX - g.x, dy: t.clientY - g.y, inHandle: g.inHandle, scrollTop: g.scroller ? g.scroller.scrollTop : null });
+        if (g.owner !== "sheet") return;
+        g.y = t.clientY;
+      }
+      e.preventDefault();
+      const dt = e.timeStamp - g.lastT;
+      if (dt > 0) g.v = (t.clientY - g.lastY) / dt;
+      g.lastY = t.clientY;
+      g.lastT = e.timeStamp;
+      const d = latest.current;
+      d.onMove(sheetHeightWhileDragging(d.from, t.clientY - g.y, d.min, d.max));
+    };
+    const end = (cancelled: boolean) => () => {
+      const done = g;
+      g = null;
+      if (done?.owner !== "sheet") return;
+      const d = latest.current;
+      d.onMove(null);
+      if (!cancelled) rail.set(sheetSettles({ wasOpen: open, dy: done.lastY - done.y, velocity: done.v, span: d.max - d.min }));
+    };
+    const onEnd = end(false);
+    const onCancel = end(true);
+    root.addEventListener("touchstart", start, { passive: true });
+    root.addEventListener("touchmove", move, { passive: false });
+    root.addEventListener("touchend", onEnd);
+    root.addEventListener("touchcancel", onCancel);
+    return () => {
+      root.removeEventListener("touchstart", start);
+      root.removeEventListener("touchmove", move);
+      root.removeEventListener("touchend", onEnd);
+      root.removeEventListener("touchcancel", onCancel);
+    };
+  }, [ref, placement]);
+}
+
+function ChevronDown() {
   return (
-    <button
-      type="button"
-      aria-label={expand ? "Show chat" : "Hide chat"}
-      title={expand ? "Show chat" : "Hide chat"}
-      onClick={(e) => {
-        if (!dragged.current) rail.set(expand);
-        dragged.current = false;
-      }}
-      onPointerDown={(e) => {
-        dragged.current = false;
-        if (e.pointerType === "mouse") return;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        gesture.current = { y: e.clientY, t: e.timeStamp, lastY: e.clientY, lastT: e.timeStamp, v: 0, moved: false };
-      }}
-      onPointerMove={(e) => {
-        const g = gesture.current;
-        if (!g) return;
-        if (!g.moved && Math.abs(e.clientY - g.y) < TAP_SLOP) return;
-        g.moved = true;
-        dragged.current = true;
-        const dt = e.timeStamp - g.lastT;
-        if (dt > 0) g.v = (e.clientY - g.lastY) / dt;
-        g.lastY = e.clientY;
-        g.lastT = e.timeStamp;
-        drag.onMove(sheetHeightWhileDragging(drag.from, e.clientY - g.y, drag.min, drag.max));
-      }}
-      onPointerUp={(e) => end(e, false)}
-      onPointerCancel={(e) => end(e, true)}
-      style={{ height: GRABBER }}
-      className="group flex w-full shrink-0 touch-none items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
-    >
-      <span aria-hidden className="h-1 w-9 rounded-full bg-border group-hover:bg-muted-foreground" />
-    </button>
+    <svg aria-hidden viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6l4 4 4-4" />
+    </svg>
+  );
+}
+
+/** Folded: a grabber that opens the chat on tap. Open: a header to drag down, with a close button. */
+function SheetHandle({ placement }: { placement: ChatPlacement }) {
+  if (placement === "docked") {
+    return (
+      <button
+        type="button"
+        data-sheet-handle=""
+        aria-label="Show chat"
+        title="Show chat"
+        onClick={() => rail.set(true)}
+        style={{ height: GRABBER }}
+        className="group flex w-full shrink-0 items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+      >
+        <span aria-hidden className="h-1 w-9 rounded-full bg-border group-hover:bg-muted-foreground" />
+      </button>
+    );
+  }
+  return (
+    <div data-sheet-handle="" style={{ height: SHEET_HEADER }} className="relative flex w-full shrink-0 items-center border-b border-border px-4">
+      <span aria-hidden className="absolute left-1/2 top-1.5 h-1 w-9 -translate-x-1/2 rounded-full bg-border" />
+      <span className="text-xs font-medium text-muted-foreground">Orchestrator chat</span>
+      <button
+        type="button"
+        aria-label="Hide chat"
+        title="Hide chat"
+        onClick={() => rail.set(false)}
+        className="-mr-2 ml-auto flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+      >
+        <ChevronDown />
+      </button>
+    </div>
   );
 }
 
@@ -284,6 +340,7 @@ function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDock
   const [dragging, setDragging] = useState<number | null>(null);
   const [sheetHeight, setSheetHeight] = useState<number | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
+  const asideRef = useRef<HTMLElement>(null);
   const composer = useDockedComposer(chatRef, placement === "docked");
   const width = clampRailWidth(dragging ?? saved, pageWidth);
   const dock = dockHeight(composer, pageHeight || 800);
@@ -299,6 +356,7 @@ function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDock
   };
   const docked = dock + GRABBER;
   const open = Math.max(docked, (pageHeight || 800) - SHEET.topGap);
+  useSheetTouch(asideRef, placement, { from: placement === "sheet" ? open : docked, min: docked, max: open, onMove: setSheetHeight });
   const style =
     placement === "rail" ? { width }
     : sheetHeight !== null ? { height: sheetHeight }
@@ -306,6 +364,7 @@ function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDock
     : { height: `calc(${docked}px + env(safe-area-inset-bottom))` };
   return (
     <aside
+      ref={asideRef}
       aria-label="Orchestrator chat"
       data-placement={placement}
       style={style}
@@ -319,7 +378,7 @@ function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDock
       )}
     >
       {placement === "rail" && <ResizeHandle width={width} onDrag={setDragging} onDone={persist} />}
-      {placement !== "rail" && <Grabber placement={placement} drag={{ from: placement === "sheet" ? open : docked, min: docked, max: open, onMove: setSheetHeight }} />}
+      {placement !== "rail" && <SheetHandle placement={placement} />}
       <div ref={chatRef} className={cx("flex min-h-0 flex-1 flex-col", placement === "rail" ? "min-w-[340px]" : "mx-auto w-full max-w-[720px]")}>
         <ThreadChat threadId={threadId} variant="compact" layout="contained" focusRequest={focusRequest} className="min-h-0 flex-1" />
       </div>

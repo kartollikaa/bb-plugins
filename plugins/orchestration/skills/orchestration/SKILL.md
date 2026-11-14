@@ -20,8 +20,10 @@ several name the thread, the newest wins.
   so the view would replace the whole split), and none when a thread becomes an orchestrator while
   it is open.
 - **Chat** in the view's title bar shows or hides the rail. On a narrow page it opens as a sheet
-  from the bottom; Esc, a tap above it, or dragging its handle down closes it, and dragging the
-  dock's handle up opens it (touch only; `sheetSettles` in `src/route.ts`). The rail's width can be dragged and is remembered.
+  from the bottom with a header and a close chevron; Esc or a tap above it closes it too. On touch,
+  a vertical drag anywhere on the folded dock opens it; open, the header and composer drag it down
+  and the transcript does once scrolled to its top (`sheetGestureOwner`, `sheetSettles` in
+  `src/route.ts`). On a phone the title bar shows only Full chat. The rail's width can be dragged and is remembered.
 - While the chat is folded, its composer stays docked under the view (the owner can delegate from
   there). The composer shows in one place only: the rail or sheet when open, the dock otherwise.
 - The view for a thread no ledger names says so and offers **Open chat**.
