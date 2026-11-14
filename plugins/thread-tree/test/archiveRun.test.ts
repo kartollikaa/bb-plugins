@@ -172,8 +172,24 @@ test("a run that throws after a root archived keeps what it did and says it fail
   assert.deepEqual(foldArchiveOutcome({ archived: 1, skipped: 0, kept: 0, changed: 1, unchecked: 0, stop: "error", error: "server gone" }), {
     tone: "error",
     title: "Archived 1 thread",
-    description: "Archiving failed: server gone",
+    description: "Archiving failed: server gone. Skipped 1 thread that got changes since",
   });
+});
+
+test("an ending cut short by bb still counts the threads skipped before it", () => {
+  assert.equal(
+    foldArchiveOutcome({ archived: 0, skipped: 1, kept: 0, changed: 0, unchecked: 1, stop: "timeout" })?.description,
+    "bb's confirmation wasn't answered in time. Skipped 1 thread with uncommitted changes. Skipped 1 thread whose worktrees couldn't be checked",
+  );
+});
+
+test("a cancel after a root was skipped at run time still reports that skip", () => {
+  assert.deepEqual(foldArchiveOutcome({ archived: 0, skipped: 0, kept: 0, changed: 0, unchecked: 1, stop: "cancelled" }), {
+    tone: "warning",
+    title: "Nothing archived",
+    description: "Skipped 1 thread whose worktrees couldn't be checked",
+  });
+  assert.equal(foldArchiveOutcome({ archived: 0, skipped: 2, kept: 0, changed: 0, stop: "cancelled" }), null);
 });
 
 test("a worktree check that fails skips the root as unchecked, not as changed", async () => {

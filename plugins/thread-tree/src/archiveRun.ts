@@ -197,14 +197,18 @@ export function foldArchiveOutcome({
   error?: string;
 }): FoldArchiveOutcome | null {
   if (stop === "busy") return { tone: "info", title: "Another fold is still archiving" };
-  const reason = stop === "error" ? `Archiving failed: ${error ?? "unknown error"}` : stop ? STOP_REASON[stop] : undefined;
-  if (reason) return { tone: stop === "unavailable" || stop === "error" ? "error" : "warning", title: archived > 0 ? `Archived ${plural(archived, "thread")}` : "Archive stopped", description: reason };
-  const parts = [skippedSummary({ skipped, kept }), changed > 0 ? `Skipped ${plural(changed, "thread")} that got changes since` : null,
+  const runSkips = [changed > 0 ? `Skipped ${plural(changed, "thread")} that got changes since` : null,
     unchecked > 0 ? `Skipped ${plural(unchecked, "thread")} whose worktrees couldn't be checked` : null,
-  ];
-  if (stop && archived > 0) parts.push("Stopped before the rest");
-  const description = parts.filter((part) => part !== null).join(". ");
-  if (archived === 0) return stop || !description ? null : { tone: "warning", title: "Nothing archived", description };
+  ].filter((part) => part !== null);
+  const skips = [skippedSummary({ skipped, kept }), ...runSkips].filter((part) => part !== null);
+  const reason = stop === "error" ? `Archiving failed: ${error ?? "unknown error"}` : stop ? STOP_REASON[stop] : undefined;
+  if (reason) return { tone: stop === "unavailable" || stop === "error" ? "error" : "warning", title: archived > 0 ? `Archived ${plural(archived, "thread")}` : "Archive stopped", description: [reason, ...skips].join(". ") };
+  if (archived === 0) {
+    // The confirm button already showed the plan's skips; a cancel only reports what the run itself skipped.
+    const unseen = stop ? runSkips : skips;
+    return unseen.length > 0 ? { tone: "warning", title: "Nothing archived", description: unseen.join(". ") } : null;
+  }
+  const description = [...skips, ...(stop ? ["Stopped before the rest"] : [])].join(". ");
   if (!description) return null;
   return { tone: stop ? "warning" : "success", title: `Archived ${plural(archived, "thread")}`, description };
 }
