@@ -14,3 +14,15 @@ export async function archiveInTurn(
   }
   return { archived, stopped: false };
 }
+
+/** bb's Archive settles before the server records the archive, so the check is retried a few times. */
+export async function settlesTrue(
+  check: () => Promise<boolean>,
+  { attempts, delayMs, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }: { attempts: number; delayMs: number; sleep?: (ms: number) => Promise<void> },
+): Promise<boolean> {
+  for (let attempt = 1; ; attempt++) {
+    if (await check()) return true;
+    if (attempt >= attempts) return false;
+    await sleep(delayMs);
+  }
+}

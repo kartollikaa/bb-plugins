@@ -79,7 +79,7 @@ import {
   type TreeRow,
 } from "./tree";
 import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, orchestrationTreeIds, rollupOver } from "./orchestrations";
-import { archiveInTurn } from "./archiveRun";
+import { archiveInTurn, settlesTrue } from "./archiveRun";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
 import { useDragReorder, useFlipOrder } from "./useReorder";
@@ -1473,6 +1473,8 @@ async function prepareFoldArchive(
 }
 
 const BOUND_ARCHIVE_WAIT_MS = 2_000;
+const ARCHIVE_LANDING_CHECKS = 10;
+const ARCHIVE_LANDING_DELAY_MS = 300;
 
 /** Lives at list level: archiving a fold's root unmounts its fold line while later roots still wait for bb's confirmation. */
 function BbArchiveRun({ job }: { job: BbArchiveJob }) {
@@ -1488,7 +1490,10 @@ function BbArchiveRun({ job }: { job: BbArchiveJob }) {
   useEffect(() => {
     if (started.current || (bound < job.targets.length && !waited)) return;
     started.current = true;
-    const isArchived = (threadId: string) => sdk.threads.get({ threadId }).then((thread) => thread.archivedAt !== null, () => false);
+    const isArchived = (threadId: string) => settlesTrue(
+      () => sdk.threads.get({ threadId }).then((thread) => thread.archivedAt !== null, () => false),
+      { attempts: ARCHIVE_LANDING_CHECKS, delayMs: ARCHIVE_LANDING_DELAY_MS },
+    );
     archiveInTurn(job.targets.map((target) => target.id), (id) => actions.current.get(id), isArchived)
       .then(job.finish, () => job.finish({ archived: [], stopped: true }));
   }, [bound, waited, job, sdk]);
