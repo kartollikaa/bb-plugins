@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildForest, groupRows, type TreeThread } from "../src/tree.ts";
 import {
+  archiveScopes,
   foldArchivePlan,
   orchestrationTreeIds,
   dirtyEnvironmentIds,
@@ -154,4 +155,13 @@ test("a worktree counts as dirty when it has changes or untracked files, or its 
     plain: { outcome: "not_applicable", reason: "non_git_environment" },
   };
   assert.deepEqual(dirtyEnvironmentIds([...Object.keys(statuses), "missing"], statuses).sort(), ["broken", "changed", "denied", "missing", "untracked"]);
+});
+
+test("every asked thread gets an archive scope, a leaf with nothing below it too", () => {
+  const scopes = archiveScopes(
+    ["root", "leaf"],
+    [{ threadId: "root", cascadeThreadIds: ["owned"] }],
+    [{ threadId: "root", descendantIds: ["kid", "owned"] }, { threadId: "leaf", descendantIds: [] }],
+  );
+  assert.deepEqual(scopes, { root: ["root", "owned", "kid"], leaf: ["leaf"] });
 });

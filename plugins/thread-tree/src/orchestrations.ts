@@ -132,6 +132,18 @@ export function foldArchivePlan<T extends TreeThread>(
   };
 }
 
+/** What archiving each thread takes along: itself, bb's archive cascade and its hidden-inclusive descendants. */
+export function archiveScopes(
+  threadIds: readonly string[],
+  cascade: readonly { threadId: string; cascadeThreadIds: readonly string[] }[],
+  descendants: readonly { threadId: string; descendantIds: readonly string[] }[],
+): Record<string, string[]> {
+  const scopes = new Map(threadIds.map((id) => [id, new Set([id])]));
+  cascade.forEach(({ threadId, cascadeThreadIds }) => cascadeThreadIds.forEach((id) => scopes.get(threadId)?.add(id)));
+  descendants.forEach(({ threadId, descendantIds }) => descendantIds.forEach((id) => scopes.get(threadId)?.add(id)));
+  return Object.fromEntries([...scopes].map(([id, scope]) => [id, [...scope]]));
+}
+
 const NOTHING_TO_LOSE = new Set(["path_not_found"]);
 
 /** Environments whose worktree archiving could lose work: uncommitted or untracked changes, or a status that couldn't be read. */

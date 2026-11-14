@@ -20,7 +20,7 @@ import { sectionPatchSchema, SETTINGS } from "./src/settings";
 import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/threadPullRequests";
 import { createProjectFolderHistory } from "./src/projectFolders";
 import { createArchiveHistory } from "./src/archiveUndo";
-import { dirtyEnvironmentIds } from "./src/orchestrations";
+import { archiveScopes, dirtyEnvironmentIds } from "./src/orchestrations";
 
 const MAX_THREADS_PER_CALL = 200;
 
@@ -181,15 +181,8 @@ export default async function plugin(bb: BbPluginApi) {
         bb.sdk.threads.experimental_listCascade({ threadIds, action: "archive" }),
         bb.sdk.threads.experimental_listDescendants({ threadIds, includeHidden: true }),
       ]);
-      const scopes = new Map<string, Set<string>>();
-      const scopeOf = (id: string) => scopes.get(id) ?? scopes.set(id, new Set([id])).get(id)!;
-      cascade.threads.forEach(({ threadId, cascadeThreadIds }) => cascadeThreadIds.forEach((id) => scopeOf(threadId).add(id)));
-      descendants.threads.forEach(({ threadId, descendantIds }) => descendantIds.forEach((id) => scopeOf(threadId).add(id)));
-      const everything = [...new Set([...scopes.values()].flatMap((scope) => [...scope]))];
-      return {
-        scopes: Object.fromEntries([...scopes].map(([id, scope]) => [id, [...scope]])),
-        dirty: await dirtyThreadIds(everything),
-      };
+      const scopes = archiveScopes(threadIds, cascade.threads, descendants.threads);
+      return { scopes, dirty: await dirtyThreadIds([...new Set(Object.values(scopes).flat())]) };
     },
     archiveClaim: async ({ threadIds }) => {
       const claimId = ++lastClaimId;
