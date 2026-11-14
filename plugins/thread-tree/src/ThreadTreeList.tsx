@@ -80,7 +80,7 @@ import {
   foldState,
   type TreeRow,
 } from "./tree";
-import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver, MAX_THREADS_PER_CALL } from "./orchestrations";
+import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitleParts, rollupOver, type SubtitlePart, MAX_THREADS_PER_CALL } from "./orchestrations";
 import { archiveInTurn, archiveRunLifecycle, dialogOutsideSidebar, foldArchiveOutcome, runClaimedArchive, skippedSummary, uncommittedAfterRun, waitForArchive, type ArchiveRunResult } from "./archiveRun";
 import { ARCHIVE_CONFIRM_WAIT_MS } from "./archiveUndo";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
@@ -362,10 +362,11 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             ? "No archived threads."
             : "Loading archived threads…";
 
+  const firstFolderIndex = groups.findIndex((group) => group.key !== "pinned");
   const renderRow = (
     row: TreeRow<PluginSidebarThread>,
     variant: "tree" | "flat",
-    { subtitle, numbered = variant === "tree", rollup }: { subtitle?: string; numbered?: boolean; rollup?: RollupState | null } = {},
+    { subtitle, numbered = variant === "tree", rollup }: { subtitle?: string | readonly SubtitlePart[]; numbered?: boolean; rollup?: RollupState | null } = {},
   ) => (
     <Fragment key={row.thread.id}>
       <ThreadRowView
@@ -556,26 +557,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         </div>
       </div>
 
-      {!showArchived && orchestrationList.length > 0 ? (
-        <section aria-label="Orchestrations" data-orchestrations="">
-          <GroupHeader
-            title="Orchestrations"
-            icon={<Icon name="Network" fallback="Layers" aria-hidden className="size-3.5" />}
-            isCollapsed={collapsedGroups.has("orchestrations")}
-            count={orchestrationList.length}
-            onToggle={() => collapsedGroups.toggle("orchestrations")}
-          />
-          <Collapse open={!collapsedGroups.has("orchestrations")}>
-            <div role="list" className="mt-0.5 flex flex-col gap-0.5">
-              {orchestrationList.map((entry) => renderRow(flatRow(entry.thread), "flat", {
-                numbered: false,
-                subtitle: orchestrationSubtitle(entry, (projectId) => projectById.get(projectId)?.name ?? null),
-                rollup: entry.rollup,
-              }))}
-            </div>
-          </Collapse>
-        </section>
-      ) : null}
 
       {treePlaceholder ? <div className="px-3 text-xs text-muted-foreground">{treePlaceholder}</div> : null}
 
@@ -586,7 +567,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         className="relative flex flex-col gap-3"
         {...(canReorder ? projectDrag.containerProps : {})}
       >
-        {groups.map((group) => {
+        {groups.map((group, groupIndex) => {
+          const orchestrationsHere = groupIndex === firstFolderIndex && !showArchived && orchestrationList.length > 0;
           const isCollapsed = (view.foldOnDrag && canReorder && projectDrag.isDragging) || collapsedGroups.has(group.key);
           const project = group.projectId ? projectById.get(group.projectId) : undefined;
           const { title, icon } = groupLook(group.key, project, isCollapsed);
@@ -597,6 +579,27 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           } : undefined;
           const reorderable = canReorder && projectId !== null;
           return (
+            <Fragment key={group.key}>
+            {orchestrationsHere ? (
+              <section aria-label="Orchestrations" data-orchestrations="">
+                <GroupHeader
+                  title="Orchestrations"
+                  icon={<Icon name="thread-tree/network" fallback="Layers" aria-hidden className="size-3.5" />}
+                  isCollapsed={collapsedGroups.has("orchestrations")}
+                  count={orchestrationList.length}
+                  onToggle={() => collapsedGroups.toggle("orchestrations")}
+                />
+                <Collapse open={!collapsedGroups.has("orchestrations")}>
+                  <div role="list" className="mt-0.5 flex flex-col gap-0.5">
+                    {orchestrationList.map((entry) => renderRow(flatRow(entry.thread), "flat", {
+                      numbered: false,
+                      subtitle: orchestrationSubtitleParts(entry, (projectId) => projectById.get(projectId)?.name ?? null),
+                      rollup: entry.rollup,
+                    }))}
+                  </div>
+                </Collapse>
+              </section>
+            ) : null}
             <section
               key={group.key}
               data-flip-key={group.key}
@@ -652,6 +655,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                 </div>
               </Collapse>
             </section>
+            </Fragment>
           );
         })}
       </div>
@@ -973,7 +977,7 @@ function ThreadRowView({
   numbered: boolean;
   context?: string;
   /** A second line under the title: the Running filter's context or an orchestration's progress. */
-  subtitle?: string;
+  subtitle?: string | readonly SubtitlePart[];
   isActive: boolean;
   /** The subtree's state drawn in place of the thread's own; a folded tree row works it out itself. */
   rollup?: RollupState | null;
@@ -1082,7 +1086,14 @@ function ThreadRowView({
           {subtitle ? (
             <span className="flex min-w-0 flex-1 flex-col justify-center">
               <Link thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />
-              <span data-row-subtitle="" className="truncate text-2xs text-sidebar-foreground/50">{subtitle}</span>
+              <span data-row-subtitle="" className="truncate text-2xs text-sidebar-foreground/50">
+                {typeof subtitle === "string" ? subtitle : subtitle.map((part, index) => (
+                  <Fragment key={part.text}>
+                    {index > 0 ? " · " : null}
+                    <span className={cn(part.tone === "attention" && "text-amber-600 dark:text-amber-400", part.tone === "bad" && "text-red-600/90 dark:text-red-400/90")}>{part.text}</span>
+                  </Fragment>
+                ))}
+              </span>
             </span>
           ) : (
             <Link thread={thread} isActive={isActive} stateLabel={glyph.label} splitProps={splitProps} onOpen={onOpen} />

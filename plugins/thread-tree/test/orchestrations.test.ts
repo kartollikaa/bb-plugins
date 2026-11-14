@@ -9,6 +9,7 @@ import {
   foldBarSegments,
   isFinishedFold,
   orchestrationSubtitle,
+  orchestrationSubtitleParts,
   orchestrations,
   rollupOver,
 } from "../src/orchestrations.ts";
@@ -96,6 +97,10 @@ test("Orchestrations lists roots with subthreads that still have work going, wit
   assert.deepEqual(list.map((o) => o.rollup), ["input", "unread", null]);
   assert.equal(orchestrationSubtitle(live!, (id) => ({ bb: "bb-plugins", web: "web" })[id] ?? null), "bb-plugins + web · 2/5 done · 1 needs you · 1 failed · 1 running");
   assert.equal(orchestrationSubtitle(unreadOnly!, () => "bb-plugins"), "bb-plugins · 1/1 done");
+  assert.deepEqual(
+    orchestrationSubtitleParts(live!, (id) => ({ bb: "bb-plugins", web: "web" })[id] ?? null).map((part) => part.tone),
+    ["muted", "muted", "attention", "bad", "muted"],
+  );
 });
 
 test("a waiting subthread keeps its orchestration in the section", () => {

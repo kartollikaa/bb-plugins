@@ -16,7 +16,10 @@
     "name": "Thread Tree",
     "description": "A sidebar thread list that shows automations, recent activity and archived threads, nests child threads under their parent and shows each thread's provider subagents as a counter with a status dot.",
     "branding": {
-      "icon": "Network"
+      "icon": "Network",
+      "experimental_icons": {
+        "network": "./assets/network.svg"
+      }
     },
     "server": "./server.ts",
     "app": "./app.tsx"

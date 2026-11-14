@@ -83,15 +83,26 @@ export function orchestrationTreeIds<T extends TreeThread>(forest: Forest<T>, ro
   return [rootId, ...descendantsOf(forest, rootId).map((thread) => thread.id)];
 }
 
-export function orchestrationSubtitle(orchestration: Orchestration<TreeThread>, projectName: (projectId: string) => string | null): string {
+export interface SubtitlePart {
+  text: string;
+  tone: "muted" | "attention" | "bad";
+}
+
+/** The shortcut's second line; what needs the user or failed carries its state's colour. */
+export function orchestrationSubtitleParts(orchestration: Orchestration<TreeThread>, projectName: (projectId: string) => string | null): SubtitlePart[] {
   const projects = orchestration.projectIds.map(projectName).filter((name): name is string => !!name).join(" + ");
-  return [
-    projects || null,
-    `${orchestration.done}/${orchestration.total} done`,
-    orchestration.needsYou ? `${orchestration.needsYou} needs you` : null,
-    orchestration.failed ? `${orchestration.failed} failed` : null,
-    orchestration.running ? `${orchestration.running} running` : null,
-  ].filter(Boolean).join(" · ");
+  const parts: (SubtitlePart | null)[] = [
+    projects ? { text: projects, tone: "muted" } : null,
+    { text: `${orchestration.done}/${orchestration.total} done`, tone: "muted" },
+    orchestration.needsYou ? { text: `${orchestration.needsYou} needs you`, tone: "attention" } : null,
+    orchestration.failed ? { text: `${orchestration.failed} failed`, tone: "bad" } : null,
+    orchestration.running ? { text: `${orchestration.running} running`, tone: "muted" } : null,
+  ];
+  return parts.filter((part): part is SubtitlePart => part !== null);
+}
+
+export function orchestrationSubtitle(orchestration: Orchestration<TreeThread>, projectName: (projectId: string) => string | null): string {
+  return orchestrationSubtitleParts(orchestration, projectName).map((part) => part.text).join(" · ");
 }
 
 export interface FoldArchivePlan {
