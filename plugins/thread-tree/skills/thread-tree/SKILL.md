@@ -24,8 +24,9 @@ Automations' gives failed and running automations and the soonest next run
 expanded PR row draws its most urgent reason as a tinted icon (the same look
 as a thread row's PR icon), then the title and repo; the number and reasons are
 in its tooltip. Hover shows "Open its thread" when one of the user's threads
-links the PR, Open on GitHub, and Snooze. Paused automations stay behind
-"N paused".
+links the PR (⌘/Ctrl-click opens that thread in a split), Open on GitHub, and
+Snooze. A middle-click on these buttons does nothing, so it never opens GitHub.
+Paused automations stay behind "N paused".
 
 Needs you sits above the sections and hides when nothing waits. In order:
 threads asking a question (the question and how long they have waited, longest
