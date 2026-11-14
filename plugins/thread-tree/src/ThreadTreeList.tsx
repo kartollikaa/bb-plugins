@@ -76,7 +76,7 @@ import {
   foldState,
   type TreeRow,
 } from "./tree";
-import { archivePlan, foldBarSegments, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver } from "./orchestrations";
+import { archivePlan, foldBarSegments, isFinishedFold, orchestrations, orchestrationSubtitle, orchestrationTreeIds, rollupOver } from "./orchestrations";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
 import { useDragReorder, useFlipOrder } from "./useReorder";
@@ -310,12 +310,13 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       event.preventDefault();
       const group = groups.find((entry) => entry.rows.some((row) => row.thread.id === thread.id));
       if (group) collapsedGroups.remove([group.key]);
-      collapsedThreads.remove([thread.id]);
-      setRevealed({ id: thread.id, ids: new Set([thread.id, ...descendantIdsOf(thread.id)]) });
+      const tree = orchestrationTreeIds(activeForest, thread.id);
+      collapsedThreads.remove(tree);
+      setRevealed({ id: thread.id, ids: new Set(tree) });
       navigate.toThread(thread.id, { split: event.metaKey || event.ctrlKey });
       onNavigate();
     },
-    [groups, collapsedGroups, collapsedThreads, descendantIdsOf, navigate, onNavigate],
+    [groups, collapsedGroups, collapsedThreads, activeForest, navigate, onNavigate],
   );
   useEffect(() => {
     if (!revealed) return;

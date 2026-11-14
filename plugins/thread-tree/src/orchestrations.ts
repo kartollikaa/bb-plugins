@@ -74,6 +74,11 @@ function inTreeOrder<T extends TreeThread>(forest: Forest<T>, rootId: string): T
   return out;
 }
 
+/** The orchestrator and every thread below it: what a shortcut click unfolds and highlights. */
+export function orchestrationTreeIds<T extends TreeThread>(forest: Forest<T>, rootId: string): string[] {
+  return [rootId, ...descendantsOf(forest, rootId).map((thread) => thread.id)];
+}
+
 export function orchestrationSubtitle(orchestration: Orchestration<TreeThread>, projectName: (projectId: string) => string | null): string {
   const projects = orchestration.projectIds.map(projectName).filter((name): name is string => !!name).join(" + ");
   return [

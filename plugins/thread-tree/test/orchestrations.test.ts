@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildForest, groupRows, type TreeThread } from "../src/tree.ts";
 import {
   archivePlan,
+  orchestrationTreeIds,
   holdForHiddenChanges,
   unlistedDescendantIds,
   dirtyEnvironmentIds,
@@ -100,6 +101,11 @@ test("Orchestrations lists roots with subthreads that still have work going, wit
 test("a waiting subthread keeps its orchestration in the section", () => {
   const threads = [thread("root"), thread("k", { parentThreadId: "root", indicator: "queued-waiting" })];
   assert.deepEqual(orchestrations(buildForest(threads)).map((o) => o.state), ["waiting"]);
+});
+
+test("revealing an orchestration covers its whole tree, nested subthreads included", () => {
+  const forest = buildForest([thread("root"), thread("a", { parentThreadId: "root" }), thread("a1", { parentThreadId: "a" }), thread("other")]);
+  assert.deepEqual(orchestrationTreeIds(forest, "root").sort(), ["a", "a1", "root"]);
 });
 
 test("archiving a finished fold goes leaves first and keeps dirty threads and their ancestors", () => {
