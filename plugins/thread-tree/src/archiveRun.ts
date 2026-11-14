@@ -58,6 +58,33 @@ export async function archiveInTurn(
   }
 }
 
+/** Takes the one run slot before claiming, so an overlapping fold can't rebatch or release the running fold's threads. */
+export async function runClaimedArchive({
+  acquire,
+  release,
+  claim,
+  unclaim,
+  archive,
+}: {
+  acquire: () => boolean;
+  release: () => void;
+  claim: () => Promise<string | null>;
+  unclaim: (claimId: string) => Promise<void>;
+  archive: () => Promise<ArchiveRunResult>;
+}): Promise<ArchiveRunResult> {
+  if (!acquire()) return { archived: [], changed: [], unchecked: [], stop: "busy" };
+  try {
+    const claimId = await claim();
+    try {
+      return await archive();
+    } finally {
+      if (claimId !== null) await unclaim(claimId);
+    }
+  } finally {
+    release();
+  }
+}
+
 /** How long an archive may take to land once no dialog is open; a large cascade can take seconds to record. */
 export const ARCHIVE_LANDING_GRACE_MS = 10_000;
 

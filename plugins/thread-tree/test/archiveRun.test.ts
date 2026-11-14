@@ -5,6 +5,7 @@ import {
   archiveInTurn,
   dialogOutsideSidebar,
   foldArchiveOutcome,
+  runClaimedArchive,
   waitForArchive,
 } from "../src/archiveRun.ts";
 
@@ -195,4 +196,32 @@ test("the landing grace covers a slow cascade that takes several seconds to reco
   const { now, sleep } = clock();
   const result = await waitForArchive(async () => now() >= 18_000, { dialogOpen: () => now() < 10_000, deadline: 600_000, intervalMs: 500, now, sleep });
   assert.equal(result, "archived");
+});
+
+test("a fold that finds another run going claims nothing", async () => {
+  const log: string[] = [];
+  const result = await runClaimedArchive({
+    acquire: () => false,
+    release: () => log.push("release"),
+    claim: async () => (log.push("claim"), "c1"),
+    unclaim: async () => void log.push("unclaim"),
+    archive: async () => (log.push("archive"), { archived: [], changed: [], unchecked: [], stop: null }),
+  });
+  assert.equal(result.stop, "busy");
+  assert.deepEqual(log, []);
+});
+
+test("a fold run claims after taking the slot and lets both go, even when archiving throws", async () => {
+  const log: string[] = [];
+  const steps = {
+    acquire: () => (log.push("acquire"), true),
+    release: () => void log.push("release"),
+    claim: async () => (log.push("claim"), "c1"),
+    unclaim: async (id: string) => void log.push(`unclaim ${id}`),
+  };
+  await runClaimedArchive({ ...steps, archive: async () => (log.push("archive"), { archived: [], changed: [], unchecked: [], stop: null }) });
+  assert.deepEqual(log, ["acquire", "claim", "archive", "unclaim c1", "release"]);
+  log.length = 0;
+  await assert.rejects(runClaimedArchive({ ...steps, archive: async () => { throw new Error("x"); } }));
+  assert.deepEqual(log, ["acquire", "claim", "unclaim c1", "release"]);
 });

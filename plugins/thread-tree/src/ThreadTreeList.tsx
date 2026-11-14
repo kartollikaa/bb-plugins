@@ -80,7 +80,7 @@ import {
   type TreeRow,
 } from "./tree";
 import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver, MAX_THREADS_PER_CALL } from "./orchestrations";
-import { archiveInTurn, dialogOutsideSidebar, foldArchiveOutcome, skippedSummary, waitForArchive, type ArchiveRunResult } from "./archiveRun";
+import { archiveInTurn, dialogOutsideSidebar, foldArchiveOutcome, runClaimedArchive, skippedSummary, waitForArchive, type ArchiveRunResult } from "./archiveRun";
 import { ARCHIVE_CONFIRM_WAIT_MS } from "./archiveUndo";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
@@ -309,20 +309,25 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   const [archiveJob, setArchiveJob] = useState<BbArchiveJob | null>(null);
   const archiveJobRunning = useRef(false);
-  const runBbArchive = useCallback((targets: PluginThreadActionTarget[], isStillClean: (id: string) => Promise<boolean>) => {
-    if (archiveJobRunning.current) return Promise.resolve<ArchiveRunResult>({ archived: [], changed: [], unchecked: [], stop: "busy" });
-    archiveJobRunning.current = true;
-    return new Promise<ArchiveRunResult>((resolve) => setArchiveJob({
+  const archiveRunner = useMemo<BbArchiveRunner>(() => ({
+    acquire: () => {
+      if (archiveJobRunning.current) return false;
+      archiveJobRunning.current = true;
+      return true;
+    },
+    release: () => {
+      archiveJobRunning.current = false;
+    },
+    run: (targets, isStillClean) => new Promise<ArchiveRunResult>((resolve) => setArchiveJob({
       targets,
       isStillClean,
       finish: (result) => {
-        archiveJobRunning.current = false;
         setArchiveJob(null);
         resolve(result);
       },
-    }));
-  }, []);
-  const archiveFold = useCallback((root: PluginSidebarThread) => prepareFoldArchive(rpc, activeForest, root, runBbArchive), [rpc, activeForest, runBbArchive]);
+    })),
+  }), []);
+  const archiveFold = useCallback((root: PluginSidebarThread) => prepareFoldArchive(rpc, activeForest, root, archiveRunner), [rpc, activeForest, archiveRunner]);
 
   if (status === "loading" && threads.length === 0) {
     return <div className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</div>;
@@ -1389,6 +1394,12 @@ function FoldArchiveButton({ onArchive }: { onArchive: () => Promise<PreparedFol
   );
 }
 
+interface BbArchiveRunner {
+  acquire(): boolean;
+  release(): void;
+  run(targets: PluginThreadActionTarget[], isStillClean: (id: string) => Promise<boolean>): Promise<ArchiveRunResult>;
+}
+
 interface BbArchiveJob {
   targets: PluginThreadActionTarget[];
   isStillClean(id: string): Promise<boolean>;
@@ -1400,7 +1411,7 @@ async function prepareFoldArchive(
   rpc: ReturnType<typeof useRpc<typeof rpcContract>>,
   forest: Forest<PluginSidebarThread>,
   root: PluginSidebarThread,
-  runBbArchive: (targets: PluginThreadActionTarget[], isStillClean: (id: string) => Promise<boolean>) => Promise<ArchiveRunResult>,
+  runner: BbArchiveRunner,
 ): Promise<PreparedFoldArchive | null> {
   const subtree = new Map([root, ...descendantsOf(forest, root.id)].map((thread) => [thread.id, thread]));
   const ids = [...subtree.keys()];
@@ -1422,13 +1433,13 @@ async function prepareFoldArchive(
     plan,
     async run() {
       const claimed = [...new Set(plan.roots.flatMap((id) => scopes.get(id) ?? [id]))];
-      const claimId = await rpc.call("archiveClaim", { threadIds: claimed }).then(({ claimId }) => claimId, () => null);
-      let result: ArchiveRunResult;
-      try {
-        result = await runBbArchive(plan.roots.map((id) => toActionTarget(subtree.get(id)!)), isStillClean);
-      } finally {
-        if (claimId !== null) await rpc.call("archiveRelease", { claimId }).catch(() => undefined);
-      }
+      const result = await runClaimedArchive({
+        acquire: runner.acquire,
+        release: runner.release,
+        claim: () => rpc.call("archiveClaim", { threadIds: claimed }).then(({ claimId }) => claimId, () => null),
+        unclaim: (claimId) => rpc.call("archiveRelease", { claimId }).then(() => undefined, () => undefined),
+        archive: () => runner.run(plan.roots.map((id) => toActionTarget(subtree.get(id)!)), isStillClean),
+      });
       const threadCount = (roots: readonly string[]) => new Set(roots.flatMap((id) => scopes.get(id) ?? [id])).size;
       const outcome = foldArchiveOutcome({ archived: threadCount(result.archived), skipped: plan.skipped, kept: plan.kept, changed: threadCount(result.changed), unchecked: threadCount(result.unchecked), stop: result.stop, error: result.error });
       if (outcome) toast[outcome.tone](outcome.title, { description: outcome.description });
