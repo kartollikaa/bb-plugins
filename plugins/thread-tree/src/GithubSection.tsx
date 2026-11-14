@@ -93,7 +93,6 @@ export function GithubSection({
   onOpenThread,
 }: {
   folder: GithubFolder;
-  /** Lowercased PR URL → a thread that links it. */
   threadOfPullRequest: ReadonlyMap<string, string>;
   onOpenThread: (threadId: string, split: boolean) => void;
   isCollapsed: boolean;

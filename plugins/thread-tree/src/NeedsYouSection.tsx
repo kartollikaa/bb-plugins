@@ -88,10 +88,10 @@ export function useNeedsYou(sources: NeedsYouSources) {
   const all = useMemo(
     () => [
       ...threadItems({ threads, questions, firstSeen, orchestrationOf }),
-      ...(pullRequestMode === "none" ? [] : pullRequestItems(pullRequestMode, linked, folderAttention, folderItems)),
+      ...(pullRequestMode === "none" ? [] : pullRequestItems(pullRequestMode, linked, folderAttention, folderItems, threadOfPullRequest)),
       ...automationItems(automations),
     ],
-    [threads, questions, firstSeen, orchestrationOf, pullRequestMode, linked, folderAttention, folderItems, automations],
+    [threads, questions, firstSeen, orchestrationOf, pullRequestMode, linked, folderAttention, folderItems, threadOfPullRequest, automations],
   );
 
   const [snoozes, saveSnooze] = usePersistentRecord("needs-you-snoozes", readSnoozes);

@@ -189,9 +189,9 @@ export function pullRequestItems(
   linked: readonly LinkedPullRequests[],
   folder: FolderAttention,
   folderItems: readonly GithubFolderItem[],
+  threadOf: ReadonlyMap<string, string> = linkedThreadByUrl(linked),
 ): PullRequestItem[] {
   if (mode === "none") return [];
-  const threadOf = linkedThreadByUrl(linked);
   const linkedPr = new Map<string, ThreadPullRequest>();
   for (const { pullRequests } of linked) {
     for (const pr of pullRequests) if (!linkedPr.has(pr.url.toLowerCase())) linkedPr.set(pr.url.toLowerCase(), pr);
