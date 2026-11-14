@@ -21,6 +21,11 @@ import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/th
 import { createProjectFolderHistory } from "./src/projectFolders";
 import { ARCHIVE_CLAIM_TTL_MS, createArchiveClaims, createArchiveHistory, releaseUnarchived } from "./src/archiveUndo";
 import { archiveScopes, dirtyEnvironmentIds, MAX_THREADS_PER_CALL } from "./src/orchestrations";
+import { createSignalReader, threadSignalsSchema, type SignalListArgs } from "./src/threadSignals";
+
+/** At most one refresh per thread this often; bb already debounces its events to one a second. */
+const SIGNAL_REFRESH_MS = 2_000;
+const signalTag = (threadId: string) => `signals:${threadId}`;
 
 
 export const rpcContract = defineRpcContract({
@@ -29,6 +34,12 @@ export const rpcContract = defineRpcContract({
     output: z.record(z.string(), z.array(threadPullRequestSchema)),
   },
   projectFolders: { input: z.null(), output: z.object({ projectIds: z.array(z.string()) }) },
+  /** Each thread's current turn as its event log tells it; null when the log couldn't be read. */
+  threadSignals: {
+    input: z.object({ keys: z.array(z.string().min(1)).min(1).max(200) }),
+    output: z.record(z.string(), threadSignalsSchema.nullable()),
+    keyTags: (key: string) => [signalTag(key)],
+  },
   automations: {
     input: z.null(),
     output: z.object({
@@ -126,6 +137,22 @@ export default async function plugin(bb: BbPluginApi) {
     bb.events.on(event, ({ thread }) => projectFolders.record(thread));
   }
 
+  const signals = createSignalReader({
+    listEvents: (args: SignalListArgs) => bb.sdk.threads.events.list(args as Parameters<typeof bb.sdk.threads.events.list>[0]),
+    log: (message) => bb.log.warn(message),
+  });
+  const signalRefresh = new Map<string, ReturnType<typeof setTimeout>>();
+  const refreshSignals = (threadId: string) => {
+    if (!signals.has(threadId) || signalRefresh.has(threadId)) return;
+    signalRefresh.set(threadId, setTimeout(() => {
+      signalRefresh.delete(threadId);
+      bb.rpc.experimental_invalidate([signalTag(threadId)]);
+    }, SIGNAL_REFRESH_MS));
+  };
+  for (const event of ["experimental_thread.events", "thread.active", "thread.idle", "thread.failed"] as const) {
+    bb.events.on(event, ({ thread }) => refreshSignals(thread.id));
+  }
+
   const readSessionPullRequests = createThreadPullRequestReader((method, input, outputSchema) =>
     bb.sdk.plugins.callRpc({ pluginId: "thread-links", method, input, outputSchema }));
 
@@ -160,6 +187,9 @@ export default async function plugin(bb: BbPluginApi) {
       [threadId, await readSessionPullRequests(threadId)],
     ))),
     projectFolders: async () => ({ projectIds: await projectFolders.list() }),
+    threadSignals: async ({ keys }) => Object.fromEntries(await Promise.all([...new Set(keys)].map(async (threadId) =>
+      [threadId, await signals.read(threadId).catch(() => null)] as const,
+    ))),
     undoArchive: async () => {
       const batch = archives.takeLatestBatch();
       const restored: { threadId: string; title: string }[] = [];
@@ -245,6 +275,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.deleted", ({ thread }) => {
     folder.forget(thread.id);
     archives.forget(thread.id);
+    signals.forget(thread.id);
   });
   bb.events.on("thread.archived", ({ thread }) => archives.record(thread.id, thread.title ?? thread.titleFallback ?? "Untitled thread"));
   bb.events.on("thread.unarchived", ({ thread }) => archives.forget(thread.id));
