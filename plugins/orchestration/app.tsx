@@ -1,23 +1,24 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   definePluginApp,
   experimental_THREAD_INFO_ROW_GROUPS as ROW_GROUPS,
   experimental_ThreadContextCardRow as ThreadContextCardRow,
   experimental_useSidebarThreads,
   useBbNavigate,
+  useSidebarSplitLayout,
   type ExperimentalThreadContextCardProps,
   type PluginNavPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { OrchestrationTab } from "./src/OrchestrationTab";
 import { OrchestratorHeader, OrchestratorPage, surfacePreference } from "./src/OrchestratorPage";
 import { shouldOpenView, threadFromSubPath, VIEW_PATH } from "./src/route";
-import { useIsOrchestrator, useOrchestration } from "./src/useOrchestration";
+import { useIsOrchestrator, useOrchestration, useOrchestratorMembership } from "./src/useOrchestration";
 
 const TAB = { id: "orchestration", context: { kind: "thread" }, availability: "fixed" } as const;
 
 function useOpenView() {
   const navigate = useBbNavigate();
-  return (threadId: string, replace = false) => {
+  return (threadId: string, replace: boolean) => {
     surfacePreference().set(threadId, "view");
     navigate.toPluginPanel(VIEW_PATH, { subPath: threadId, replace });
   };
@@ -25,12 +26,17 @@ function useOpenView() {
 
 /** bb has no slot for a thread's main area, so the orchestrator's thread view hands over to the plugin page. */
 function useTabVisibleAndOpenViewByDefault({ threadId }: { threadId: string }) {
-  const isOrchestrator = useIsOrchestrator(threadId);
+  const membership = useOrchestratorMembership(threadId);
+  const inSplit = useSidebarSplitLayout() !== null;
   const openView = useOpenView();
+  const decided = useRef<string | null>(null);
   useEffect(() => {
-    if (shouldOpenView({ isOrchestrator, prefersChat: surfacePreference().prefersChat(threadId) })) openView(threadId, true);
-  }, [isOrchestrator, threadId]);
-  return isOrchestrator;
+    if (membership === null) return;
+    const open = shouldOpenView({ membership, prefersChat: surfacePreference().prefersChat(threadId), inSplit, decided: decided.current === threadId });
+    decided.current = threadId;
+    if (open) openView(threadId, true);
+  }, [membership, threadId, inSplit]);
+  return membership === true;
 }
 
 function StatusRow({ threadId }: ExperimentalThreadContextCardProps) {
@@ -45,7 +51,7 @@ function StatusRow({ threadId }: ExperimentalThreadContextCardProps) {
       leading={<span aria-hidden className={`size-[7px] rounded-full ${attention ? "bg-attention" : "bg-foreground"}`} />}
       label={view.rowLabel}
       title={`${view.heading}. ${view.subline} Click to open the orchestration view.`}
-      onClick={() => openView(threadId)}
+      onClick={() => openView(threadId, true)}
     />
   );
 }

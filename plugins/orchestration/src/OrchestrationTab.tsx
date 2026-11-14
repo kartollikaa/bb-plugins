@@ -207,7 +207,7 @@ export function Message({ title, body, action }: { title: string; body: string; 
 }
 
 /** `revealComposer` makes the chat composer visible before a draft goes in; the page's rail uses it. */
-export function OrchestrationTab({ threadId, revealComposer, className, noneAction }: { threadId: string; revealComposer?: () => Promise<void>; className?: string; noneAction?: ReactNode }) {
+export function OrchestrationTab({ threadId, revealComposer, variant = "tab", noneAction }: { threadId: string; revealComposer?: () => Promise<void>; variant?: "tab" | "page"; noneAction?: ReactNode }) {
   const isOrchestrator = useIsOrchestrator(threadId);
   const state = useOrchestration(threadId, isOrchestrator);
   const composers = useComposers();
@@ -240,7 +240,7 @@ export function OrchestrationTab({ threadId, revealComposer, className, noneActi
   const [first, ...rest] = view.asks;
   const askThread = (ask: Ask) => (ask.key in threadIds ? threadIds[ask.key]! : null);
   return (
-    <div className={cx("flex h-full flex-col gap-6 overflow-y-auto px-4 pb-4 pt-5 text-sm leading-[1.45] text-foreground", className)}>
+    <div className={cx("flex flex-col gap-6 text-sm leading-[1.45] text-foreground", variant === "tab" ? "h-full overflow-y-auto px-4 pb-4 pt-5" : "mx-auto w-full max-w-[680px] px-6 pb-6 pt-6")}>
       <section>
         <h2 className="m-0 text-base font-semibold leading-[1.35] tracking-[-0.01em] [text-wrap:balance]">{view.heading}</h2>
         <p className="m-0 mt-1 text-muted-foreground [text-wrap:pretty]">{view.subline}</p>

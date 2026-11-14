@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatPreference, clampRailWidth, railMode, RAIL, shouldOpenView, threadFromSubPath, VIEW_PATH, type PreferenceStorage } from "../src/route.ts";
+import { chatPreference, clampRailWidth, railMode, railOpen, RAIL, shouldOpenView, threadFromSubPath, VIEW_PATH, type PreferenceStorage } from "../src/route.ts";
 
 test("the view's subPath is the thread id", () => {
   assert.equal(VIEW_PATH, "orchestrator");
-  assert.equal(threadFromSubPath("thr_8qykgad8yr"), "thr_8qykgad8yr");
-  assert.equal(threadFromSubPath("thr_8qykgad8yr/"), "thr_8qykgad8yr");
+  assert.equal(threadFromSubPath("thr_abc123"), "thr_abc123");
+  assert.equal(threadFromSubPath("thr_abc123/"), "thr_abc123");
 });
 
 test("a subPath that isn't a thread id names no thread", () => {
@@ -47,10 +47,28 @@ test("a storage that throws reads as no preference and never breaks a write", ()
   assert.equal(chatPreference(null).prefersChat("thr_a"), false);
 });
 
-test("the redirect fires only for an orchestrator whose owner didn't pick the chat", () => {
-  assert.equal(shouldOpenView({ isOrchestrator: true, prefersChat: false }), true);
-  assert.equal(shouldOpenView({ isOrchestrator: true, prefersChat: true }), false);
-  assert.equal(shouldOpenView({ isOrchestrator: false, prefersChat: false }), false);
+test("the redirect fires once, on the first known membership, for an orchestrator the owner didn't switch to chat", () => {
+  const base = { membership: true, prefersChat: false, inSplit: false, decided: false } as const;
+  assert.equal(shouldOpenView(base), true);
+  assert.equal(shouldOpenView({ ...base, prefersChat: true }), false);
+  assert.equal(shouldOpenView({ ...base, membership: false }), false);
+  assert.equal(shouldOpenView({ ...base, membership: null }), false);
+});
+
+test("a thread that turns into an orchestrator while open stays in its chat", () => {
+  assert.equal(shouldOpenView({ membership: true, prefersChat: false, inSplit: false, decided: true }), false);
+});
+
+test("a split layout is never torn down by the redirect", () => {
+  assert.equal(shouldOpenView({ membership: true, prefersChat: false, inSplit: true, decided: false }), false);
+});
+
+test("the rail opens by default as a rail, closed as a drawer, and a choice holds only for its thread and mode", () => {
+  assert.equal(railOpen(null, "thr_a:rail", "rail"), true);
+  assert.equal(railOpen(null, "thr_a:drawer", "drawer"), false);
+  assert.equal(railOpen({ key: "thr_a:rail", open: false }, "thr_a:rail", "rail"), false);
+  assert.equal(railOpen({ key: "thr_a:rail", open: true }, "thr_a:drawer", "drawer"), false);
+  assert.equal(railOpen({ key: "thr_a:rail", open: false }, "thr_b:rail", "rail"), true);
 });
 
 test("the rail turns into a drawer below 900px of page width", () => {

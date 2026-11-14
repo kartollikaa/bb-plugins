@@ -44,13 +44,17 @@ export function chatPreference(storage: PreferenceStorage | null) {
   };
 }
 
-export function shouldOpenView({ isOrchestrator, prefersChat }: { isOrchestrator: boolean; prefersChat: boolean }): boolean {
-  return isOrchestrator && !prefersChat;
+/**
+ * `membership` is null until the ledger lookup answers; `decided` is true once this thread view has
+ * seen an answer, so a later flip never yanks the owner out of the chat.
+ */
+export function shouldOpenView({ membership, prefersChat, inSplit, decided }: { membership: boolean | null; prefersChat: boolean; inSplit: boolean; decided: boolean }): boolean {
+  return membership === true && !decided && !prefersChat && !inSplit;
 }
 
 export const RAIL = { default: 400, min: 340, max: 560, drawerBelow: 900 } as const;
 
-export function railMode(pageWidth: number): "rail" | "drawer" {
+export function railMode(pageWidth: number): RailMode {
   return pageWidth < RAIL.drawerBelow ? "drawer" : "rail";
 }
 
@@ -58,4 +62,14 @@ export function clampRailWidth(width: number, pageWidth: number): number {
   if (!Number.isFinite(width)) return RAIL.default;
   const max = Math.max(RAIL.min, Math.min(RAIL.max, Math.floor(pageWidth / 2)));
   return Math.min(max, Math.max(RAIL.min, Math.round(width)));
+}
+
+export type RailMode = "rail" | "drawer";
+export interface RailChoice {
+  key: string;
+  open: boolean;
+}
+
+export function railOpen(choice: RailChoice | null, key: string, mode: RailMode): boolean {
+  return choice?.key === key ? choice.open : mode === "rail";
 }

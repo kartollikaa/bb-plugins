@@ -24,11 +24,16 @@ function useVisibleInterval(tick: () => void, ms: number, enabled = true) {
   }, [tick, ms, enabled]);
 }
 
-export function useIsOrchestrator(threadId: string): boolean {
+/** Null until the ledger lookup has answered for this thread. */
+export function useOrchestratorMembership(threadId: string): boolean | null {
   const keys = useMemo(() => [threadId], [threadId]);
   const query = experimental_useRpcKeyedQuery({ contract, method: "isOrchestrator", keys });
   useVisibleInterval(query.refetch, MEMBERSHIP_REFRESH_MS);
-  return query.data?.[threadId] === true;
+  return query.data?.[threadId] ?? null;
+}
+
+export function useIsOrchestrator(threadId: string): boolean {
+  return useOrchestratorMembership(threadId) === true;
 }
 
 function useNow(): number {
