@@ -1414,6 +1414,7 @@ function OlderThreads({
 
 interface PreparedFoldArchive {
   plan: FoldArchivePlan;
+  markSkipped(): void;
   run(): Promise<void>;
 }
 
@@ -1438,6 +1439,7 @@ function FoldArchiveButton({ label = "Archive", onArchive }: { label?: string; o
           if (!prepared) return setStep("idle");
           const { plan } = prepared;
           if (plan.roots.length === 0) {
+            prepared.markSkipped();
             toast.warning("Nothing archived", { description: skippedSummary(plan) ?? undefined });
             return setStep("idle");
           }
@@ -1510,6 +1512,7 @@ async function prepareFoldArchive(
   const isStillClean = (id: string) => rpc.call("archiveScope", { threadIds: [id] }).then(({ dirty }) => dirty.length === 0);
   return {
     plan,
+    markSkipped: () => updateUncommitted((current) => uncommittedAfterRun(current, { checked: ids, dirty: [...dirty], changed: [], stop: null })),
     async run() {
       const claimed = [...new Set(plan.roots.flatMap((id) => scopes.get(id) ?? [id]))];
       const result = await runClaimedArchive({
