@@ -44,10 +44,13 @@ that don't move or change height while agents work.
   failed, running, finished but unread. Each count is a toggle filter that shows a flat list of
   those threads. The Running filter is the one place that shows each thread's current step and a
   live timer.
-- `/` (and a search icon in the line) opens an inline filter matching title, branch, PR number and
-  project. Escape clears it.
-- Rejected: a permanent search box plus filter chips, and a separate Running section. Together
-  they made the top taller than today, and Running repeated tree rows.
+- A full-width search field sits above the counts, beside the Sections button: 32px tall, a
+  search icon, "Search threads" and a `/` key chip. Clicking it or pressing `/` turns it into the
+  input in place, matching title, branch, PR number and project. Escape clears it. Picking a count
+  closes the search. The owner asked for it after the first build hid search behind a small icon:
+  "the search bar should be more visually outstanding and bigger in size… I don't actually see it
+  because it's too small".
+- Rejected: filter chips and a separate Running section. Running repeated tree rows.
 
 ### Needs you
 

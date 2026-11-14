@@ -46,14 +46,15 @@ thread is left; it works anywhere in bb while the
 sidebar thread list is loaded, and Settings → Keyboard rebinds it. Browsers also use Ctrl+Shift+I for DevTools. The header
 hint shows the default for the platform, not a rebinding. Each browser client keeps its own snoozes.
 
-The line at the top counts threads that need input, failed, are running, and
+Under the search field, a line counts threads that need input, failed, are running, and
 finished but are not read yet. Each count is a toggle: it swaps the sections and
 the tree for a flat list of those threads, children included, most recently
 active first. Running rows add a second line with the project and the
 orchestration they run under. Click the count again, Clear, or press Escape to
-go back. `/` (outside a text field) or the search icon opens a search box that
-matches the title, branch, PR number (`#123`) and project of the threads the
-tree lists, archived ones when Archived is on. Escape clears it.
+go back. The search field above the counts, or `/` outside a text field, opens
+search, which matches the title, branch, PR number (`#123`) and project of the
+threads the tree lists, archived ones when Archived is on. Escape clears it, and
+picking a count closes it.
 
 Every thread row keeps one height whatever its state; rows are taller on a
 phone-sized viewport. A row is one line, except under the Running filter. Left to right: status glyph, title, Retry on a

@@ -46,7 +46,7 @@ import { GithubSection, useGithubFolder } from "./GithubSection";
 import { isSectionCollapsed, sectionToggleKey, toneClass, type SummaryPart } from "./sectionSummaries";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph, rollupGlyph } from "./statusGlyph";
-import { StatusLine } from "./StatusLine";
+import { SearchField, StatusLine } from "./StatusLine";
 import { DOT_CLASS } from "./StatusDot";
 import { countStatusFilters, filterThreads, handleFlatListEscape, handleSearchKey, isModalDialog, MODAL_DIALOG_SELECTOR, orchestrationTitle, refocusAfterClose, returnFocus, runningContext, type CloseReason, sidebarBehindModal, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
 import type { rpcContract } from "../server";
@@ -279,6 +279,13 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     setSearchOpen(true);
     searchInputRef.current?.focus();
   }, []);
+  const pickStatusFilter = useCallback((next: StatusFilter | null) => {
+    if (next) {
+      setSearchOpen(false);
+      setQuery("");
+    }
+    setStatusFilter(next);
+  }, []);
   const pendingFocus = useRef<ClosedView | null>(null);
   const closeSearch = useCallback((reason: CloseReason = "action") => {
     pendingFocus.current = refocusAfterClose({ search: true }, reason);
@@ -476,19 +483,19 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           if (event.currentTarget.contains(event.target as Node)) handleFlatListEscape(event, !!(statusFilter || searchOpen), closeFlatList);
         }}
       >
-      <div className="-mb-2 flex h-5 items-center justify-between gap-2 px-1.5">
-        <StatusLine
-          counts={filterCounts}
-          filter={statusFilter}
-          onFilter={setStatusFilter}
-          searchOpen={searchOpen}
-          query={query}
-          onQuery={setQuery}
-          onOpenSearch={openSearch}
-          onCloseSearch={closeSearch}
-          inputRef={searchInputRef}
-        />
-        <SectionsMenu view={view} order={sectionOrder.filter((id) => presentSections.includes(id))} hidden={presentSections.length - shownSections.length} onChange={setSection} />
+      <div className="-mb-2 flex flex-col gap-1 px-1.5">
+        <div className="flex items-center gap-1">
+          <SearchField
+            open={searchOpen}
+            query={query}
+            onQuery={setQuery}
+            onOpen={openSearch}
+            onClose={closeSearch}
+            inputRef={searchInputRef}
+          />
+          <SectionsMenu view={view} order={sectionOrder.filter((id) => presentSections.includes(id))} hidden={presentSections.length - shownSections.length} onChange={setSection} />
+        </div>
+        <StatusLine counts={filterCounts} filter={statusFilter} onFilter={pickStatusFilter} />
       </div>
       {flatList ? (
         <FlatListSection
@@ -839,9 +846,9 @@ function SectionsMenu({
           type="button"
           aria-label={hidden > 0 ? `Sections, ${hidden} hidden` : "Sections"}
           title={hidden > 0 ? `Sections: choose what the sidebar shows (${hidden} hidden)` : "Sections: choose what the sidebar shows"}
-          className="flex h-5 items-center rounded-md px-1 text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/60 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/30 data-[state=open]:bg-sidebar-accent"
         >
-          <Icon name="SlidersHorizontal" fallback="Eye" aria-hidden className="size-3" />
+          <Icon name="SlidersHorizontal" fallback="Eye" aria-hidden className="size-4" />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
