@@ -47,8 +47,6 @@ export type DotState = "input" | "error" | "running" | "done" | "stopped";
 /** A thread's rollup state; "waiting" is a queued message or a goal with no turn running. */
 export type ThreadState = "input" | "error" | "running" | "waiting" | "done";
 
-export type StateCounts = Partial<Record<ThreadState, number>>;
-
 /** A rollup state that tells finished-unread apart from done and read. */
 export type FoldState = ThreadState | "unread";
 

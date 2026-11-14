@@ -78,7 +78,8 @@ import {
   foldState,
   type TreeRow,
 } from "./tree";
-import { archivePlan, foldBarSegments, isFinishedFold, orchestrations, orchestrationSubtitle, orchestrationTreeIds, rollupOver } from "./orchestrations";
+import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, orchestrationTreeIds, rollupOver } from "./orchestrations";
+import { archiveInTurn } from "./archiveRun";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
 import { useDragReorder, useFlipOrder } from "./useReorder";
@@ -94,6 +95,7 @@ const ROW_PAD_PX = 6;
 const INDENT_PX = 24;
 
 const ARCHIVE_ACTION_KEY = "bb--core/archive";
+const ARCHIVE_SCOPE_CHUNK = 200;
 
 const GROUP_MODES: readonly { id: GroupMode; label: string; chip: string; icon: React.ReactNode }[] = [
   { id: "project", label: "Project", chip: "Group: Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },
@@ -243,7 +245,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const sharedBranches = useMemo(() => sharedBranchThreads(threads, familyRootOf(threads)), [threads]);
   const orchestrationList = useMemo(() => orchestrations(activeForest), [activeForest]);
   const [revealed, setRevealed] = useState<{ id: string; ids: ReadonlySet<string> } | null>(null);
-  const sdk = useSdk();
   const canHover = !useMediaQuery(NO_HOVER_QUERY);
   const searchPool = showArchived ? listed.threads : threads;
   const flatList = useMemo(() => {
@@ -331,7 +332,21 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       clearTimeout(clear);
     };
   }, [revealed, view.reduceMotion]);
-  const archiveFold = useCallback((root: PluginSidebarThread) => archiveFinishedFold(rpc, activeForest, root), [rpc, activeForest]);
+  const [archiveJob, setArchiveJob] = useState<BbArchiveJob | null>(null);
+  const archiveJobRunning = useRef(false);
+  const runBbArchive = useCallback((targets: PluginThreadActionTarget[]) => {
+    if (archiveJobRunning.current) return Promise.resolve<ArchiveRunResult>({ archived: [], stopped: true });
+    archiveJobRunning.current = true;
+    return new Promise<ArchiveRunResult>((resolve) => setArchiveJob({
+      targets,
+      finish: (result) => {
+        archiveJobRunning.current = false;
+        setArchiveJob(null);
+        resolve(result);
+      },
+    }));
+  }, []);
+  const archiveFold = useCallback((root: PluginSidebarThread) => prepareFoldArchive(rpc, activeForest, root, runBbArchive), [rpc, activeForest, runBbArchive]);
 
   if (status === "loading" && threads.length === 0) {
     return <div className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</div>;
@@ -647,6 +662,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       </>
       )}
       </div>
+      {archiveJob ? <BbArchiveRun job={archiveJob} /> : null}
     </ReduceMotionContext.Provider>
   );
 }
@@ -1306,7 +1322,7 @@ function FoldLine({
   total: number;
   onExpand: () => void;
   /** Absent in the archived view. */
-  onArchive?: () => Promise<void>;
+  onArchive?: () => Promise<PreparedFoldArchive | null>;
 }) {
   const finished = isFinishedFold(own, counts);
   const parts = finished ? [] : FOLD_STATES.filter(({ state }) => (counts[state] ?? 0) > 0);
@@ -1338,40 +1354,64 @@ function FoldLine({
           </span>
         ))}
       </button>
-      {finished && onArchive ? <FoldArchiveButton count={total + 1} onArchive={onArchive} /> : null}
+      {finished && onArchive ? <FoldArchiveButton onArchive={onArchive} /> : null}
     </div>
   );
 }
 
-/** Asks once inline, since it archives a whole tree; the toast that follows says what was skipped. */
-function FoldArchiveButton({ count, onArchive }: { count: number; onArchive: () => Promise<void> }) {
-  const [step, setStep] = useState<"idle" | "confirm" | "pending">("idle");
+interface PreparedFoldArchive {
+  plan: FoldArchivePlan;
+  run(): Promise<void>;
+}
+
+/** Reads the fold's archive scope first; bb's own Archive then confirms each clean root, so a split tree gets the counts inline before that. */
+function FoldArchiveButton({ onArchive }: { onArchive: () => Promise<PreparedFoldArchive | null> }) {
+  const [step, setStep] = useState<"idle" | "pending" | { prepared: PreparedFoldArchive }>("idle");
   const button = "flex h-5 shrink-0 items-center gap-1 rounded-md px-1.5 text-2xs outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring disabled:opacity-60";
-  if (step === "idle") {
+  const run = async (prepared: PreparedFoldArchive) => {
+    setStep("pending");
+    await prepared.run();
+    setStep("idle");
+  };
+  if (typeof step === "string") {
     return (
-      <button type="button" data-fold-archive="" onClick={() => setStep("confirm")} className={cn(button, "ml-auto text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground")}>
+      <button
+        type="button"
+        data-fold-archive=""
+        disabled={step === "pending"}
+        onClick={async () => {
+          setStep("pending");
+          const prepared = await onArchive();
+          if (!prepared) return setStep("idle");
+          const { plan } = prepared;
+          if (plan.roots.length === 0) {
+            toast.warning("Nothing archived", { description: skippedSummary(plan) ?? undefined });
+            return setStep("idle");
+          }
+          if (plan.skipped + plan.kept === 0) return run(prepared);
+          setStep({ prepared });
+        }}
+        className={cn(button, "ml-auto text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground")}
+      >
         <Icon name="Archive" aria-hidden className="size-3" />
-        Archive
+        {step === "pending" ? "Archiving…" : "Archive"}
       </button>
     );
   }
+  const { plan } = step.prepared;
   return (
     <span className="ml-auto flex shrink-0 items-center gap-0.5">
       <button
         type="button"
         data-fold-archive-confirm=""
         autoFocus
-        disabled={step === "pending"}
-        onClick={async () => {
-          setStep("pending");
-          await onArchive();
-          setStep("idle");
-        }}
+        title={skippedSummary(plan) ?? undefined}
+        onClick={() => run(step.prepared)}
         className={cn(button, "bg-destructive/10 text-destructive hover:bg-destructive/20")}
       >
-        {step === "pending" ? "Archiving…" : `Archive ${count} threads`}
+        {`Archive ${plan.archiveCount} · skip ${plan.skipped + plan.kept}`}
       </button>
-      <button type="button" disabled={step === "pending"} onClick={() => setStep("idle")} className={cn(button, "text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground")}>
+      <button type="button" onClick={() => setStep("idle")} className={cn(button, "text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground")}>
         Cancel
       </button>
     </span>
@@ -1380,48 +1420,97 @@ function FoldArchiveButton({ count, onArchive }: { count: number; onArchive: () 
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
-/** Archives the tree leaves first as one undo, skipping any worktree with changes and the threads above it. */
-async function archiveFinishedFold(
+function skippedSummary({ skipped, kept }: FoldArchivePlan) {
+  if (skipped + kept === 0) return null;
+  return `Skipped ${plural(skipped, "thread")} with uncommitted changes${kept ? ` and ${plural(kept, "thread")} above them` : ""}`;
+}
+
+type ArchiveRunResult = Awaited<ReturnType<typeof archiveInTurn>>;
+interface BbArchiveJob {
+  targets: PluginThreadActionTarget[];
+  finish(result: ArchiveRunResult): void;
+}
+
+/** Reads what archiving the fold takes along, picks the clean roots, and returns a run through bb's own Archive. */
+async function prepareFoldArchive(
   rpc: ReturnType<typeof useRpc<typeof rpcContract>>,
   forest: Forest<PluginSidebarThread>,
   root: PluginSidebarThread,
-) {
-  const subtree = [root, ...descendantsOf(forest, root.id)];
-  const environmentOf = new Map(subtree.flatMap((thread) => {
-    const environment = thread.environment;
-    return environment?.id && environment.isWorktree !== false ? [[thread.id, environment.id] as const] : [];
-  }));
-  const environmentIds = [...new Set(environmentOf.values())];
+  runBbArchive: (targets: PluginThreadActionTarget[]) => Promise<ArchiveRunResult>,
+): Promise<PreparedFoldArchive | null> {
+  const subtree = new Map([root, ...descendantsOf(forest, root.id)].map((thread) => [thread.id, thread]));
+  const ids = [...subtree.keys()];
+  const scopes = new Map<string, string[]>();
   const dirty = new Set<string>();
   try {
-    for (let index = 0; index < environmentIds.length; index += 200) {
-      const { dirty: found } = await rpc.call("dirtyWorktrees", { environmentIds: environmentIds.slice(index, index + 200) });
-      found.forEach((id) => dirty.add(id));
+    for (let index = 0; index < ids.length; index += ARCHIVE_SCOPE_CHUNK) {
+      const result = await rpc.call("archiveScope", { threadIds: ids.slice(index, index + ARCHIVE_SCOPE_CHUNK) });
+      Object.entries(result.scopes).forEach(([id, scope]) => scopes.set(id, scope));
+      result.dirty.forEach((id) => dirty.add(id));
     }
   } catch (error) {
     toast.error("Archive failed", { description: `Couldn't check worktrees for changes: ${error instanceof Error ? error.message : String(error)}` });
-    return;
+    return null;
   }
-  const dirtyThreads = new Set([...environmentOf].filter(([, environmentId]) => dirty.has(environmentId)).map(([threadId]) => threadId));
-  const plan = archivePlan(forest, root.id, dirtyThreads);
-  let result = { archived: 0, held: [] as string[], skipped: 0, error: undefined as string | undefined };
-  if (plan.archive.length > 0) {
-    try {
-      result = { error: undefined, ...await rpc.call("archiveThreads", { threadIds: plan.archive }) };
-    } catch (error) {
-      result.error = error instanceof Error ? error.message : String(error);
-    }
-  }
-  const { archived } = result;
-  if (result.error) {
-    toast.error(archived ? `Archived ${plural(archived, "thread")}, then failed` : "Archive failed", { description: result.error });
-    return;
-  }
-  const skippedCount = plan.skipped.length + result.skipped;
-  const keptCount = plan.kept.length + result.held.length;
-  const skipped = skippedCount + keptCount > 0 ? `Skipped ${plural(skippedCount, "thread")} with uncommitted changes${keptCount ? ` and ${plural(keptCount, "thread")} above them` : ""}` : null;
-  if (archived === 0) toast.warning("Nothing archived", { description: skipped ?? undefined });
-  else toast.success(`Archived ${plural(archived, "thread")}`, { description: skipped ?? "⌘Z to undo" });
+  const plan = foldArchivePlan(forest, root.id, scopes, dirty);
+  return {
+    plan,
+    async run() {
+      const claimed = [...new Set(plan.roots.flatMap((id) => scopes.get(id) ?? [id]))];
+      const claimId = await rpc.call("archiveClaim", { threadIds: claimed }).then(({ claimId }) => claimId, () => null);
+      let result: ArchiveRunResult;
+      try {
+        result = await runBbArchive(plan.roots.map((id) => toActionTarget(subtree.get(id)!)));
+      } finally {
+        if (claimId !== null) await rpc.call("archiveRelease", { claimId }).catch(() => undefined);
+      }
+      const summary = skippedSummary(plan);
+      if (!summary || result.archived.length === 0) return;
+      const archived = new Set(result.archived.flatMap((id) => scopes.get(id) ?? [id])).size;
+      toast.success(`Archived ${plural(archived, "thread")}`, { description: summary });
+    },
+  };
+}
+
+const BOUND_ARCHIVE_WAIT_MS = 2_000;
+
+/** Lives at list level: archiving a fold's root unmounts its fold line while later roots still wait for bb's confirmation. */
+function BbArchiveRun({ job }: { job: BbArchiveJob }) {
+  const sdk = useSdk();
+  const actions = useRef(new Map<string, () => Promise<void>>());
+  const started = useRef(false);
+  const [bound, setBound] = useState(0);
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setWaited(true), BOUND_ARCHIVE_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (started.current || (bound < job.targets.length && !waited)) return;
+    started.current = true;
+    const isArchived = (threadId: string) => sdk.threads.get({ threadId }).then((thread) => thread.archivedAt !== null, () => false);
+    archiveInTurn(job.targets.map((target) => target.id), (id) => actions.current.get(id), isArchived)
+      .then(job.finish, () => job.finish({ archived: [], stopped: true }));
+  }, [bound, waited, job, sdk]);
+  return job.targets.map((target) => (
+    <BoundArchive
+      key={target.id}
+      target={target}
+      onBound={(run) => {
+        if (!actions.current.has(target.id)) setBound((count) => count + 1);
+        actions.current.set(target.id, run);
+      }}
+    />
+  ));
+}
+
+function BoundArchive({ target, onBound }: { target: PluginThreadActionTarget; onBound: (run: () => Promise<void>) => void }) {
+  const [entry] = useThreadActions(target, { keys: [ARCHIVE_ACTION_KEY] });
+  const run = entry && !entry.action.disabled ? entry.action.run : undefined;
+  useEffect(() => {
+    if (run) onBound(() => run());
+  }, [run]);
+  return null;
 }
 
 /** Rows sit this far apart; continuing lines reach across the gap. */

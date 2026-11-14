@@ -86,14 +86,18 @@ and in the archived view.
 
 A folded parent's glyph shows its subtree's state when that is more urgent than
 its own. Its label names both, as in "Last turn failed; subthread needs input". The fold line counts the
-subtree by state, with finished-unread threads as "to review"; from five
-subthreads a small bar shows the same split. When the parent and every
-subthread are done and read, the fold line says "all done" and offers Archive.
-It asks once, then archives the tree leaves first. A thread whose worktree has
-uncommitted or untracked changes, or whose git status can't be read, is skipped
-along with the threads above it, and the toast says how many were skipped.
-Hidden subthreads count too, since archiving a parent takes them along. One
-Cmd/Ctrl+Z restores everything that Archive took.
+subtree by state, with finished-unread threads as "to review"; a bigger subtree
+also gets a small bar with the same split. When the parent and every subthread
+are done and read, the fold line says "all done" and offers Archive. Archive
+runs bb's own Archive action, so bb's confirmation setting and Undo apply. A
+thread whose worktree has uncommitted or untracked changes, or whose git status
+can't be read, is skipped along with the threads above it; hidden subthreads
+and threads that archive along with a parent are checked too. With nothing to
+skip, Archive goes straight to bb's action on the parent. Otherwise the fold
+line first asks "Archive N · skip M" with the real counts, then bb's action
+runs on each clean subtree in turn, and a toast says what was skipped.
+Cancelling bb's confirmation stops the rest. One Cmd/Ctrl+Z restores
+everything that Archive took.
 
 The provider icon sits in a fixed slot before the age, in the provider's brand
 tint (Claude orange, Codex blue-violet), or in the text colour with the
@@ -123,11 +127,12 @@ this one under Settings → Appearance → Sidebar, or run
 
 ## Layout
 
-- `server.ts`: RPC `subagents`, `undoArchive`, `dirtyWorktrees` and `archiveThreads`, the Automations and GitHub Folder proxies, and the `bb thread-tree` command.
+- `server.ts`: RPC `subagents`, `undoArchive`, `archiveScope`, `archiveClaim` and `archiveRelease`, the Automations and GitHub Folder proxies, and the `bb thread-tree` command.
 - `src/githubFolder.ts`: the slice of the GitHub Folder plugin's view that the GitHub section draws.
 - `src/subagents.ts`: folds a thread's event log into its subagents.
 - `src/tree.ts`: pure tree, grouping and subagent state logic.
 - `src/orchestrations.ts`: the Orchestrations shortcuts, the folded rollup and bar, and the archive plan.
+- `src/archiveRun.ts`: runs bb's Archive on each clean root in turn.
 - `src/archiveUndo.ts`: which recent archives one Cmd/Ctrl+Z brings back.
 - `src/ThreadTreeList.tsx`, `src/SubagentBadge.tsx`, `src/GithubSection.tsx`: the sidebar UI.
 - `test/`: `node --test` suites for the pure modules.

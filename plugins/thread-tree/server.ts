@@ -79,7 +79,7 @@ export const rpcContract = defineRpcContract({
   },
   /** Groups the coming archives of these threads into one ⌘Z, however far apart they land. */
   archiveClaim: {
-    input: z.object({ threadIds: z.array(z.string().min(1)).min(1).max(5000) }).strict(),
+    input: z.object({ threadIds: z.array(z.string().min(1)).min(1) }).strict(),
     output: z.object({ claimId: z.number() }),
   },
   /** Ends a claim; threads it covered that weren't archived go back to ordinary grouping. */
