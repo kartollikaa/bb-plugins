@@ -132,7 +132,7 @@ test("skips and threads changed since the click go into the summary", () => {
   assert.deepEqual(foldArchiveOutcome({ archived: 4, skipped: 1, kept: 1, changed: 2, stop: null }), {
     tone: "success",
     title: "Archived 4 threads",
-    description: "Skipped 1 thread with uncommitted changes and 1 thread above them. Skipped 2 threads that got changes since",
+    description: "Skipped 1 thread with uncommitted changes and 1 thread kept with them. Skipped 2 threads that got changes since",
   });
 });
 

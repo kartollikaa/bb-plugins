@@ -89,7 +89,7 @@ const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ?
 
 export function skippedSummary({ skipped, kept }: { skipped: number; kept: number }): string | null {
   if (skipped + kept === 0) return null;
-  return `Skipped ${plural(skipped, "thread")} with uncommitted changes${kept ? ` and ${plural(kept, "thread")} above them` : ""}`;
+  return `Skipped ${plural(skipped, "thread")} with uncommitted changes${kept ? ` and ${plural(kept, "thread")} kept with them` : ""}`;
 }
 
 export interface FoldArchiveOutcome {
