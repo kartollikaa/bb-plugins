@@ -88,7 +88,7 @@ Finished orchestrations drop out by themselves; the section hides when empty
 and in the archived view.
 
 A folded parent's glyph shows its subtree's state when that is more urgent than
-its own, labelled "Subthread needs input" and so on. The fold line counts the
+its own. Its label names both, as in "Last turn failed; subthread needs input". The fold line counts the
 subtree by state, with finished-unread threads as "to review"; from five
 subthreads a small bar shows the same split. When the parent and every
 subthread are done and read, the fold line says "all done" and offers Archive.

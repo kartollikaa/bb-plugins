@@ -158,6 +158,10 @@ test("another plugin's row status never covers a failed queued message", () => {
 });
 
 test("a rolled-up subtree draws bb's glyph for its state and says it is a subthread's", () => {
-  assert.deepEqual(rollupGlyph("unread"), { indicator: "unread-success", rowStatus: null, label: "Subthread finished, not read" });
-  assert.equal(rollupGlyph("input").indicator, "waiting-for-input");
+  assert.deepEqual(rollupGlyph("unread", null), { indicator: "unread-success", rowStatus: null, label: "Subthread finished, not read" });
+  assert.equal(rollupGlyph("input", null).indicator, "waiting-for-input");
+});
+
+test("a rolled-up glyph's label keeps the thread's own state first", () => {
+  assert.equal(rollupGlyph("input", "Last turn failed").label, "Last turn failed; subthread needs input");
 });

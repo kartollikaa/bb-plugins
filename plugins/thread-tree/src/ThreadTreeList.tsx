@@ -974,7 +974,8 @@ function ThreadRowView({
   const { hasUnsubmittedDraft } = useSidebarThreadDraft(thread.id);
   const rowStatus = useSidebarThreadRowStatus(thread.id);
   const rolledUp = rollup !== undefined ? rollup : row.foldCounts ? rollupOver(foldState(thread), row.foldCounts) : null;
-  const glyph = rolledUp ? rollupGlyph(rolledUp) : resolveRowGlyph(thread, hasUnsubmittedDraft, rowStatus);
+  const ownGlyph = resolveRowGlyph(thread, hasUnsubmittedDraft, rowStatus);
+  const glyph = rolledUp ? rollupGlyph(rolledUp, ownGlyph.label) : ownGlyph;
   const dot = <RowStatusGlyph glyph={glyph} />;
   const providerName = provider?.displayName ?? thread.providerId;
   const failed = thread.status === "error" && !thread.isArchived;

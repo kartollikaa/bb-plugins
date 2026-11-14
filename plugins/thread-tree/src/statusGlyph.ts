@@ -120,9 +120,10 @@ const ROLLUP_LABEL: Record<FoldState, string> = {
   done: "Subthreads done",
 };
 
-/** A folded parent or an orchestration shortcut drawing its subtree's state instead of its own. */
-export function rollupGlyph(state: FoldState): RowGlyph<never> {
-  return { indicator: FOLD_GLYPH[state], rowStatus: null, label: ROLLUP_LABEL[state] };
+/** A folded parent or an orchestration shortcut drawing its subtree's state; the label still names its own first. */
+export function rollupGlyph(state: FoldState, ownLabel: string | null): RowGlyph<never> {
+  const below = ROLLUP_LABEL[state];
+  return { indicator: FOLD_GLYPH[state], rowStatus: null, label: ownLabel ? `${ownLabel}; ${below[0]!.toLowerCase()}${below.slice(1)}` : below };
 }
 
 /** The status line's counts, drawn as the row glyph each one lists. */
