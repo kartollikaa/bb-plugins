@@ -122,3 +122,9 @@ test("a PR URL links to the first thread that has it, case-insensitively", () =>
 test("a PR row's icon label and tooltip name the reason with the same words", () => {
   assert.equal(pullRequestLook(pr(1, ["ready"])).label, "Approved, ready to merge");
 });
+
+test("a paused automation that is mid-run counts as running in the header, as its dot shows", () => {
+  const now = Date.parse("2026-11-14T12:00:00Z");
+  const paused = automation({ name: "p", enabled: false, lastRunStatus: "running" });
+  assert.equal(automationsSummary([paused], now).some((part) => part.text === "1 running"), true);
+});

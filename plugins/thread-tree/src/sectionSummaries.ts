@@ -38,9 +38,8 @@ export function pullRequestSummary(items: readonly GithubFolderItem[]): SummaryP
 
 export function automationsSummary(automations: readonly AutomationSummary[], now: number): SummaryPart[] {
   const active = automations.filter((automation) => automation.enabled);
-  const dots = active.map(automationDot);
-  const failed = dots.filter((dot) => dot === "error").length;
-  const running = dots.filter((dot) => dot === "running").length;
+  const failed = active.filter((automation) => automationDot(automation) === "error").length;
+  const running = automations.filter((automation) => automationDot(automation) === "running").length;
   const next = Math.min(...active.map((automation) => automation.nextRunAt ?? Infinity));
   const parts: SummaryPart[] = [];
   if (failed > 0) parts.push({ text: `${failed} failed`, tone: "bad" });
