@@ -70,7 +70,7 @@ export function GroupHeader({
                   title={action.label}
                   className={cn(
                     "flex size-5 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                    "opacity-0 focus-visible:opacity-100 group-hover/header:opacity-100 group-data-[menu-open]/actions:opacity-100",
+                    "opacity-0 focus-visible:opacity-100 group-hover/header:opacity-100 group-focus-within/actions:opacity-100 group-data-[menu-open]/actions:opacity-100",
                     TOUCH_DIMMED,
                   )}
                 >
