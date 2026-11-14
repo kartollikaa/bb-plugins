@@ -183,3 +183,38 @@ test("formatting helpers", () => {
   assert.equal(firstLine("x".repeat(200), 10), "xxxxxxxxx…");
   assert.equal(firstLine("_RO1_ says REQUEST_CHANGES on __S6__"), "RO1 says REQUEST_CHANGES on S6");
 });
+
+test("a structured «For the owner» ask says what is asked, and its options become quick replies", () => {
+  const v = view([subtask("S2", "working")], { thr_s2: live(1) }, {}, {
+    forTheOwner: ["ask: Merge kartollika-ai-hub#38 | why: S5 passed review | link: kartollikaa/kartollika-ai-hub#38 | thread: thr_s5x | options: Go as you recommend / Not now"],
+  });
+  const ask = v.asks[0]!;
+  assert.equal(v.heading, "One thing waits on you");
+  assert.equal(ask.title, "Merge kartollika-ai-hub#38");
+  assert.equal(ask.text, "S5 passed review");
+  assert.equal(ask.drafts!.primary, "Re «Merge kartollika-ai-hub#38»: ");
+  assert.deepEqual(ask.replies, [
+    { label: "Go as you recommend", draft: "Re «Merge kartollika-ai-hub#38»: Go as you recommend" },
+    { label: "Not now", draft: "Re «Merge kartollika-ai-hub#38»: Not now" },
+  ]);
+  assert.deepEqual(ask.links, [{ label: "kartollikaa/kartollika-ai-hub#38", href: "https://github.com/kartollikaa/kartollika-ai-hub/pull/38" }]);
+  assert.deepEqual(ask.threads, ["thr_s5x"]);
+});
+
+test("notes from «For the owner» stay out of what needs you and show in the history", () => {
+  const v = view([subtask("S2", "working")], { thr_s2: live(1) }, {}, {
+    forTheOwner: ["Nothing waiting. Store PR get-bb/marketplace#958 waits on a maintainer.", "note: T4 accepted the pager slide"],
+  });
+  assert.equal(v.asks.length, 0);
+  assert.equal(v.heading, "Nothing needs you");
+  assert.deepEqual(v.history.notes, ["Nothing waiting. Store PR get-bb/marketplace#958 waits on a maintainer.", "T4 accepted the pager slide"]);
+});
+
+test("a free «For the owner» line keeps its full text and gets its links and threads as actions", () => {
+  const ask = view([], {}, {}, { forTheOwner: ["Waiting: owner merge of kartollikaa/bb-plugins#12 (thread thr_q1)"] }).asks[0]!;
+  assert.equal(ask.title, null);
+  assert.equal(ask.text, "Waiting: owner merge of kartollikaa/bb-plugins#12 (thread thr_q1)");
+  assert.deepEqual(ask.links.map((l) => l.label), ["kartollikaa/bb-plugins#12"]);
+  assert.deepEqual(ask.threads, ["thr_q1"]);
+  assert.deepEqual(ask.replies, []);
+});

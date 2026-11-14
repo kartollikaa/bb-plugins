@@ -1,5 +1,6 @@
 // Turns a ledger snapshot plus bb's live thread state into the tab's one answer: does anything need you, and is the team moving.
 import type { Agent, LedgerSummary, Subtask } from "./contract.ts";
+import { parseOwnerItem, type Link } from "./owner.ts";
 
 /** Owner's rule: quiet this long while working, or the third failure of a delivery, means stuck. */
 export const QUIET_MS = 30 * 60_000;
@@ -30,7 +31,12 @@ export interface Ask {
   who: string;
   age: string;
   since: number | null;
+  /** What is asked, when the ledger line says it in the structured format. */
+  title: string | null;
   text: string;
+  links: Link[];
+  threads: string[];
+  replies: { label: string; draft: string }[];
   /** question → Answer; decision → Release / Not yet; owner → a «For the owner» line; thread → the answer lives in a thread, not in a message. */
   kind: "question" | "decision" | "owner" | "thread";
   drafts: { primary: string; secondary?: string } | null;
@@ -49,7 +55,7 @@ export interface View {
   active: Row[];
   done: Row[];
   goal: string | null;
-  history: { sessions: string; handover: string | null; ledger: string; warnings: string[] };
+  history: { sessions: string; handover: string | null; ledger: string; warnings: string[]; notes: string[] };
 }
 
 export interface ViewInput {
@@ -181,7 +187,7 @@ function askOf(c: Classified, now: number): Ask {
   const { subtask, agent } = c;
   const who = subtask.name ? `${subtask.id} · ${subtask.name}` : subtask.id;
   const since = c.lastReport;
-  const base = { key: subtask.id, who, since, age: since === null ? "" : shortAge(now - since) };
+  const base = { key: subtask.id, who, since, age: since === null ? "" : shortAge(now - since), title: null, links: [], threads: [], replies: [] };
   if (subtask.status === "ready") {
     return {
       ...base,
@@ -217,21 +223,29 @@ export function buildView(input: ViewInput): View {
       who: "Orchestrator",
       since: orchestrator.latestAttentionAt || null,
       age: orchestrator.latestAttentionAt ? shortAge(now - orchestrator.latestAttentionAt) : "",
+      title: null,
       text: "The orchestrator waits on an approval or a question in this chat.",
+      links: [],
+      threads: [],
+      replies: [],
       kind: "thread",
       drafts: null,
     });
   }
+  const notes: string[] = [];
   ledger.forTheOwner.forEach((line, i) => {
-    asks.push({
-      key: `owner-${i}`,
-      who: "For you, from the ledger",
-      since: null,
-      age: "",
-      text: line,
-      kind: "owner",
-      drafts: { primary: `Re «${firstLine(line, 60)}»: ` },
-    });
+    const item = parseOwnerItem(line);
+    if (item.kind === "note") {
+      notes.push(item.text);
+      return;
+    }
+    const base = { key: `owner-${i}`, who: "For you, from the ledger", since: null, age: "", kind: "owner" as const, links: item.links, threads: item.threads };
+    if (item.kind === "ask") {
+      const re = `Re «${item.title}»: `;
+      asks.push({ ...base, title: item.title, text: item.why ?? "", drafts: { primary: re }, replies: item.options.map((label) => ({ label, draft: `${re}${label}` })) });
+    } else {
+      asks.push({ ...base, title: null, text: item.text, drafts: { primary: `Re «${firstLine(item.text, 60)}»: ` }, replies: [] });
+    }
   });
   asks.sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));
 
@@ -250,6 +264,7 @@ export function buildView(input: ViewInput): View {
     handover: lastHandover?.why ?? null,
     ledger: ledger.path,
     warnings: ledger.warnings,
+    notes,
   };
   const common = { asks, active, done, goal: ledger.goal, history, activeLabel: `${active.length} active`, teamLabel: asks.length ? "Rest of the team" : "Team" };
 
@@ -312,5 +327,5 @@ export function buildView(input: ViewInput): View {
 
 /** What a «sent» marker sticks to: a new question, decision or ledger line under the same key is a new ask. */
 export function askIdentity(ask: Ask): string {
-  return [ask.key, ask.kind, ask.since ?? "", ask.text].join("\u0000");
+  return [ask.key, ask.kind, ask.since ?? "", ask.title ?? "", ask.text].join("\u0000");
 }
