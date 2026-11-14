@@ -52,9 +52,18 @@ export function StopButton({ threadId }: { threadId: string }) {
       icon="Square"
       errorTitle="Stop failed"
       tone="neutral"
-      run={() => sdk.threads.stop({ threadId })}
+      run={() => stopThread(sdk, threadId)}
     />
   );
+}
+
+/** bb's Stop with a toast on failure; the row glyph, its menu and the stuck item share it. */
+export async function stopThread(sdk: ReturnType<typeof useSdk>, threadId: string) {
+  try {
+    await sdk.threads.stop({ threadId });
+  } catch (error) {
+    toast.error("Stop failed", { description: error instanceof Error ? error.message : String(error) });
+  }
 }
 
 const PILL_TONE = {

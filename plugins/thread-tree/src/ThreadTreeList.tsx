@@ -41,6 +41,7 @@ import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { AutomationsSection, useAutomations } from "./AutomationsSection";
 import { NeedsYouSection, useNeedsYou } from "./NeedsYouSection";
+import { stopThread } from "./RetryButton";
 import { pullRequestSourcesSettled } from "./needsYou";
 import { GithubSection, useGithubFolder } from "./GithubSection";
 import { isSectionCollapsed, sectionToggleKey, toneClass, type SummaryPart } from "./sectionSummaries";
@@ -1292,14 +1293,6 @@ function ArchiveButton({ thread }: { thread: PluginThreadActionTarget }) {
       <Icon name={action.icon ?? "Archive"} fallback="Archive" aria-hidden className="size-3.5" />
     </button>
   );
-}
-
-async function stopThread(sdk: ReturnType<typeof useSdk>, threadId: string) {
-  try {
-    await sdk.threads.stop({ threadId });
-  } catch (error) {
-    toast.error("Stop failed", { description: error instanceof Error ? error.message : String(error) });
-  }
 }
 
 /** The running glyph turns into Stop under the pointer, away from Archive at the row's other end. */
