@@ -118,3 +118,7 @@ test("a PR URL links to the first thread that has it, case-insensitively", () =>
   ]);
   assert.equal(linked.get(url.toLowerCase()), "t1");
 });
+
+test("a PR row's icon label and tooltip name the reason with the same words", () => {
+  assert.equal(pullRequestLook(pr(1, ["ready"])).label, "Approved, ready to merge");
+});

@@ -76,7 +76,7 @@ export function pullRequestLook(item: GithubFolderItem): PullRequestLook {
   const found = ATTENTION_LOOK.find(([attention]) => item.attention.includes(attention));
   if (found) {
     const [reason, look] = found;
-    return { reason, label: ATTENTION_LABEL[reason], ...look };
+    return { reason, ...look, label: ATTENTION_LABEL[reason] };
   }
   return {
     reason: null,
