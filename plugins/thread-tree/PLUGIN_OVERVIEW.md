@@ -26,20 +26,19 @@ under it, and the subagents it runs inside its own session show on its row.
   state; its glyph shows the most urgent state below. A finished fold offers
   Archive, skipping worktrees with uncommitted changes.
 - Per project, threads idle, read and quiet for a day fold into "N older";
-  expanded, it offers Archive these with the same skips.
+  expanded, it offers Archive these, skipping uncommitted worktrees.
 - Orchestrations: a shortcut for each orchestrator with work going, with its
   projects and progress.
 - Before each title, bb's own status glyph: a spinner while the agent works, a
   question mark when it needs input, a red cross for a failure, a dot for an
   unread result, a pencil for a draft. A failed thread gets a Retry button.
-- Rows are one line. A tinted PR icon appears only when a pull request needs
-  action.
+- Rows are one line; a tinted PR icon appears only when a PR needs action.
 - A ⚠ warns when another live thread works on the same branch or worktree.
 - Each row shows its agent provider; hover for title, branch and age.
 - Hovering or focusing a row fades Archive and ⋯ in over its end; Archive keeps
   bb's confirmation and Undo. Cmd+Z or Ctrl+Z restores recently archived
   threads and their children.
-- Hover a running thread's spinner to stop it; on touch, Stop is in the row's
+- Hover a running thread's spinner to stop it; on touch, Stop is only in the row's
   menu.
 - Provider subagents show a counter and status dot on the parent's row;
   hover for type, state, duration and tokens.
