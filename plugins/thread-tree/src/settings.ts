@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const limit = z.number().int().min(1).max(50);
+const inactiveHours = z.number().int().min(0).max(8760);
 
 export const SETTINGS = {
   showGithub: {
@@ -58,6 +59,13 @@ export const SETTINGS = {
     type: "boolean",
     label: "Show the time since the last update",
     default: true,
+  },
+  hideInactiveProjectsAfterHours: {
+    type: "number",
+    label: "Hide project folders inactive for (hours)",
+    description: "A folder whose threads all stayed quiet this long moves into an \"N inactive projects\" fold at the bottom. Running, waiting, asking, failed or pinned threads keep it. 0 turns hiding off.",
+    experimental_schema: inactiveHours,
+    default: 24,
   },
   foldOnDrag: {
     type: "boolean",
@@ -121,6 +129,7 @@ export type ViewSettings = {
   providerIconStyle: ProviderIconStyle;
   showSubagents: boolean;
   showAge: boolean;
+  hideInactiveProjectsAfterHours: number;
   foldOnDrag: boolean;
   reduceMotion: boolean;
 };
@@ -131,7 +140,7 @@ const DEFAULTS: ViewSettings = Object.fromEntries(
 
 /** Frontend values are untrusted: anything missing or of the wrong type falls back to its default. */
 export function readViewSettings(values: Record<string, unknown> | undefined): ViewSettings {
-  const bool = (key: Exclude<keyof ViewSettings, "providerIconStyle" | "needsYouPullRequests">) => (typeof values?.[key] === "boolean" ? (values[key] as boolean) : (DEFAULTS[key] as boolean));
+  const bool = (key: Exclude<keyof ViewSettings, "providerIconStyle" | "needsYouPullRequests" | "hideInactiveProjectsAfterHours">) => (typeof values?.[key] === "boolean" ? (values[key] as boolean) : (DEFAULTS[key] as boolean));
   const count = (key: "recentLimit" | "recentMoreLimit") => {
     const parsed = limit.safeParse(values?.[key]);
     return parsed.success ? parsed.data : DEFAULTS[key];
@@ -147,7 +156,15 @@ export function readViewSettings(values: Record<string, unknown> | undefined): V
     providerIconStyle: values?.providerIconStyle === "monochrome" ? "monochrome" : "tint",
     showSubagents: bool("showSubagents"),
     showAge: bool("showAge"),
+    hideInactiveProjectsAfterHours: readInactiveHours(values?.hideInactiveProjectsAfterHours),
     foldOnDrag: bool("foldOnDrag"),
     reduceMotion: bool("reduceMotion"),
   };
+}
+
+/** A cleared field (null or blank) turns hiding off; anything else invalid falls back to the default. */
+function readInactiveHours(value: unknown): number {
+  if (value === null || (typeof value === "string" && value.trim() === "")) return 0;
+  const parsed = inactiveHours.safeParse(value);
+  return parsed.success ? parsed.data : DEFAULTS.hideInactiveProjectsAfterHours;
 }

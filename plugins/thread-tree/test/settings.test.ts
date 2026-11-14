@@ -65,3 +65,13 @@ test("Needs you PRs default to linked and take only known modes", () => {
   assert.equal(readViewSettings({ needsYouPullRequests: "none" }).needsYouPullRequests, "none");
   assert.equal(readViewSettings({ needsYouPullRequests: "bogus" }).needsYouPullRequests, "linked");
 });
+
+test("inactive project folders hide after 24 hours unless set otherwise; 0 or a cleared value turns it off", () => {
+  assert.equal(readViewSettings(undefined).hideInactiveProjectsAfterHours, 24);
+  assert.equal(readViewSettings({ hideInactiveProjectsAfterHours: 72 }).hideInactiveProjectsAfterHours, 72);
+  assert.equal(readViewSettings({ hideInactiveProjectsAfterHours: 0 }).hideInactiveProjectsAfterHours, 0);
+  assert.equal(readViewSettings({ hideInactiveProjectsAfterHours: null }).hideInactiveProjectsAfterHours, 0);
+  assert.equal(readViewSettings({ hideInactiveProjectsAfterHours: " " }).hideInactiveProjectsAfterHours, 0);
+  assert.equal(readViewSettings({ hideInactiveProjectsAfterHours: -1 }).hideInactiveProjectsAfterHours, 24);
+  assert.equal(readViewSettings({ hideInactiveProjectsAfterHours: 1.5 }).hideInactiveProjectsAfterHours, 24);
+});
