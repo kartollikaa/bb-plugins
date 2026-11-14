@@ -227,7 +227,7 @@ export function NeedsYouSection({
         <div
           role="list"
           data-needs-you-queue=""
-          className="mt-0.5 flex flex-col gap-0.5 rounded-[9px] border border-[color-mix(in_oklab,var(--attention)_25%,transparent)] bg-[var(--row-base)] p-[3px] [--row-base:color-mix(in_oklab,var(--attention)_7%,var(--sidebar))]"
+          className="mt-0.5 flex flex-col gap-0.5 rounded-[9px] border border-[color-mix(in_oklab,var(--attention)_25%,transparent)] bg-[var(--row-base)] p-[3px] [--row-base:color-mix(in_oklab,var(--attention)_14%,var(--sidebar))]"
         >
           {shown.map((item) => (
             <NeedsYouRow

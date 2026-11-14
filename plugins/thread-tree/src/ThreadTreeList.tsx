@@ -532,7 +532,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       <div className="mx-1.5 border-t border-sidebar-border" />
 
       <div className="-mb-1 flex h-6 items-center justify-between px-1.5">
-        <span className="text-xs font-medium text-sidebar-foreground/45">{showArchived ? "Archived threads" : "Threads"}</span>
+        <span className="text-xs font-medium text-sidebar-foreground">{showArchived ? "Archived threads" : "Threads"}</span>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
