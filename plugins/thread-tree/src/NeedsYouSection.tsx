@@ -8,6 +8,7 @@ import {
   describeQuestion,
   questionsToRead,
   isSnoozed,
+  cursorThreadId,
   itemTarget,
   linkedPullRequests,
   nextItem,
@@ -62,12 +63,13 @@ interface NeedsYouSources {
   /** Both PR sources have loaded, so a PR item's signature is final. */
   pullRequestsSettled: boolean;
   orchestrationOf: (threadId: string) => string | null;
+  activeThreadId: string | null;
   onNavigate: () => void;
 }
 
 /** The queue's visible items, snoozing, and ⇧⌘I, which works while the section is folded or replaced by a flat list. */
 export function useNeedsYou(sources: NeedsYouSources) {
-  const { threads, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, pullRequestsSettled, orchestrationOf, onNavigate } = sources;
+  const { threads, activeThreadId, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, pullRequestsSettled, orchestrationOf, onNavigate } = sources;
   const waiting = useMemo(() => threads.filter((thread) => threadItemKind(thread) === "input"), [threads]);
   const questions = useQuestions(waiting);
   const firstSeenRef = useRef<ReadonlyMap<string, number>>(new Map());
@@ -97,9 +99,9 @@ export function useNeedsYou(sources: NeedsYouSources) {
   const navigate = useBbNavigate();
   const openAutomationsPage = useOpenAutomationsPage(onNavigate);
   const cursor = useRef<InboxCursor | null>(null);
-  const open = (item: NeedsYouItem, split = false) => {
+  const open = (item: NeedsYouItem, split = false, viewThreadId = activeThreadId) => {
     const target = itemTarget(item);
-    cursor.current = { key: item.key, index: Math.max(0, items.indexOf(item)), threadId: target.kind === "thread" ? target.threadId : null };
+    cursor.current = { key: item.key, index: Math.max(0, items.indexOf(item)), threadId: cursorThreadId(target, viewThreadId) };
     if (target.kind === "thread") {
       navigate.toThread(target.threadId, { split });
       onNavigate();
@@ -121,7 +123,7 @@ export function useNeedsYou(sources: NeedsYouSources) {
   useEffect(() => setInboxHandler((threadId) => {
     const { items: current, open: openItem } = latest.current;
     const item = nextItem(current, threadId, cursor.current);
-    if (item) openItem(item);
+    if (item) openItem(item, false, threadId);
     else toast(current.length > 0 ? "Nothing else needs you" : "Nothing needs you");
     return item !== null;
   }), []);

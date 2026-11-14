@@ -3,7 +3,7 @@ import { threadDotState } from "./tree.ts";
 import type { FilterThread } from "./statusFilters.ts";
 import { PR_REASON_LOOK, prActionReason, type FolderAttention, type PrReason } from "./prAttention.ts";
 import { excludeDescendantPullRequests, type ThreadPullRequest } from "./threadPullRequests.ts";
-import { ATTENTION_LABEL, type GithubFolderItem } from "./githubFolder.ts";
+import { ATTENTION_LABEL, prOpenTarget, type GithubFolderItem } from "./githubFolder.ts";
 import { automationDot, type AutomationSummary } from "./automations.ts";
 import type { NeedsYouPullRequests } from "./settings.ts";
 
@@ -298,6 +298,13 @@ export type ItemTarget = { kind: "thread"; threadId: string } | { kind: "pr"; ur
 export function itemTarget(item: NeedsYouItem): ItemTarget {
   if (item.threadId) return { kind: "thread", threadId: item.threadId };
   return item.kind === "pr" ? { kind: "pr", url: item.url } : { kind: "automations" };
+}
+
+/** The thread in view after opening `target`: a PR in a new tab leaves `viewThreadId` on screen. */
+export function cursorThreadId(target: ItemTarget, viewThreadId: string | null): string | null {
+  if (target.kind === "thread") return target.threadId;
+  if (target.kind === "pr") return prOpenTarget(target.url)?.kind === "folder" ? null : viewThreadId;
+  return null;
 }
 
 /** Where the last ⇧⌘I left off; it holds while the user stays where it took them. */

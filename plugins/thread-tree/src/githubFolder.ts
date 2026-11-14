@@ -59,8 +59,22 @@ export const ATTENTION_LABEL: Record<Attention, string> = {
 };
 
 export function githubFolderPrPath(url: string): string | null {
-  const match = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/.exec(url);
+  const match = /^https:\/\/(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/i.exec(url);
   return match ? `/plugins/github-folder/pr/${match[1]}/${match[2]}/${match[3]}` : null;
+}
+
+export type PrOpenTarget = { kind: "folder"; path: string } | { kind: "tab"; url: string };
+
+/** GitHub Folder's page for a github.com PR, a new tab for another http(s) host, else nothing to open. */
+export function prOpenTarget(url: string): PrOpenTarget | null {
+  const path = githubFolderPrPath(url);
+  if (path) return { kind: "folder", path };
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "https:" || protocol === "http:" ? { kind: "tab", url } : null;
+  } catch {
+    return null;
+  }
 }
 
 const ABSENT_CODES = new Set(["not_found", "unknown_method"]);

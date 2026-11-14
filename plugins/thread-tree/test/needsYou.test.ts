@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   automationItems,
+  cursorThreadId,
   describeQuestion,
   failedQueuedMessage,
   isSnoozed,
@@ -339,4 +340,11 @@ test("PR sources count as settled only once the thread list has loaded too", () 
   assert.equal(pullRequestSourcesSettled({ threadsStatus: "ready", folderLoaded: false, pullRequestsLoading: false }), false);
   assert.equal(pullRequestSourcesSettled({ threadsStatus: "ready", folderLoaded: true, pullRequestsLoading: true }), false);
   assert.equal(pullRequestSourcesSettled({ threadsStatus: "ready", folderLoaded: true, pullRequestsLoading: false }), true);
+});
+
+test("⇧⌘I's cursor keeps the thread in view when a PR opens in a new tab", () => {
+  assert.equal(cursorThreadId({ kind: "thread", threadId: "t2" }, "t1"), "t2");
+  assert.equal(cursorThreadId({ kind: "pr", url: "https://github.com/o/r/pull/1" }, "t1"), null);
+  assert.equal(cursorThreadId({ kind: "pr", url: "https://git.example.com/o/r/pull/1" }, "t1"), "t1");
+  assert.equal(cursorThreadId({ kind: "automations" }, "t1"), null);
 });
