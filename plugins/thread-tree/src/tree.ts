@@ -94,6 +94,8 @@ export interface TreeGroup<T extends TreeThread> {
   rows: TreeRow<T>[];
   rootCount: number;
   latestActivityAt: number;
+  /** A project folder's quiet roots, kept out of `rows`; null when there are none. */
+  older: { rootCount: number; rows: TreeRow<T>[] } | null;
 }
 
 export interface Forest<T extends TreeThread> {
@@ -298,6 +300,7 @@ export function groupRows<T extends TreeThread>(
   folderSorts: FolderSorts = {},
   defaultSort: ThreadSort = "activity",
   retainedProjectIds: readonly string[] = [],
+  isOlder: (root: T) => boolean = () => false,
 ): TreeGroup<T>[] {
   const pinned = forest.roots.filter((root) => root.isPinned).sort(byPinOrder);
   const buckets = new Map<string, { projectId: string | null; roots: T[] }>();
@@ -318,13 +321,19 @@ export function groupRows<T extends TreeThread>(
       if (!buckets.has(key)) buckets.set(key, { projectId, roots: [] });
     }
   }
-  const makeGroup = (key: string, projectId: string | null, roots: T[]): TreeGroup<T> => ({
-    key,
-    projectId,
-    rootCount: roots.length,
-    latestActivityAt: Math.max(0, ...roots.map((root) => root.updatedAt)),
-    rows: flattenRows(forest, key === "pinned" ? roots : sortRoots(forest, roots, folderSorts[key] ?? defaultSort), collapsed, activeThreadId),
-  });
+  const makeGroup = (key: string, projectId: string | null, roots: T[]): TreeGroup<T> => {
+    const sorted = key === "pinned" ? roots : sortRoots(forest, roots, folderSorts[key] ?? defaultSort);
+    const older = mode === "project" && key !== "pinned" ? sorted.filter(isOlder) : [];
+    const rows = (list: readonly T[]) => flattenRows(forest, list, collapsed, activeThreadId);
+    return {
+      key,
+      projectId,
+      rootCount: roots.length,
+      latestActivityAt: Math.max(0, ...roots.map((root) => root.updatedAt)),
+      rows: rows(older.length > 0 ? sorted.filter((root) => !older.includes(root)) : sorted),
+      older: older.length > 0 ? { rootCount: older.length, rows: rows(older) } : null,
+    };
+  };
   const rest = [...buckets].map(([key, bucket]) => makeGroup(key, bucket.projectId, bucket.roots));
   if (mode === "status") {
     const rank = (key: string) => THREAD_DOT_PRIORITY.indexOf(key.slice("status:".length) as ThreadState);
