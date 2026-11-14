@@ -23,6 +23,10 @@ export interface SummaryPart {
 }
 
 /** As in the prototype: problems and a bare count sit side by side; any other note follows a "·". */
+export function toneClass(tone: SummaryPart["tone"]): string | undefined {
+  return tone === "bad" ? "text-red-600/90 dark:text-red-400/90" : tone === "attention" ? "text-amber-600 dark:text-amber-400" : undefined;
+}
+
 export function summarySeparator(parts: readonly SummaryPart[], index: number): string {
   const part = parts[index];
   return index > 0 && part?.tone !== "bad" && !/^\d+$/.test(part?.text ?? "") ? "· " : "";

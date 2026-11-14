@@ -26,6 +26,8 @@ import {
   type ThreadQuestion,
   queuePreview,
   QUEUE_PREVIEW,
+  NEXT_ITEM_SHORTCUT,
+  shortcutLabel,
 } from "./needsYou";
 import { PR_REASON_LOOK, type FolderAttention } from "./prAttention";
 import type { ThreadPullRequest } from "./threadPullRequests";
@@ -220,7 +222,7 @@ export function NeedsYouSection({
         icon={<span className="size-[7px] rounded-full bg-attention" />}
         isCollapsed={isCollapsed}
         count={items.length}
-        hint="⇧⌘I next"
+        hint={`${shortcutLabel(NEXT_ITEM_SHORTCUT, IS_MAC)} next`}
         onToggle={onToggle}
       />
       <Collapse open={!isCollapsed}>
@@ -378,3 +380,5 @@ function OverlayButton({ label, icon, fallback, onClick }: { label: string; icon
     </button>
   );
 }
+
+const IS_MAC = typeof navigator !== "undefined" && /mac|iphone|ipad/i.test(navigator.platform);

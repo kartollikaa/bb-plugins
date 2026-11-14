@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { useReportHeaderMenuOpen } from "./headerMenu";
 
 // Radix opens a menu on pointerdown, so a swipe that starts on the trigger opens it; on touch wait for the click.
 export function useTapToOpenMenu() {
@@ -6,6 +7,7 @@ export function useTapToOpenMenu() {
   const trigger = useRef<HTMLButtonElement | null>(null);
   const touchPress = useRef(false);
   const closingPress = useRef<Event | null>(null);
+  useReportHeaderMenuOpen(open);
 
   // Radix dismisses on a bubbling document pointerdown or focus loss; on mobile neither may arrive, so close from capture.
   useEffect(() => {

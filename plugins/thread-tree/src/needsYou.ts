@@ -336,10 +336,18 @@ export function nextItem(items: readonly NeedsYouItem[], activeThreadId: string 
   return null;
 }
 
-/** The queue shows its first items and folds the rest into "N more". */
 export const QUEUE_PREVIEW = 5;
 
 export function queuePreview<T>(items: readonly T[], expanded: boolean, limit = QUEUE_PREVIEW): { shown: readonly T[]; hidden: number } {
   if (expanded || items.length <= limit) return { shown: items, hidden: 0 };
   return { shown: items.slice(0, limit), hidden: items.length - limit };
+}
+
+export const NEXT_ITEM_SHORTCUT = { key: "i", mod: true, shift: true } as const;
+
+/** bb's default binding as macOS or other platforms write it; the SDK does not expose a rebinding. */
+export function shortcutLabel(shortcut: { key: string; mod?: boolean; shift?: boolean }, isMac: boolean): string {
+  const key = shortcut.key.toUpperCase();
+  if (isMac) return `${shortcut.shift ? "⇧" : ""}${shortcut.mod ? "⌘" : ""}${key}`;
+  return [shortcut.mod ? "Ctrl" : null, shortcut.shift ? "Shift" : null, key].filter(Boolean).join("+");
 }

@@ -1,6 +1,7 @@
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ThreadTreeList } from "./src/ThreadTreeList";
 import { hasInboxHandler, openNextInboxItem } from "./src/inbox";
+import { NEXT_ITEM_SHORTCUT } from "./src/needsYou";
 
 export default definePluginApp((app) => {
   app.slots.experimental_threadList({
@@ -12,7 +13,7 @@ export default definePluginApp((app) => {
   app.commands.register({
     id: "needs-you-next",
     title: "Needs you: open the next item",
-    defaultShortcut: { key: "i", mod: true, shift: true },
+    defaultShortcut: NEXT_ITEM_SHORTCUT,
     isAvailable: hasInboxHandler,
     run: ({ threadId }) => {
       openNextInboxItem(threadId);

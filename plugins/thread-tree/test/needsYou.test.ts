@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   queuePreview,
+  NEXT_ITEM_SHORTCUT,
+  shortcutLabel,
   automationItems,
   cursorThreadId,
   describeQuestion,
@@ -349,4 +351,9 @@ test("the queue shows five items and folds the rest into a count until expanded"
   assert.deepEqual(queuePreview(items, false), { shown: ["a", "b", "c", "d", "e"], hidden: 2 });
   assert.deepEqual(queuePreview(items, true), { shown: items, hidden: 0 });
   assert.deepEqual(queuePreview(items.slice(0, 5), false), { shown: items.slice(0, 5), hidden: 0 });
+});
+
+test("the next-item hint names Command on macOS and Ctrl elsewhere", () => {
+  assert.equal(shortcutLabel(NEXT_ITEM_SHORTCUT, true), "⇧⌘I");
+  assert.equal(shortcutLabel(NEXT_ITEM_SHORTCUT, false), "Ctrl+Shift+I");
 });
