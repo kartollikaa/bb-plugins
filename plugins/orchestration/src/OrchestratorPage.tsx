@@ -164,19 +164,43 @@ function ResizeHandle({ width, onDrag, onDone }: { width: number; onDrag: (w: nu
   );
 }
 
-/** bb's composer is the sticky footer of `ThreadChat`'s scroller; the dock sizes itself to it. */
-function useComposerHeight(ref: RefObject<HTMLElement | null>) {
+/** Makes everything in `root` but `keep` and its ancestors inert; returns the elements it changed. */
+function inertAround(keep: Element, root: Element): Element[] {
+  const changed: Element[] = [];
+  for (let node: Element | null = keep; node && node !== root; node = node.parentElement) {
+    for (const sibling of Array.from(node.parentElement?.children ?? [])) {
+      if (sibling !== node && !sibling.hasAttribute("inert")) {
+        sibling.setAttribute("inert", "");
+        changed.push(sibling);
+      }
+    }
+  }
+  return changed;
+}
+
+/**
+ * bb's composer is the sticky footer of `ThreadChat`'s scroller. While docked, the dock sizes itself
+ * to it and the hidden transcript around it is made inert, so Tab and screen readers skip it.
+ */
+function useDockedComposer(ref: RefObject<HTMLElement | null>, docked: boolean) {
   const [height, setHeight] = useState<number | null>(null);
   useEffect(() => {
     const root = ref.current;
-    if (!root) return;
+    if (!root || !docked) return;
     let observed: Element | null = null;
+    let inert: Element[] = [];
     let frame = 0;
+    const release = () => {
+      inert.forEach((el) => el.removeAttribute("inert"));
+      inert = [];
+    };
     const ro = new ResizeObserver(([entry]) => setHeight(entry!.target.getBoundingClientRect().height));
     const attach = () => {
       frame = 0;
       const all = root.querySelectorAll('[class~="sticky"][class~="bottom-0"]');
       const el = all[all.length - 1] ?? null;
+      release();
+      if (el) inert = inertAround(el, root);
       if (el === observed) return;
       if (observed) ro.unobserve(observed);
       observed = el;
@@ -192,8 +216,9 @@ function useComposerHeight(ref: RefObject<HTMLElement | null>) {
       cancelAnimationFrame(frame);
       mo.disconnect();
       ro.disconnect();
+      release();
     };
-  }, [ref]);
+  }, [ref, docked]);
   return height;
 }
 
@@ -219,7 +244,7 @@ function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDock
   const [saved, setSaved] = useState(readWidth);
   const [dragging, setDragging] = useState<number | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
-  const composer = useComposerHeight(chatRef);
+  const composer = useDockedComposer(chatRef, placement === "docked");
   const width = clampRailWidth(dragging ?? saved, pageWidth);
   const dock = dockHeight(composer, pageHeight || 800);
   useLayoutEffect(() => onDockHeight(dock + GRABBER), [dock, onDockHeight]);
@@ -292,7 +317,7 @@ function View({ threadId }: { threadId: string }) {
 
   return (
     <div ref={ref} className="relative flex h-full min-h-0 w-full overflow-hidden bg-background">
-      <div inert={placement === "sheet"} style={{ paddingBottom: placement === "docked" ? dockSpace : 0 }} className="min-w-0 flex-1 overflow-y-auto">
+      <div inert={placement === "sheet"} style={{ paddingBottom: placement === "docked" ? `calc(${dockSpace}px + env(safe-area-inset-bottom))` : 0 }} className="min-w-0 flex-1 overflow-y-auto">
         <OrchestrationTab
           key={threadId}
           threadId={threadId}

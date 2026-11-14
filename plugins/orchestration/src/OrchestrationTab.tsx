@@ -85,11 +85,6 @@ function Expandable({ children }: { children: ReactNode }) {
   );
 }
 
-function linkName(href: string, label: string): string {
-  const gh = /^https:\/\/github\.com\/[^/]+\/[^/]+\/(pull|issues)\/(\d+)/.exec(href);
-  return gh ? `${gh[1] === "pull" ? "PR" : "issue"} #${gh[2]}` : label;
-}
-
 const linkButton = "inline-flex h-[26px] items-center rounded-md border border-border px-2.5 text-xs font-medium text-foreground no-underline hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
@@ -120,11 +115,11 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
           </>
         ) : answerable ? (
           <>
-            {ask.replies.map((r, i) => <Button key={r.label} variant={i === 0 ? "primary" : "outline"} onClick={() => actions.fill(id, r.draft)}>{r.label}</Button>)}
+            {ask.replies.map((r, i) => <Button key={i} variant={i === 0 ? "primary" : "outline"} onClick={() => actions.fill(id, r.draft)}>{r.label}</Button>)}
             <Button variant={ask.replies.length ? "quiet" : "primary"} onClick={() => actions.fill(id, ask.drafts!.primary)}>{ask.replies.length ? "Other answer" : "Answer"}</Button>
           </>
         ) : null}
-        {ask.links.map((l) => <UrlLink key={l.href} href={l.href} target="_blank" title={l.label} className={linkButton}>Open {linkName(l.href, l.label)}</UrlLink>)}
+        {ask.links.map((l) => <UrlLink key={l.href} href={l.href} title={l.title} className={linkButton}>Open {l.label}</UrlLink>)}
         {threads.map((t) => <Button key={t} variant={answerable || ask.kind === "decision" ? "quiet" : "primary"} onClick={() => actions.openThread(t)}>{threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
       </div>
     </div>
@@ -249,7 +244,7 @@ export function Message({ title, body, action }: { title: string; body: string; 
   );
 }
 
-/** `revealComposer` makes the chat composer visible before a draft goes in; the page's rail uses it. */
+/** `revealComposer` runs before a draft goes in; the page uses it to focus its composer. */
 export function OrchestrationTab({ threadId, revealComposer, variant = "tab", noneAction }: { threadId: string; revealComposer?: () => Promise<void>; variant?: "tab" | "page"; noneAction?: ReactNode }) {
   const isOrchestrator = useIsOrchestrator(threadId);
   const state = useOrchestration(threadId, isOrchestrator);

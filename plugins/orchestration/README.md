@@ -66,10 +66,14 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
 - `ask:` is the card's title: what the owner is asked to do or decide. The other fields are
   optional, separated by ` | `, in any order: `why:` (one line of context), `link:` (URLs or
   `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
-  ` / `). Each option fills the composer with `Re «<title>»: <option>`; Other answer fills
+  ` / `). A GitHub link reads `repo#N` on its button. Each option fills the composer with `Re «<title>»: <option>`; Other answer fills
   `Re «<title>»: `.
-- `note:`, and any line that starts with «Nothing», is information, not an ask: it shows under Goal
-  and history and never counts as needs you.
+- `note:`, and a status line that opens with «Nothing», «Nothing waiting», «Nothing pending» or
+  «Nothing waits on the owner» followed by a full stop or the end, is information, not an ask: it
+  shows under Goal and history and never counts as needs you. «Nothing lands until you approve…» is
+  still an ask; when in doubt, write `note:` or `ask:`.
+- A ` | ` segment without one of the keys above stays with the field before it, so a title or a
+  `why:` may contain ` | `.
 - Any other line stays a card with its full text, expandable, with its URLs, `owner/repo#N` refs and
   thread ids as buttons.
 
