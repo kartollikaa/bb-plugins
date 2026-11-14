@@ -30,7 +30,10 @@ export function isOlderRoot<T extends TreeThread>(forest: Forest<T>, root: T, co
   return !root.isPinned && [root, ...descendantsOf(forest, root.id)].every((thread) => isQuietAndOld(thread, context));
 }
 
-/** Ids of the forest's roots that fold into a folder's "N older" line. */
 export function olderRootIds<T extends TreeThread>(forest: Forest<T>, context: OlderContext<T>): Set<string> {
   return new Set(forest.roots.filter((root) => isOlderRoot(forest, root, context)).map((root) => root.id));
+}
+
+export function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  return a.size === b.size && [...a].every((id) => b.has(id));
 }

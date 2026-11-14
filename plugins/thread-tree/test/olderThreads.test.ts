@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildForest, groupRows, type TreeThread } from "../src/tree.ts";
-import { isOlderRoot, OLDER_AFTER_MS, olderRootIds, type OlderContext } from "../src/olderThreads.ts";
+import { isOlderRoot, OLDER_AFTER_MS, olderRootIds, sameIds, type OlderContext } from "../src/olderThreads.ts";
 
 const NOW = Date.parse("2026-11-14T12:00:00Z");
 const OLD = NOW - OLDER_AFTER_MS - 1;
@@ -111,4 +111,10 @@ test("a folder with nothing older has no older line", () => {
   const forest = buildForest([thread("new", { updatedAt: NOW })]);
   const [group] = groupRows(forest, new Set(), "project", null, null, {}, "activity", [], () => false);
   assert.equal(group!.older, null);
+});
+
+test("two id sets are the same only with the same members", () => {
+  assert.equal(sameIds(new Set(["a", "b"]), new Set(["b", "a"])), true);
+  assert.equal(sameIds(new Set(["a"]), new Set(["a", "b"])), false);
+  assert.equal(sameIds(new Set(["a", "c"]), new Set(["a", "b"])), false);
 });
