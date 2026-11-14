@@ -20,6 +20,7 @@ import { sectionPatchSchema, SETTINGS } from "./src/settings";
 import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/threadPullRequests";
 import { createProjectFolderHistory } from "./src/projectFolders";
 import { createArchiveHistory } from "./src/archiveUndo";
+import { dirtyEnvironmentIds } from "./src/orchestrations";
 
 const MAX_THREADS_PER_CALL = 200;
 
@@ -70,6 +71,11 @@ export const rpcContract = defineRpcContract({
       restored: z.array(z.object({ threadId: z.string(), title: z.string() })),
       failed: z.array(z.object({ threadId: z.string(), title: z.string(), error: z.string() })),
     }),
+  },
+  /** Environments whose worktree archiving would lose changes, per bb's git plugin; all of them when it can't be read. */
+  dirtyWorktrees: {
+    input: z.object({ environmentIds: z.array(z.string().min(1)).min(1).max(200) }).strict(),
+    output: z.object({ dirty: z.array(z.string()) }),
   },
   /** Shows or hides sidebar sections from the sidebar itself. */
   setSections: {
@@ -131,6 +137,15 @@ export default async function plugin(bb: BbPluginApi) {
         }
       }
       return { restored, failed };
+    },
+    dirtyWorktrees: async ({ environmentIds }) => {
+      try {
+        const statuses = await bb.sdk.plugins.callRpc({ pluginId: "bb--git", method: "status", input: { keys: environmentIds }, outputSchema: z.record(z.string(), z.unknown()) });
+        return { dirty: dirtyEnvironmentIds(environmentIds, statuses) };
+      } catch (error) {
+        bb.log.warn(`git status for archive failed: ${error instanceof Error ? error.message : String(error)}`);
+        return { dirty: environmentIds };
+      }
     },
     setSections: async (patch) => {
       await settings.experimental_set(patch);

@@ -1,8 +1,8 @@
 import { experimental_ThreadStatusGlyph as ThreadStatusGlyph, type PluginSidebarThreadIndicator, type PluginSidebarThreadRowStatus } from "@get-bb/plugin-sdk/app";
 import { cn } from "@/lib/utils";
 import { useStill } from "./motion";
-import { glyphMotionClass, isIdleGlyph, ROLLUP_GLYPH, type RowGlyph } from "./statusGlyph";
-import type { ThreadState } from "./tree";
+import { FOLD_GLYPH, glyphMotionClass, isIdleGlyph, type RowGlyph } from "./statusGlyph";
+import type { FoldState } from "./tree";
 
 /** Quiet, not empty: a blank glyph slot reads as a hole between the tree guide and the title. */
 function IdleDot({ className }: { className?: string }) {
@@ -25,8 +25,8 @@ export function RowStatusGlyph({ glyph }: { glyph: RowGlyph<PluginSidebarThreadR
 }
 
 /** A rollup state (overview, fold line, status group) in bb's glyph, held still: it labels a count, it isn't live. */
-export function RollupGlyph({ state, className }: { state: ThreadState; className?: string }) {
-  return <StillGlyph indicator={ROLLUP_GLYPH[state]} className={className} />;
+export function RollupGlyph({ state, className }: { state: FoldState; className?: string }) {
+  return <StillGlyph indicator={FOLD_GLYPH[state]} className={className} />;
 }
 
 /** bb's glyph for `indicator` at count size, held still. */

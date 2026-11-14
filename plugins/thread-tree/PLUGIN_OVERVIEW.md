@@ -23,9 +23,11 @@ under it, and the subagents it runs inside its own session show on its row.
 - Sort by last activity, creation date or status, globally or per folder.
 - The Archived toggle shows archived threads in the same grouping and nesting.
 - Each child thread sits under the thread that spawned it, at any depth, even
-  in another project. Hover a parent's status glyph for a chevron that folds
-  its subtree into one line counting each state. The open thread and threads
-  waiting for your input stay visible under the fold.
+  in another project. Fold a parent into one line counting its subtree by
+  state; its glyph shows the most urgent state below. A finished fold offers
+  Archive, skipping worktrees with uncommitted changes.
+- Orchestrations: a shortcut for each orchestrator with work going, with its
+  projects and progress. Click to open it and light up its tree.
 - Before each title, bb's own status glyph: a spinner while the agent works, a
   question mark when it needs input, a red cross for a failure, a dot for an
   unread result, a pencil for a draft. A failed thread gets a Retry button.
@@ -36,8 +38,7 @@ under it, and the subagents it runs inside its own session show on its row.
 - Hovering or focusing a row fades Archive and ⋯ in over its end; Archive keeps
   bb's confirmation and Undo. Cmd+Z or Ctrl+Z restores recently archived
   threads and their children.
-- Hover a running thread's spinner to stop it; on a touch screen Stop is only
-  in the row's menu.
+- Hover a running thread's spinner to stop it.
 - Provider subagents show a counter and status dot on the parent's row;
   hover for type, state, duration and tokens.
 - Hold Ctrl (or Cmd on a Mac) to see each row's jump key.
@@ -55,8 +56,7 @@ to their headers and reopen on drop.
 Settings → Installed plugins → Thread Tree holds the section switches, Recent
 Activity row counts, which PRs Needs you lists, provider icon colour (brand tint or monochrome), and
 switches for the subagent counters and the age label. Reduce motion stops the
-sidebar animations and holds status spinners still, as the system's
-reduced-motion preference does for the spinners.
+sidebar animations and spinners.
 
 ## How it works
 

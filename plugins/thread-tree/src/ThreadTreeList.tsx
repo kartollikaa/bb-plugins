@@ -43,7 +43,7 @@ import { NeedsYouSection, useNeedsYou } from "./NeedsYouSection";
 import { pullRequestSourcesSettled } from "./needsYou";
 import { GithubSection, useGithubFolder } from "./GithubSection";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
-import { resolveRowGlyph } from "./statusGlyph";
+import { resolveRowGlyph, rollupGlyph } from "./statusGlyph";
 import { StatusLine } from "./StatusLine";
 import { countStatusFilters, filterThreads, handleFlatListEscape, handleSearchKey, isModalDialog, MODAL_DIALOG_SELECTOR, orchestrationTitle, refocusAfterClose, returnFocus, runningContext, type CloseReason, sidebarBehindModal, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
 import type { rpcContract } from "../server";
@@ -71,9 +71,12 @@ import {
   resolveProjectOrder,
   type ThreadState,
   type GroupMode,
-  type StateCounts,
+  type FoldCounts,
+  type FoldState,
+  foldState,
   type TreeRow,
 } from "./tree";
+import { archivePlan, foldBarSegments, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver } from "./orchestrations";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
 import { useDragReorder, useFlipOrder } from "./useReorder";
@@ -236,6 +239,9 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     onNavigate,
   });
   const sharedBranches = useMemo(() => sharedBranchThreads(threads, familyRootOf(threads)), [threads]);
+  const orchestrationList = useMemo(() => orchestrations(activeForest), [activeForest]);
+  const [revealed, setRevealed] = useState<{ id: string; ids: ReadonlySet<string> } | null>(null);
+  const sdk = useSdk();
   const canHover = !useMediaQuery(NO_HOVER_QUERY);
   const searchPool = showArchived ? listed.threads : threads;
   const flatList = useMemo(() => {
@@ -298,6 +304,32 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     [navigate, onNavigate],
   );
 
+  const revealOrchestration = useCallback(
+    (thread: PluginSidebarThread, event: MouseEvent) => {
+      if (event.button !== 0 || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      const group = groups.find((entry) => entry.rows.some((row) => row.thread.id === thread.id));
+      if (group) collapsedGroups.remove([group.key]);
+      collapsedThreads.remove([thread.id]);
+      setRevealed({ id: thread.id, ids: new Set([thread.id, ...descendantIdsOf(thread.id)]) });
+      navigate.toThread(thread.id, { split: event.metaKey || event.ctrlKey });
+      onNavigate();
+    },
+    [groups, collapsedGroups, collapsedThreads, descendantIdsOf, navigate, onNavigate],
+  );
+  useEffect(() => {
+    if (!revealed) return;
+    const scroll = setTimeout(() => {
+      treeRef.current?.querySelector(`[data-thread-id="${CSS.escape(revealed.id)}"]`)?.scrollIntoView({ block: "nearest", behavior: view.reduceMotion ? "auto" : "smooth" });
+    }, REVEAL_SCROLL_DELAY_MS);
+    const clear = setTimeout(() => setRevealed(null), REVEAL_HIGHLIGHT_MS);
+    return () => {
+      clearTimeout(scroll);
+      clearTimeout(clear);
+    };
+  }, [revealed, view.reduceMotion]);
+  const archiveFold = useCallback((root: PluginSidebarThread) => archiveFinishedFold(sdk, rpc, activeForest, root), [sdk, rpc, activeForest]);
+
   if (status === "loading" && threads.length === 0) {
     return <div className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</div>;
   }
@@ -315,7 +347,11 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             ? "No archived threads."
             : "Loading archived threads…";
 
-  const renderRow = (row: TreeRow<PluginSidebarThread>, variant: "tree" | "flat", { subtitle, numbered = variant === "tree" }: { subtitle?: string; numbered?: boolean } = {}) => (
+  const renderRow = (
+    row: TreeRow<PluginSidebarThread>,
+    variant: "tree" | "flat",
+    { subtitle, numbered = variant === "tree", rollup, onOpen = open }: { subtitle?: string; numbered?: boolean; rollup?: FoldState | null; onOpen?: typeof open } = {},
+  ) => (
     <Fragment key={row.thread.id}>
       <ThreadRowView
         row={row}
@@ -325,6 +361,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         context={variant === "flat" ? projectById.get(row.thread.projectId)?.name : undefined}
         subtitle={subtitle}
         isActive={row.thread.id === activeThreadId}
+        isRevealed={variant === "tree" && !!revealed?.ids.has(row.thread.id)}
+        rollup={rollup}
         isCompactViewport={isCompactViewport}
         canHover={canHover}
         subagents={subagents.get(row.thread.id)}
@@ -335,15 +373,17 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         view={view}
         now={now}
         onToggle={() => collapsedThreads.toggle(row.thread.id)}
-        onOpen={open}
+        onOpen={onOpen}
       />
       {variant === "tree" && row.foldCounts ? (
         <FoldLine
           depth={row.depth + 1}
           guides={[...row.guides, row.hasVisibleChildren]}
           counts={row.foldCounts}
+          own={foldState(row.thread)}
           total={row.descendantCount}
           onExpand={() => collapsedThreads.toggle(row.thread.id)}
+          onArchive={showArchived ? undefined : () => archiveFold(row.thread)}
         />
       ) : null}
     </Fragment>
@@ -492,6 +532,29 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           />
         </div>
       </div>
+
+      {!showArchived && orchestrationList.length > 0 ? (
+        <section aria-label="Orchestrations" data-orchestrations="">
+          <GroupHeader
+            title="Orchestrations"
+            icon={<Icon name="Network" fallback="Layers" aria-hidden className="size-3.5" />}
+            isCollapsed={collapsedGroups.has("orchestrations")}
+            count={orchestrationList.length}
+            alwaysShowCount
+            onToggle={() => collapsedGroups.toggle("orchestrations")}
+          />
+          <Collapse open={!collapsedGroups.has("orchestrations")}>
+            <div role="list" className="mt-0.5 flex flex-col gap-0.5">
+              {orchestrationList.map((entry) => renderRow(flatRow(entry.thread), "flat", {
+                numbered: false,
+                subtitle: orchestrationSubtitle(entry, (projectId) => projectById.get(projectId)?.name ?? null),
+                rollup: entry.state === foldState(entry.thread) ? null : entry.state,
+                onOpen: revealOrchestration,
+              }))}
+            </div>
+          </Collapse>
+        </section>
+      ) : null}
 
       {treePlaceholder ? <div className="px-3 text-xs text-muted-foreground">{treePlaceholder}</div> : null}
 
@@ -859,6 +922,8 @@ function ThreadRowView({
   context,
   subtitle,
   isActive,
+  isRevealed,
+  rollup,
   isCompactViewport,
   canHover,
   subagents,
@@ -877,9 +942,13 @@ function ThreadRowView({
   /** bb's jump keys target these rows: the tree's, or the filter or search list that replaces it; never Recent Activity's duplicates. */
   numbered: boolean;
   context?: string;
-  /** A second line under the title; only the Running filter has one. */
+  /** A second line under the title: the Running filter's context or an orchestration's progress. */
   subtitle?: string;
   isActive: boolean;
+  /** Lit briefly after its orchestration shortcut was clicked. */
+  isRevealed: boolean;
+  /** The subtree's state drawn in place of the thread's own; a folded tree row works it out itself. */
+  rollup?: FoldState | null;
   isCompactViewport: boolean;
   canHover: boolean;
   subagents: ThreadSubagents | undefined;
@@ -903,7 +972,8 @@ function ThreadRowView({
   const Link = numbered ? NumberedRowLink : RowLink;
   const { hasUnsubmittedDraft } = useSidebarThreadDraft(thread.id);
   const rowStatus = useSidebarThreadRowStatus(thread.id);
-  const glyph = resolveRowGlyph(thread, hasUnsubmittedDraft, rowStatus);
+  const rolledUp = rollup !== undefined ? rollup : row.foldCounts ? rollupOver(foldState(thread), row.foldCounts) : null;
+  const glyph = rolledUp ? rollupGlyph(rolledUp) : resolveRowGlyph(thread, hasUnsubmittedDraft, rowStatus);
   const dot = <RowStatusGlyph glyph={glyph} />;
   const providerName = provider?.displayName ?? thread.providerId;
   const failed = thread.status === "error" && !thread.isArchived;
@@ -928,9 +998,13 @@ function ThreadRowView({
         aria-selected={isTree ? isActive : undefined}
         title={tooltip}
         data-thread-row=""
+        data-thread-id={thread.id}
+        data-rollup={rolledUp ?? undefined}
+        data-revealed={isRevealed || undefined}
         className={cn(
           "group/row relative rounded-md text-sm text-sidebar-foreground/90",
           isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : ROW_TINT,
+          REVEALED_RING,
         )}
         data-keyboard-focus={keyboardFocus || undefined}
         data-menu-open={menuOpen || undefined}
@@ -1189,33 +1263,55 @@ function useStopInlineAction(thread: PluginSidebarThread): PluginThreadActionsIn
   );
 }
 
-const FOLD_STATES: readonly { state: ThreadState; label: string }[] = [
+const FOLD_STATES: readonly { state: FoldState; label: string }[] = [
   { state: "input", label: "needs input" },
   { state: "error", label: "failed" },
   { state: "running", label: "running" },
   { state: "waiting", label: "waiting" },
+  { state: "unread", label: "to review" },
   { state: "done", label: "done" },
 ];
 
-/** The line under a folded parent: its whole subtree by state. Clicking it unfolds. */
+// bb's theme has no blue status token, so running uses Tailwind's palette, as the status dots do.
+const FOLD_BAR_CLASS: Record<FoldState, string> = {
+  input: "bg-attention",
+  error: "bg-destructive",
+  running: "bg-blue-500",
+  waiting: "bg-blue-500/40",
+  unread: "bg-success",
+  done: "bg-sidebar-foreground/20",
+};
+
+const REVEAL_SCROLL_DELAY_MS = 220;
+const REVEAL_HIGHLIGHT_MS = 1_600;
+const REVEALED_RING = "data-[revealed]:bg-sidebar-accent/70 data-[revealed]:ring-1 data-[revealed]:ring-inset data-[revealed]:ring-sidebar-ring/40";
+
+/** The line under a folded parent: its whole subtree by state. Clicking it unfolds; a finished one offers Archive. */
 function FoldLine({
   depth,
   guides,
   counts,
+  own,
   total,
   onExpand,
+  onArchive,
 }: {
   depth: number;
   guides: boolean[];
-  counts: StateCounts;
+  counts: FoldCounts;
+  own: FoldState;
   total: number;
   onExpand: () => void;
+  /** Absent in the archived view. */
+  onArchive?: () => Promise<void>;
 }) {
-  const parts = FOLD_STATES.filter(({ state }) => (counts[state] ?? 0) > 0);
-  const subthreads = `${total} subthread${total === 1 ? "" : "s"}`;
+  const finished = isFinishedFold(own, counts);
+  const parts = finished ? [] : FOLD_STATES.filter(({ state }) => (counts[state] ?? 0) > 0);
+  const segments = foldBarSegments(counts, total);
+  const subthreads = `${total} subthread${total === 1 ? "" : "s"}${finished ? " · all done" : ""}`;
   const description = [subthreads, ...parts.map(({ state, label }) => `${counts[state]} ${label}`)].join(", ");
   return (
-    <div role="none" className="relative flex h-6 items-center pr-2" style={{ paddingLeft: ROW_PAD_PX + depth * INDENT_PX }}>
+    <div role="none" data-fold-line="" className="relative flex h-6 items-center gap-1 pr-2" style={{ paddingLeft: ROW_PAD_PX + depth * INDENT_PX }}>
       <TreeGuides depth={depth} guides={guides} hasOpenChildren={false} isPeek centerY={12} />
       <button
         type="button"
@@ -1224,6 +1320,13 @@ function FoldLine({
         aria-label={`Expand subthreads: ${description}`}
         className={cn("-ml-1 flex h-5 min-w-0 items-center gap-2 overflow-hidden rounded-md px-1 text-2xs tabular-nums text-sidebar-foreground/50 outline-none hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring", ROW_TINT)}
       >
+        {segments.length > 0 ? (
+          <span aria-hidden data-fold-bar="" className="flex h-1 w-10 shrink-0 overflow-hidden rounded-full bg-sidebar-foreground/10">
+            {segments.map(({ state, fraction }) => (
+              <span key={state} data-fold-segment={state} className={FOLD_BAR_CLASS[state]} style={{ width: `${fraction * 100}%` }} />
+            ))}
+          </span>
+        ) : null}
         <span className="shrink-0">{subthreads}</span>
         {parts.map(({ state, label }) => (
           <span key={state} className="flex shrink-0 items-center gap-1">
@@ -1232,8 +1335,87 @@ function FoldLine({
           </span>
         ))}
       </button>
+      {finished && onArchive ? <FoldArchiveButton count={total + 1} onArchive={onArchive} /> : null}
     </div>
   );
+}
+
+/** Asks once inline, since it archives a whole tree; the toast that follows says what was skipped. */
+function FoldArchiveButton({ count, onArchive }: { count: number; onArchive: () => Promise<void> }) {
+  const [step, setStep] = useState<"idle" | "confirm" | "pending">("idle");
+  const button = "flex h-5 shrink-0 items-center gap-1 rounded-md px-1.5 text-2xs outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring disabled:opacity-60";
+  if (step === "idle") {
+    return (
+      <button type="button" data-fold-archive="" onClick={() => setStep("confirm")} className={cn(button, "ml-auto text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground")}>
+        <Icon name="Archive" aria-hidden className="size-3" />
+        Archive
+      </button>
+    );
+  }
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-0.5">
+      <button
+        type="button"
+        data-fold-archive-confirm=""
+        autoFocus
+        disabled={step === "pending"}
+        onClick={async () => {
+          setStep("pending");
+          await onArchive();
+          setStep("idle");
+        }}
+        className={cn(button, "bg-destructive/10 text-destructive hover:bg-destructive/20")}
+      >
+        {step === "pending" ? "Archiving…" : `Archive ${count} threads`}
+      </button>
+      <button type="button" disabled={step === "pending"} onClick={() => setStep("idle")} className={cn(button, "text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground")}>
+        Cancel
+      </button>
+    </span>
+  );
+}
+
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+/** Archives the tree leaves first, one thread at a time, skipping any worktree with changes and the threads above it. */
+async function archiveFinishedFold(
+  sdk: ReturnType<typeof useSdk>,
+  rpc: ReturnType<typeof useRpc<typeof rpcContract>>,
+  forest: Forest<PluginSidebarThread>,
+  root: PluginSidebarThread,
+) {
+  const subtree = [root, ...descendantsOf(forest, root.id)];
+  const environmentOf = new Map(subtree.flatMap((thread) => {
+    const environment = thread.environment;
+    return environment?.id && environment.isWorktree !== false ? [[thread.id, environment.id] as const] : [];
+  }));
+  const environmentIds = [...new Set(environmentOf.values())];
+  const dirty = new Set<string>();
+  try {
+    for (let index = 0; index < environmentIds.length; index += 200) {
+      const { dirty: found } = await rpc.call("dirtyWorktrees", { environmentIds: environmentIds.slice(index, index + 200) });
+      found.forEach((id) => dirty.add(id));
+    }
+  } catch (error) {
+    toast.error("Archive failed", { description: `Couldn't check worktrees for changes: ${error instanceof Error ? error.message : String(error)}` });
+    return;
+  }
+  const dirtyThreads = new Set([...environmentOf].filter(([, environmentId]) => dirty.has(environmentId)).map(([threadId]) => threadId));
+  const plan = archivePlan(forest, root.id, dirtyThreads);
+  let archived = 0;
+  for (const threadId of plan.archive) {
+    try {
+      await sdk.threads.archive({ threadId });
+      archived += 1;
+    } catch (error) {
+      toast.error(`Archived ${plural(archived, "thread")}, then failed`, { description: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+  }
+  const held = plan.skipped.length + plan.kept.length;
+  const skipped = held > 0 ? `Skipped ${plural(plan.skipped.length, "thread")} with uncommitted changes${plan.kept.length ? ` and ${plural(plan.kept.length, "thread")} above them` : ""}` : null;
+  if (archived === 0) toast.warning("Nothing archived", { description: skipped ?? undefined });
+  else toast.success(`Archived ${plural(archived, "thread")}`, { description: skipped ?? "⌘Z to undo" });
 }
 
 /** Rows sit this far apart; continuing lines reach across the gap. */

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { glyphMotionClass, isIdleGlyph, resolveRowGlyph, ROLLUP_GLYPH, type GlyphThread } from "../src/statusGlyph.ts";
+import { glyphMotionClass, isIdleGlyph, resolveRowGlyph, ROLLUP_GLYPH, rollupGlyph, type GlyphThread } from "../src/statusGlyph.ts";
 
 const idleActivity = { workflows: 0, backgroundAgents: 0, backgroundCommands: 0, planMode: 0 };
 
@@ -155,4 +155,9 @@ test("another plugin's row status never covers a failed queued message", () => {
     rowStatus: null,
     label: "Queued message failed to send",
   });
+});
+
+test("a rolled-up subtree draws bb's glyph for its state and says it is a subthread's", () => {
+  assert.deepEqual(rollupGlyph("unread"), { indicator: "unread-success", rowStatus: null, label: "Subthread finished, not read" });
+  assert.equal(rollupGlyph("input").indicator, "waiting-for-input");
 });

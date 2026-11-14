@@ -1,6 +1,6 @@
 // What a thread row's status glyph shows, folded the way bb's own sidebar folds it.
 import type { PluginSidebarThreadIndicator } from "@get-bb/plugin-sdk/app";
-import { hasBackgroundWork, WORKING_INDICATORS, type ThreadState } from "./tree.ts";
+import { hasBackgroundWork, WORKING_INDICATORS, type FoldState, type ThreadState } from "./tree.ts";
 import type { StatusFilter } from "./statusFilters.ts";
 
 export type GlyphIndicator = PluginSidebarThreadIndicator;
@@ -108,6 +108,22 @@ export const ROLLUP_GLYPH: Record<ThreadState, GlyphIndicator> = {
   waiting: "queued-waiting",
   done: "none",
 };
+
+export const FOLD_GLYPH: Record<FoldState, GlyphIndicator> = { ...ROLLUP_GLYPH, unread: "unread-success" };
+
+const ROLLUP_LABEL: Record<FoldState, string> = {
+  input: "Subthread needs input",
+  error: "Subthread failed",
+  running: "Subthread running",
+  waiting: "Subthread waiting",
+  unread: "Subthread finished, not read",
+  done: "Subthreads done",
+};
+
+/** A folded parent or an orchestration shortcut drawing its subtree's state instead of its own. */
+export function rollupGlyph(state: FoldState): RowGlyph<never> {
+  return { indicator: FOLD_GLYPH[state], rowStatus: null, label: ROLLUP_LABEL[state] };
+}
 
 /** The status line's counts, drawn as the row glyph each one lists. */
 export const FILTER_GLYPH: Record<StatusFilter, GlyphIndicator> = {

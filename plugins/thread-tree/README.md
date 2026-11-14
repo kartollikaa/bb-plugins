@@ -74,6 +74,26 @@ A ⚠ marks a thread whose branch or worktree another unarchived thread also
 uses; its tooltip names the other thread. Threads in a project's own checkout,
 and an orchestrator with its subthreads, never warn.
 
+An orchestrator is any thread with unarchived subthreads. The Orchestrations
+section under the Threads heading has a shortcut for each top-level one that
+still has work going: something in its tree runs, waits, needs input, failed or
+finished unread. The shortcut's glyph is the most urgent of these, and its
+second line gives the projects it spans and its progress, such as
+`bb-plugins · 2/4 done · 1 needs you`. Clicking it opens the orchestrator,
+unfolds its project folder and its tree, and briefly lights the tree up.
+Finished orchestrations drop out by themselves; the section hides when empty
+and in the archived view.
+
+A folded parent's glyph shows its subtree's state when that is more urgent than
+its own, labelled "Subthread needs input" and so on. The fold line counts the
+subtree by state, with finished-unread threads as "to review"; from five
+subthreads a small bar shows the same split. When the parent and every
+subthread are done and read, the fold line says "all done" and offers Archive.
+It asks once, then archives the tree leaves first. A thread whose worktree has
+uncommitted or untracked changes, or whose git status can't be read, is skipped
+along with the threads above it, and the toast says how many were skipped.
+Cmd/Ctrl+Z restores the archived ones.
+
 The provider icon sits in a fixed slot before the age, in the provider's brand
 tint (Claude orange, Codex blue-violet), or in the text colour with the
 `providerIconStyle` setting set to `monochrome`. This setting replaces
@@ -102,10 +122,11 @@ this one under Settings → Appearance → Sidebar, or run
 
 ## Layout
 
-- `server.ts`: RPC `subagents` and `undoArchive`, the Automations and GitHub Folder proxies, and the `bb thread-tree` command.
+- `server.ts`: RPC `subagents`, `undoArchive` and `dirtyWorktrees`, the Automations and GitHub Folder proxies, and the `bb thread-tree` command.
 - `src/githubFolder.ts`: the slice of the GitHub Folder plugin's view that the GitHub section draws.
 - `src/subagents.ts`: folds a thread's event log into its subagents.
 - `src/tree.ts`: pure tree, grouping and subagent state logic.
+- `src/orchestrations.ts`: the Orchestrations shortcuts, the folded rollup and bar, and the archive plan.
 - `src/archiveUndo.ts`: which recent archives one Cmd/Ctrl+Z brings back.
 - `src/ThreadTreeList.tsx`, `src/SubagentBadge.tsx`, `src/GithubSection.tsx`: the sidebar UI.
 - `test/`: `node --test` suites for the pure modules.
