@@ -26,6 +26,9 @@ under it, and the subagents it runs inside its own session show on its row.
   Archive, skipping worktrees with uncommitted changes.
 - Per project, threads idle, read and quiet for a day fold into "N older";
   expanded, it offers Archive these, skipping uncommitted worktrees.
+- Projects with no activity for 24 hours (a setting; 0 turns it off) move
+  into "N inactive projects" at the bottom; running, asking, failed or pinned
+  threads keep a project in place.
 - Orchestrations: a shortcut for each thread with live subthreads, most
   urgent first, with its projects and progress; finished ones go last, muted.
 - Before each title, bb's own status glyph: spinner, question mark, red cross,
@@ -52,7 +55,8 @@ to their headers and reopen on drop.
 ## Settings
 
 Thread Tree's settings hold the section switches, Recent
-Activity row counts, which PRs Needs you lists, provider icon colour, and
+Activity row counts, which PRs Needs you lists, provider icon colour, the
+inactive-project window, and
 switches for the subagent counters and the age label. Reduce motion stops the
 sidebar animations and holds spinners still; so does the system's
 reduced-motion preference.

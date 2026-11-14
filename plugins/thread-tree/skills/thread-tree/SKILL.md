@@ -166,6 +166,19 @@ one opened from the expanded list stays there, one opened from outside stays out
 thread is opened. The Pinned group, Status and flat grouping, and
 the archived view don't fold older threads.
 
+A whole project folder whose threads have all been quiet for longer than the
+`hideInactiveProjectsAfterHours` setting (default 24 hours; 0 turns it off)
+moves into one "N inactive projects" line at the bottom of the tree, collapsed
+by default. Quiet means every thread in the folder's trees, subthreads
+included, is idle (read or not) and its last activity, bb's `latestAttentionAt`, is
+older than the window; reading a thread doesn't count as activity. A running,
+queued, asking or failed thread, or a pinned thread of that project, keeps the
+folder in place, and so does the open thread unless it was opened from the
+expanded line. Clicking the line shows those folders beneath it as normal
+folders, "N older" included; its tooltip states the rule. Search, the status
+filters and Needs you still reach their threads. Status and flat grouping and
+the archived view don't hide folders.
+
 The provider icon sits in a fixed slot before the age, in the provider's brand
 tint (Claude orange, Codex blue-violet), or in the text colour with the
 `providerIconStyle` setting set to `monochrome`. This setting replaces
@@ -208,6 +221,7 @@ Select: `providerIconStyle` (`tint` or `monochrome`); `needsYouPullRequests` (`l
 PRs of the user's threads with failing checks, conflicts or changes requested; `all`: every GitHub
 Folder item; `none`).
 Numbers (1–50): `recentLimit` (Recent Activity rows), `recentMoreLimit` (rows after Show more).
+Number (hours, 0–8760): `hideInactiveProjectsAfterHours` (default 24; 0 never hides a folder).
 The order of Pull requests, Automations and Recent Activity, the project order, and which groups are
 folded are not settings: each browser client keeps them itself. The user changes them in the
 sidebar by dragging a header or from its right-click menu; the Sections menu (the

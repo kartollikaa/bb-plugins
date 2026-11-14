@@ -211,6 +211,23 @@ and in folder there are gonna be the whole … with nested tree."
   goes through bb's own archive and its confirmation, skips threads whose worktree has
   uncommitted changes (they stay listed with a marker), and says how many it skipped.
 
+### Inactive projects
+
+Owner: «хочу ещё чтобы проекты которые долго не были активны уходили из сайд бара. Время
+реактивности задавать в настройках, по умолчанию это 24 часа».
+
+- A project folder whose every thread (subthreads included) is idle and whose newest
+  `latestAttentionAt` is older than `hideInactiveProjectsAfterHours` (default 24, 0 turns it off)
+  moves into one "N inactive projects" line at the bottom of the tree, collapsed by default.
+  `updatedAt` is not activity: reading a thread bumps it, and a click must not bring a folder back.
+- A running, queued, asking or failed thread keeps the folder, and so does a pinned thread of
+  that project. A finished but unread thread doesn't: Needs you lists it.
+- Hidden folders stay reachable: expanding the line shows them as normal folders, and search,
+  the status filters and Needs you still find their threads. The open thread holds its folder's
+  side of the line the way it holds its side of "N older".
+- Only the Project grouping of the active view hides folders. An empty retained folder counts as
+  inactive.
+
 ### Recent Activity
 
 Hidden by default in v2: the status-line filters and Needs you cover what it was used for, and

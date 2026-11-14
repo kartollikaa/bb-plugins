@@ -97,6 +97,7 @@ import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW
 import { canStop, END_SLOT_MIN_PX, NO_HOVER_QUERY, ROW_ACTION_BUTTON, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
 import { foldedRootOf, OLDER_RULE, olderRootIds, sameIds } from "./olderThreads";
+import { folderProjectOf, inactiveProjectIds, inactiveRule } from "./inactiveProjects";
 import { RetryButton } from "./RetryButton";
 
 const ROW_PAD_PX = 6;
@@ -220,7 +221,32 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     [forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId, folderSorts, threadSort, showArchived, retainedProjectIds, isOlder],
   );
   const pinnedGroup = groups.find((group) => group.key === "pinned");
-  const folderGroups = groups.filter((group) => group.key !== "pinned");
+  const inactiveShown = flags.has("inactive-projects");
+  const stableInactiveIds = useRef<ReadonlySet<string>>(new Set());
+  const openedFromInactive = useRef<{ id: string | null; wasInactive: boolean }>({ id: null, wasInactive: false });
+  if (openedFromInactive.current.id !== (activeThreadId ?? null)) {
+    const folder = folderProjectOf(forest, activeThreadId ?? null);
+    openedFromInactive.current = { id: activeThreadId ?? null, wasInactive: folder !== null && stableInactiveIds.current.has(folder) && inactiveShown };
+  }
+  const activeWasInactive = openedFromInactive.current.wasInactive;
+  const folderProjectIds = useMemo(
+    () => groups.flatMap((group) => (group.key !== "pinned" && group.projectId !== null ? [group.projectId] : [])),
+    [groups],
+  );
+  const inactiveIds = useMemo(
+    () => showArchived || groupMode !== "project"
+      ? new Set<string>()
+      : inactiveProjectIds(forest, folderProjectIds, { now, hideAfterHours: view.hideInactiveProjectsAfterHours, activeThreadId: activeThreadId ?? null, activeWasInactive }),
+    [showArchived, groupMode, forest, folderProjectIds, now, view.hideInactiveProjectsAfterHours, activeThreadId, activeWasInactive],
+  );
+  if (!sameIds(stableInactiveIds.current, inactiveIds)) stableInactiveIds.current = inactiveIds;
+  const shownInactiveIds = stableInactiveIds.current;
+  const isInactiveGroup = useCallback(
+    (group: { key: string; projectId: string | null }) => group.projectId !== null && group.key !== "pinned" && shownInactiveIds.has(group.projectId),
+    [shownInactiveIds],
+  );
+  const folderGroups = groups.filter((group) => group.key !== "pinned" && !isInactiveGroup(group));
+  const inactiveGroups = groups.filter(isInactiveGroup);
   const showMoreRecent = flags.has("recent-more");
   const recentHidden = !view.showRecent || collapsedGroups.has("recent");
   const recent = useMemo(
@@ -293,8 +319,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     }));
   }, [statusFilter, threads, searchOpen, query, searchPool, projectById, pullRequestsOf]);
   const shownThreads = useMemo(
-    () => (view.showSubagents ? threadsOnScreen({ flatList, recent, recentHidden, groups: groups.map((group) => group.older && olderShown(group.key) ? { ...group, rows: [...group.rows, ...group.older.rows] } : group), collapsed: collapsedGroups.values }) : []),
-    [flatList, recent, recentHidden, groups, olderShown, view.showSubagents, collapsedGroups.values],
+    () => (view.showSubagents ? threadsOnScreen({ flatList, recent, recentHidden, groups: groups.filter((group) => inactiveShown || !isInactiveGroup(group)).map((group) => group.older && olderShown(group.key) ? { ...group, rows: [...group.rows, ...group.older.rows] } : group), collapsed: collapsedGroups.values }) : []),
+    [flatList, recent, recentHidden, groups, olderShown, view.showSubagents, collapsedGroups.values, inactiveShown, isInactiveGroup],
   );
   const subagents = useSubagents(shownThreads);
   const openSearch = useCallback(() => {
@@ -682,7 +708,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           </Collapse>
         </section>
       ) : null}
-      {folderGroups.length > 0 ? (
+      {folderGroups.length > 0 || inactiveGroups.length > 0 ? (
         <div
           ref={treeRef}
           role="tree"
@@ -691,6 +717,16 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           {...(canReorder ? projectDrag.containerProps : {})}
         >
           {folderGroups.map(renderGroup)}
+          {inactiveGroups.length > 0 ? (
+            <InactiveProjects
+              count={inactiveGroups.length}
+              rule={inactiveRule(view.hideInactiveProjectsAfterHours)}
+              isOpen={inactiveShown}
+              onToggle={() => flags.toggle("inactive-projects")}
+            >
+              {inactiveGroups.map(renderGroup)}
+            </InactiveProjects>
+          ) : null}
         </div>
       ) : null}
 
@@ -1450,6 +1486,41 @@ function OlderThreads({
         {isOpen ? <FoldArchiveButton label="Archive these" onArchive={onArchive} /> : null}
       </div>
     </>
+  );
+}
+
+/** Folders quiet for longer than the setting's window, behind one line at the bottom; expanded, they sit beneath it. */
+function InactiveProjects({
+  count,
+  rule,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  count: number;
+  rule: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div data-inactive-projects="" className="flex flex-col">
+      <div role="none" className="flex h-6 items-center px-2">
+        <button
+          type="button"
+          aria-expanded={isOpen}
+          title={`${rule}.`}
+          onClick={onToggle}
+          className={cn("-ml-1 flex h-5 min-w-0 items-center gap-1 rounded-md px-1 text-2xs tabular-nums text-sidebar-foreground/50 outline-none hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring", ROW_TINT)}
+        >
+          <Icon name="ChevronRight" aria-hidden className={cn("size-3 transition-transform motion-reduce:transition-none", isOpen && "rotate-90")} />
+          {isOpen ? "Hide inactive projects" : `${count} inactive ${count === 1 ? "project" : "projects"}`}
+        </button>
+      </div>
+      <Collapse open={isOpen}>
+        <div role="group" aria-label="Inactive projects" className="mt-0.5 flex flex-col gap-2">{children}</div>
+      </Collapse>
+    </div>
   );
 }
 
