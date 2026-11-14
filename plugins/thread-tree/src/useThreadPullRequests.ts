@@ -3,6 +3,7 @@ import { experimental_useRpcKeyedQuery, type PluginSidebarThread } from "@get-bb
 import { z } from "zod";
 import { createRefreshScheduler } from "./refreshScheduler";
 import { activitySignatures, changedKeys } from "./pullRequestKeys";
+import { mergeEnvironmentOf } from "./pullRequestActions";
 import { knownPullRequestStates, mergePullRequests, pullRequestStatusRowSchema, threadPullRequestSchema, type ThreadPullRequest } from "./threadPullRequests";
 
 const REFRESH_MS = 60_000;
@@ -97,5 +98,6 @@ export function useThreadPullRequests(threads: readonly PluginSidebarThread[], c
     return mergePullRequests(statusRow?.outcome === "available" ? statusRow.pullRequest : undefined, sessionRow ?? []);
   }, [rowsOf]);
   const pullRequestStatesOf = useCallback((thread: PluginSidebarThread) => knownPullRequestStates(rowsOf(thread)), [rowsOf]);
-  return { pullRequestsOf, pullRequestStatesOf, isLoading: status.isLoading || session.isLoading };
+  const mergeEnvironmentOfUrl = useCallback((url: string) => mergeEnvironmentOf(url, statusData), [statusData]);
+  return { pullRequestsOf, pullRequestStatesOf, mergeEnvironmentOf: mergeEnvironmentOfUrl, isLoading: status.isLoading || session.isLoading };
 }

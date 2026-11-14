@@ -22,6 +22,7 @@ import {
   type InboxCursor,
   type NeedsYouItem,
   type PendingInteraction,
+  type PullRequestItem,
   type ThreadItemKind,
   type ThreadQuestion,
   queuePreview,
@@ -70,6 +71,9 @@ interface NeedsYouSources {
   pullRequestsSettled: boolean;
   orchestrationOf: (threadId: string) => string | null;
   signalsOf: (threadId: string) => ThreadSignals | undefined;
+  diffStatOf: (threadId: string) => string | null;
+  /** Review threads started from a PR row, by lowercased URL, until the PR's own link shows up. */
+  reviewThreadOf: ReadonlyMap<string, string>;
   now: number;
   activeThreadId: string | null;
   onNavigate: () => void;
@@ -77,7 +81,7 @@ interface NeedsYouSources {
 
 /** The queue's visible items, snoozing, and ⇧⌘I, which works while the section is folded or replaced by a flat list. */
 export function useNeedsYou(sources: NeedsYouSources) {
-  const { threads, activeThreadId, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, pullRequestsSettled, orchestrationOf, signalsOf, now, onNavigate } = sources;
+  const { threads, activeThreadId, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, pullRequestsSettled, orchestrationOf, signalsOf, diffStatOf, reviewThreadOf, now, onNavigate } = sources;
   const waiting = useMemo(() => threads.filter((thread) => threadItemKind(thread) === "input"), [threads]);
   const questions = useQuestions(waiting);
   const firstSeenRef = useRef<ReadonlyMap<string, number>>(new Map());
@@ -91,15 +95,15 @@ export function useNeedsYou(sources: NeedsYouSources) {
     };
     return linkedPullRequests(threads.map((thread) => thread.id), prsOf, descendantIdsOf);
   }, [threads, pullRequestsOf, descendantIdsOf]);
-  const threadOfPullRequest = useMemo(() => linkedThreadByUrl(linked), [linked]);
+  const threadOfPullRequest = useMemo(() => new Map([...reviewThreadOf, ...linkedThreadByUrl(linked)]), [linked, reviewThreadOf]);
 
   const all = useMemo(
     () => [
-      ...threadItems({ threads, questions, firstSeen, orchestrationOf, signalsOf, now }),
+      ...threadItems({ threads, questions, firstSeen, orchestrationOf, signalsOf, diffStatOf, now }),
       ...(pullRequestMode === "none" ? [] : pullRequestItems(pullRequestMode, linked, folderAttention, folderItems, threadOfPullRequest)),
       ...automationItems(automations),
     ],
-    [threads, questions, firstSeen, orchestrationOf, signalsOf, now, pullRequestMode, linked, folderAttention, folderItems, threadOfPullRequest, automations],
+    [threads, questions, firstSeen, orchestrationOf, signalsOf, diffStatOf, now, pullRequestMode, linked, folderAttention, folderItems, threadOfPullRequest, automations],
   );
 
   const [snoozes, saveSnooze] = usePersistentRecord("needs-you-snoozes", readSnoozes);
@@ -202,6 +206,7 @@ export function NeedsYouSection({
   onOpen,
   onSnooze,
   renderProvider,
+  renderPullRequestAction,
 }: {
   items: readonly NeedsYouItem[];
   isCollapsed: boolean;
@@ -215,6 +220,8 @@ export function NeedsYouSection({
   onSnooze: (item: NeedsYouItem) => void;
   /** The provider slot a thread item shares with its tree row. */
   renderProvider: (threadId: string) => React.ReactNode;
+  /** Merge or Agent review, when the PR offers one. */
+  renderPullRequestAction: (item: PullRequestItem) => React.ReactNode;
 }) {
   const [showAll, setShowAll] = useState(false);
   if (items.length === 0) return null;
@@ -247,6 +254,7 @@ export function NeedsYouSection({
               onOpen={(split) => onOpen(item, split)}
               onSnooze={() => onSnooze(item)}
               provider={item.kind === "pr" || item.kind === "automation" ? null : renderProvider(item.threadId)}
+              pullRequestAction={item.kind === "pr" ? renderPullRequestAction(item) : null}
             />
           ))}
           {items.length > QUEUE_PREVIEW ? (
@@ -275,6 +283,7 @@ function NeedsYouRow({
   onOpen,
   onSnooze,
   provider,
+  pullRequestAction,
 }: {
   item: NeedsYouItem;
   isActive: boolean;
@@ -285,6 +294,7 @@ function NeedsYouRow({
   onOpen: (split: boolean) => void;
   onSnooze: () => void;
   provider: React.ReactNode;
+  pullRequestAction: React.ReactNode;
 }) {
   const sdk = useSdk();
   const [keyboardFocus, setKeyboardFocus] = useState(false);
@@ -298,7 +308,7 @@ function NeedsYouRow({
     ? <RetryButton threadId={item.threadId} />
     : item.kind === "queued-failed"
       ? <ResendButton threadId={item.threadId} />
-      : item.kind === "stuck" ? <StopButton threadId={item.threadId} /> : null;
+      : item.kind === "stuck" ? <StopButton threadId={item.threadId} /> : pullRequestAction;
   const actionButtons = (
     <>
       {failure ? <span className="pointer-events-auto flex">{failure}</span> : null}

@@ -11,7 +11,7 @@ const pendingActions = createPendingActions();
 export function RetryButton({ threadId }: { threadId: string }) {
   const sdk = useSdk();
   return (
-    <FailurePill
+    <ActionPill
       label="Retry"
       pendingKey={`retry:${threadId}`}
       ariaLabel="Retry the failed turn"
@@ -26,7 +26,7 @@ export function RetryButton({ threadId }: { threadId: string }) {
 export function ResendButton({ threadId }: { threadId: string }) {
   const sdk = useSdk();
   return (
-    <FailurePill
+    <ActionPill
       label="Resend"
       pendingKey={`resend:${threadId}`}
       ariaLabel="Resend the failed queued message"
@@ -45,7 +45,7 @@ export function ResendButton({ threadId }: { threadId: string }) {
 export function StopButton({ threadId }: { threadId: string }) {
   const sdk = useSdk();
   return (
-    <FailurePill
+    <ActionPill
       label="Stop"
       pendingKey={`stop:${threadId}`}
       ariaLabel="Stop the stuck turn"
@@ -71,28 +71,38 @@ const PILL_TONE = {
   neutral: "border-sidebar-foreground/25 text-sidebar-foreground/80 hover:bg-sidebar-foreground/10",
 } as const;
 
-function FailurePill({ label, pendingKey, ariaLabel, icon, errorTitle, run, tone = "danger" }: { label: string; pendingKey: string; ariaLabel: string; icon: string; errorTitle: string; run: () => Promise<unknown>; tone?: keyof typeof PILL_TONE }) {
-  const pending = useSyncExternalStore(pendingActions.subscribe, () => pendingActions.has(pendingKey));
+/** Runs `run` once at a time per key, with a toast on failure; pills and icon buttons share the pending state. */
+export async function runPending(pendingKey: string, errorTitle: string, run: () => Promise<unknown>) {
+  const release = pendingActions.begin(pendingKey);
+  if (!release) return;
+  try {
+    await run();
+  } catch (error) {
+    toast.error(errorTitle, { description: error instanceof Error ? error.message : String(error) });
+  } finally {
+    release();
+  }
+}
+
+export function usePending(pendingKey: string): boolean {
+  return useSyncExternalStore(pendingActions.subscribe, () => pendingActions.has(pendingKey));
+}
+
+export function ActionPill({ label, pendingKey, ariaLabel, icon, errorTitle, run, tone = "danger" }: { label: string; pendingKey: string; ariaLabel: string; icon: string; errorTitle: string; run: () => Promise<unknown>; tone?: keyof typeof PILL_TONE }) {
+  const pending = usePending(pendingKey);
   return (
     <button
       type="button"
       disabled={pending}
-      onClick={async (event) => {
+      onClick={(event) => {
         event.stopPropagation();
-        const release = pendingActions.begin(pendingKey);
-        if (!release) return;
-        try {
-          await run();
-        } catch (error) {
-          toast.error(errorTitle, { description: error instanceof Error ? error.message : String(error) });
-        } finally {
-          release();
-        }
+        void runPending(pendingKey, errorTitle, run);
       }}
       aria-label={ariaLabel}
+      title={ariaLabel}
       className={`flex h-5 shrink-0 items-center gap-1 rounded-full border px-1.5 text-2xs font-medium disabled:opacity-60 ${PILL_TONE[tone]}`}
     >
-      <Icon name={pending ? "Loading" : icon} aria-hidden className="size-3" />
+      <Icon name={pending ? "Loading" : icon} fallback="Play" aria-hidden className="size-3" />
       {label}
     </button>
   );

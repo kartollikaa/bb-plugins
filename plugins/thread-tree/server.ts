@@ -22,13 +22,32 @@ import { createProjectFolderHistory } from "./src/projectFolders";
 import { ARCHIVE_CLAIM_TTL_MS, createArchiveClaims, createArchiveHistory, releaseUnarchived } from "./src/archiveUndo";
 import { archiveScopes, dirtyEnvironmentIds, MAX_THREADS_PER_CALL } from "./src/orchestrations";
 import { createSignalReader, threadSignalsSchema, type SignalListArgs } from "./src/threadSignals";
+import { agentReviewPrompt, mergeEnvironmentOf, projectForRepo, PR_STATUS_PLUGIN_ID, repoSlugFromPrUrl } from "./src/pullRequestActions";
+import { pullRequestStatusRowSchema } from "./src/threadPullRequests";
 
 /** At most one refresh per thread this often; bb already debounces its events to one a second. */
 const SIGNAL_REFRESH_MS = 2_000;
 const signalTag = (threadId: string) => `signals:${threadId}`;
 
 
+const pullRequestUrlSchema = z.string().max(400).regex(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*$/i);
+
 export const rpcContract = defineRpcContract({
+  /** The project an agent review of a repo's PR starts in, keyed by `owner/repo`; null when no project has that remote. */
+  reviewProjects: {
+    input: z.object({ keys: z.array(z.string().min(1).max(200)).min(1).max(200) }),
+    output: z.record(z.string(), z.object({ projectId: z.string(), name: z.string() }).nullable()),
+  },
+  /** Starts a thread that reviews a PR in its repo's project. */
+  agentReview: {
+    input: z.object({ url: pullRequestUrlSchema, number: z.number().int().positive(), title: z.string().max(400) }).strict(),
+    output: z.object({ threadId: z.string(), projectId: z.string() }),
+  },
+  /** Merges a PR through bb's GitHub PR Status, only while it is still that environment's open current-branch PR. */
+  mergePullRequest: {
+    input: z.object({ environmentId: z.string().min(1), url: pullRequestUrlSchema }).strict(),
+    output: z.object({ message: z.string() }),
+  },
   threadPullRequests: {
     input: z.object({ keys: z.array(z.string().min(1)).min(1).max(200) }),
     output: z.record(z.string(), z.array(threadPullRequestSchema)),
@@ -182,7 +201,45 @@ export default async function plugin(bb: BbPluginApi) {
     return threads.filter((thread) => thread.environmentId && dirty.has(thread.environmentId)).map((thread) => thread.id);
   };
 
+  const listProjects = async () => (await bb.sdk.projects.list()).map((project) => ({
+    id: project.id,
+    name: project.name,
+    gitRemoteUrl: project.gitRemoteUrl,
+    updatedAt: project.updatedAt,
+  }));
+
   bb.rpc.register(rpcContract, {
+    reviewProjects: async ({ keys }) => {
+      const projects = await listProjects();
+      return Object.fromEntries(keys.map((repo) => [repo, projectForRepo(repo, projects)]));
+    },
+    agentReview: async ({ url, number, title }) => {
+      const repo = repoSlugFromPrUrl(url);
+      const project = repo ? projectForRepo(repo, await listProjects()) : null;
+      if (!project) throw new Error(`No project uses ${repo ?? url}`);
+      const thread = await bb.sdk.threads.spawn({
+        projectId: project.projectId,
+        environment: { type: "project-default" },
+        title: `Review #${number} ${title}`.slice(0, 200),
+        prompt: agentReviewPrompt({ url, number, title }),
+      });
+      return { threadId: thread.id, projectId: project.projectId };
+    },
+    mergePullRequest: async ({ environmentId, url }) => {
+      const rows = await bb.sdk.plugins.callRpc({
+        pluginId: PR_STATUS_PLUGIN_ID,
+        method: "pullRequests",
+        input: { keys: [environmentId] },
+        outputSchema: z.record(z.string(), pullRequestStatusRowSchema),
+      });
+      if (mergeEnvironmentOf(url, rows) !== environmentId) throw new Error("This pull request is no longer open on that thread's branch");
+      return bb.sdk.plugins.callRpc({
+        pluginId: PR_STATUS_PLUGIN_ID,
+        method: "merge",
+        input: { environmentId, method: "merge" },
+        outputSchema: z.object({ message: z.string() }),
+      });
+    },
     threadPullRequests: async ({ keys }) => Object.fromEntries(await Promise.all(keys.map(async (threadId) =>
       [threadId, await readSessionPullRequests(threadId)],
     ))),

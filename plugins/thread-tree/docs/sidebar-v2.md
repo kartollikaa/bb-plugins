@@ -191,6 +191,14 @@ and in folder there are gonna be the whole … with nested tree."
   "1 failed · next in 12m").
 - Expanded PR rows: the reason as a tinted icon in the glyph slot, title, repo; number and reason
   in the tooltip. A PR linked to a thread offers "open its thread". Snooze stays.
+- A PR no thread links, in a repo some project uses, offers Agent review: a new thread in that
+  project reviews it without posting or checking out its branch, and the row then offers its
+  thread. A PR GitHub calls ready to merge offers Merge when a thread's environment holds its
+  branch; a toast confirms. Needs you's PR items carry the same button. With the default PR
+  setting neither shows there: linked PRs in the queue need fixes, not a merge or a review.
+- A result to review on a worktree of its own reads its diff: "Finished · +825 −36 · 4 files".
+  A plain checkout or a worktree shared beyond the thread's subtree holds others' work, so it
+  shows none.
 - Paused automations stay behind "N paused", as today.
 
 ### Older threads
@@ -224,8 +232,9 @@ and a user who has it turned on keeps it. Removal is reconsidered after v2 has b
 | Stuck agent | server folds the thread's events (`experimental_thread.events` → `threads.events.list`); last progress is the newest non-bookkeeping event. bb's watchdog event (`system/provider-turn-watchdog`) never appeared in sampled threads and isn't used | Done (S9a) |
 | Step text, turn timer | same fold: `item/started` (bb's labels; a command's first real words), top-level `turn/started`; pushed by keyed RPC `threadSignals` and tag invalidation | Done (S9a) |
 | PR attention on rows | Failing/Conflicts from bb GitHub PR Status and Thread Links; Changes/Ready need GitHub Folder's `attention` joined by URL | Medium |
-| Merge | bb GitHub PR Status merge over plugin RPC (unverified) | Medium |
-| Agent review of an unclaimed PR | `threads.spawn`; repo → project mapping unverified | Medium |
+| Merge | bb GitHub PR Status `merge` over plugin RPC; it merges an environment's current-branch PR, so Merge needs a thread environment whose open PR is this one, and the server re-reads `pullRequests` before merging. Merge commit, as bb's own default | Done (S9b); a live merge not exercised |
+| Agent review of an unclaimed PR | `threads.spawn` with the project's default environment; repo → project by the project's `gitRemoteUrl` (ssh or https), the most recently updated project when several share it | Done (S9b) |
+| Diff stat of a result | bb Git plugin's keyed `status`: the merge base side (committed) plus the working tree (uncommitted), files counted once. Only for a worktree no thread outside the result's subtree uses | Done (S9b) |
 | ⇧⌘I | `app.commands.register` with `defaultShortcut`; free in bb's own keymap (`bb settings keyboard list`), bb leaves colliding plugin defaults unbound | Low |
 | Context-window fill, rate limits | same fold: `thread/contextWindowUsage/updated` (reset by compaction); `provider/error` with category `rate-limit` or HTTP 429 (Codex reports it as a stream disconnect). `provider/rateLimits/updated` (windows, reset times) never appeared in sampled Claude or Codex threads, so reset times aren't shown | Done (S9a) |
 
@@ -256,7 +265,7 @@ the live bb, and is released per [docs/workflow.md](../../../docs/workflow.md).
    with the reason glyph.
 8. **Older threads** fold.
 9. **Later, costlier.** Part a (done): stuck-agent items, step text and turn timer, context and
-   rate-limit signals. Part b: Merge, Agent review, diff stat for results to review.
+   rate-limit signals. Part b (done): Merge, Agent review, diff stat for results to review.
 
 ## Settled questions
 

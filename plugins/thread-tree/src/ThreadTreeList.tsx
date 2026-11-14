@@ -32,6 +32,8 @@ import { cn } from "@/lib/utils";
 import { usePortalScopeProps } from "@/lib/portal-scope";
 import { useTapToOpenMenu } from "./useTapToOpenMenu";
 import { useThreadPullRequests } from "./useThreadPullRequests";
+import { useDiffStats } from "./useDiffStats";
+import { PullRequestActionPill, usePullRequestActions } from "./usePullRequestActions";
 import { excludeDescendantPullRequests, type ThreadPullRequest } from "./threadPullRequests";
 import { folderAttentionByUrl, PR_REASON_LOOK, prTooltip, rowPullRequest, type FolderAttention, type RowPullRequest } from "./prAttention";
 import { providerTintColor } from "./providerTint";
@@ -196,7 +198,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const shownProjectOrder = projectOrder && projectDrag.order;
   const sectionsRef = useRef<HTMLDivElement>(null);
   const prThreads = useMemo(() => pullRequestThreads(activeForest, forest), [activeForest, forest]);
-  const { pullRequestsOf, pullRequestStatesOf, isLoading: pullRequestsLoading } = useThreadPullRequests(prThreads, sectionsRef);
+  const { pullRequestsOf, pullRequestStatesOf, mergeEnvironmentOf, isLoading: pullRequestsLoading } = useThreadPullRequests(prThreads, sectionsRef);
   const draftIds = useSidebarThreadDraftIds();
   const olderShown = useCallback((groupKey: string) => flags.has(`older:${groupKey}`), [flags]);
   const stableOlderIds = useRef<ReadonlySet<string>>(new Set());
@@ -254,6 +256,13 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const automations = useAutomations();
   const signalsOf = useThreadSignals(threads);
   const descendantIdsOf = useCallback((threadId: string) => descendantsOf(activeForest, threadId).map((thread) => thread.id), [activeForest]);
+  const diffStatOf = useDiffStats(threads, descendantIdsOf);
+  const pullRequestActions = usePullRequestActions({
+    repos: useMemo(() => (folderItems ? [...folderItems.items, ...folderItems.snoozed].map((item) => item.pr.repo) : []), [folderItems]),
+    mergeEnvironmentOf,
+    onMerged: githubFolder.refresh,
+    onNavigate,
+  });
   const needsYou = useNeedsYou({
     threads,
     descendantIdsOf,
@@ -265,6 +274,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     pullRequestsSettled: pullRequestSourcesSettled({ threadsStatus: status, folderLoaded: githubFolder.isLoaded, pullRequestsLoading }),
     orchestrationOf,
     signalsOf,
+    diffStatOf,
+    reviewThreadOf: pullRequestActions.startedReviews,
     now,
     activeThreadId: activeThreadId ?? null,
     onNavigate,
@@ -541,6 +552,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           const providerId = threadById.get(threadId)?.providerId;
           return providerId ? <ProviderSlot providerId={providerId} provider={providerById.get(providerId)} style={view.providerIconStyle} /> : null;
         }}
+        renderPullRequestAction={(item) => <PullRequestActionPill pr={item} handlers={pullRequestActions} />}
       />
       {shownSections.map((id, index) => {
         const section = SECTION_BY_ID[id];
@@ -560,6 +572,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
               <GithubSection
                 folder={githubFolder}
                 threadOfPullRequest={needsYou.threadOfPullRequest}
+                pullRequestActions={pullRequestActions}
                 onOpenThread={(threadId, split) => {
                   navigate.toThread(threadId, { split });
                   onNavigate();

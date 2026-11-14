@@ -20,6 +20,7 @@ import { ROW_HOVER_SOLID_BG, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
 import { formatAge } from "./time";
 import { Collapse } from "./Collapse";
 import { pullRequestLook, pullRequestSummary } from "./sectionSummaries";
+import { PullRequestActionIcon, type PullRequestActionHandlers } from "./usePullRequestActions";
 
 const POLL_MS = 60_000;
 
@@ -90,10 +91,12 @@ export function GithubSection({
   onToggleSnoozed,
   folder,
   threadOfPullRequest,
+  pullRequestActions,
   onOpenThread,
 }: {
   folder: GithubFolder;
   threadOfPullRequest: ReadonlyMap<string, string>;
+  pullRequestActions: PullRequestActionHandlers;
   onOpenThread: (threadId: string, split: boolean) => void;
   isCollapsed: boolean;
   onToggle: () => void;
@@ -141,6 +144,13 @@ export function GithubSection({
               key={item.pr.url}
               item={item}
               onOpenThread={threadId ? (split) => onOpenThread(threadId, split) : undefined}
+              action={(className) => (
+                <PullRequestActionIcon
+                  pr={{ url: item.pr.url, number: item.pr.number, title: item.pr.title, repo: item.pr.repo, attention: item.attention, threadId: threadId ?? null }}
+                  handlers={pullRequestActions}
+                  className={className}
+                />
+              )}
               isSnoozed={view.snoozed.includes(item)}
               now={now}
               onHover={() => prefetch(item.pr.url)}
@@ -188,10 +198,13 @@ function PullRequestRow({
   onOpen,
   onOpenOnGithub,
   onOpenThread,
+  action,
   onToggleSnoozed,
 }: {
   item: GithubFolderItem;
   onOpenThread?: (split: boolean) => void;
+  /** Merge or Agent review, drawn with the strip's button class. */
+  action: (className: string) => React.ReactNode;
   isSnoozed: boolean;
   now: number;
   onHover: () => void;
@@ -250,6 +263,7 @@ function PullRequestRow({
             <Icon name="MessageSquare" fallback="ArrowUpRight" aria-hidden className="size-3.5" />
           </button>
         ) : null}
+        {action(STRIP_BUTTON)}
         <button
           type="button"
           aria-label="Open on GitHub"
@@ -278,6 +292,8 @@ function PullRequestRow({
     </div>
   );
 }
+
+const STRIP_BUTTON = "flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground disabled:opacity-60";
 
 const SOURCE_ITEMS: readonly { source: keyof GithubSettings["sources"]; label: string }[] = [
   { source: "review", label: "Review requests" },

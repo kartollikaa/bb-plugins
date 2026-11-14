@@ -27,6 +27,14 @@ as a thread row's PR icon), then the title and repo; the number and reasons are
 in its tooltip. Hover shows "Open its thread" when one of the user's threads
 links the PR (⌘/Ctrl-click opens that thread in a split), Open on GitHub, and
 Snooze. A middle-click on these buttons does nothing, so it never opens GitHub.
+An unclaimed PR whose repo is the remote of a bb project also offers Agent
+review (a robot icon): it starts a thread in that project (the most recently
+updated one when several share the remote) that reviews the PR with `gh`,
+without checking out its branch or posting to GitHub, and opens it; the row then
+offers Open its thread. A PR GitHub calls ready to merge, when it is the open
+current-branch PR of a thread's environment, offers Merge instead: a toast asks
+to confirm, then bb's GitHub PR Status merges it with a merge commit. The
+server refuses when that environment's PR is no longer this one.
 Paused automations stay behind "N paused".
 
 Needs you sits above the sections in an amber card and hides when nothing
@@ -39,7 +47,13 @@ changes requested (ready to merge stays a row icon); then enabled automations
 whose last run failed. Each item is two lines, title then reason; a subthread's
 reason names its orchestration. Clicking an item opens its thread; a PR with no
 thread opens GitHub Folder's PR page, an automation with no run the Automations
-page. A failed turn offers Retry, a failed queued message Resend. A failed
+page. A result on a worktree of its own (no thread outside its subtree
+uses it) shows its diff instead of "review the result": "Finished · +825 −36 ·
+4 files", the branch's commits since its merge base plus uncommitted work, read
+from bb's Git plugin. A plain checkout or a shared worktree holds other threads'
+work, so it shows no diff. PR items carry the same Merge or Review button as
+the Pull requests section; with the default PR setting neither applies, since
+those PRs are linked and need fixes, not a merge. A failed turn offers Retry, a failed queued message Resend. A failed
 turn's reason adds "rate limit" when the turn hit one, or "failed N times in a row" once failures repeat without a completed turn between. A thread is stuck
 when its turn has gone a long time without progress (one threshold for every thread, orchestrator or subthread): no step, output or report in its event log. A command or tool call still running counts as work, so an agent waiting on a long test run or `bb thread wait` is not stuck; the Running list shows that step and its timer.
 A thread waiting on the user is a question instead, and a turn that ended is
