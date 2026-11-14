@@ -101,7 +101,6 @@ export function isSearchKey(event: SearchKeyEvent): boolean {
   return event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !event.defaultPrevented && !event.isComposing && !event.typing && !event.modalOpen;
 }
 
-/** What just closed: a status filter's flat list, or the search box. */
 export type ClosedView = { filter: StatusFilter } | { search: true };
 
 export type CloseReason = "blur" | "action";
