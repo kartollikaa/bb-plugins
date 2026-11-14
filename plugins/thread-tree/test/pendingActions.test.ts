@@ -51,3 +51,11 @@ test("an expired call that settles late doesn't free the newer run of the same a
   stale();
   assert.equal(pending.has("retry:t1"), true);
 });
+
+test("a timer that fires at once frees the button instead of throwing", () => {
+  const pending = createPendingActions({ setTimer: (run) => { run(); return 1; }, clearTimer: () => undefined });
+  const release = pending.begin("retry:t1");
+  assert.ok(release);
+  release();
+  assert.equal(pending.has("retry:t1"), false);
+});

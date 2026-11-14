@@ -18,24 +18,25 @@ export function createPendingActions({
   setTimer = (run, ms) => setTimeout(run, ms) as unknown as number,
   clearTimer = (id) => clearTimeout(id),
 }: PendingActionTimers = {}): PendingActions {
-  const timers = new Map<string, number>();
+  const runs = new Map<string, { timer?: number }>();
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((listener) => listener());
-  const end = (key: string, timer: number) => {
-    if (timers.get(key) !== timer) return;
-    timers.delete(key);
-    clearTimer(timer);
+  const end = (key: string, run: { timer?: number }) => {
+    if (runs.get(key) !== run) return;
+    runs.delete(key);
+    if (run.timer !== undefined) clearTimer(run.timer);
     notify();
   };
   return {
     begin(key) {
-      if (timers.has(key)) return null;
-      const timer = setTimer(() => end(key, timer), expireMs);
-      timers.set(key, timer);
+      if (runs.has(key)) return null;
+      const run: { timer?: number } = {};
+      runs.set(key, run);
       notify();
-      return () => end(key, timer);
+      run.timer = setTimer(() => end(key, run), expireMs);
+      return () => end(key, run);
     },
-    has: (key) => timers.has(key),
+    has: (key) => runs.has(key),
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
