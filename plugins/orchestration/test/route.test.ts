@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatPreference, viewEnabled, clampRailWidth, railMode, railOpen, RAIL, shouldOpenView, threadFromSubPath, VIEW_PATH, type PreferenceStorage } from "../src/route.ts";
+import { chatPlacement, chatPreference, dockHeight, DOCK, viewEnabled, clampRailWidth, railMode, railOpen, RAIL, shouldOpenView, threadFromSubPath, VIEW_PATH, type PreferenceStorage } from "../src/route.ts";
 
 test("the view's subPath is the thread id", () => {
   assert.equal(VIEW_PATH, "orchestrator");
@@ -97,4 +97,20 @@ test("the orchestration view switch is on unless the setting says false", () => 
 
 test("with the switch off, an orchestrator thread stays in bb's thread view", () => {
   assert.equal(shouldOpenView({ enabled: false, membership: true, prefersChat: false, inSplit: false, decided: false }), false);
+});
+
+test("the chat shows its composer in exactly one place: the rail or sheet when open, docked under the view when not", () => {
+  assert.equal(chatPlacement("rail", true), "rail");
+  assert.equal(chatPlacement("rail", false), "docked");
+  assert.equal(chatPlacement("drawer", true), "sheet");
+  assert.equal(chatPlacement("drawer", false), "docked");
+});
+
+test("the dock is as tall as bb's composer, with a fallback before it is measured and a cap at half the page", () => {
+  assert.equal(dockHeight(117, 900), 117);
+  assert.equal(dockHeight(null, 900), DOCK.fallback);
+  assert.equal(dockHeight(0, 900), DOCK.fallback);
+  assert.equal(dockHeight(Number.NaN, 900), DOCK.fallback);
+  assert.equal(dockHeight(700, 900), 450);
+  assert.equal(dockHeight(117.4, 900), 118);
 });

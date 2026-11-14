@@ -81,3 +81,18 @@ export interface RailChoice {
 export function railOpen(choice: RailChoice | null, key: string, mode: RailMode): boolean {
   return choice?.key === key ? choice.open : mode === "rail";
 }
+
+export type ChatPlacement = "rail" | "sheet" | "docked";
+
+/** A folded chat docks its composer under the view, so the composer is never shown twice. */
+export function chatPlacement(mode: RailMode, open: boolean): ChatPlacement {
+  if (!open) return "docked";
+  return mode === "rail" ? "rail" : "sheet";
+}
+
+export const DOCK = { fallback: 120 } as const;
+
+export function dockHeight(measured: number | null, pageHeight: number): number {
+  const height = measured && Number.isFinite(measured) && measured > 0 ? Math.ceil(measured) : DOCK.fallback;
+  return Math.min(height, Math.floor(pageHeight / 2));
+}
