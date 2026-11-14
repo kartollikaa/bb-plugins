@@ -12,6 +12,7 @@ import {
 } from "./src/automations";
 import {
   GITHUB_FOLDER_PLUGIN_ID,
+  githubFolderAbsent,
   githubFolderViewSchema,
   githubSettingsPatchSchema,
 } from "./src/githubFolder";
@@ -46,8 +47,8 @@ export const rpcContract = defineRpcContract({
   },
   githubFolder: {
     input: z.object({ refresh: z.boolean() }),
-    /** Null view when the GitHub Folder plugin is not installed, off or unreachable. */
-    output: z.object({ view: githubFolderViewSchema.nullable() }),
+    /** Null view when the GitHub Folder plugin is not installed; `failed` when a read failed and the view is unknown. */
+    output: z.object({ view: githubFolderViewSchema.nullable(), failed: z.literal(true).optional() }),
   },
   githubFolderUpdate: {
     input: githubSettingsPatchSchema,
@@ -138,8 +139,8 @@ export default async function plugin(bb: BbPluginApi) {
     githubFolder: async ({ refresh }) => {
       try {
         return { view: await callGithubFolder(refresh ? "refresh" : "folder", null, githubFolderViewSchema) };
-      } catch {
-        return { view: null };
+      } catch (error) {
+        return githubFolderAbsent(error) ? { view: null } : { view: null, failed: true as const };
       }
     },
     githubFolderUpdate: (patch) => callGithubFolder("updateSettings", patch, ok),

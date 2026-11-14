@@ -62,3 +62,11 @@ export function githubFolderPrPath(url: string): string | null {
   const match = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/.exec(url);
   return match ? `/plugins/github-folder/pr/${match[1]}/${match[2]}/${match[3]}` : null;
 }
+
+const ABSENT_CODES = new Set(["not_found", "unknown_method"]);
+
+/** Not installed or without the method; any other failure is transient and must not read as an empty folder. */
+export function githubFolderAbsent(error: unknown): boolean {
+  const code = error && typeof error === "object" && "code" in error ? (error as { code: unknown }).code : null;
+  return typeof code === "string" && ABSENT_CODES.has(code);
+}

@@ -43,7 +43,9 @@ export function useGithubFolder() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const load = useCallback(
     (refresh: boolean) =>
-      rpc.call("githubFolder", { refresh }).then(setState, () => setState((previous) => previous ?? { view: null })),
+      rpc.call("githubFolder", { refresh }).then(({ view, failed }) => {
+        if (!failed) setState({ view });
+      }, () => undefined),
     [rpc],
   );
   useEffect(() => {
