@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon } from "@/components/ui/icon";
 import { failedQueuedMessage } from "./needsYou";
+import { createPendingActions } from "./pendingActions";
+
+const pendingActions = createPendingActions();
 
 /** Re-submits the failed turn, the same as bb's own Retry in the thread. */
 export function RetryButton({ threadId }: { threadId: string }) {
@@ -10,6 +13,7 @@ export function RetryButton({ threadId }: { threadId: string }) {
   return (
     <FailurePill
       label="Retry"
+      pendingKey={`retry:${threadId}`}
       ariaLabel="Retry the failed turn"
       icon="RotateCcw"
       errorTitle="Retry failed"
@@ -24,6 +28,7 @@ export function ResendButton({ threadId }: { threadId: string }) {
   return (
     <FailurePill
       label="Resend"
+      pendingKey={`resend:${threadId}`}
       ariaLabel="Resend the failed queued message"
       icon="Send"
       errorTitle="Resend failed"
@@ -36,21 +41,21 @@ export function ResendButton({ threadId }: { threadId: string }) {
   );
 }
 
-function FailurePill({ label, ariaLabel, icon, errorTitle, run }: { label: string; ariaLabel: string; icon: string; errorTitle: string; run: () => Promise<unknown> }) {
-  const [pending, setPending] = useState(false);
+function FailurePill({ label, pendingKey, ariaLabel, icon, errorTitle, run }: { label: string; pendingKey: string; ariaLabel: string; icon: string; errorTitle: string; run: () => Promise<unknown> }) {
+  const pending = useSyncExternalStore(pendingActions.subscribe, () => pendingActions.has(pendingKey));
   return (
     <button
       type="button"
       disabled={pending}
       onClick={async (event) => {
         event.stopPropagation();
-        setPending(true);
+        if (!pendingActions.begin(pendingKey)) return;
         try {
           await run();
         } catch (error) {
           toast.error(errorTitle, { description: error instanceof Error ? error.message : String(error) });
         } finally {
-          setPending(false);
+          pendingActions.end(pendingKey);
         }
       }}
       aria-label={ariaLabel}
