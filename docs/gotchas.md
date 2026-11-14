@@ -55,8 +55,9 @@ can find it by the error text.
 - **A thread-header control can only be a labelled button.** `experimental_threadAction` with
   `placement: "header"` renders an outline button showing `label` only (no icon, no `detail`, no
   switch), after the workspace's Open button, and folds into the thread menu at compact width.
-- **A thread action's `threadIds` can hold an empty string.** Filter it to real thread ids before
-  a keyed RPC whose input demands non-empty keys: one bad key fails the whole batch's validation.
+- **One bad key fails every keyed read of that method.** `experimental_useRpcKeyedQuery` shares one
+  key set per method across all callers and refetches them together, so a key the RPC's input rejects
+  (an empty thread id) breaks every lookup. Filter keys to real ids at each call site.
 - **Filling a composer without sending:** `useComposers()` lists composer handles; pick the one with
   `scope.kind === "thread"` and the thread's id, then `replace`/`insert` and `focus()`. Never `submit()`.
 - **A thread's context card collapses while the side panel is open**, so a probe for a
