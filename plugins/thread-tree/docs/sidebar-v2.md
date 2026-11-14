@@ -182,7 +182,8 @@ and in folder there are gonna be the whole … with nested tree."
 - Expanded, the subthreads are the progress. Folded, the parent's glyph rolls up the most urgent
   state in its subtree, subthreads that need input or are open still peek out (as today), and the
   fold line counts the subtree by state. A small segmented bar joins the fold line only from five
-  subthreads up. A finished folded orchestrator's fold line offers Archive.
+  subthreads up and only when they are split across states: a one-colour bar (all done) read as a
+  stray grey stripe and repeated the count. A finished folded orchestrator's fold line offers Archive.
 - Rejected: a bar on the row, a ring around the status glyph, progress in a subtitle.
 
 ### Pull requests and Automations sections

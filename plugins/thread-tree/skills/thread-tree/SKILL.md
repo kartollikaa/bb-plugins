@@ -133,8 +133,8 @@ and in the archived view.
 
 A folded parent's glyph shows its subtree's state when that is more urgent than
 its own. Its label names both, as in "Last turn failed; subthread needs input". The fold line counts the
-subtree by state, with finished-unread threads as "to review"; a bigger subtree
-also gets a small bar with the same split. When the parent and every subthread
+subtree by state, with finished-unread threads as "to review"; a subtree of five
+or more split across several states also gets a small bar with that split. When the parent and every subthread
 are done and read, the fold line says "all done" and offers Archive. Archive
 runs bb's own Archive action, so bb's confirmation setting and Undo apply. A
 thread whose worktree has uncommitted or untracked changes, or whose git status

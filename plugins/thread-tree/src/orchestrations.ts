@@ -20,9 +20,12 @@ export function isFinishedFold(own: FoldState, counts: FoldCounts): boolean {
 
 export const FOLD_BAR_MIN_SUBTHREADS = 5;
 
+/** Empty unless the subtree is big and split across states: a one-colour bar says nothing the count doesn't. */
 export function foldBarSegments(counts: FoldCounts, total: number): { state: FoldState; fraction: number }[] {
   if (total < FOLD_BAR_MIN_SUBTHREADS) return [];
-  return FOLD_PRIORITY.filter((state) => (counts[state] ?? 0) > 0).map((state) => ({ state, fraction: counts[state]! / total }));
+  const present = FOLD_PRIORITY.filter((state) => (counts[state] ?? 0) > 0);
+  if (present.length < 2) return [];
+  return present.map((state) => ({ state, fraction: counts[state]! / total }));
 }
 
 export interface Orchestration<T extends TreeThread> {

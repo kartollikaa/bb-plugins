@@ -64,8 +64,10 @@ test("a fold is finished when the parent and every subthread are done and read",
   assert.equal(isFinishedFold("done", {}), false);
 });
 
-test("the fold bar shows only from five subthreads, segments sized by state, most urgent first", () => {
+test("the fold bar shows only from five subthreads split across states, segments sized by state, most urgent first", () => {
   assert.deepEqual(foldBarSegments({ running: 2, done: 2 }, 4), []);
+  assert.deepEqual(foldBarSegments({ done: 11 }, 11), []);
+  assert.deepEqual(foldBarSegments({ running: 6 }, 6), []);
   assert.deepEqual(foldBarSegments({ done: 3, input: 1, running: 1 }, 5), [
     { state: "input", fraction: 0.2 },
     { state: "running", fraction: 0.2 },
