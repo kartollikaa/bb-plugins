@@ -7,14 +7,14 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { contract, type Agent, type LedgerSummary, type Snapshot } from "./src/contract.ts";
 import { summarizeExport } from "./src/ledger.ts";
 import { exportScriptCandidates, ledgerFor, scanLedgers, type LedgerFile } from "./src/locate.ts";
-import { quickReplies, REPLY_MODE, replySender } from "./src/reply.ts";
+import { quickReplies, REPLY_MODE, replySender, toDelivery } from "./src/reply.ts";
 
 const run = promisify(execFile);
 const SCAN_TTL_MS = 10_000;
 const AGENT_TTL_MS = 15_000;
 const FINISHED_AGENT_TTL_MS = 10 * 60_000;
 const OUTPUT_LIMIT = 1_200;
-const REPLY_DEDUPE_MS = 10 * 60_000;
+const REPLY_DEDUPE_MS = 5_000;
 const FINISHED_STATUSES = new Set(["landed", "verified", "dropped"]);
 const LIVE_STATUSES = new Set(["working", "briefed", "question", "delivered", "gate", "ready", "card"]);
 
@@ -138,7 +138,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   const sendReply = replySender(async (threadId, text) => {
     const result = await bb.sdk.threads.send({ threadId, input: [{ type: "text", text, mentions: [] }], mode: REPLY_MODE });
-    return result.delivery;
+    return toDelivery(result.delivery);
   }, { windowMs: REPLY_DEDUPE_MS, now: Date.now });
 
   async function reply(threadId: string, text: string) {

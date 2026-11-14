@@ -2,21 +2,15 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, typ
 import { experimental_useRpcMutation, Markdown, UrlLink, useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { contract } from "./contract.ts";
-import { createReplyTracker, type ReplyState } from "./reply.ts";
+import { createReplyTracker, replyKey, type ReplyState } from "./reply.ts";
 import { askIdentity, type Ask, type Row, type RowKind, type View } from "./view.ts";
 import { useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
+import { localStore } from "./storage.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-const replies = createReplyTracker(storage());
+const replies = createReplyTracker(localStore());
+const replyKeyOf = (ask: Ask) => replyKey(ask.title ?? "", ask.replies.map((r) => r.label));
 
 /** Puts text into the orchestrator's composer and focuses it; never sends. Keeps a draft the owner already started. */
 function fillComposer(composers: readonly PluginComposerApi[], threadId: string, text: string): boolean {
@@ -104,13 +98,14 @@ const linkButton = "block h-[26px] max-w-full truncate whitespace-nowrap leading
 
 function replyStatus(state: ReplyState): string {
   if (state.kind === "sending") return `Sending «${state.option}»…`;
+  if (state.delivery === "already") return `«${state.option}» was already sent to the orchestrator`;
   return state.delivery === "queued" ? `Sent «${state.option}», queued until the orchestrator's turn ends` : `Sent «${state.option}» to the orchestrator`;
 }
 
 function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
   const sent = actions.sent === askIdentity(ask);
   const id = askIdentity(ask);
-  const replied = actions.replyState(id);
+  const replied = ask.replies.length ? actions.replyState(replyKeyOf(ask)) : null;
   const threads = threadId ? [threadId] : ask.threads;
   const answerable = (ask.kind === "question" || ask.kind === "owner") && ask.drafts;
   return (
@@ -138,7 +133,7 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
           </>
         ) : answerable ? (
           <>
-            {ask.replies.map((r, i) => <Button key={i} variant={i === 0 ? "primary" : "outline"} onClick={() => actions.reply(id, r.label, r.draft)}>{r.label}</Button>)}
+            {ask.replies.map((r, i) => <Button key={i} variant={i === 0 ? "primary" : "outline"} onClick={() => actions.reply(replyKeyOf(ask), r.label, r.draft)}>{r.label}</Button>)}
             <Button variant={ask.replies.length ? "quiet" : "primary"} onClick={() => actions.fill(id, ask.drafts!.primary)}>{ask.replies.length ? "Other answer" : "Answer"}</Button>
           </>
         ) : null}
@@ -279,7 +274,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   const [showAllAsks, setShowAllAsks] = useState(false);
   const replyMutation = experimental_useRpcMutation({ contract, method: "reply" });
   useSyncExternalStore(replies.subscribe, replies.version);
-  const liveAsks = state.kind === "ready" ? state.view.asks.map(askIdentity) : null;
+  const liveAsks = state.kind === "ready" ? state.view.asks.filter((ask) => ask.replies.length).map(replyKeyOf) : null;
   const liveKey = liveAsks?.join("\u0001") ?? null;
   useEffect(() => {
     if (liveAsks) replies.prune(threadId, liveAsks);
@@ -289,11 +284,12 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
     sent,
     replyState: (key) => replies.get(threadId, key),
     reply(key, label, text) {
-      if (!replies.begin(threadId, key, label)) return;
+      const token = replies.begin(threadId, key, label);
+      if (token === null) return;
       replyMutation.mutate({ threadId, text }).then(
-        ({ delivery }) => replies.done(threadId, key, delivery),
+        ({ delivery }) => replies.done(threadId, key, token, delivery),
         (error: unknown) => {
-          replies.fail(threadId, key);
+          replies.fail(threadId, key, token);
           toast.error(`Couldn't send «${label}»`, { description: error instanceof Error ? error.message : String(error) });
         },
       );

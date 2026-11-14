@@ -45,8 +45,9 @@ A quick-reply option button sends `Re «<title>»: <option>` to the orchestrator
 per click, with `queue-if-active`: mid-turn it waits in bb's queue. The server sends only texts the
 ledger's current asks offer, and only to the thread the ledger names as orchestrator. Owner, on the
 change: «when I click on the button on the suggestion it just puts the text in the chat. I suggest
-that it should send the message by itself». The card reads Sent until the ask leaves the ledger, so
-drop an answered ask from «For the owner». Answer, Other answer, Release and Not yet only put a draft
+that it should send the message by itself». The card reads Sent until an ask with that title and
+those options leaves the ledger, so drop an answered ask from «For the owner»; to ask again later,
+re-add it after it has been gone for a snapshot, or reword it. Answer, Other answer, Release and Not yet only put a draft
 into the orchestrator's composer and focus it, wherever the composer currently is (rail, sheet or
 dock); they never send. Keep ledger statuses and «For the owner» current: the tab reads nothing else.
 

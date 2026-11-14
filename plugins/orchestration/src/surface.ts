@@ -3,16 +3,9 @@ import { experimental_useRpcMutation, useBbNavigate, useSettings } from "@get-bb
 import { contract } from "./contract.ts";
 import { chatPreference, viewEnabled, VIEW_PATH } from "./route.ts";
 import { pendingSwitch } from "./switch.ts";
+import { localStore } from "./storage.ts";
 
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-export const surfacePreference = () => chatPreference(storage());
+export const surfacePreference = () => chatPreference(localStore());
 
 export function useOpenChat() {
   const navigate = useBbNavigate();

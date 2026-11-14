@@ -4,6 +4,7 @@ import { Button, Message, OrchestrationTab } from "./OrchestrationTab.tsx";
 import { chatPlacement, clampRailWidth, dockHeight, RAIL, railMode, railOpen, threadFromSubPath, type ChatPlacement, type RailChoice, type RailMode } from "./route.ts";
 import { useOrchestratorMembership } from "./useOrchestration.ts";
 import { useOpenChat, useViewSwitch } from "./surface.ts";
+import { localStore } from "./storage.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 const WIDTH_KEY = "orchestration.railWidth";
@@ -38,17 +39,9 @@ const rail = (() => {
 
 const useRailOpen = () => useSyncExternalStore(rail.subscribe, rail.get, rail.get);
 
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
 function readWidth(): number {
   try {
-    return Number(storage()?.getItem(WIDTH_KEY) ?? RAIL.default);
+    return Number(localStore()?.getItem(WIDTH_KEY) ?? RAIL.default);
   } catch {
     return RAIL.default;
   }
@@ -252,7 +245,7 @@ function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDock
     const next = clampRailWidth(w, pageWidth);
     setSaved(next);
     try {
-      storage()?.setItem(WIDTH_KEY, String(next));
+      localStore()?.setItem(WIDTH_KEY, String(next));
     } catch {
       // Width just isn't remembered.
     }
