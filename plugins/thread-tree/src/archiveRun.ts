@@ -1,5 +1,5 @@
 export type ArchiveLanding = "archived" | "cancelled" | "stopped" | "timeout";
-export type ArchiveRunStop = Exclude<ArchiveLanding, "archived"> | "unavailable" | "busy";
+export type ArchiveRunStop = Exclude<ArchiveLanding, "archived"> | "unavailable" | "busy" | "error";
 
 export interface ArchiveRunResult {
   archived: string[];
@@ -8,6 +8,7 @@ export interface ArchiveRunResult {
   /** Roots skipped because their worktrees couldn't be checked again. */
   unchecked: string[];
   stop: ArchiveRunStop | null;
+  error?: string;
 }
 
 /** Runs bb's Archive on each root in turn; a root left unarchived means the user cancelled bb's confirmation, so the rest aren't asked. */
@@ -28,25 +29,33 @@ export async function archiveInTurn(
   const archived: string[] = [];
   const changed: string[] = [];
   const unchecked: string[] = [];
-  for (const id of rootIds) {
-    if (signal?.aborted) return { archived, changed, unchecked, stop: "stopped" };
-    const clean = await isStillClean(id).catch(() => null);
-    if (clean === null) {
-      unchecked.push(id);
-      continue;
-    }
-    if (!clean) {
-      changed.push(id);
-      continue;
-    }
-    const run = actionOf(id);
-    if (!run) return { archived, changed, unchecked, stop: "unavailable" };
-    await run();
-    const landing = await landed(id);
-    if (landing !== "archived") return { archived, changed, unchecked, stop: landing };
-    archived.push(id);
+  try {
+    return await archiveEach();
+  } catch (error) {
+    return { archived, changed, unchecked, stop: "error", error: error instanceof Error ? error.message : String(error) };
   }
-  return { archived, changed, unchecked, stop: null };
+
+  async function archiveEach(): Promise<ArchiveRunResult> {
+    for (const id of rootIds) {
+      if (signal?.aborted) return { archived, changed, unchecked, stop: "stopped" };
+      const clean = await isStillClean(id).catch(() => null);
+      if (clean === null) {
+        unchecked.push(id);
+        continue;
+      }
+      if (!clean) {
+        changed.push(id);
+        continue;
+      }
+      const run = actionOf(id);
+      if (!run) return { archived, changed, unchecked, stop: "unavailable" };
+      await run();
+      const landing = await landed(id);
+      if (landing !== "archived") return { archived, changed, unchecked, stop: landing };
+      archived.push(id);
+    }
+    return { archived, changed, unchecked, stop: null };
+  }
 }
 
 /** How long an archive may take to land once no dialog is open; a large cascade can take seconds to record. */
@@ -119,6 +128,7 @@ export function foldArchiveOutcome({
   changed,
   unchecked = 0,
   stop,
+  error,
 }: {
   archived: number;
   skipped: number;
@@ -126,10 +136,11 @@ export function foldArchiveOutcome({
   changed: number;
   unchecked?: number;
   stop: ArchiveRunStop | null;
+  error?: string;
 }): FoldArchiveOutcome | null {
   if (stop === "busy") return { tone: "info", title: "Another fold is still archiving" };
-  const reason = stop ? STOP_REASON[stop] : undefined;
-  if (reason) return { tone: stop === "unavailable" ? "error" : "warning", title: archived > 0 ? `Archived ${plural(archived, "thread")}` : "Archive stopped", description: reason };
+  const reason = stop === "error" ? `Archiving failed: ${error ?? "unknown error"}` : stop ? STOP_REASON[stop] : undefined;
+  if (reason) return { tone: stop === "unavailable" || stop === "error" ? "error" : "warning", title: archived > 0 ? `Archived ${plural(archived, "thread")}` : "Archive stopped", description: reason };
   const parts = [skippedSummary({ skipped, kept }), changed > 0 ? `Skipped ${plural(changed, "thread")} that got changes since` : null,
     unchecked > 0 ? `Skipped ${plural(unchecked, "thread")} whose worktrees couldn't be checked` : null,
   ];

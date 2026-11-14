@@ -157,6 +157,23 @@ test("a dialog that holds the sidebar itself, the compact-width drawer, is not b
   assert.equal(dialogOutsideSidebar([], sidebar), false);
 });
 
+test("a run that throws after a root archived keeps what it did and says it failed", async () => {
+  const result = await archiveInTurn(["a", "b", "c"], {
+    actionOf: () => async () => undefined,
+    isStillClean: async (id) => id !== "b",
+    landed: async (id) => {
+      if (id === "c") throw new Error("server gone");
+      return "archived";
+    },
+  });
+  assert.deepEqual(result, { archived: ["a"], changed: ["b"], unchecked: [], stop: "error", error: "server gone" });
+  assert.deepEqual(foldArchiveOutcome({ archived: 1, skipped: 0, kept: 0, changed: 1, unchecked: 0, stop: "error", error: "server gone" }), {
+    tone: "error",
+    title: "Archived 1 thread",
+    description: "Archiving failed: server gone",
+  });
+});
+
 test("a worktree check that fails skips the root as unchecked, not as changed", async () => {
   const result = await archiveInTurn(["a", "b"], {
     actionOf: () => async () => undefined,

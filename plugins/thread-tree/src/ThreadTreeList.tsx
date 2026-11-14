@@ -1430,7 +1430,7 @@ async function prepareFoldArchive(
         if (claimId !== null) await rpc.call("archiveRelease", { claimId }).catch(() => undefined);
       }
       const threadCount = (roots: readonly string[]) => new Set(roots.flatMap((id) => scopes.get(id) ?? [id])).size;
-      const outcome = foldArchiveOutcome({ archived: threadCount(result.archived), skipped: plan.skipped, kept: plan.kept, changed: threadCount(result.changed), unchecked: threadCount(result.unchecked), stop: result.stop });
+      const outcome = foldArchiveOutcome({ archived: threadCount(result.archived), skipped: plan.skipped, kept: plan.kept, changed: threadCount(result.changed), unchecked: threadCount(result.unchecked), stop: result.stop, error: result.error });
       if (outcome) toast[outcome.tone](outcome.title, { description: outcome.description });
     },
   };
@@ -1476,7 +1476,6 @@ function BbArchiveRun({ job, sidebarRef }: { job: BbArchiveJob; sidebarRef: Reac
       });
     };
     archiveInTurn(job.targets.map((target) => target.id), { actionOf: (id) => actions.current.get(id), isStillClean: job.isStillClean, landed, signal })
-      .catch((): ArchiveRunResult => ({ archived: [], changed: [], unchecked: [], stop: "stopped" }))
       .then((result) => {
         toast.dismiss(ARCHIVE_WAIT_TOAST_ID);
         job.finish(result);
