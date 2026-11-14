@@ -16,6 +16,7 @@ Plugins for [bb](https://getbb.app), each in its own folder with its own README.
 | [thread-switcher](plugins/thread-switcher) | Control+Tab through recent threads in a row of cards that preview each chat, with status, project, branch and a subthread recap; threads that need you come first. The hotkey, card count and order are settings. |
 | [task-stop](plugins/task-stop) | A stop button on each running background command and background agent in the card above the composer, so one task stops without interrupting the turn. |
 | [kaiten](plugins/kaiten) | The Kaiten sprint board as a bb page; a click on a card starts a thread that works it. |
+| [orchestration](plugins/orchestration) | An Orchestration tab on an orchestrator's thread: what needs you and whether the team is moving, from the orchestrate ledger and bb's live thread state. |
 
 Marketplace listings, release tags and submission/update PRs for every plugin:
 [Publication status](docs/publication.md).

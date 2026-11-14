@@ -45,6 +45,12 @@ can find it by the error text.
 - **Icon names outside bb's set render as a Zap.** `experimental_Icon` falls back silently for an
   unknown Lucide name (`Sparkles`, `RefreshCw` did). Declare the glyph under
   `bb.branding.experimental_icons` and reference it as `"<plugin-id>/<name>"`.
+  `bb.branding.icon` itself can't take that namespaced name (the reload fails); give it the SVG path.
+- **Filling a composer without sending:** `useComposers()` lists composer handles; pick the one with
+  `scope.kind === "thread"` and the thread's id, then `replace`/`insert` and `focus()`. Never `submit()`.
+- **A thread's context card collapses while the side panel is open**, so a probe for a
+  `threadContextCardRow` finds nothing then. Close the panel first; a fixed tab's button is labelled
+  `Show <title> panel`.
 - **Claude's frames API answers 404 without Claude Code's headers.** `GET /api/frame/frames` with a
   valid OAuth token still needs `X-Frame-CP`, `X-Frame-Surface`, `X-Frame-Platform`,
   `X-Frame-Client-Version` and the `application/vnd.ant.frame-refusal+json` Accept type.

@@ -25,6 +25,7 @@ distribution, not community publication. Recheck these sources before acting on 
 | [mouse-pet](../plugins/mouse-pet) | No public tag | Not submitted | No live listing | None |
 | [kaiten](../plugins/kaiten) | No public tag | Not submitted | No live listing | None |
 | [power-pill](../plugins/power-pill) | No public tag | Not submitted | No live listing | None |
+| [orchestration](../plugins/orchestration) | No public tag | Not submitted | No live listing | None |
 
 All tagged plugins above are also in the self-hosted [catalog](../marketplace.json). The untagged
 plugins are local entries in [.bb/plugins.json](../.bb/plugins.json).

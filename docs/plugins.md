@@ -229,6 +229,21 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   card prompt). Run `npm run typecheck`.
 - MIT. Not released yet; not in `marketplace.json`.
 
+## orchestration — `plugins/orchestration/`
+
+- **What:** a fixed side-panel tab, Orchestration, and a context-card row, both only on a thread
+  that an orchestrate ledger's first line names. One status sentence, a card per thing that needs the
+  owner, the team as one row per subtask, and a goal/history fold. Answer and Release only fill the
+  orchestrator's composer.
+- **How:** the server scans `~/.claude/projects/*/orchestrate/*.md` first lines, runs orchestrate's
+  `orchestration_ledger.py export` (setting `exportScript`, else the plugin cache, newest first) and
+  adds per-agent model, effort, context and last output from `threads.*`. The app merges that with
+  `experimental_useSidebarThreads()`; `src/view.ts` is the pure view model (needs you, stuck, done).
+- **Agent skill:** `skills/orchestration/`.
+- **Tests:** `npm test` covers `test/*.test.ts` (ledger export summary, ledger lookup, view model and
+  both stuck thresholds). Run `npm run typecheck`.
+- MIT. Not released yet; not in `marketplace.json`.
+
 ## Retired repos
 
 Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on
