@@ -1,6 +1,6 @@
 ---
 name: orchestration
-description: Explains the Orchestration view an orchestrator thread opens on (chat in a side rail, Full chat to go back), the Orchestration tab and context-card row, what makes a subtask "needs you" or "stuck", and the exportScript setting. Use when the user asks about that view or tab, why a thread opens on it or doesn't, or why it shows a subtask as stuck.
+description: Explains the Orchestration view an orchestrator thread opens on (chat in a side rail, Full chat to go back), the Orchestration tab and context-card row, what makes a subtask "needs you" or "stuck", the Orchestration view switch and its orchestrationView setting, and the exportScript setting. Use when the user asks about that view, switch or tab, why a thread opens on it or doesn't, or why it shows a subtask as stuck.
 ---
 
 # Orchestration
@@ -22,6 +22,10 @@ several name the thread, the newest wins.
 - **Chat** in the view's title bar shows or hides the rail. On a narrow page the rail is a drawer;
   Esc closes it. The rail's width can be dragged and is remembered.
 - The view for a thread no ledger names says so and offers **Open chat**.
+- **Orchestration view** switch, last in the view's title bar: off goes to bb's thread view and
+  stops the redirect for all orchestrators. bb's thread header shows an **Orchestration view** button
+  in the same place (bb renders header actions as labelled buttons, not switches; at compact width
+  it folds into the thread menu); it turns the setting back on and opens the view.
 
 ## What it shows
 
@@ -37,7 +41,16 @@ several name the thread, the newest wins.
 The Answer, Release and Not yet buttons only put a draft into the orchestrator's composer and focus
 it; on the view they open the rail first. They never send. Keep ledger statuses and «For the owner» current: the tab reads nothing else.
 
-## Setting
+## Settings
+
+`orchestrationView` (boolean, default on): whether an orchestrator's thread opens on the view. The
+title-bar switch and the thread-header button write this same setting; it is global, not per thread.
+**Full chat** is the per-thread choice and lives in the client's browser storage.
+
+```sh
+bb plugin config orchestration set orchestrationView false
+bb plugin config orchestration unset orchestrationView
+```
 
 `exportScript`: path to orchestrate's `scripts/orchestration_ledger.py`. Empty means auto-discovery
 in `~/.claude/plugins/cache/*/orchestrate/<version>/scripts/`, newest first. Only orchestrate versions that ship the `export` command work. A failed export is

@@ -31,7 +31,7 @@ export default async function plugin(bb: BbPluginApi) {
     orchestrationView: {
       type: "boolean",
       label: "Open orchestrators on the Orchestration view",
-      description: "On: an orchestrator's thread opens on the Orchestration view with its chat in a side rail. Off: it opens in bb's normal thread view. The switch in the view's corner changes this setting.",
+      description: "On: an orchestrator's thread opens on the Orchestration view with its chat in a side rail. Off: it opens in bb's normal thread view. The Orchestration view switch in the title bar changes this setting.",
       default: true,
     },
   });

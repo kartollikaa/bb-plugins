@@ -4,7 +4,8 @@ one question: does anything need you, and is the team moving?
 ## What you get
 
 - The orchestrator's thread opens on this view, with its chat in a rail you can fold away. Full chat
-  takes you back to the normal thread view and remembers that for the thread.
+  takes you back to the normal thread view and remembers that for the thread. The Orchestration view
+  switch in the title bar (also in plugin settings) turns the view off or on for every orchestrator.
 - One status sentence on top: "Nothing needs you", "One decision for you", or "S5 has gone quiet".
 - A card for each thing that waits on you: a subtask's question, a delivery ready to land, a pending
   approval, a line the ledger keeps for the owner. Answer and Release start a reply in the
