@@ -286,7 +286,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     const onKeyDown = (event: KeyboardEvent) => {
       const sidebar = sectionsRef.current;
       handleSearchKey(event, {
-        modalOpen: () => (!!sidebar && sidebarBehindModal(sidebar)) || Array.from(document.querySelectorAll(MODAL_DIALOG_SELECTOR)).some((dialog) => isModalDialog(dialog) && (!sidebar || !dialog.contains(sidebar))),
+        modalOpen: () => (!!sidebar && sidebarBehindModal(sidebar)) || dialogOutsideSidebar(Array.from(document.querySelectorAll(MODAL_DIALOG_SELECTOR)).filter(isModalDialog), sidebar),
         sidebarShown: () => (sidebar?.getClientRects().length ?? 0) > 0,
         open: openSearch,
       });
@@ -1454,7 +1454,7 @@ const BOUND_ARCHIVE_WAIT_MS = 2_000;
 const ARCHIVE_POLL_MS = 500;
 const ARCHIVE_WAIT_TOAST_ID = "thread-tree-fold-archive-wait";
 
-/** Any dialog counts, a Radix modal carries no aria-modal; a stray popover only makes the wait longer. */
+/** Any dialog but the sidebar's own drawer counts, a Radix modal carries no aria-modal; a stray popover only makes the wait longer. */
 const dialogOpenBesides = (sidebar: Element | null) => () =>
   dialogOutsideSidebar(Array.from(document.querySelectorAll(`[role="dialog"], ${MODAL_DIALOG_SELECTOR}`)), sidebar);
 
