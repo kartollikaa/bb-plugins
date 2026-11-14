@@ -87,7 +87,7 @@ export function StatusLine({
   onFilter: (filter: StatusFilter | null) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
+    <div className="flex w-full min-w-0 items-center gap-0.5 overflow-hidden">
       <span role="status" className="sr-only">{statusSummary(counts)}</span>
       {STATUS_FILTERS.map(({ id, label }) => {
         const count = counts[id];

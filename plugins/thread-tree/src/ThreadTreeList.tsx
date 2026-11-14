@@ -91,7 +91,7 @@ import { Collapse } from "./Collapse";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
 import { canStop, END_SLOT_MIN_PX, NO_HOVER_QUERY, ROW_ACTION_BUTTON, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
-import { OLDER_RULE, olderRootIds, sameIds } from "./olderThreads";
+import { foldedRootOf, OLDER_RULE, olderRootIds, sameIds } from "./olderThreads";
 import { RetryButton } from "./RetryButton";
 
 const ROW_PAD_PX = 6;
@@ -195,11 +195,18 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const prThreads = useMemo(() => pullRequestThreads(activeForest, forest), [activeForest, forest]);
   const { pullRequestsOf, pullRequestStatesOf, isLoading: pullRequestsLoading } = useThreadPullRequests(prThreads, sectionsRef);
   const draftIds = useSidebarThreadDraftIds();
+  const olderShown = useCallback((groupKey: string) => flags.has(`older:${groupKey}`), [flags]);
+  const stableOlderIds = useRef<ReadonlySet<string>>(new Set());
+  const openedFrom = useRef<{ id: string | null; wasOlder: boolean }>({ id: null, wasOlder: false });
+  if (openedFrom.current.id !== (activeThreadId ?? null)) {
+    const foldedRoot = foldedRootOf(forest, stableOlderIds.current, activeThreadId ?? null);
+    openedFrom.current = { id: activeThreadId ?? null, wasOlder: foldedRoot !== null && olderShown(`project:${foldedRoot.projectId}`) };
+  }
+  const activeWasOlder = openedFrom.current.wasOlder;
   const olderIds = useMemo(
-    () => showArchived ? new Set<string>() : olderRootIds(forest, { now, activeThreadId: activeThreadId ?? null, draftIds, pullRequestStates: pullRequestStatesOf }),
-    [showArchived, forest, now, activeThreadId, draftIds, pullRequestStatesOf],
+    () => showArchived ? new Set<string>() : olderRootIds(forest, { now, activeThreadId: activeThreadId ?? null, activeWasOlder, draftIds, pullRequestStates: pullRequestStatesOf }),
+    [showArchived, forest, now, activeThreadId, activeWasOlder, draftIds, pullRequestStatesOf],
   );
-  const stableOlderIds = useRef(olderIds);
   if (!sameIds(stableOlderIds.current, olderIds)) stableOlderIds.current = olderIds;
   const shownOlderIds = stableOlderIds.current;
   const isOlder = useMemo(() => (root: PluginSidebarThread) => shownOlderIds.has(root.id), [shownOlderIds]);
@@ -209,7 +216,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   );
   const pinnedGroup = groups.find((group) => group.key === "pinned");
   const folderGroups = groups.filter((group) => group.key !== "pinned");
-  const olderShown = useCallback((groupKey: string) => flags.has(`older:${groupKey}`), [flags]);
   const showMoreRecent = flags.has("recent-more");
   const recentHidden = !view.showRecent || collapsedGroups.has("recent");
   const recent = useMemo(
@@ -1008,7 +1014,7 @@ function ThreadRowView({
   const { splitProps } = useSidebarThreadSplit(thread.id);
   const [menuOpen, setMenuOpen] = useState(false);
   const [keyboardFocus, setKeyboardFocus] = useState(false);
-  const age = formatAge(thread.updatedAt, now);
+  const age = formatAge(thread.latestAttentionAt, now);
   const target = useMemo(() => toActionTarget(thread), [thread]);
   const isTree = variant === "tree";
   const Link = numbered ? NumberedRowLink : RowLink;
@@ -1026,7 +1032,7 @@ function ThreadRowView({
     context ? `${thread.displayTitle} · ${context}` : thread.displayTitle,
     branch ? `Branch: ${branch}` : null,
     `Provider: ${providerName}`,
-    `Updated ${age === "now" ? "just now" : `${age} ago`}`,
+    `Last activity ${age === "now" ? "just now" : `${age} ago`}`,
   ].filter(Boolean).join("\n");
 
   const heightPx = rowHeightPx(isCompactViewport, subtitle ? 2 : 1);

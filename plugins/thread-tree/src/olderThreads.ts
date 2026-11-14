@@ -4,11 +4,13 @@ import { descendantsOf, foldState, type Forest, type TreeThread } from "./tree.t
 export const OLDER_AFTER_MS = 24 * 60 * 60 * 1000;
 
 export const OLDER_RULE =
-  "Idle and read, no draft or pending question, not pinned or open, every subthread quiet too, pull requests merged, closed or none, and nothing new for over a day";
+  "Idle and read, no draft or pending question, not pinned, every subthread quiet too, pull requests merged, closed or none, and no activity for over a day";
 
 export interface OlderContext<T extends TreeThread> {
   now: number;
   activeThreadId: string | null;
+  /** The open thread's tree was in an expanded "N older" list when opened, so opening it doesn't pull it out. */
+  activeWasOlder: boolean;
   draftIds: ReadonlySet<string>;
   /** Null while unknown, which keeps the thread out. */
   pullRequestStates: (thread: T) => readonly string[] | null;
@@ -20,14 +22,21 @@ function isQuietAndOld<T extends TreeThread>(thread: T, context: OlderContext<T>
   return (
     foldState(thread) === "done" &&
     !context.draftIds.has(thread.id) &&
-    thread.id !== context.activeThreadId &&
-    context.now - thread.updatedAt > OLDER_AFTER_MS &&
+    context.now - thread.latestAttentionAt > OLDER_AFTER_MS &&
     (context.pullRequestStates(thread)?.every((state) => SETTLED_PULL_REQUESTS.has(state)) ?? false)
   );
 }
 
 export function isOlderRoot<T extends TreeThread>(forest: Forest<T>, root: T, context: OlderContext<T>): boolean {
-  return !root.isPinned && [root, ...descendantsOf(forest, root.id)].every((thread) => isQuietAndOld(thread, context));
+  const tree = [root, ...descendantsOf(forest, root.id)];
+  if (!context.activeWasOlder && tree.some((thread) => thread.id === context.activeThreadId)) return false;
+  return !root.isPinned && tree.every((thread) => isQuietAndOld(thread, context));
+}
+
+/** The folded root whose tree holds `threadId`, if any. */
+export function foldedRootOf<T extends TreeThread>(forest: Forest<T>, olderIds: ReadonlySet<string>, threadId: string | null): T | null {
+  if (threadId === null) return null;
+  return forest.roots.find((root) => olderIds.has(root.id) && (root.id === threadId || descendantsOf(forest, root.id).some((thread) => thread.id === threadId))) ?? null;
 }
 
 export function olderRootIds<T extends TreeThread>(forest: Forest<T>, context: OlderContext<T>): Set<string> {

@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { ancestorsOf, buildForest, descendantsOf, effectiveState, groupRows, placeNear, readFolderSorts, rememberProjectFolders, recentThreads, resolveProjectOrder, summarize, threadDotState, threadsOnScreen, type TreeThread } from "../src/tree.ts";
 import type { Subagent } from "../src/subagents.ts";
 
+/** Every fixture reads as just opened, so code keyed on `updatedAt` instead of bb's activity time fails. */
+const JUST_READ = 1e12;
+
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
   id,
   projectId: "p1",
@@ -18,20 +21,20 @@ const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
   hasPendingInteraction: false,
   activity: { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 },
   createdAt: 0,
-  updatedAt: 0,
+  updatedAt: JUST_READ,
   ...extra,
-  latestAttentionAt: extra.latestAttentionAt ?? extra.updatedAt ?? 0,
+  latestAttentionAt: extra.latestAttentionAt ?? 0,
 });
 
 const ids = (rows: { thread: TreeThread; depth: number }[]) => rows.map((r) => `${"-".repeat(r.depth)}${r.thread.id}`);
 
 test("children nest under their parent in spawn order, any depth", () => {
   const threads = [
-    thread("root", { updatedAt: 10 }),
+    thread("root", { latestAttentionAt: 10 }),
     thread("b", { parentThreadId: "root", createdAt: 2 }),
     thread("a", { parentThreadId: "root", createdAt: 1 }),
     thread("a1", { parentThreadId: "a", createdAt: 3 }),
-    thread("other", { updatedAt: 5 }),
+    thread("other", { latestAttentionAt: 5 }),
   ];
   const [group] = groupRows(buildForest(threads), new Set());
   assert.deepEqual(ids(group!.rows), ["root", "-a", "--a1", "-b", "other"]);
@@ -57,14 +60,14 @@ test("hidden threads drop out; orphans become roots", () => {
 
 test("archived threads nest like active ones, for the archived view", () => {
   const threads = [
-    thread("parent", { isArchived: true, updatedAt: 2 }),
-    thread("kid", { isArchived: true, parentThreadId: "parent", updatedAt: 1 }),
+    thread("parent", { isArchived: true, latestAttentionAt: 2 }),
+    thread("kid", { isArchived: true, parentThreadId: "parent", latestAttentionAt: 1 }),
   ];
   assert.deepEqual(ids(groupRows(buildForest(threads), new Set())[0]!.rows), ["parent", "-kid"]);
 });
 
 test("a parent cycle still draws every thread exactly once", () => {
-  const threads = [thread("x", { parentThreadId: "y", updatedAt: 2 }), thread("y", { parentThreadId: "x", updatedAt: 1 })];
+  const threads = [thread("x", { parentThreadId: "y", latestAttentionAt: 2 }), thread("y", { parentThreadId: "x", latestAttentionAt: 1 })];
   const rows = groupRows(buildForest(threads), new Set())[0]!.rows;
   assert.deepEqual(ids(rows), ["x", "-y"]);
 });
@@ -80,7 +83,7 @@ test("collapsing hides the subtree and flags live work inside it", () => {
 
 test("pinned threads detach into the Pinned group with their subtree", () => {
   const threads = [
-    thread("parent", { updatedAt: 9 }),
+    thread("parent", { latestAttentionAt: 9 }),
     thread("pinnedKid", { parentThreadId: "parent", isPinned: true, pinSortKey: "a" }),
     thread("grandkid", { parentThreadId: "pinnedKid" }),
   ];
@@ -91,7 +94,7 @@ test("pinned threads detach into the Pinned group with their subtree", () => {
 });
 
 test("projects order by their latest activity", () => {
-  const threads = [thread("old", { projectId: "a", updatedAt: 1 }), thread("new", { projectId: "b", updatedAt: 5 })];
+  const threads = [thread("old", { projectId: "a", latestAttentionAt: 1 }), thread("new", { projectId: "b", latestAttentionAt: 5 })];
   const groups = groupRows(buildForest(threads), new Set());
   assert.deepEqual(groups.map((g) => [g.key, g.rows.length]), [["project:b", 1], ["project:a", 1]]);
 });
@@ -183,7 +186,7 @@ test("the open thread shows through its folded ancestors until it is left", () =
 
 test("status grouping files a root by its most urgent subtree state, urgent groups first", () => {
   const threads = [
-    thread("calm", { updatedAt: 9 }),
+    thread("calm", { latestAttentionAt: 9 }),
     thread("busy", { status: "active" }),
     thread("parent"),
     thread("asking", { parentThreadId: "parent", hasPendingInteraction: true }),
@@ -204,18 +207,18 @@ test("status grouping files a root by its most urgent subtree state, urgent grou
 });
 
 test("no grouping puts every unpinned root in one group by activity", () => {
-  const threads = [thread("a", { projectId: "x", updatedAt: 1 }), thread("b", { projectId: "y", updatedAt: 2 })];
+  const threads = [thread("a", { projectId: "x", latestAttentionAt: 1 }), thread("b", { projectId: "y", latestAttentionAt: 2 })];
   const groups = groupRows(buildForest(threads), new Set(), "none");
   assert.deepEqual(groups.map((g) => [g.key, ids(g.rows)]), [["all", ["b", "a"]]]);
 });
 
 test("recent activity is flat, newest first, children included, hidden and archived left out", () => {
   const threads = [
-    thread("old", { updatedAt: 1 }),
-    thread("kid", { parentThreadId: "old", updatedAt: 5 }),
-    thread("mid", { updatedAt: 3 }),
-    thread("gone", { isArchived: true, updatedAt: 9 }),
-    thread("ghost", { isHidden: true, updatedAt: 8 }),
+    thread("old", { latestAttentionAt: 1 }),
+    thread("kid", { parentThreadId: "old", latestAttentionAt: 5 }),
+    thread("mid", { latestAttentionAt: 3 }),
+    thread("gone", { isArchived: true, latestAttentionAt: 9 }),
+    thread("ghost", { isHidden: true, latestAttentionAt: 8 }),
   ];
   assert.deepEqual(recentThreads(threads, 2).map((t) => t.id), ["kid", "mid"]);
   assert.deepEqual(recentThreads(threads, 10).map((t) => t.id), ["kid", "mid", "old"]);
@@ -250,7 +253,7 @@ test("guide lines run on past middle children and bend at the last one", () => {
 });
 
 test("a fixed project order ignores activity", () => {
-  const threads = [thread("a", { projectId: "pa", updatedAt: 1 }), thread("b", { projectId: "pb", updatedAt: 9 })];
+  const threads = [thread("a", { projectId: "pa", latestAttentionAt: 1 }), thread("b", { projectId: "pb", latestAttentionAt: 9 })];
   const forest = buildForest(threads);
   assert.deepEqual(groupRows(forest, new Set(), "project", ["pa", "pb"]).map((g) => g.key), ["project:pa", "project:pb"]);
   assert.deepEqual(groupRows(forest, new Set(), "project", null).map((g) => g.key), ["project:pb", "project:pa"]);
@@ -284,8 +287,8 @@ test("placeNear drops a block before or after its target", () => {
 
 test("folder creation order stays fixed when activity changes, with nested children intact", () => {
   const threads = [
-    thread("old", { createdAt: 1, updatedAt: 30 }),
-    thread("new", { createdAt: 2, updatedAt: 10 }),
+    thread("old", { createdAt: 1, latestAttentionAt: 30 }),
+    thread("new", { createdAt: 2, latestAttentionAt: 10 }),
     thread("kid", { parentThreadId: "new", createdAt: 3 }),
   ];
   const rows = (sort: "activity" | "created") => ids(groupRows(buildForest(threads), new Set(), "project", null, null, { "project:p1": sort })[0]!.rows);
@@ -299,7 +302,7 @@ test("folder creation order stays fixed when activity changes, with nested child
 
 test("status sort uses the subtree priority and stable creation order within a status", () => {
   const threads = [
-    thread("done", { updatedAt: 100 }),
+    thread("done", { latestAttentionAt: 100 }),
     thread("busy", { status: "active" }),
     thread("error", { status: "error" }),
     thread("parent"),
@@ -308,16 +311,16 @@ test("status sort uses the subtree priority and stable creation order within a s
   ];
   const rows = () => ids(groupRows(buildForest(threads), new Set(), "none", null, null, { all: "status" })[0]!.rows);
   assert.deepEqual(rows(), ["parent", "-input", "error", "new-busy", "busy", "done"]);
-  threads[1]!.updatedAt = 1000;
+  threads[1]!.latestAttentionAt = 1000;
   assert.deepEqual(rows(), ["parent", "-input", "error", "new-busy", "busy", "done"]);
 });
 
 test("folder sorts are independent and pinned roots retain their manual order", () => {
   const threads = [
-    thread("a-old", { projectId: "a", createdAt: 1, updatedAt: 20 }),
-    thread("a-new", { projectId: "a", createdAt: 2, updatedAt: 10 }),
-    thread("b-old", { projectId: "b", createdAt: 1, updatedAt: 20 }),
-    thread("b-new", { projectId: "b", createdAt: 2, updatedAt: 10 }),
+    thread("a-old", { projectId: "a", createdAt: 1, latestAttentionAt: 20 }),
+    thread("a-new", { projectId: "a", createdAt: 2, latestAttentionAt: 10 }),
+    thread("b-old", { projectId: "b", createdAt: 1, latestAttentionAt: 20 }),
+    thread("b-new", { projectId: "b", createdAt: 2, latestAttentionAt: 10 }),
     thread("pin-first", { isPinned: true, pinSortKey: "a", createdAt: 1 }),
     thread("pin-last", { isPinned: true, pinSortKey: "b", createdAt: 2 }),
   ];
@@ -332,10 +335,10 @@ test("folder sorts reject malformed storage and keep only known modes", () => {
 
 test("global sort applies across folders while local overrides take precedence", () => {
   const threads = [
-    thread("a-old", { projectId: "a", createdAt: 1, updatedAt: 20 }),
-    thread("a-new", { projectId: "a", createdAt: 2, updatedAt: 10 }),
-    thread("b-old", { projectId: "b", createdAt: 1, updatedAt: 20 }),
-    thread("b-new", { projectId: "b", createdAt: 2, updatedAt: 10 }),
+    thread("a-old", { projectId: "a", createdAt: 1, latestAttentionAt: 20 }),
+    thread("a-new", { projectId: "a", createdAt: 2, latestAttentionAt: 10 }),
+    thread("b-old", { projectId: "b", createdAt: 1, latestAttentionAt: 20 }),
+    thread("b-new", { projectId: "b", createdAt: 2, latestAttentionAt: 10 }),
   ];
   const rows = (overrides: Record<string, "activity">) => groupRows(buildForest(threads), new Set(), "project", ["a", "b"], null, overrides, "created").map((g) => ids(g.rows));
   assert.deepEqual(rows({}), [["a-new", "a-old"], ["b-new", "b-old"]]);
@@ -367,7 +370,7 @@ test("retention includes pinned, child and archived projects but excludes hidden
 });
 
 test("retained folders respect project order without duplicating populated folders", () => {
-  const forest = buildForest([thread("root", { updatedAt: 10 })]);
+  const forest = buildForest([thread("root", { latestAttentionAt: 10 })]);
   const groups = groupRows(forest, new Set(), "project", ["p2", "p1"], null, {}, "activity", ["p1", "p2"]);
   assert.deepEqual(groups.map((group) => [group.projectId, group.rootCount]), [["p2", 0], ["p1", 1]]);
   const activity = groupRows(forest, new Set(), "project", null, null, {}, "activity", ["p2"]);
@@ -408,9 +411,9 @@ test("a queued message or a goal with no turn running waits: not running, not do
 
 test("a waiting thread ranks below running and above done in status groups", () => {
   const threads = [
-    thread("done", { updatedAt: 3 }),
-    thread("wait", { indicator: "queued-waiting", updatedAt: 2 }),
-    thread("run", { status: "active", updatedAt: 1 }),
+    thread("done", { latestAttentionAt: 3 }),
+    thread("wait", { indicator: "queued-waiting", latestAttentionAt: 2 }),
+    thread("run", { status: "active", latestAttentionAt: 1 }),
   ];
   const groups = groupRows(buildForest(threads), new Set(), "status");
   assert.deepEqual(groups.map((g) => g.key), ["status:running", "status:waiting", "status:done"]);

@@ -13,6 +13,9 @@ import {
   rollupOver,
 } from "../src/orchestrations.ts";
 
+/** Every fixture reads as just opened, so code keyed on `updatedAt` instead of bb's activity time fails. */
+const JUST_READ = 1e12;
+
 const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
   id,
   projectId: "p1",
@@ -28,9 +31,9 @@ const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
   hasPendingInteraction: false,
   activity: { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 },
   createdAt: 0,
-  updatedAt: 0,
+  updatedAt: JUST_READ,
   ...extra,
-  latestAttentionAt: extra.latestAttentionAt ?? extra.updatedAt ?? 0,
+  latestAttentionAt: extra.latestAttentionAt ?? 0,
 });
 const running = { status: "active" };
 const input = { hasPendingInteraction: true };
@@ -72,19 +75,19 @@ test("the fold bar shows only from five subthreads, segments sized by state, mos
 
 test("Orchestrations lists every root with subthreads, most urgent first, with their progress", () => {
   const threads = [
-    thread("live", { updatedAt: 9, projectId: "bb" }),
+    thread("live", { latestAttentionAt: 9, projectId: "bb" }),
     thread("l1", { parentThreadId: "live", ...input }),
     thread("l2", { parentThreadId: "live", projectId: "web", ...running }),
     thread("l3", { parentThreadId: "live" }),
     thread("l4", { parentThreadId: "l3", ...unread }),
     thread("l5", { parentThreadId: "live", ...failed }),
-    thread("finished", { updatedAt: 7 }),
+    thread("finished", { latestAttentionAt: 7 }),
     thread("f1", { parentThreadId: "finished" }),
-    thread("unreadOnly", { updatedAt: 8 }),
+    thread("unreadOnly", { latestAttentionAt: 8 }),
     thread("u1", { parentThreadId: "unreadOnly", ...unread }),
-    thread("selfRunning", { updatedAt: 6, ...running }),
+    thread("selfRunning", { latestAttentionAt: 6, ...running }),
     thread("s1", { parentThreadId: "selfRunning" }),
-    thread("lone", { updatedAt: 10, ...running }),
+    thread("lone", { latestAttentionAt: 10, ...running }),
   ];
   const list = orchestrations(buildForest(threads));
   assert.deepEqual(list.map((o) => o.thread.id), ["live", "selfRunning", "unreadOnly", "finished"]);
@@ -120,11 +123,11 @@ test("an orchestrator leaves the list once it or its last subthread is archived"
 
 test("same urgency sorts by the tree's latest activity, finished ones always last", () => {
   const threads = [
-    thread("doneRecent", { updatedAt: 100 }),
+    thread("doneRecent", { latestAttentionAt: 100 }),
     thread("d1", { parentThreadId: "doneRecent" }),
-    thread("old", { updatedAt: 1 }),
-    thread("o1", { parentThreadId: "old", updatedAt: 50, ...running }),
-    thread("new", { updatedAt: 20 }),
+    thread("old", { latestAttentionAt: 1 }),
+    thread("o1", { parentThreadId: "old", latestAttentionAt: 50, ...running }),
+    thread("new", { latestAttentionAt: 20 }),
     thread("n1", { parentThreadId: "new", ...running }),
   ];
   assert.deepEqual(orchestrations(buildForest(threads)).map((o) => o.thread.id), ["old", "new", "doneRecent"]);

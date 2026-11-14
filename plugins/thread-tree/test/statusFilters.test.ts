@@ -14,6 +14,9 @@ import {
 } from "../src/statusFilters.ts";
 import { rowHeightPx } from "../src/rowActions.ts";
 
+/** Every fixture reads as just opened, so code keyed on `updatedAt` instead of bb's activity time fails. */
+const JUST_READ = 1e12;
+
 const thread = (id: string, extra: Partial<FilterThread> = {}): FilterThread => ({
   id,
   projectId: "p1",
@@ -30,11 +33,11 @@ const thread = (id: string, extra: Partial<FilterThread> = {}): FilterThread => 
   hasPendingInteraction: false,
   activity: { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 },
   createdAt: 0,
-  updatedAt: 0,
+  updatedAt: JUST_READ,
   displayTitle: id,
   environment: null,
   ...extra,
-  latestAttentionAt: extra.latestAttentionAt ?? extra.updatedAt ?? 0,
+  latestAttentionAt: extra.latestAttentionAt ?? 0,
 });
 
 const ids = (threads: readonly { id: string }[]) => threads.map((t) => t.id);
@@ -68,11 +71,11 @@ test("counts cover visible, unarchived threads only, with every filter present e
 
 test("a filter lists its threads flat, children included, most recently active first", () => {
   const threads = [
-    thread("old", { status: "active", updatedAt: 1 }),
-    thread("kid", { status: "active", parentThreadId: "old", updatedAt: 3 }),
-    thread("new", { status: "active", updatedAt: 2 }),
-    thread("idle", { updatedAt: 9 }),
-    thread("gone", { status: "active", isArchived: true, updatedAt: 9 }),
+    thread("old", { status: "active", latestAttentionAt: 1 }),
+    thread("kid", { status: "active", parentThreadId: "old", latestAttentionAt: 3 }),
+    thread("new", { status: "active", latestAttentionAt: 2 }),
+    thread("idle", { latestAttentionAt: 9 }),
+    thread("gone", { status: "active", isArchived: true, latestAttentionAt: 9 }),
   ];
   assert.deepEqual(ids(filterThreads(threads, "running")), ["kid", "new", "old"]);
   assert.deepEqual(ids(filterThreads(threads, "input")), []);
@@ -80,10 +83,10 @@ test("a filter lists its threads flat, children included, most recently active f
 
 test("search matches title, branch, PR number and project, every word somewhere, ignoring case", () => {
   const threads = [
-    thread("t1", { displayTitle: "Fix payments sheet", projectId: "app", updatedAt: 1 }),
-    thread("t2", { displayTitle: "Release notes", environment: { branchName: "feature/payments-v2" }, updatedAt: 2 }),
-    thread("t3", { displayTitle: "Review", projectId: "bb", updatedAt: 3 }),
-    thread("t4", { displayTitle: "Untitled", updatedAt: 4 }),
+    thread("t1", { displayTitle: "Fix payments sheet", projectId: "app", latestAttentionAt: 1 }),
+    thread("t2", { displayTitle: "Release notes", environment: { branchName: "feature/payments-v2" }, latestAttentionAt: 2 }),
+    thread("t3", { displayTitle: "Review", projectId: "bb", latestAttentionAt: 3 }),
+    thread("t4", { displayTitle: "Untitled", latestAttentionAt: 4 }),
   ];
   const describe = (t: FilterThread) => ({
     projectName: t.projectId === "bb" ? "bb-plugins" : t.projectId === "app" ? "Mobile App" : "Personal",

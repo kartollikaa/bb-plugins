@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildForest, groupRows, type TreeThread } from "../src/tree.ts";
-import { isOlderRoot, OLDER_AFTER_MS, olderRootIds, sameIds, type OlderContext } from "../src/olderThreads.ts";
+import { foldedRootOf, isOlderRoot, OLDER_AFTER_MS, olderRootIds, sameIds, type OlderContext } from "../src/olderThreads.ts";
 
 const NOW = Date.parse("2026-11-14T12:00:00Z");
 const OLD = NOW - OLDER_AFTER_MS - 1;
@@ -23,14 +23,14 @@ function thread(id: string, over: Partial<TreeThread> = {}): TreeThread {
     isUnread: false,
     activity: { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 },
     createdAt: OLD,
-    updatedAt: OLD,
+    updatedAt: NOW,
     ...over,
-    latestAttentionAt: over.latestAttentionAt ?? over.updatedAt ?? OLD,
+    latestAttentionAt: over.latestAttentionAt ?? OLD,
   };
 }
 
 function context(over: Partial<OlderContext<TreeThread>> = {}): OlderContext<TreeThread> {
-  return { now: NOW, activeThreadId: null, draftIds: new Set(), pullRequestStates: () => [], ...over };
+  return { now: NOW, activeThreadId: null, activeWasOlder: false, draftIds: new Set(), pullRequestStates: () => [], ...over };
 }
 
 const older = (threads: TreeThread[], ctx = context()) => {
@@ -42,8 +42,8 @@ test("an idle, read root untouched for over a day folds", () => {
   assert.deepEqual(older([thread("a")]), ["a"]);
 });
 
-test("a day or less since the last update keeps the root out", () => {
-  assert.deepEqual(older([thread("a", { updatedAt: NOW - OLDER_AFTER_MS })]), []);
+test("a day or less since the last activity keeps the root out", () => {
+  assert.deepEqual(older([thread("a", { latestAttentionAt: NOW - OLDER_AFTER_MS })]), []);
 });
 
 test("unread, running, waiting, failed or asking roots stay out", () => {
@@ -77,7 +77,7 @@ test("a root folds only when its whole subtree is quiet and old too", () => {
     thread("busy"),
     thread("busy-kid", { parentThreadId: "busy", isUnread: true }),
     thread("fresh"),
-    thread("fresh-kid", { parentThreadId: "fresh", updatedAt: NOW - 1000 }),
+    thread("fresh-kid", { parentThreadId: "fresh", latestAttentionAt: NOW - 1000 }),
     thread("pr"),
     thread("pr-kid", { parentThreadId: "pr" }),
     thread("holds-open"),
@@ -91,7 +91,7 @@ test("project folders split older roots off their rows; pinned and other modes d
   const threads = [
     thread("old"),
     thread("old-kid", { parentThreadId: "old" }),
-    thread("new", { updatedAt: NOW }),
+    thread("new", { latestAttentionAt: NOW }),
     thread("pinned", { isPinned: true }),
   ];
   const forest = buildForest(threads);
@@ -109,7 +109,7 @@ test("project folders split older roots off their rows; pinned and other modes d
 });
 
 test("a folder with nothing older has no older line", () => {
-  const forest = buildForest([thread("new", { updatedAt: NOW })]);
+  const forest = buildForest([thread("new", { latestAttentionAt: NOW })]);
   const [group] = groupRows(forest, new Set(), "project", null, null, {}, "activity", [], () => false);
   assert.equal(group!.older, null);
 });
@@ -118,4 +118,25 @@ test("two id sets are the same only with the same members", () => {
   assert.equal(sameIds(new Set(["a", "b"]), new Set(["b", "a"])), true);
   assert.equal(sameIds(new Set(["a"]), new Set(["a", "b"])), false);
   assert.equal(sameIds(new Set(["a", "c"]), new Set(["a", "b"])), false);
+});
+
+test("reading a folded thread bumps updatedAt, not bb's activity time, so it stays folded", () => {
+  assert.deepEqual(older([thread("a", { updatedAt: NOW, latestAttentionAt: OLD })]), ["a"]);
+});
+
+test("a click never moves a thread across the fold: the open thread keeps the side it was opened from", () => {
+  const threads = [thread("root"), thread("kid", { parentThreadId: "root" })];
+  assert.deepEqual(older(threads, context({ activeThreadId: "kid", activeWasOlder: true })), ["root"]);
+  assert.deepEqual(older(threads, context({ activeThreadId: "kid", activeWasOlder: false })), []);
+  assert.deepEqual(older(threads, context({ activeThreadId: "root", activeWasOlder: false })), []);
+  assert.deepEqual(older([thread("busy", { status: "active" })], context({ activeThreadId: "busy", activeWasOlder: true })), []);
+});
+
+test("foldedRootOf finds the folded root that holds a thread, subthreads included", () => {
+  const forest = buildForest([thread("root"), thread("kid", { parentThreadId: "root" }), thread("other")]);
+  const folded = new Set(["root"]);
+  assert.equal(foldedRootOf(forest, folded, "kid")?.id, "root");
+  assert.equal(foldedRootOf(forest, folded, "root")?.id, "root");
+  assert.equal(foldedRootOf(forest, folded, "other"), null);
+  assert.equal(foldedRootOf(forest, folded, null), null);
 });

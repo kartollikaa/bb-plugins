@@ -30,8 +30,8 @@ that don't move or change height while agents work.
 - **Tree rows are one line and a fixed height.** No step text, questions or PR line in the tree,
   so rows don't jump when a turn starts or ends.
 - **Nothing moves under the cursor.** Hover actions overlay the row instead of reflowing it.
-- **The top of the sidebar is no taller than today.** New things go into the status line or
-  under Threads.
+- **The top of the sidebar stays compact.** New things go into the status line or under Threads.
+  The one exception is the search field's own row, added at the owner's request (see below).
 - **Quiet when fine.** Healthy sections collapse to a summary header; idle threads get only a faint dot.
 - **Use bb's own pieces** (status glyph, drafts, row statuses, provider icon, thread actions) so
   the list matches bb and keeps other plugins' contributions.
@@ -44,8 +44,8 @@ that don't move or change height while agents work.
   failed, running, finished but unread. Each count is a toggle filter that shows a flat list of
   those threads. The Running filter is the one place that shows each thread's current step and a
   live timer.
-- A full-width search field sits above the counts, beside the Sections button: 32px tall, a
-  search icon, "Search threads" and a `/` key chip. Clicking it or pressing `/` turns it into the
+- A full-width search field sits above the counts, beside the Sections button: a comfortable
+  hit target with a search icon, "Search threads" and a `/` key chip. Clicking it or pressing `/` turns it into the
   input in place, matching title, branch, PR number and project. Escape clears it. Picking a count
   closes the search. The owner asked for it after the first build hid search behind a small icon:
   "the search bar should be more visually outstanding and bigger in size… I don't actually see it
@@ -140,7 +140,14 @@ and in folder there are gonna be the whole … with nested tree."
 - **The user's clicks never reorder it** (owner: «Нужно оставлять их там, где они как бы и были.
   Мои клики не должны менять их расположение.»). Reading a thread bumps `updatedAt` and clears
   unread, so neither may key the order; folders, filters and Recent Activity sort on
-  `latestAttentionAt` for the same reason.
+  `latestAttentionAt` for the same reason, and so do the row's age, the "N older" fold and Needs
+  you's failed items. The thread a click opens keeps its side of the "N older" fold until another
+  thread is opened: one opened from the expanded list stays in it, one opened from outside stays
+  out, even if reading it made it quiet.
+- **What `latestAttentionAt` is** (checked in bb's server source): set when a thread is created,
+  when a top-level thread goes from working to idle, and when any thread errors. A read, a
+  message or a subthread finishing work never sets it, so a subthread keeps its spawn time until
+  it fails. bb's own sidebar sorts and labels rows by it, children included.
 - **Shortcut row:** most urgent state of the subtree as the glyph, title, provider, age; second
   line with the projects it spans and progress ("bb-plugins · 2/4 done · 1 needs you").
 - Click opens the orchestrator like a normal row: no scrolling, unfolding or highlighting in the tree.
@@ -191,7 +198,7 @@ and a user who has it turned on keeps it. Removal is reconsidered after v2 has b
 | Archive, other actions | `experimental_useThreadActions` (bb's Archive keeps its confirmation and undo) | Low |
 | Stop | `sdk.threads.stop` | Low; behaviour unverified |
 | Question text for Needs you | `sdk.threads.interactions` | Medium |
-| Waiting since | `latestAttentionAt` (meaning unverified) or first seen in the client | Medium |
+| Waiting since | first seen in the client | Medium |
 | Stuck agent | server reads the turn watchdog event (`provider-turn-idle`) | Medium |
 | Step text, turn timer | server subscribes to turn events and pushes to the app | High |
 | PR attention on rows | Failing/Conflicts from bb GitHub PR Status and Thread Links; Changes/Ready need GitHub Folder's `attention` joined by URL | Medium |

@@ -28,6 +28,9 @@ import type { ThreadPullRequest } from "../src/threadPullRequests.ts";
 import type { AutomationSummary } from "../src/automations.ts";
 import type { GithubFolderItem } from "../src/githubFolder.ts";
 
+/** Every fixture reads as just opened, so code keyed on `updatedAt` instead of bb's activity time fails. */
+const JUST_READ = 1e12;
+
 const thread = (id: string, extra: Partial<NeedsYouThread> = {}): NeedsYouThread => ({
   id,
   projectId: "p1",
@@ -44,12 +47,12 @@ const thread = (id: string, extra: Partial<NeedsYouThread> = {}): NeedsYouThread
   hasPendingInteraction: false,
   activity: { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 },
   createdAt: 0,
-  updatedAt: 0,
+  updatedAt: JUST_READ,
   displayTitle: id,
   environment: null,
   queuedWork: "none",
   ...extra,
-  latestAttentionAt: extra.latestAttentionAt ?? extra.updatedAt ?? 0,
+  latestAttentionAt: extra.latestAttentionAt ?? 0,
 });
 
 const none = () => null;
@@ -73,10 +76,10 @@ test("a thread is one item at most: a question, else a failed turn, else a faile
 
 test("thread items come in the spec's order: questions longest waiting first, then failed, queued-failed, results", () => {
   const items = build([
-    thread("result", { isUnread: true, updatedAt: 50 }),
-    thread("queued", { indicator: "queued-failed", updatedAt: 40 }),
-    thread("failed-old", { status: "error", updatedAt: 10 }),
-    thread("failed-new", { status: "error", updatedAt: 30 }),
+    thread("result", { isUnread: true, latestAttentionAt: 50 }),
+    thread("queued", { indicator: "queued-failed", latestAttentionAt: 40 }),
+    thread("failed-old", { status: "error", latestAttentionAt: 10 }),
+    thread("failed-new", { status: "error", latestAttentionAt: 30 }),
     thread("asked-late", { hasPendingInteraction: true }),
     thread("asked-early", { hasPendingInteraction: true }),
   ], {
@@ -208,7 +211,7 @@ test("pruning drops snoozes of changed items, keeps those whose source hasn't lo
 });
 
 test("⇧⌘I opens the first item, then the one after the open thread, wrapping", () => {
-  const items = build([thread("a", { status: "error", updatedAt: 3 }), thread("b", { status: "error", updatedAt: 2 }), thread("c", { status: "error", updatedAt: 1 })]);
+  const items = build([thread("a", { status: "error", latestAttentionAt: 3 }), thread("b", { status: "error", latestAttentionAt: 2 }), thread("c", { status: "error", latestAttentionAt: 1 })]);
   assert.equal(nextItem(items, null)?.threadId, "a");
   assert.equal(nextItem(items, "elsewhere")?.threadId, "a");
   assert.equal(nextItem(items, "a")?.threadId, "b");
@@ -262,7 +265,7 @@ test("⇧⌘I steps past every item of the open thread, and from the last opened
   const folder = pullRequestItems("all", [], new Map(), [folderItem(8, ["review"]), folderItem(9, ["review"])]);
   const opened = folder[0]!;
   assert.equal(nextItem(folder, null, { key: opened.key, index: 0, threadId: null })?.key, folder[1]!.key, "a PR page has no thread, the cursor knows where it was");
-  const unread = build([thread("u1", { isUnread: true, updatedAt: 2 }), thread("u2", { isUnread: true, updatedAt: 1 })]);
+  const unread = build([thread("u1", { isUnread: true, latestAttentionAt: 2 }), thread("u2", { isUnread: true, latestAttentionAt: 1 })]);
   const afterRead = unread.slice(1);
   assert.equal(nextItem(afterRead, "u1", { key: unread[0]!.key, index: 0, threadId: "u1" })?.threadId, "u2", "the read result left; the next one took its place");
   assert.equal(nextItem(unread, "elsewhere", { key: unread[0]!.key, index: 0, threadId: "u1" })?.threadId, "u1", "navigating away drops the cursor");
@@ -279,7 +282,7 @@ test("with two sidebars mounted, unmounting the newer one hands ⇧⌘I back to 
 });
 
 test("only a thread whose turn failed offers Retry; an unread failure that has moved on doesn't", () => {
-  const [errored, unreadError] = build([thread("e", { status: "error", updatedAt: 2 }), thread("u", { status: "idle", indicator: "unread-error", updatedAt: 1 })]);
+  const [errored, unreadError] = build([thread("e", { status: "error", latestAttentionAt: 2 }), thread("u", { status: "idle", indicator: "unread-error", latestAttentionAt: 1 })]);
   assert.equal(errored!.kind === "failed" && errored!.canRetry, true);
   assert.equal(unreadError!.kind === "failed" && unreadError!.canRetry, false);
 });
@@ -357,4 +360,12 @@ test("the queue shows five items and folds the rest into a count until expanded"
 test("the next-item hint names Command on macOS and Ctrl elsewhere", () => {
   assert.equal(shortcutLabel(NEXT_ITEM_SHORTCUT, true), "⇧⌘I");
   assert.equal(shortcutLabel(NEXT_ITEM_SHORTCUT, false), "Ctrl+Shift+I");
+});
+
+test("opening a failed thread keeps its place among the failed: reading bumps updatedAt, not bb's activity time", () => {
+  const items = build([
+    thread("opened", { status: "error", latestAttentionAt: 10, updatedAt: 100 }),
+    thread("newer", { status: "error", latestAttentionAt: 30, updatedAt: 30 }),
+  ]);
+  assert.deepEqual(items.map((item) => item.threadId), ["newer", "opened"]);
 });

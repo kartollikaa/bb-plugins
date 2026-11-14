@@ -120,7 +120,7 @@ const KIND_ORDER: readonly ThreadItemKind[] = ["input", "failed", "queued-failed
 
 /** Questions first, longest wait first; then failures, failed queued messages and results, most recent first. */
 export function threadItems<T extends NeedsYouThread>({ threads, questions, firstSeen, orchestrationOf }: ThreadItemsInput<T>): ThreadItem[] {
-  const items: (ThreadItem & { updatedAt: number })[] = [];
+  const items: (ThreadItem & { latestAttentionAt: number })[] = [];
   for (const thread of threads) {
     const kind = threadItemKind(thread);
     if (!kind) continue;
@@ -135,14 +135,14 @@ export function threadItems<T extends NeedsYouThread>({ threads, questions, firs
       since: kind === "input" ? question?.since ?? firstSeen.get(thread.id) ?? null : null,
       orchestration: orchestrationOf(thread.id),
       canRetry: kind === "failed" && thread.status === "error",
-      updatedAt: thread.updatedAt,
+      latestAttentionAt: thread.latestAttentionAt,
     });
   }
   items.sort((a, b) =>
     KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) ||
-    (a.kind === "input" ? (a.since ?? Infinity) - (b.since ?? Infinity) : b.updatedAt - a.updatedAt) ||
+    (a.kind === "input" ? (a.since ?? Infinity) - (b.since ?? Infinity) : b.latestAttentionAt - a.latestAttentionAt) ||
     a.key.localeCompare(b.key));
-  return items.map(({ updatedAt: _updatedAt, ...item }) => item);
+  return items.map(({ latestAttentionAt: _latestAttentionAt, ...item }) => item);
 }
 
 /** Waiting threads whose pending requests weren't read at their current update. */

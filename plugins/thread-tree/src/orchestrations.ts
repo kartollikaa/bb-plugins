@@ -31,7 +31,7 @@ export interface Orchestration<T extends TreeThread> {
   state: FoldState;
   /** The subtree's state when it outranks the orchestrator's own. */
   rollup: RollupState | null;
-  /** The orchestrator and every subthread are done and read: drawn muted, listed last. */
+  /** The orchestrator and every subthread are done and read: drawn muted, ranked with unread finished trees. */
   finished: boolean;
   /** The orchestrator's project first, then its subthreads' in tree order. */
   projectIds: string[];

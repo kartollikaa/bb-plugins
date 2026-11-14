@@ -23,7 +23,7 @@ failed and running automations and the soonest next run ("1 failed · next in
 title and repo; the number and reasons are in the tooltip. Hover offers "Open its
 thread" when one of your threads links the PR, Open on GitHub, and Snooze.
 Recent Activity is off by default (`showRecent`); the Sections menu (the sliders
-icon in the status line, beside search) turns it back on, and its tooltip counts
+icon beside the search field) turns it back on, and its tooltip counts
 hidden sections.
 `src/sectionSummaries.ts` holds the summaries, the reason glyphs and which
 sections start folded.
@@ -59,7 +59,7 @@ picking a count closes it.
 Every thread row keeps one height whatever its state; rows are taller on a
 phone-sized viewport. A row is one line, except under the Running filter. Left to right: status glyph, title, Retry on a
 failed turn, PR icon, shared-branch warning, subagent counter, provider icon, age.
-Hovering the row shows its title, branch, provider and when it last updated.
+Hovering the row shows its title, branch, provider and its last activity.
 
 Hovering a row, or focusing it with the keyboard, fades Archive and ⋯ in over
 its right end at once; nothing under them moves. They cover only the provider
@@ -125,9 +125,9 @@ the toast's Stop when no dialog covers it and closing the sidebar; a run that
 ends early says why. One Cmd/Ctrl+Z restores everything that Archive took.
 
 In each project folder, top-level threads that are idle and read, hold no draft
-or pending question, aren't pinned or open, have only such subthreads, whose
-pull requests are merged, closed or absent, and where nothing changed for over a
-day fold into one "N older" line at the folder's end; its tooltip states that
+or pending question, aren't pinned, have only such subthreads, whose pull
+requests are merged, closed or absent, and with no activity for over a day fold
+into one "N older" line at the folder's end; its tooltip states that
 rule. A thread whose PR state isn't known yet stays out, so without bb's GitHub PR
 Status plugin a thread with an environment never folds. Clicking the line shows
 them above it and turns it into "Hide older" with an "Archive these" button.
@@ -135,7 +135,9 @@ That button works like a finished fold's Archive across all of them: bb's own
 Archive with its confirmation and Undo, worktrees with changes skipped, and a
 skip count before it starts. Once an archive run ends, each thread it skipped
 for changes stays listed with a pencil marker until a later run finds it clean.
-A run cancelled at the skip count marks nothing. The Pinned group, Status and flat grouping, and
+A run cancelled at the skip count marks nothing. Opening a thread never moves it across the fold:
+one opened from the expanded list stays there, one opened from outside stays out until another
+thread is opened. The Pinned group, Status and flat grouping, and
 the archived view don't fold older threads.
 
 The provider icon sits in a fixed slot before the age, in the provider's brand
@@ -186,7 +188,9 @@ open its Thread settings and choose an override. Use global setting clears that 
 and folder overrides persist in this browser, including after a reload:
 
 - Last activity (default): most recently active first, by bb's own activity time,
-  so opening or reading a thread does not move it.
+  so opening or reading a thread does not move it. bb sets that time when a thread
+  starts, when a top-level thread finishes a turn and when any thread fails, so a
+  subthread counts from its spawn until it fails. The row's age shows the same time.
 - Creation date: newest first; message activity keeps rows in place.
 - Status: needs input, errors, working, waiting (a queued message or a goal between turns), then done, using the most urgent state
   in each thread's subtree. Within a status, newest threads come first.
