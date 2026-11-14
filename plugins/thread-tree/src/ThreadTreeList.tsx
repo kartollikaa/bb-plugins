@@ -342,9 +342,11 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const [uncommittedIds, setUncommittedIds] = useState<ReadonlySet<string>>(new Set());
   const archiveOlder = useCallback(async (roots: readonly PluginSidebarThread[]) => {
     const prepared = await archiveFold(roots);
-    if (prepared) setUncommittedIds((current) => new Set([...current, ...prepared.dirty]));
+    if (!prepared) return prepared;
+    const checked = new Set(roots.flatMap((root) => [root.id, ...descendantsOf(activeForest, root.id).map((thread) => thread.id)]));
+    setUncommittedIds((current) => new Set([...[...current].filter((id) => !checked.has(id)), ...prepared.dirty]));
     return prepared;
-  }, [archiveFold]);
+  }, [archiveFold, activeForest]);
 
   if (status === "loading" && threads.length === 0) {
     return <div className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</div>;
