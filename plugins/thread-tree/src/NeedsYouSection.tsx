@@ -68,10 +68,10 @@ interface NeedsYouSources {
 /** The queue's visible items, snoozing, and ⇧⌘I, which works while the section is folded or replaced by a flat list. */
 export function useNeedsYou(sources: NeedsYouSources) {
   const { threads, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, pullRequestsSettled, orchestrationOf, onNavigate } = sources;
-  const questions = useQuestions(threads);
-  const firstSeen = useRef<ReadonlyMap<string, number>>(new Map());
-  const waitingIds = threads.filter((thread) => threadItemKind(thread) === "input").map((thread) => thread.id);
-  firstSeen.current = trackFirstSeen(firstSeen.current, waitingIds, Date.now());
+  const waiting = useMemo(() => threads.filter((thread) => threadItemKind(thread) === "input"), [threads]);
+  const questions = useQuestions(waiting);
+  const firstSeenRef = useRef<ReadonlyMap<string, number>>(new Map());
+  const firstSeen = useMemo(() => (firstSeenRef.current = trackFirstSeen(firstSeenRef.current, waiting.map((thread) => thread.id), Date.now())), [waiting]);
 
   const all = useMemo(() => {
     const byId = new Map(threads.map((thread) => [thread.id, thread]));
@@ -80,11 +80,11 @@ export function useNeedsYou(sources: NeedsYouSources) {
       return thread ? pullRequestsOf(thread) : [];
     };
     return [
-      ...threadItems({ threads, questions, firstSeen: firstSeen.current, orchestrationOf }),
+      ...threadItems({ threads, questions, firstSeen, orchestrationOf }),
       ...(pullRequestMode === "none" ? [] : pullRequestItems(pullRequestMode, linkedPullRequests(threads.map((thread) => thread.id), prsOf, descendantIdsOf), folderAttention, folderItems)),
       ...automationItems(automations),
     ];
-  }, [threads, questions, orchestrationOf, pullRequestMode, pullRequestsOf, descendantIdsOf, folderAttention, folderItems, automations]);
+  }, [threads, questions, firstSeen, orchestrationOf, pullRequestMode, pullRequestsOf, descendantIdsOf, folderAttention, folderItems, automations]);
 
   const [snoozes, saveSnooze] = usePersistentRecord("needs-you-snoozes", readSnoozes);
   const settled = useCallback((item: NeedsYouItem) => item.kind !== "pr" || pullRequestsSettled, [pullRequestsSettled]);
@@ -132,14 +132,13 @@ export function useNeedsYou(sources: NeedsYouSources) {
 const QUESTION_RETRY_MS = 10_000;
 
 /** Pending requests of the threads that need input, read again only for a thread that changed. */
-function useQuestions(threads: readonly PluginSidebarThread[]): ReadonlyMap<string, ThreadQuestion> {
+function useQuestions(waitingThreads: readonly PluginSidebarThread[]): ReadonlyMap<string, ThreadQuestion> {
   const sdk = useSdk();
   const [questions, setQuestions] = useState<ReadonlyMap<string, ThreadQuestion>>(new Map());
   const readAt = useRef(new Map<string, number>());
   const [retryRound, setRetryRound] = useState(0);
   const retryTimer = useRef<number | undefined>(undefined);
-  const waitingKey = threads
-    .filter((thread) => threadItemKind(thread) === "input")
+  const waitingKey = waitingThreads
     .map((thread) => `${thread.id}@${thread.updatedAt}`)
     .sort()
     .join();
