@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { experimental_useRpcKeyedQuery, experimental_useRpcQuery, experimental_useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import { combineAnswers } from "./answered.ts";
 import { contract } from "./contract.ts";
+import type { LedgerSummary } from "./contract.ts";
 import { createReplyTracker } from "./reply.ts";
 import { localStore } from "./storage.ts";
 import { orchestratorLookupKeys } from "./switch.ts";
@@ -54,7 +55,7 @@ export type OrchestrationState =
   | { kind: "loading" }
   | { kind: "none" }
   | { kind: "error"; message: string; retry: () => void }
-  | { kind: "ready"; view: View; threadIds: Record<string, string> };
+  | { kind: "ready"; view: View; ledger: LedgerSummary; threadIds: Record<string, string> };
 
 export function useOrchestration(threadId: string, enabled: boolean): OrchestrationState {
   const query = experimental_useRpcQuery({ contract, method: "snapshot", input: { threadId }, enabled });
@@ -89,6 +90,6 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
     if (data.state === "error") return { kind: "error", message: data.message, retry: () => void query.refetch() };
     const answered = combineAnswers(data.answered, replies.answers(threadId), data.askFirstSeen);
     const view = buildView({ ledger: data.ledger, agents: data.agents, live, orchestratorThreadId: threadId, now: Math.max(now, data.readAt), answered });
-    return { kind: "ready", view, threadIds: view.threadIds };
+    return { kind: "ready", view, ledger: data.ledger, threadIds: view.threadIds };
   }, [query.data, query.error, query.refetch, live, threadId, now, repliesVersion]);
 }

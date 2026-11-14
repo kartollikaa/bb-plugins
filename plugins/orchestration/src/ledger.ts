@@ -1,5 +1,6 @@
 // Reads the orchestrate plugin's ledger export (schema «orchestrate-ledger-export» v1) into what the tab shows.
 import type { LedgerSummary, Subtask } from "./contract.ts";
+import { workflowEvents } from "./history.ts";
 
 export const EXPORT_SCHEMA = "orchestrate-ledger-export";
 export const EXPORT_VERSION = 1;
@@ -102,6 +103,7 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
   const last = orchestratorHandovers.at(-1);
   return {
     path,
+    workflow: workflowEvents(data),
     goal: str(root.goal),
     status: str(root.status),
     subtasks,

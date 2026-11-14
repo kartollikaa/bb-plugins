@@ -3,6 +3,7 @@ import { experimental_useRpcMutation, experimental_useSidebarThreads, Markdown, 
 import { toast } from "sonner";
 import { contract } from "./contract.ts";
 import { answeredStatus } from "./answered.ts";
+import { WorkflowHistory } from "./WorkflowHistory.tsx";
 import { replyKey, replyStatus, type ReplyState } from "./reply.ts";
 import { askIdentity, type Ask, type RecapLine, type Row, type RowKind, type View } from "./view.ts";
 import { replies, useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
@@ -398,6 +399,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
       )}
 
       <Team view={view} actions={actions} threadIds={threadIds} />
+      <WorkflowHistory key={threadId} ledger={state.ledger} view={view} openThread={actions.openThread} />
       {view.state !== "planning" && <History view={view} />}
     </div>
   );

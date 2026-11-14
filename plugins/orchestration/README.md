@@ -129,3 +129,16 @@ bb plugin reload orchestration
 ```
 
 MIT.
+
+## Task breakdown and workflow history
+
+The view and side-panel tab show every ledger task in plan order, including completed and
+dropped tasks from earlier sessions. Expand a task for its full ledger status, current team
+state, dependencies and thread link. Landed and verified tasks count as completed; dropped
+tasks have their own count.
+
+Workflow history lists recorded decisions, delivery-gate stages (including archived gates)
+and handovers in timestamp order, oldest first. Undated entries follow in source order.
+Filter by task or event type, expand an entry for its evidence, and use Show more for the
+rest. These are ledger records, not a reconstructed history of every status transition;
+missing events and dates are not inferred. Task statuses show the latest ledger values.
