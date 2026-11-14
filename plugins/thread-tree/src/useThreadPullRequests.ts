@@ -80,7 +80,9 @@ export function useThreadPullRequests(threads: readonly PluginSidebarThread[], c
     signatures.current = next;
   }, [threads, scheduler]);
 
-  const statusData = status.error ? undefined : status.data;
+  const lastGoodStatus = useRef(status.data);
+  if (!status.error) lastGoodStatus.current = status.data;
+  const statusData = lastGoodStatus.current;
   const sessionData = session.data;
   const rowsOf = useCallback((thread: PluginSidebarThread) => {
     const environmentId = thread.environment?.id;
