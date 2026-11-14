@@ -15,6 +15,7 @@ export interface TreeThread {
   status: string;
   indicator: string;
   hasPendingInteraction: boolean;
+  isUnread?: boolean;
   activity: { backgroundAgents: number; backgroundCommands: number; workflows: number };
   createdAt: number;
   updatedAt: number;
@@ -27,7 +28,7 @@ export interface TreeRow<T extends TreeThread> {
   hasChildren: boolean;
   isExpanded: boolean;
   /** A collapsed thread's whole subtree by state; null when expanded or childless. */
-  foldCounts: StateCounts | null;
+  foldCounts: FoldCounts | null;
   /** Shown through a collapsed ancestor: the open thread, or one that needs input. */
   isPeek: boolean;
   /** Thread rows hang directly beneath it: its children, or descendants peeking out of the fold. */
@@ -47,6 +48,19 @@ export type DotState = "input" | "error" | "running" | "done" | "stopped";
 export type ThreadState = "input" | "error" | "running" | "waiting" | "done";
 
 export type StateCounts = Partial<Record<ThreadState, number>>;
+
+/** A rollup state that tells finished-unread apart from done and read. */
+export type FoldState = ThreadState | "unread";
+
+export type FoldCounts = Partial<Record<FoldState, number>>;
+
+/** Most urgent first; finished-unread outranks only work that is done and read. */
+export const FOLD_PRIORITY: readonly FoldState[] = ["input", "error", "running", "waiting", "unread", "done"];
+
+export function foldState(thread: TreeThread): FoldState {
+  const state = threadDotState(thread);
+  return state === "done" && thread.isUnread ? "unread" : state;
+}
 
 /** Most urgent first: what needs the user, then what broke, then live work, then work parked between turns. */
 const THREAD_DOT_PRIORITY: readonly ThreadState[] = ["input", "error", "running", "waiting", "done"];
@@ -199,12 +213,12 @@ export function flattenRows<T extends TreeThread>(
     return count;
   };
   const fold = (thread: T) => {
-    const counts: StateCounts = {};
+    const counts: FoldCounts = {};
     const peeking: T[] = [];
     const visit = (kid: T, underPeek: boolean) => {
       const peeks = !underPeek && peeksOut(kid);
       if (peeks) peeking.push(kid);
-      const state = threadDotState(kid);
+      const state = foldState(kid);
       counts[state] = (counts[state] ?? 0) + 1;
       for (const grandkid of kidsOf(kid)) visit(grandkid, underPeek || peeks);
     };
