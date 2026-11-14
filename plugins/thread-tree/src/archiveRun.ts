@@ -41,13 +41,16 @@ export async function archiveInTurn(
   return { archived, changed, stop: null };
 }
 
+/** How long an archive may take to land once no dialog is open; a large cascade can take seconds to record. */
+export const ARCHIVE_LANDING_GRACE_MS = 10_000;
+
 /** bb's Archive `run()` settles while its confirmation is still open, so this waits on the archive itself: as long as a dialog is up, then a grace for it to land. */
 export async function waitForArchive(
   isArchived: () => Promise<boolean>,
   {
     dialogOpen,
     deadline,
-    graceMs,
+    graceMs = ARCHIVE_LANDING_GRACE_MS,
     intervalMs,
     signal,
     now = Date.now,
@@ -55,7 +58,7 @@ export async function waitForArchive(
   }: {
     dialogOpen: () => boolean;
     deadline: number;
-    graceMs: number;
+    graceMs?: number;
     intervalMs: number;
     signal?: AbortSignal;
     now?: () => number;

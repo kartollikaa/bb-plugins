@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  ARCHIVE_LANDING_GRACE_MS,
   archiveInTurn,
   dialogOutsideSidebar,
   foldArchiveOutcome,
@@ -154,4 +155,11 @@ test("a dialog that holds the sidebar itself, the compact-width drawer, is not b
   assert.equal(dialogOutsideSidebar([drawer, confirm], sidebar), true);
   assert.equal(dialogOutsideSidebar([confirm], null), true);
   assert.equal(dialogOutsideSidebar([], sidebar), false);
+});
+
+test("the landing grace covers a slow cascade that takes several seconds to record", async () => {
+  assert.ok(ARCHIVE_LANDING_GRACE_MS >= 10_000);
+  const { now, sleep } = clock();
+  const result = await waitForArchive(async () => now() >= 18_000, { dialogOpen: () => now() < 10_000, deadline: 600_000, intervalMs: 500, now, sleep });
+  assert.equal(result, "archived");
 });

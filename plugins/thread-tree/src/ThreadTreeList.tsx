@@ -1438,8 +1438,6 @@ async function prepareFoldArchive(
 
 const BOUND_ARCHIVE_WAIT_MS = 2_000;
 const ARCHIVE_POLL_MS = 500;
-/** How long an archive may take to land once no dialog is open. */
-const ARCHIVE_LANDING_GRACE_MS = 3_000;
 const ARCHIVE_WAIT_TOAST_ID = "thread-tree-fold-archive-wait";
 
 /** Any dialog counts, a Radix modal carries no aria-modal; a stray popover only makes the wait longer. */
@@ -1473,7 +1471,6 @@ function BbArchiveRun({ job, sidebarRef }: { job: BbArchiveJob; sidebarRef: Reac
       return waitForArchive(() => sdk.threads.get({ threadId }).then((thread) => thread.archivedAt !== null, () => false), {
         dialogOpen: dialogOpenBesides(sidebarRef.current),
         deadline,
-        graceMs: ARCHIVE_LANDING_GRACE_MS,
         intervalMs: ARCHIVE_POLL_MS,
         signal,
       });
