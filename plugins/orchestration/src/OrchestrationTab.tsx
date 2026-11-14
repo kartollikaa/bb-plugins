@@ -107,9 +107,7 @@ function AnsweredCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; 
       {ask.title && <p className="m-0 text-sm leading-[1.4] text-muted-foreground [overflow-wrap:anywhere]">{ask.title}</p>}
       <div className="flex flex-wrap items-center gap-1.5">
         <span role="status" className="text-xs text-muted-foreground">{answeredStatus(ask.answered!, Date.now())}</span>
-        {actions.sent === askIdentity(ask)
-          ? <span className="text-xs text-muted-foreground">Reply started in the chat composer</span>
-          : ask.drafts && <Button variant="quiet" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.primary)}>Other answer</Button>}
+        {ask.drafts && <Button variant="quiet" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.primary)}>Other answer</Button>}
         {threads.map((t) => <Button key={t} variant="quiet" onClick={() => actions.openThread(t)}>{threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
       </div>
     </div>
