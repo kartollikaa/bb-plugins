@@ -49,13 +49,14 @@ function FailurePill({ label, pendingKey, ariaLabel, icon, errorTitle, run }: { 
       disabled={pending}
       onClick={async (event) => {
         event.stopPropagation();
-        if (!pendingActions.begin(pendingKey)) return;
+        const release = pendingActions.begin(pendingKey);
+        if (!release) return;
         try {
           await run();
         } catch (error) {
           toast.error(errorTitle, { description: error instanceof Error ? error.message : String(error) });
         } finally {
-          pendingActions.end(pendingKey);
+          release();
         }
       }}
       aria-label={ariaLabel}

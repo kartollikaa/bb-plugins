@@ -1,6 +1,6 @@
 export interface PendingActions {
-  begin(key: string): boolean;
-  end(key: string): void;
+  /** Null when the action is already in flight; otherwise ends this run only, never a newer one. */
+  begin(key: string): (() => void) | null;
   has(key: string): boolean;
   subscribe(listener: () => void): () => void;
 }
@@ -21,24 +21,20 @@ export function createPendingActions({
   const timers = new Map<string, number>();
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((listener) => listener());
-  const end = (key: string) => {
-    const timer = timers.get(key);
-    if (timer === undefined) return;
+  const end = (key: string, timer: number) => {
+    if (timers.get(key) !== timer) return;
     timers.delete(key);
     clearTimer(timer);
     notify();
   };
   return {
     begin(key) {
-      if (timers.has(key)) return false;
-      const timer = setTimer(() => {
-        if (timers.get(key) === timer) end(key);
-      }, expireMs);
+      if (timers.has(key)) return null;
+      const timer = setTimer(() => end(key, timer), expireMs);
       timers.set(key, timer);
       notify();
-      return true;
+      return () => end(key, timer);
     },
-    end,
     has: (key) => timers.has(key),
     subscribe(listener) {
       listeners.add(listener);
