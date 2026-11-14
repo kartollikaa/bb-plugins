@@ -9,6 +9,7 @@ import {
   pullRequestSummary,
   pullRequestLook,
   sectionToggleKey,
+  summarySeparator,
 } from "../src/sectionSummaries.ts";
 
 function pr(number: number, attention: GithubFolderItem["attention"], isDraft = false): GithubFolderItem {
@@ -127,4 +128,13 @@ test("a paused automation that is mid-run counts as running in the header, as it
   const now = Date.parse("2026-11-14T12:00:00Z");
   const paused = automation({ name: "p", enabled: false, lastRunStatus: "running" });
   assert.equal(automationsSummary([paused], now).some((part) => part.text === "1 running"), true);
+});
+
+test("a summary separates notes with a dot, but not problems or the bare count", () => {
+  const prs = [{ text: "1 failing", tone: "bad" }, { text: "1 conflicts", tone: "bad" }, { text: "5", tone: "muted" }] as const;
+  assert.deepEqual(prs.map((_, index) => summarySeparator(prs, index)), ["", "", ""]);
+  const autos = [{ text: "1 failed", tone: "bad" }, { text: "next in 12m", tone: "muted" }] as const;
+  assert.deepEqual(autos.map((_, index) => summarySeparator(autos, index)), ["", "· "]);
+  const only = [{ text: "next in 22h", tone: "muted" }] as const;
+  assert.equal(summarySeparator(only, 0), "");
 });

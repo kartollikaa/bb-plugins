@@ -112,7 +112,7 @@ export function GithubSection({
   return (
     <section aria-label="GitHub pull requests">
       <GroupHeader
-        title="GitHub"
+        title="Pull requests"
         icon={<Icon name="Github" aria-hidden className="size-3.5" />}
         isCollapsed={isCollapsed}
         count={view.items.length}

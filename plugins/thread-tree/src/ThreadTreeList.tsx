@@ -500,7 +500,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                   icon={<Icon name="Clock" aria-hidden className="size-3.5" />}
                   isCollapsed={recentCollapsed}
                   count={recent.length}
-  alwaysShowCount
                   onToggle={() => collapsedGroups.toggle("recent")}
                   menu={menu}
                 />
@@ -559,7 +558,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             icon={<Icon name="Network" fallback="Layers" aria-hidden className="size-3.5" />}
             isCollapsed={collapsedGroups.has("orchestrations")}
             count={orchestrationList.length}
-            alwaysShowCount
             onToggle={() => collapsedGroups.toggle("orchestrations")}
           />
           <Collapse open={!collapsedGroups.has("orchestrations")}>
@@ -612,15 +610,13 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                     onChange={(sort) => setFolderSort(group.key, sort === "inherit" ? undefined : sort)}
                   />
                 ) : undefined}
-                count={group.rootCount}
-                alwaysShowCount={group.rootCount === 0}
+                count={group.rootCount === 0 ? null : group.rootCount}
                 onToggle={() => collapsedGroups.toggle(group.key)}
                 action={
                   startThread
                     ? {
                         label: `New thread in ${title}`,
                         icon: "Plus",
-                        alwaysVisible: true,
                         onClick: startThread,
                       }
                     : undefined

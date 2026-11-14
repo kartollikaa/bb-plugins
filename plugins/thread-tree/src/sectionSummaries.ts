@@ -19,7 +19,13 @@ export function isSectionCollapsed(stored: ReadonlySet<string>, section: string)
 
 export interface SummaryPart {
   text: string;
-  tone: "bad" | "muted";
+  tone: "bad" | "attention" | "muted";
+}
+
+/** As in the prototype: problems and a bare count sit side by side; any other note follows a "·". */
+export function summarySeparator(parts: readonly SummaryPart[], index: number): string {
+  const part = parts[index];
+  return index > 0 && part?.tone !== "bad" && !/^\d+$/.test(part?.text ?? "") ? "· " : "";
 }
 
 const PR_PROBLEMS: readonly { attention: Attention; word: string }[] = [

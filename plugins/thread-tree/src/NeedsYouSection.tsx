@@ -213,7 +213,6 @@ export function NeedsYouSection({
         icon={<Icon name="Inbox" aria-hidden className="size-3.5" />}
         isCollapsed={isCollapsed}
         count={items.length}
-        alwaysShowCount
         onToggle={onToggle}
       />
       <Collapse open={!isCollapsed}>

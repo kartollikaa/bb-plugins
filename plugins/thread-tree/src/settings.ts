@@ -5,7 +5,7 @@ const limit = z.number().int().min(1).max(50);
 export const SETTINGS = {
   showGithub: {
     type: "boolean",
-    label: "Show the GitHub section",
+    label: "Show the Pull requests section",
     description: "Pull requests that need you, read from the GitHub Folder plugin.",
     default: true,
   },
@@ -74,7 +74,7 @@ export const SETTINGS = {
 
 /** In default display order. */
 export const SIDEBAR_SECTIONS = [
-  { id: "github", key: "showGithub", label: "GitHub", icon: "Github" },
+  { id: "github", key: "showGithub", label: "Pull requests", icon: "Github" },
   { id: "automations", key: "showAutomations", label: "Automations", icon: "Zap" },
   { id: "recent", key: "showRecent", label: "Recent Activity", icon: "Clock" },
 ] as const;

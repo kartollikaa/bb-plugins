@@ -4,14 +4,13 @@ import { usePortalScopeProps } from "@/lib/portal-scope";
 import { cn } from "@/lib/utils";
 import { headerChevronMotion, TOUCH_DIMMED } from "./rowStyles";
 import { useStill } from "./motion";
-import type { SummaryPart } from "./sectionSummaries";
+import { summarySeparator, type SummaryPart } from "./sectionSummaries";
 
 export function GroupHeader({
   title,
   icon,
   isCollapsed,
   count,
-  alwaysShowCount,
   summary,
   onToggle,
   extra,
@@ -21,52 +20,50 @@ export function GroupHeader({
   title: string;
   icon: React.ReactNode;
   isCollapsed: boolean;
-  count: number;
-  /** Keep the count visible while the group is expanded. */
-  alwaysShowCount?: boolean;
-  /** Replaces the count, shown collapsed or not. */
+  /** Right-aligned, collapsed or not; null draws none. */
+  count: number | null;
+  /** Replaces the count. */
   summary?: readonly SummaryPart[];
   onToggle: () => void;
   /** Controls drawn before `action`, such as a menu trigger. */
   extra?: React.ReactNode;
-  /** A button at the end of the header, shown on hover unless `alwaysVisible`. */
-  action?: { label: string; icon: string; onClick: () => void; alwaysVisible?: boolean };
+  /** A button at the end of the header, shown on hover. */
+  action?: { label: string; icon: string; onClick: () => void };
   /** Right-click menu on the header. */
   menu?: readonly HeaderMenuItem[];
 }) {
   const still = useStill();
   const header = (
-    <div data-drag-image className="group/header flex h-7 items-center gap-1 px-1.5">
+    <div data-drag-image className="group/header flex h-[26px] items-center gap-1 pl-2 pr-1.5">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={!isCollapsed}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left text-xs font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground"
+        className="flex min-w-0 flex-1 items-center gap-[7px] self-stretch rounded-md text-left text-xs font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground"
       >
-        <span className="flex w-4 shrink-0 items-center justify-center text-sidebar-foreground/50">{icon}</span>
-        <span className={cn("truncate", summary && "shrink-0")}>{title}</span>
+        <span className="flex w-3.5 shrink-0 items-center justify-center text-sidebar-foreground/50">{icon}</span>
+        <span className="min-w-0 truncate">{title}</span>
+        <Icon
+          name="ChevronRight"
+          aria-hidden
+          className={cn("size-3 shrink-0 opacity-60", headerChevronMotion(still), !isCollapsed && "rotate-90")}
+        />
         {summary ? (
-          <span data-section-summary="" title={summary.map((part) => part.text).join(" · ")} className="min-w-0 truncate tabular-nums text-sidebar-foreground/40">
+          <span
+            data-section-summary=""
+            title={summary.map((part) => part.text).join(" · ")}
+            className="ml-auto flex min-w-0 shrink items-center gap-1.5 overflow-hidden whitespace-nowrap text-2xs font-normal tabular-nums text-sidebar-foreground/45"
+          >
             {summary.map((part, index) => (
-              <span key={part.text} className={cn(part.tone === "bad" && "text-red-600/80 dark:text-red-400/80")}>
-                {index > 0 ? <span className="text-sidebar-foreground/40"> · </span> : null}
+              <span key={part.text} className={cn("shrink-0", part.tone === "bad" && "text-red-600/90 dark:text-red-400/90", part.tone === "attention" && "text-amber-600 dark:text-amber-400")}>
+                {summarySeparator(summary, index)}
                 {part.text}
               </span>
             ))}
           </span>
-        ) : isCollapsed || alwaysShowCount ? (
-          <span className="tabular-nums text-sidebar-foreground/40">{count}</span>
+        ) : count !== null && count !== undefined ? (
+          <span data-section-count="" className="ml-auto shrink-0 text-2xs font-normal tabular-nums text-sidebar-foreground/45">{count}</span>
         ) : null}
-        <Icon
-          name="ChevronRight"
-          aria-hidden
-          className={cn(
-            "size-3 shrink-0 text-sidebar-foreground/40 opacity-0 group-hover/header:opacity-100",
-            headerChevronMotion(still),
-            TOUCH_DIMMED,
-            !isCollapsed && "rotate-90",
-          )}
-        />
       </button>
       {extra}
       {action ? (
@@ -76,8 +73,9 @@ export function GroupHeader({
           aria-label={action.label}
           title={action.label}
           className={cn(
-            "flex size-5 items-center justify-center rounded-md text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-            !action.alwaysVisible && ["opacity-0 focus-visible:opacity-100 group-hover/header:opacity-100", TOUCH_DIMMED],
+            "flex size-5 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+            "opacity-0 focus-visible:opacity-100 group-hover/header:opacity-100",
+            TOUCH_DIMMED,
           )}
         >
           <Icon name={action.icon} aria-hidden className="size-3.5" />
