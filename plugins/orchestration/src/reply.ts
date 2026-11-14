@@ -1,4 +1,5 @@
 import { parseOwnerItem } from "./owner.ts";
+import { shortAge } from "./age.ts";
 import type { PreferenceStorage } from "./route.ts";
 
 export type Delivery = "sent" | "queued";
@@ -49,8 +50,17 @@ export function replySender(
   };
 }
 
-export type ReplyState = { kind: "sending"; option: string } | { kind: "sent"; option: string; delivery: Outcome };
-type Entry = ReplyState & { token: number; at: number };
+export type ReplyState = { kind: "sending"; option: string } | { kind: "sent"; option: string; delivery: Outcome; at: number };
+type Entry = { kind: "sending" | "sent"; option: string; delivery?: Outcome; token: number; at: number };
+
+export function replyStatus(state: ReplyState, now: number): string {
+  if (state.kind === "sending") return `Sending «${state.option}»…`;
+  const age = shortAge(now - state.at);
+  const when = age === "now" ? "just now" : `${age} ago`;
+  if (state.delivery === "already") return `«${state.option}» was already sent · ${when}`;
+  if (state.delivery === "queued") return `Sent «${state.option}», queued behind the orchestrator's turn · ${when}`;
+  return `Sent «${state.option}» · ${when}`;
+}
 
 const STORAGE_KEY = "orchestration.sentReplies.v1";
 type Saved = Record<string, Record<string, { option: string; delivery: Outcome; at: number }>>;
@@ -68,7 +78,7 @@ export function createReplyTracker(
     const saved: Saved = {};
     for (const [threadId, asks] of states) {
       for (const [ask, entry] of asks) {
-        if (entry.kind === "sent") (saved[threadId] ??= {})[ask] = { option: entry.option, delivery: entry.delivery, at: entry.at };
+        if (entry.kind === "sent" && entry.delivery) (saved[threadId] ??= {})[ask] = { option: entry.option, delivery: entry.delivery, at: entry.at };
       }
     }
     try {
@@ -102,7 +112,7 @@ export function createReplyTracker(
 
   const view = (entry: Entry | undefined): ReplyState | null => {
     if (!entry) return null;
-    return entry.kind === "sending" ? { kind: "sending", option: entry.option } : { kind: "sent", option: entry.option, delivery: entry.delivery };
+    return entry.kind === "sending" ? { kind: "sending", option: entry.option } : { kind: "sent", option: entry.option, delivery: entry.delivery ?? "sent", at: entry.at };
   };
   const current = (threadId: string, ask: string, token: number) => {
     const entry = states.get(threadId)?.get(ask);
@@ -117,6 +127,13 @@ export function createReplyTracker(
       if (m.has(ask)) return null;
       const token = nextToken++;
       m.set(ask, { kind: "sending", option, token, at: now() });
+      emit();
+      return token;
+    },
+    again(threadId: string, ask: string, option: string): number | null {
+      if (states.get(threadId)?.get(ask)?.kind !== "sent") return null;
+      const token = nextToken++;
+      of(threadId).set(ask, { kind: "sending", option, token, at: now() });
       emit();
       return token;
     },

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createReplyTracker, quickReplies, replyDraft, replyKey, replySender, toDelivery, type Delivery } from "../src/reply.ts";
+import { createReplyTracker, quickReplies, replyDraft, replyKey, replySender, replyStatus, toDelivery, type Delivery } from "../src/reply.ts";
 
 test("a quick reply reads Re «title»: option", () => {
   assert.equal(replyDraft("Merge PR #12?", "Merge it"), "Re «Merge PR #12?»: Merge it");
@@ -89,18 +89,18 @@ test("a failed send can be retried", async () => {
 });
 
 test("the tracker lets one click through per card and keeps the sent state", () => {
-  const tracker = createReplyTracker();
+  const tracker = createReplyTracker(null, { now: () => 0 });
   const token = tracker.begin("thr_o", "ask-1", "Merge it");
   assert.notEqual(token, null);
   assert.equal(tracker.begin("thr_o", "ask-1", "Not now"), null);
   assert.deepEqual(tracker.get("thr_o", "ask-1"), { kind: "sending", option: "Merge it" });
   tracker.done("thr_o", "ask-1", token!, "queued");
-  assert.deepEqual(tracker.get("thr_o", "ask-1"), { kind: "sent", option: "Merge it", delivery: "queued" });
+  assert.deepEqual(tracker.get("thr_o", "ask-1"), { kind: "sent", option: "Merge it", delivery: "queued", at: 0 });
   assert.equal(tracker.begin("thr_o", "ask-1", "Merge it"), null);
 });
 
 test("a failure frees the card for another click", () => {
-  const tracker = createReplyTracker();
+  const tracker = createReplyTracker(null, { now: () => 0 });
   const token = tracker.begin("thr_o", "ask-1", "Merge it")!;
   tracker.fail("thr_o", "ask-1", token);
   assert.equal(tracker.get("thr_o", "ask-1"), null);
@@ -108,7 +108,7 @@ test("a failure frees the card for another click", () => {
 });
 
 test("an earlier attempt's result never lands on a later click", () => {
-  const tracker = createReplyTracker();
+  const tracker = createReplyTracker(null, { now: () => 0 });
   const first = tracker.begin("thr_o", "ask-1", "Merge it")!;
   tracker.prune("thr_o", []);
   const second = tracker.begin("thr_o", "ask-1", "Not now")!;
@@ -117,11 +117,11 @@ test("an earlier attempt's result never lands on a later click", () => {
   tracker.fail("thr_o", "ask-1", first);
   assert.deepEqual(tracker.get("thr_o", "ask-1"), { kind: "sending", option: "Not now" });
   tracker.done("thr_o", "ask-1", second, "queued");
-  assert.deepEqual(tracker.get("thr_o", "ask-1"), { kind: "sent", option: "Not now", delivery: "queued" });
+  assert.deepEqual(tracker.get("thr_o", "ask-1"), { kind: "sent", option: "Not now", delivery: "queued", at: 0 });
 });
 
 test("the sent state goes once the ledger drops the ask, only for that orchestrator", () => {
-  const tracker = createReplyTracker();
+  const tracker = createReplyTracker(null, { now: () => 0 });
   tracker.done("thr_o", "ask-1", tracker.begin("thr_o", "ask-1", "Merge it")!, "sent");
   tracker.begin("thr_o", "ask-2", "Yes");
   tracker.begin("thr_p", "ask-1", "Yes");
@@ -132,7 +132,7 @@ test("the sent state goes once the ledger drops the ask, only for that orchestra
 });
 
 test("subscribers hear every change", () => {
-  const tracker = createReplyTracker();
+  const tracker = createReplyTracker(null, { now: () => 0 });
   let heard = 0;
   const off = tracker.subscribe(() => heard++);
   tracker.done("thr_o", "a", tracker.begin("thr_o", "a", "x")!, "sent");
@@ -150,14 +150,14 @@ function memory() {
 
 test("a sent reply survives a reload until the ledger drops the ask; a send in flight does not", () => {
   const storage = memory();
-  const first = createReplyTracker(storage);
+  const first = createReplyTracker(storage, { now: () => 0 });
   first.done("thr_o", "ask-1", first.begin("thr_o", "ask-1", "Merge it")!, "queued");
   first.begin("thr_o", "ask-2", "Yes");
-  const reloaded = createReplyTracker(storage);
-  assert.deepEqual(reloaded.get("thr_o", "ask-1"), { kind: "sent", option: "Merge it", delivery: "queued" });
+  const reloaded = createReplyTracker(storage, { now: () => 0 });
+  assert.deepEqual(reloaded.get("thr_o", "ask-1"), { kind: "sent", option: "Merge it", delivery: "queued", at: 0 });
   assert.equal(reloaded.get("thr_o", "ask-2"), null);
   reloaded.prune("thr_o", []);
-  assert.equal(createReplyTracker(storage).get("thr_o", "ask-1"), null);
+  assert.equal(createReplyTracker(storage, { now: () => 0 }).get("thr_o", "ask-1"), null);
 });
 
 test("stored replies of orchestrators that are never reopened expire and leave storage", () => {
@@ -179,7 +179,40 @@ test("stored replies of orchestrators that are never reopened expire and leave s
 
 test("unreadable or throwing storage leaves the tracker in memory", () => {
   const broken = { getItem: () => "{not json", setItem: () => { throw new Error("quota"); }, removeItem: () => {} };
-  const tracker = createReplyTracker(broken);
+  const tracker = createReplyTracker(broken, { now: () => 0 });
   tracker.done("thr_o", "a", tracker.begin("thr_o", "a", "x")!, "sent");
-  assert.deepEqual(tracker.get("thr_o", "a"), { kind: "sent", option: "x", delivery: "sent" });
+  assert.deepEqual(tracker.get("thr_o", "a"), { kind: "sent", option: "x", delivery: "sent", at: 0 });
+});
+
+test("a sent card can send its answer again, and only from the sent state", () => {
+  let t = 0;
+  const tracker = createReplyTracker(null, { now: () => t });
+  const first = tracker.begin("thr_o", "ask", "Not now")!;
+  assert.equal(tracker.again("thr_o", "ask", "Not now"), null);
+  tracker.done("thr_o", "ask", first, "sent");
+  t = 2 * 60 * 60_000;
+  const second = tracker.again("thr_o", "ask", "Merge it");
+  assert.notEqual(second, null);
+  assert.equal(tracker.again("thr_o", "ask", "Merge it"), null);
+  assert.deepEqual(tracker.get("thr_o", "ask"), { kind: "sending", option: "Merge it" });
+  tracker.done("thr_o", "ask", first, "queued");
+  assert.deepEqual(tracker.get("thr_o", "ask"), { kind: "sending", option: "Merge it" });
+  tracker.done("thr_o", "ask", second!, "queued");
+  assert.deepEqual(tracker.get("thr_o", "ask"), { kind: "sent", option: "Merge it", delivery: "queued", at: t });
+  assert.equal(tracker.again("thr_o", "missing", "x"), null);
+});
+
+test("a failed send-again frees the card", () => {
+  const tracker = createReplyTracker(null, { now: () => 0 });
+  tracker.done("thr_o", "ask", tracker.begin("thr_o", "ask", "Yes")!, "sent");
+  tracker.fail("thr_o", "ask", tracker.again("thr_o", "ask", "Yes")!);
+  assert.equal(tracker.get("thr_o", "ask"), null);
+});
+
+test("the sent status says what went and how long ago", () => {
+  assert.equal(replyStatus({ kind: "sending", option: "Yes" }, 0), "Sending «Yes»…");
+  assert.equal(replyStatus({ kind: "sent", option: "Not now", delivery: "sent", at: 0 }, 30_000), "Sent «Not now» · just now");
+  assert.equal(replyStatus({ kind: "sent", option: "Not now", delivery: "sent", at: 0 }, 2 * 60 * 60_000), "Sent «Not now» · 2h ago");
+  assert.equal(replyStatus({ kind: "sent", option: "Yes", delivery: "queued", at: 0 }, 5 * 60_000), "Sent «Yes», queued behind the orchestrator's turn · 5m ago");
+  assert.equal(replyStatus({ kind: "sent", option: "Yes", delivery: "already", at: 0 }, 5 * 60_000), "«Yes» was already sent · 5m ago");
 });

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, typ
 import { experimental_useRpcMutation, Markdown, UrlLink, useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { contract } from "./contract.ts";
-import { createReplyTracker, replyKey, type ReplyState } from "./reply.ts";
+import { createReplyTracker, replyKey, replyStatus, type ReplyState } from "./reply.ts";
 import { askIdentity, type Ask, type Row, type RowKind, type View } from "./view.ts";
 import { useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 import { localStore } from "./storage.ts";
@@ -64,7 +64,7 @@ function Reveal({ open, children }: { open: boolean; children: ReactNode }) {
 interface Actions {
   fill(key: string, text: string): void;
   sent: string | null;
-  reply(key: string, label: string, text: string): void;
+  reply(key: string, label: string, text: string, again?: boolean): void;
   replyState(key: string): ReplyState | null;
   openThread(threadId: string | null): void;
 }
@@ -96,12 +96,6 @@ function Expandable({ children }: { children: ReactNode }) {
 
 const linkButton = "block h-[26px] max-w-full truncate whitespace-nowrap leading-[24px] rounded-md border border-border px-2.5 text-xs font-medium text-foreground no-underline hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
-function replyStatus(state: ReplyState): string {
-  if (state.kind === "sending") return `Sending «${state.option}»…`;
-  if (state.delivery === "already") return `«${state.option}» was already sent to the orchestrator`;
-  return state.delivery === "queued" ? `Sent «${state.option}», queued until the orchestrator's turn ends` : `Sent «${state.option}» to the orchestrator`;
-}
-
 function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
   const sent = actions.sent === askIdentity(ask);
   const id = askIdentity(ask);
@@ -123,7 +117,17 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         {replied ? (
-          <span role="status" className="text-xs text-muted-foreground">{replyStatus(replied)}</span>
+          <>
+            <span role="status" className="text-xs text-muted-foreground">{replyStatus(replied, Date.now())}</span>
+            {replied.kind === "sent" && (
+              <>
+                {ask.replies.filter((r) => r.label === replied.option).map((r) => (
+                  <Button key="again" variant="outline" onClick={() => actions.reply(replyKeyOf(ask), r.label, r.draft, true)}>Send again</Button>
+                ))}
+                <Button variant="quiet" onClick={() => actions.fill(id, ask.drafts!.primary)}>Other answer</Button>
+              </>
+            )}
+          </>
         ) : sent ? (
           <span className="text-xs text-muted-foreground">Reply started in the chat composer</span>
         ) : ask.kind === "decision" && ask.drafts ? (
@@ -283,8 +287,8 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   const actions: Actions = {
     sent,
     replyState: (key) => replies.get(threadId, key),
-    reply(key, label, text) {
-      const token = replies.begin(threadId, key, label);
+    reply(key, label, text, again) {
+      const token = again ? replies.again(threadId, key, label) : replies.begin(threadId, key, label);
       if (token === null) return;
       replyMutation.mutate({ threadId, text }).then(
         ({ delivery }) => replies.done(threadId, key, token, delivery),

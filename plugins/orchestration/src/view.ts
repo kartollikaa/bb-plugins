@@ -2,6 +2,9 @@
 import type { Agent, LedgerSummary, Subtask } from "./contract.ts";
 import { parseOwnerItem, type Link } from "./owner.ts";
 import { replyDraft, replyPrefix } from "./reply.ts";
+import { shortAge } from "./age.ts";
+
+export { shortAge };
 
 /** Owner's rule: quiet this long while working, or the third failure of a delivery, means stuck. */
 export const QUIET_MS = 30 * 60_000;
@@ -72,15 +75,6 @@ const ASKING = new Set(["question", "ready", "card"]);
 const WAITING = new Set(["waiting-dependency", "planned"]);
 const QUIET_WATCHED = new Set(["working", "briefed"]);
 const ORDER: Record<RowKind, number> = { you: 0, stuck: 1, work: 2, wait: 3, done: 4 };
-
-export function shortAge(ms: number): string {
-  if (ms < 60_000) return "now";
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}
 
 export function longAge(ms: number): string {
   const minutes = Math.max(1, Math.floor(ms / 60_000));

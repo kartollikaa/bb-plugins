@@ -26,8 +26,8 @@ question: does anything need you, and is the team moving?
   `Re «<title>»: <option>` to the orchestrator at once, as you asked: «when I click on the button
   on the suggestion it just puts the text in the chat. I suggest that it should send the message by
   itself». A busy orchestrator gets it in bb's queue, after its current turn. The card then reads
-  Sent until the orchestrator takes the ask off the ledger; a failed send shows an error and brings
-  the buttons back.
+  «Sent «option» · 2h ago» until the orchestrator takes the ask off the ledger, with Send again and
+  Other answer still there; a failed send shows an error and brings the buttons back.
 - **Answer, Other answer, Release, Not yet** only start a reply in the orchestrator's composer.
   Nothing is sent until you send it.
 
