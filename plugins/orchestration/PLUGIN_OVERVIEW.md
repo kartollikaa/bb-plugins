@@ -10,8 +10,9 @@ one question: does anything need you, and is the team moving?
 - One status sentence on top: "Nothing needs you", "One decision for you", or "S5 has gone quiet".
 - A card for each thing that waits on you: a subtask's question, a delivery ready to land, a pending
   approval, an ask the ledger keeps for the owner, titled with what is asked, with quick replies and
-  links to its PR and thread. Answer, quick replies and Release start a reply in the
-  orchestrator's composer; you send it yourself.
+  links to its PR and thread. A quick reply sends itself to the orchestrator in one click
+  (queued if it is mid-turn). Answer and Release start a reply in the orchestrator's composer;
+  you send it yourself.
 - The team: one row per subtask with its state and latest step. A row opens to show the model,
   context use, rotations and the gate.
 - The same sentence as a row in the thread's context card.

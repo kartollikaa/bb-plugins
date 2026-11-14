@@ -22,8 +22,14 @@ question: does anything need you, and is the team moving?
   (`Orchestrator: thr_…`) names. On top: one status sentence. Below it: a card per thing that waits
   on you, then the team with one row per subtask, then a fold with the goal and history.
 - **Context-card row.** The same status sentence in the thread's context card. A click opens the view.
-- **Answer, Release, Not yet** only start a reply in the orchestrator's composer. Nothing is sent
-  until you send it.
+- **Quick replies send.** A click on an ask's option (Merge it, Not now) sends
+  `Re «<title>»: <option>` to the orchestrator at once, as you asked: «when I click on the button
+  on the suggestion it just puts the text in the chat. I suggest that it should send the message by
+  itself». A busy orchestrator gets it in bb's queue, after its current turn. The card then reads
+  Sent until the orchestrator takes the ask off the ledger; a failed send shows an error and brings
+  the buttons back.
+- **Answer, Other answer, Release, Not yet** only start a reply in the orchestrator's composer.
+  Nothing is sent until you send it.
 
 ## Why this layout
 
@@ -66,7 +72,7 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
 - `ask:` is the card's title: what the owner is asked to do or decide. The other fields are
   optional, separated by ` | `, in any order: `why:` (one line of context), `link:` (URLs or
   `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
-  ` / `). A GitHub link reads `repo#N` on its button. Each option fills the composer with `Re «<title>»: <option>`; Other answer fills
+  ` / `). A GitHub link reads `repo#N` on its button. Each option sends `Re «<title>»: <option>` to the orchestrator; Other answer fills the composer with
   `Re «<title>»: `.
 - `note:`, and a status line that opens with «Nothing», «Nothing waiting», «Nothing pending» or
   «Nothing waits on the owner» followed by a full stop or the end, is information, not an ask: it

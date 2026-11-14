@@ -41,8 +41,14 @@ several name the thread, the newest wins.
   context-card row still name a stuck agent.
 - **Done:** `landed`, `verified`, `dropped`, or the ledger's status `closed`.
 
-The Answer, Release, Not yet and quick-reply buttons only put a draft into the orchestrator's composer and focus
-it, wherever the composer currently is (rail, sheet or dock). They never send. Keep ledger statuses and «For the owner» current: the tab reads nothing else.
+A quick-reply option button sends `Re «<title>»: <option>` to the orchestrator thread itself, once
+per click, with `queue-if-active`: mid-turn it waits in bb's queue. The server sends only texts the
+ledger's current asks offer, and only to the thread the ledger names as orchestrator. Owner, on the
+change: «when I click on the button on the suggestion it just puts the text in the chat. I suggest
+that it should send the message by itself». The card reads Sent until the ask leaves the ledger, so
+drop an answered ask from «For the owner». Answer, Other answer, Release and Not yet only put a draft
+into the orchestrator's composer and focus it, wherever the composer currently is (rail, sheet or
+dock); they never send. Keep ledger statuses and «For the owner» current: the tab reads nothing else.
 
 ## Writing «For the owner»
 
@@ -56,7 +62,7 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
 - `ask:` is the card's title: what the owner is asked to do or decide. The other fields are
   optional, separated by ` | `, in any order: `why:` (one line of context), `link:` (URLs or
   `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
-  ` / `). A GitHub link reads `repo#N` on its button. Each option fills the composer with `Re «<title>»: <option>`; Other answer fills
+  ` / `). A GitHub link reads `repo#N` on its button. Each option sends `Re «<title>»: <option>` to the orchestrator; Other answer fills the composer with
   `Re «<title>»: `.
 - `note:`, and a status line that opens with «Nothing», «Nothing waiting», «Nothing pending» or
   «Nothing waits on the owner» followed by a full stop or the end, is information, not an ask: it
