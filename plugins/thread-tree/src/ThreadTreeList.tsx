@@ -1394,7 +1394,7 @@ function OlderThreads({
   return (
     <>
       <Collapse open={isOpen}>
-        <div role="group" aria-label="Older threads" className="flex flex-col gap-0.5">{isOpen ? children : null}</div>
+        <div role="group" aria-label="Older threads" className="flex flex-col gap-0.5">{children}</div>
       </Collapse>
       <div role="none" data-older-line="" className="flex h-6 items-center gap-1 pr-2" style={{ paddingLeft: ROW_PAD_PX + GLYPH_CENTER_PX * 2 + 8 }}>
         <button
