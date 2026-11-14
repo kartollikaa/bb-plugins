@@ -20,7 +20,7 @@ import { sectionPatchSchema, SETTINGS } from "./src/settings";
 import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/threadPullRequests";
 import { createProjectFolderHistory } from "./src/projectFolders";
 import { createArchiveHistory } from "./src/archiveUndo";
-import { dirtyEnvironmentIds, holdForHiddenChanges, unlistedDescendantIds } from "./src/orchestrations";
+import { dirtyEnvironmentIds } from "./src/orchestrations";
 
 const MAX_THREADS_PER_CALL = 200;
 
@@ -72,25 +72,20 @@ export const rpcContract = defineRpcContract({
       failed: z.array(z.object({ threadId: z.string(), title: z.string(), error: z.string() })),
     }),
   },
-  /** Environments whose worktree archiving would lose changes, per bb's git plugin; all of them when it can't be read. */
-  dirtyWorktrees: {
-    input: z.object({ environmentIds: z.array(z.string().min(1)).min(1).max(200) }).strict(),
-    output: z.object({ dirty: z.array(z.string()) }),
+  /** What archiving each thread takes along (itself, its cascade, hidden descendants), and which of those have a dirty worktree. */
+  archiveScope: {
+    input: z.object({ threadIds: z.array(z.string().min(1)).min(1).max(MAX_THREADS_PER_CALL) }).strict(),
+    output: z.object({ scopes: z.record(z.string(), z.array(z.string())), dirty: z.array(z.string()) }),
   },
-  /**
-   * Archives `threadIds` in order (leaves first) as one undo, holding back any thread with a hidden
-   * subthread whose worktree has changes. Stops at the first failure.
-   */
-  archiveThreads: {
-    input: z.object({ threadIds: z.array(z.string().min(1)).min(1).max(1000) }).strict(),
-    output: z.object({
-      archived: z.number(),
-      /** Listed threads kept because a hidden thread below them has changes. */
-      held: z.array(z.string()),
-      /** Hidden threads with changes. */
-      skipped: z.number(),
-      error: z.string().optional(),
-    }),
+  /** Groups the coming archives of these threads into one ⌘Z, however far apart they land. */
+  archiveClaim: {
+    input: z.object({ threadIds: z.array(z.string().min(1)).min(1).max(5000) }).strict(),
+    output: z.object({ claimId: z.number() }),
+  },
+  /** Ends a claim; threads it covered that weren't archived go back to ordinary grouping. */
+  archiveRelease: {
+    input: z.object({ claimId: z.number() }).strict(),
+    output: z.object({ ok: z.literal(true) }),
   },
   /** Shows or hides sidebar sections from the sidebar itself. */
   setSections: {
@@ -126,6 +121,8 @@ export default async function plugin(bb: BbPluginApi) {
   const ok = z.object({ ok: z.literal(true) });
 
   const archives = createArchiveHistory();
+  const claims = new Map<number, { threadIds: string[]; claim: ReturnType<typeof archives.claim> }>();
+  let lastClaimId = 0;
   const projectFolders = createProjectFolderHistory(bb.storage.kv, async (args) => ({ threads: await bb.sdk.threads.list(args) }));
   for (const event of ["thread.created", "thread.archived", "thread.unarchived", "thread.deleted"] as const) {
     bb.events.on(event, ({ thread }) => projectFolders.record(thread));
@@ -179,30 +176,34 @@ export default async function plugin(bb: BbPluginApi) {
       }
       return { restored, failed };
     },
-    dirtyWorktrees: async ({ environmentIds }) => ({ dirty: await readDirtyEnvironments(environmentIds) }),
-    archiveThreads: async ({ threadIds }) => {
-      const listed = await inChunks(threadIds, async (chunk) =>
-        (await bb.sdk.threads.experimental_listDescendants({ threadIds: chunk, includeHidden: true })).threads);
-      const descendants = new Map(listed.map((thread) => [thread.threadId, thread.descendantIds]));
-      const dirtyHidden = new Set(await dirtyThreadIds(unlistedDescendantIds(threadIds, descendants)));
-      const plan = holdForHiddenChanges(threadIds, descendants, dirtyHidden);
-      const claimed = [...new Set(plan.archive.flatMap((id) => [id, ...(descendants.get(id) ?? [])]))];
-      const claim = archives.claim(claimed);
-      const done = new Set<string>();
-      let archived = 0;
-      let error: string | undefined;
-      for (const threadId of plan.archive) {
-        try {
-          const result = await bb.sdk.threads.archive({ threadId });
-          [threadId, ...result.archivedThreadIds].forEach((id) => done.add(id));
-          archived += 1;
-        } catch (cause) {
-          error = cause instanceof Error ? cause.message : String(cause);
-          break;
-        }
+    archiveScope: async ({ threadIds }) => {
+      const [cascade, descendants] = await Promise.all([
+        bb.sdk.threads.experimental_listCascade({ threadIds, action: "archive" }),
+        bb.sdk.threads.experimental_listDescendants({ threadIds, includeHidden: true }),
+      ]);
+      const scopes = new Map<string, Set<string>>();
+      const scopeOf = (id: string) => scopes.get(id) ?? scopes.set(id, new Set([id])).get(id)!;
+      cascade.threads.forEach(({ threadId, cascadeThreadIds }) => cascadeThreadIds.forEach((id) => scopeOf(threadId).add(id)));
+      descendants.threads.forEach(({ threadId, descendantIds }) => descendantIds.forEach((id) => scopeOf(threadId).add(id)));
+      const everything = [...new Set([...scopes.values()].flatMap((scope) => [...scope]))];
+      return {
+        scopes: Object.fromEntries([...scopes].map(([id, scope]) => [id, [...scope]])),
+        dirty: await dirtyThreadIds(everything),
+      };
+    },
+    archiveClaim: async ({ threadIds }) => {
+      const claimId = ++lastClaimId;
+      claims.set(claimId, { threadIds, claim: archives.claim(threadIds) });
+      return { claimId };
+    },
+    archiveRelease: async ({ claimId }) => {
+      const entry = claims.get(claimId);
+      claims.delete(claimId);
+      if (entry) {
+        const archived = new Set((await inChunks(entry.threadIds, (chunk) => bb.sdk.threads.list({ threadIds: chunk, includeHidden: true, archived: true }))).map((thread) => thread.id));
+        entry.claim.release(entry.threadIds.filter((id) => !archived.has(id)));
       }
-      claim.release(claimed.filter((id) => !done.has(id)));
-      return { archived, held: plan.held, skipped: plan.skipped.length, ...(error ? { error } : {}) };
+      return { ok: true as const };
     },
     setSections: async (patch) => {
       await settings.experimental_set(patch);

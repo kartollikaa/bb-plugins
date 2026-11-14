@@ -94,49 +94,42 @@ export function orchestrationSubtitle(orchestration: Orchestration<TreeThread>, 
   ].filter(Boolean).join(" · ");
 }
 
-export interface ArchivePlan {
-  /** Children before parents, so nothing is archived while a thread below it stays. */
-  archive: string[];
-  skipped: string[];
-  /** Ancestors of a skipped thread: archiving them could take the skipped one along. */
-  kept: string[];
+export interface FoldArchivePlan {
+  /** The highest threads whose archive takes nothing dirty along, for bb's own Archive. */
+  roots: string[];
+  /** Every thread those archives take, hidden ones included. */
+  archiveCount: number;
+  skipped: number;
+  /** Sidebar threads that stay because archiving them would take a dirty one along. */
+  kept: number;
 }
 
-export function archivePlan<T extends TreeThread>(forest: Forest<T>, rootId: string, dirtyThreadIds: ReadonlySet<string>): ArchivePlan {
-  const plan: ArchivePlan = { archive: [], skipped: [], kept: [] };
-  const visit = (id: string): boolean => {
-    let keep = false;
-    for (const kid of forest.children.get(id) ?? []) keep = visit(kid.id) || keep;
-    if (dirtyThreadIds.has(id)) plan.skipped.push(id);
-    else if (keep) plan.kept.push(id);
-    else plan.archive.push(id);
-    return keep || dirtyThreadIds.has(id);
+/** `scopes`: what archiving each visible thread takes along, itself included; a thread without one counts as unsafe. */
+export function foldArchivePlan<T extends TreeThread>(
+  forest: Forest<T>,
+  rootId: string,
+  scopes: ReadonlyMap<string, readonly string[]>,
+  dirty: ReadonlySet<string>,
+): FoldArchivePlan {
+  const roots: string[] = [];
+  const covered = new Set<string>();
+  const visit = (id: string) => {
+    const scope = scopes.get(id);
+    if (scope && !scope.some((each) => dirty.has(each))) {
+      roots.push(id);
+      scope.forEach((each) => covered.add(each));
+      return;
+    }
+    for (const kid of forest.children.get(id) ?? []) visit(kid.id);
   };
   visit(rootId);
-  return plan;
-}
-
-/** Threads below the listed ones that aren't listed themselves: hidden from the sidebar, so the client couldn't check them. */
-export function unlistedDescendantIds(order: readonly string[], descendants: ReadonlyMap<string, readonly string[]>): string[] {
-  const listed = new Set(order);
-  return [...new Set(order.flatMap((id) => descendants.get(id) ?? []))].filter((id) => !listed.has(id));
-}
-
-/** Archiving a thread takes its hidden subthreads along, so one with changes holds back every listed thread above it. */
-export function holdForHiddenChanges(
-  order: readonly string[],
-  descendants: ReadonlyMap<string, readonly string[]>,
-  dirtyHidden: ReadonlySet<string>,
-): { archive: string[]; held: string[]; skipped: string[] } {
-  const result = { archive: [] as string[], held: [] as string[], skipped: [] as string[] };
-  const skipped = new Set<string>();
-  for (const id of order) {
-    const below = (descendants.get(id) ?? []).filter((kid) => dirtyHidden.has(kid));
-    below.forEach((kid) => skipped.add(kid));
-    (below.length > 0 ? result.held : result.archive).push(id);
-  }
-  result.skipped = [...skipped];
-  return result;
+  const rootScope = new Set([rootId, ...(scopes.get(rootId) ?? []), ...orchestrationTreeIds(forest, rootId)]);
+  return {
+    roots,
+    archiveCount: covered.size,
+    skipped: [...dirty].filter((id) => rootScope.has(id)).length,
+    kept: orchestrationTreeIds(forest, rootId).filter((id) => !covered.has(id) && !dirty.has(id)).length,
+  };
 }
 
 const NOTHING_TO_LOSE = new Set(["path_not_found"]);

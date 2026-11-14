@@ -2,10 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildForest, groupRows, type TreeThread } from "../src/tree.ts";
 import {
-  archivePlan,
+  foldArchivePlan,
   orchestrationTreeIds,
-  holdForHiddenChanges,
-  unlistedDescendantIds,
   dirtyEnvironmentIds,
   foldBarSegments,
   isFinishedFold,
@@ -109,39 +107,38 @@ test("revealing an orchestration covers its whole tree, nested subthreads includ
   assert.deepEqual(orchestrationTreeIds(forest, "root").sort(), ["a", "a1", "root"]);
 });
 
-test("archiving a finished fold goes leaves first and keeps dirty threads and their ancestors", () => {
-  const threads = [
-    thread("root"),
-    thread("a", { parentThreadId: "root" }),
-    thread("a1", { parentThreadId: "a" }),
-    thread("b", { parentThreadId: "root" }),
-    thread("b1", { parentThreadId: "b" }),
-  ];
-  const forest = buildForest(threads);
-  const clean = archivePlan(forest, "root", new Set());
-  assert.deepEqual(clean.skipped, []);
-  assert.deepEqual(clean.kept, []);
-  assert.equal(clean.archive.at(-1), "root");
-  assert.ok(clean.archive.indexOf("a1") < clean.archive.indexOf("a"));
-  assert.ok(clean.archive.indexOf("b1") < clean.archive.indexOf("b"));
-  assert.equal(clean.archive.length, 5);
+const archiveTree = () => buildForest([
+  thread("root"),
+  thread("a", { parentThreadId: "root" }),
+  thread("a1", { parentThreadId: "a" }),
+  thread("b", { parentThreadId: "root" }),
+  thread("b1", { parentThreadId: "b" }),
+]);
+// What archiving each visible thread takes along, per bb: its cascade plus hidden descendants (h1 under a1, h2 under root).
+const scopes = new Map([
+  ["root", ["root", "a", "a1", "h1", "b", "b1", "h2"]],
+  ["a", ["a", "a1", "h1"]],
+  ["a1", ["a1", "h1"]],
+  ["b", ["b", "b1"]],
+  ["b1", ["b1"]],
+]);
 
-  const dirty = archivePlan(forest, "root", new Set(["a1"]));
-  assert.deepEqual(dirty.skipped, ["a1"]);
-  assert.deepEqual(dirty.kept.sort(), ["a", "root"]);
-  assert.deepEqual(dirty.archive, ["b1", "b"]);
+test("a clean fold is archived through its root alone, counting the hidden threads it takes along", () => {
+  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set()), { roots: ["root"], archiveCount: 7, skipped: 0, kept: 0 });
 });
 
-test("threads below the archive list that the sidebar didn't show are found for a worktree check", () => {
-  const descendants = new Map([["a1", ["h1"]], ["a", ["a1", "h1"]], ["b", []], ["root", ["a", "a1", "h1", "b", "h2"]]]);
-  assert.deepEqual(unlistedDescendantIds(["a1", "a", "b", "root"], descendants).sort(), ["h1", "h2"]);
+test("a dirty thread, hidden or not, keeps every thread whose archive would take it along", () => {
+  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["h1"])), { roots: ["b"], archiveCount: 2, skipped: 1, kept: 3 });
+  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["b1"])), { roots: ["a"], archiveCount: 3, skipped: 1, kept: 2 });
 });
 
-test("a hidden subthread with changes holds back every listed thread above it", () => {
-  const order = ["a1", "a", "b", "root"];
-  const descendants = new Map([["a1", ["h1"]], ["a", ["a1", "h1"]], ["b", []], ["root", ["a", "a1", "h1", "b"]]]);
-  assert.deepEqual(holdForHiddenChanges(order, descendants, new Set()), { archive: order, held: [], skipped: [] });
-  assert.deepEqual(holdForHiddenChanges(order, descendants, new Set(["h1"])), { archive: ["b"], held: ["a1", "a", "root"], skipped: ["h1"] });
+test("a dirty root still lets its clean subtrees go", () => {
+  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["root"])), { roots: ["a", "b"], archiveCount: 5, skipped: 1, kept: 0 });
+});
+
+test("a thread missing from the scope check counts as unsafe", () => {
+  const partial = new Map([...scopes].filter(([id]) => id !== "b"));
+  assert.deepEqual(foldArchivePlan(archiveTree(), "root", partial, new Set(["h1"])).roots, ["b1"]);
 });
 
 test("a worktree counts as dirty when it has changes or untracked files, or its status can't be read", () => {
