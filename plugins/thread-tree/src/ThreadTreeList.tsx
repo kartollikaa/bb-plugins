@@ -309,6 +309,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   const [archiveJob, setArchiveJob] = useState<BbArchiveJob | null>(null);
   const archiveJobRunning = useRef(false);
+  const archiveJobCount = useRef(0);
   const archiveRunner = useMemo<BbArchiveRunner>(() => ({
     acquire: () => {
       if (archiveJobRunning.current) return false;
@@ -319,6 +320,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       archiveJobRunning.current = false;
     },
     run: (targets, isStillClean) => new Promise<ArchiveRunResult>((resolve) => setArchiveJob({
+      id: ++archiveJobCount.current,
       targets,
       isStillClean,
       finish: (result) => {
@@ -646,7 +648,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       </>
       )}
       </div>
-      {archiveJob ? <BbArchiveRun job={archiveJob} sidebarRef={sectionsRef} /> : null}
+      {archiveJob ? <BbArchiveRun key={archiveJob.id} job={archiveJob} sidebarRef={sectionsRef} /> : null}
     </ReduceMotionContext.Provider>
   );
 }
@@ -1401,6 +1403,7 @@ interface BbArchiveRunner {
 }
 
 interface BbArchiveJob {
+  id: number;
   targets: PluginThreadActionTarget[];
   isStillClean(id: string): Promise<boolean>;
   finish(result: ArchiveRunResult): void;
