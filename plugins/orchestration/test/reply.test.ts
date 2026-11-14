@@ -229,3 +229,13 @@ test("a sent quick reply is an answer to its ask title right away; a sending or 
   tracker.fail("thr_o", other, tracker.begin("thr_o", other, "A")!);
   assert.deepEqual(Object.keys(tracker.answers("thr_o")), ["Merge PR #12?"]);
 });
+
+test("a quick reply is dated from when its send started, before the server's read after sending", () => {
+  let clock = 100;
+  const tracker = createReplyTracker(null, { now: () => clock });
+  const key = replyKey("Pick one", ["A"]);
+  const token = tracker.begin("thr_o", key, "A")!;
+  clock = 900;
+  tracker.done("thr_o", key, token, "sent");
+  assert.equal(tracker.answers("thr_o")["Pick one"]!.at, 100);
+});

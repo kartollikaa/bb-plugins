@@ -190,7 +190,9 @@ export default async function plugin(bb: BbPluginApi) {
     if (!ledger) throw new Error("This thread is not an orchestrator, so nothing was sent.");
     const summary = await exportLedger(ledger.path);
     if (!quickReplies(summary.forTheOwner).includes(text)) throw new Error("The ledger no longer offers this answer, so nothing was sent.");
-    return { delivery: await sendReply(threadId, text) };
+    const delivery = await sendReply(threadId, text);
+    await observeOwnerLines(ledger.path, summary.forTheOwner).catch(() => {});
+    return { delivery };
   }
 
   bb.rpc.register(contract, {

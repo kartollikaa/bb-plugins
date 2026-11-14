@@ -118,7 +118,9 @@ function AnsweredCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; 
 function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
   const sent = actions.sent === askIdentity(ask);
   const id = askIdentity(ask);
-  const replied = ask.replies.length ? actions.replyState(replyKeyOf(ask)) : null;
+  const remembered = ask.replies.length ? actions.replyState(replyKeyOf(ask)) : null;
+  /** A finished send on a card that still waits belongs to an earlier asking of the same line. */
+  const replied = remembered?.kind === "sent" ? null : remembered;
   const threads = threadId ? [threadId] : ask.threads;
   const answerable = (ask.kind === "question" || ask.kind === "owner") && ask.drafts;
   return (
@@ -136,17 +138,7 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         {replied ? (
-          <>
-            <span role="status" className="text-xs text-muted-foreground">{replyStatus(replied, Date.now())}</span>
-            {replied.kind === "sent" && (
-              <>
-                {ask.replies.filter((r) => r.label === replied.option).map((r) => (
-                  <Button key="again" variant="outline" onClick={() => actions.reply(replyKeyOf(ask), r.label, r.draft, true)}>Send again</Button>
-                ))}
-                <Button variant="quiet" onClick={() => actions.fill(id, ask.drafts!.primary)}>Other answer</Button>
-              </>
-            )}
-          </>
+          <span role="status" className="text-xs text-muted-foreground">{replyStatus(replied, Date.now())}</span>
         ) : sent ? (
           <span className="text-xs text-muted-foreground">Reply started in the chat composer</span>
         ) : ask.kind === "decision" && ask.drafts ? (
@@ -156,7 +148,7 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
           </>
         ) : answerable ? (
           <>
-            {ask.replies.map((r, i) => <Button key={i} variant={i === 0 ? "primary" : "outline"} onClick={() => actions.reply(replyKeyOf(ask), r.label, r.draft)}>{r.label}</Button>)}
+            {ask.replies.map((r, i) => <Button key={i} variant={i === 0 ? "primary" : "outline"} onClick={() => actions.reply(replyKeyOf(ask), r.label, r.draft, remembered?.kind === "sent")}>{r.label}</Button>)}
             <Button variant={ask.replies.length ? "quiet" : "primary"} onClick={() => actions.fill(id, ask.drafts!.primary)}>{ask.replies.length ? "Other answer" : "Answer"}</Button>
           </>
         ) : null}

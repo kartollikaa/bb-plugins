@@ -141,7 +141,7 @@ export function createReplyTracker(
     done(threadId: string, ask: string, token: number, delivery: Outcome) {
       const entry = current(threadId, ask, token);
       if (!entry) return;
-      of(threadId).set(ask, { kind: "sent", option: entry.option, delivery, token, at: now() });
+      of(threadId).set(ask, { kind: "sent", option: entry.option, delivery, token, at: entry.at });
       emit();
     },
     fail(threadId: string, ask: string, token: number) {
