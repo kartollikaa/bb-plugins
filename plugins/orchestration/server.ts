@@ -8,6 +8,7 @@ import { contract, type Agent, type LedgerSummary, type Snapshot } from "./src/c
 import { answeredAsks, askFirstSeen, collectOwnerMessages, observe, sameLines, type Answer, type Observation, type OwnerMessage } from "./src/answered.ts";
 import { summarizeExport } from "./src/ledger.ts";
 import { exportScriptCandidates, ledgerFor, scanLedgers, type LedgerFile } from "./src/locate.ts";
+import { resolveOwner } from "./src/route.ts";
 import { quickReplies, REPLY_MODE, replySender, toDelivery } from "./src/reply.ts";
 
 const run = promisify(execFile);
@@ -196,6 +197,14 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   bb.rpc.register(contract, {
+    owner: async ({ threadId }) => {
+      const all = await ledgers();
+      const owner = await resolveOwner(threadId, (id) => ledgerFor(all, id) !== null, async (id) => {
+        const result = obj(await bb.sdk.threads.get({ threadId: id }));
+        return str(obj(result.thread ?? result).parentThreadId);
+      });
+      return { owner };
+    },
     isOrchestrator: async ({ keys }) => {
       const all = await ledgers();
       return Object.fromEntries(keys.map((key) => [key, ledgerFor(all, key) !== null]));

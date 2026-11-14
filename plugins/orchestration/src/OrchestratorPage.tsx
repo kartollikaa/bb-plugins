@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import { ThreadChat, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
+import { ThreadChat, experimental_useSidebarThreads, useSdk, useBbNavigate, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Button, Message, OrchestrationTab } from "./OrchestrationTab.tsx";
-import { chatPlacement, clampRailWidth, dockHeight, RAIL, railMode, railOpen, SHEET, sheetGestureOwner, sheetHeightWhileDragging, sheetSettles, threadFromSubPath, type ChatPlacement, type RailChoice, type RailMode } from "./route.ts";
-import { useOrchestratorMembership } from "./useOrchestration.ts";
-import { useOpenChat, useViewSwitch } from "./surface.ts";
+import { chatFromSubPath, chatPlacement, clampRailWidth, dockHeight, RAIL, railMode, railOpen, SHEET, sheetGestureOwner, sheetHeightWhileDragging, sheetSettles, threadFromSubPath, type ChatPlacement, type RailChoice, type RailMode } from "./route.ts";
+import { useOrchestratorMembership, useOrchestrationOwner } from "./useOrchestration.ts";
+import { useOpenChat, useOpenView, useViewSwitch } from "./surface.ts";
 import { localStore } from "./storage.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
@@ -98,7 +98,7 @@ function ViewSwitch({ onOff }: { onOff: () => void }) {
 }
 
 export function OrchestratorHeader({ subPath }: PluginNavPanelProps) {
-  const threadId = threadFromSubPath(subPath);
+  const threadId = chatFromSubPath(subPath);
   const open = useRailOpen();
   const openChat = useOpenChat();
   if (!threadId) return null;
@@ -321,7 +321,7 @@ function SheetHandle({ placement }: { placement: ChatPlacement }) {
   return (
     <div data-sheet-handle="" style={{ height: SHEET_HEADER }} className="relative flex w-full shrink-0 items-center border-b border-border px-4">
       <span aria-hidden className="absolute left-1/2 top-1.5 h-1 w-9 -translate-x-1/2 rounded-full bg-border" />
-      <span className="text-xs font-medium text-muted-foreground">Orchestrator chat</span>
+      <span className="text-xs font-medium text-muted-foreground">Conversation</span>
       <button
         type="button"
         aria-label="Hide chat"
@@ -336,6 +336,20 @@ function SheetHandle({ placement }: { placement: ChatPlacement }) {
 }
 
 function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDockHeight }: { threadId: string; placement: ChatPlacement; pageWidth: number; pageHeight: number; focusRequest: number; onDockHeight: (h: number) => void }) {
+  const sidebarTitle = experimental_useSidebarThreads().threads.find((thread) => thread.id === threadId)?.displayTitle;
+  const sdk = useSdk();
+  const [loadedTitle, setLoadedTitle] = useState<{ id: string; title: string } | null>(null);
+  useEffect(() => {
+    if (sidebarTitle) return;
+    let cancelled = false;
+    void sdk.threads.get({ threadId }).then((response) => {
+      const result = response as { thread?: { title?: string }; title?: string };
+      const title = result.thread?.title ?? result.title;
+      if (!cancelled && typeof title === "string") setLoadedTitle({ id: threadId, title });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [threadId, sidebarTitle, sdk]);
+  const title = sidebarTitle ?? (loadedTitle?.id === threadId ? loadedTitle.title : "Conversation");
   const [saved, setSaved] = useState(readWidth);
   const [dragging, setDragging] = useState<number | null>(null);
   const [sheetHeight, setSheetHeight] = useState<number | null>(null);
@@ -365,7 +379,7 @@ function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDock
   return (
     <aside
       ref={asideRef}
-      aria-label="Orchestrator chat"
+      aria-label={`Chat: ${title}`}
       data-placement={placement}
       style={style}
       className={cx(
@@ -379,6 +393,7 @@ function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDock
     >
       {placement === "rail" && <ResizeHandle width={width} onDrag={setDragging} onDone={persist} />}
       {placement !== "rail" && <SheetHandle placement={placement} />}
+      <div className="truncate border-b border-border px-4 py-2 text-xs text-muted-foreground" title={title}>{title}</div>
       <div ref={chatRef} className={cx("flex min-h-0 flex-1 flex-col", placement === "rail" ? "min-w-[340px]" : "mx-auto w-full max-w-[720px]")}>
         <ThreadChat threadId={threadId} variant="compact" layout="contained" focusRequest={focusRequest} className="min-h-0 flex-1" />
       </div>
@@ -397,11 +412,12 @@ function NotHere({ threadId }: { threadId: string }) {
   );
 }
 
-function View({ threadId }: { threadId: string }) {
+function View({ threadId, chatId }: { threadId: string; chatId: string }) {
+  const openView = useOpenView();
   const [ref, pageWidth, pageHeight] = useElementSize<HTMLDivElement>();
   const mode = railMode(pageWidth || 1200);
   const openChat = useOpenChat();
-  useLayoutEffect(() => rail.place(`${threadId}:${mode}`, mode), [threadId, mode]);
+  useLayoutEffect(() => { rail.place(`${threadId}:${mode}`, mode); if (chatId !== threadId) rail.set(true); }, [threadId, chatId, mode]);
   const open = useRailOpen();
   const placement = chatPlacement(mode, open);
   const [focusRequest, setFocusRequest] = useState(0);
@@ -416,7 +432,11 @@ function View({ threadId }: { threadId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [placement]);
 
-  const revealComposer = useCallback(async () => setFocusRequest((n) => n + 1), []);
+  const revealComposer = useCallback(async () => {
+    if (chatId !== threadId) openView(threadId, true);
+    rail.set(true);
+    setFocusRequest((n) => n + 1);
+  }, [threadId, chatId, openView]);
 
   return (
     <div ref={ref} className="relative flex h-full min-h-0 w-full overflow-hidden bg-background">
@@ -425,21 +445,32 @@ function View({ threadId }: { threadId: string }) {
           key={threadId}
           threadId={threadId}
           variant="page"
+          openChild={(childId) => openView(threadId, false, childId)}
           revealComposer={revealComposer}
           noneAction={<Button variant="primary" onClick={() => openChat(threadId)}>Open chat</Button>}
         />
       </div>
       {placement === "sheet" && <button type="button" aria-label="Hide chat" tabIndex={-1} onClick={() => rail.set(false)} className="absolute inset-0 z-20 bg-background/40" />}
-      <Rail threadId={threadId} placement={placement} pageWidth={pageWidth || 1200} pageHeight={pageHeight} focusRequest={focusRequest} onDockHeight={setDockSpace} />
+      <Rail key={chatId} threadId={chatId} placement={placement} pageWidth={pageWidth || 1200} pageHeight={pageHeight} focusRequest={focusRequest} onDockHeight={setDockSpace} />
     </div>
   );
 }
 
 export function OrchestratorPage({ subPath }: PluginNavPanelProps) {
   const threadId = threadFromSubPath(subPath);
+  const requestedChat = chatFromSubPath(subPath);
+  const owner = useOrchestrationOwner(requestedChat ?? "");
   const membership = useOrchestratorMembership(threadId ?? "");
+  const openView = useOpenView();
+  const navigate = useBbNavigate();
+  useEffect(() => {
+    if (!threadId || !requestedChat || requestedChat === threadId || owner === undefined || owner === threadId) return;
+    if (owner) openView(owner, true, requestedChat);
+    else navigate.toThread(requestedChat);
+  }, [threadId, requestedChat, owner]);
   if (!threadId) return <Message title="Orchestration" body="Open an orchestrator's thread to see its team here." />;
   if (membership === false) return <NotHere threadId={threadId} />;
   if (membership === null) return <Message title="Reading the ledger" body="One moment." />;
-  return <View threadId={threadId} />;
+  if (requestedChat !== threadId && owner !== threadId) return <Message title="Opening conversation" body="One moment." />;
+  return <View key={threadId} threadId={threadId} chatId={requestedChat ?? threadId} />;
 }

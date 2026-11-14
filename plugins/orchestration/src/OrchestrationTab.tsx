@@ -3,6 +3,7 @@ import { experimental_useRpcMutation, experimental_useSidebarThreads, Markdown, 
 import { toast } from "sonner";
 import { contract } from "./contract.ts";
 import { answeredStatus } from "./answered.ts";
+import { WORK_CATEGORIES } from "./categories.ts";
 import { WorkflowHistory } from "./WorkflowHistory.tsx";
 import { replyKey, replyStatus, type ReplyState } from "./reply.ts";
 import { askIdentity, type Ask, type RecapLine, type Row, type RowKind, type View } from "./view.ts";
@@ -235,7 +236,10 @@ function Team({ view, actions, threadIds }: { view: View; actions: Actions; thre
         <span>{view.activeLabel}</span>
       </div>
       <div className="-mx-2 flex flex-col">
-        {view.active.map(row)}
+        {WORK_CATEGORIES.filter((category) => category !== "Done").map((category) => {
+          const grouped = view.active.filter((r) => (r.running || r.kind === "you" ? "Active" : r.kind === "wait" ? "Planned" : "Idle / waiting") === category);
+          return grouped.length ? <section key={category} aria-label={category}><h3 className="m-0 px-2 pb-1 pt-3 text-xs font-medium text-subtle-foreground">{category} · {grouped.length}</h3>{grouped.map(row)}</section> : null;
+        })}
         {view.done.length > 0 && <Fold expanded={showDone} label={showDone ? "Hide done" : `${view.done.length} done`} onClick={() => setShowDone(!showDone)} />}
         {showDone && view.done.map(row)}
       </div>
@@ -312,7 +316,7 @@ export function Message({ title, body, action }: { title: string; body: string; 
 }
 
 /** `revealComposer` runs before a draft goes in; the page uses it to focus its composer. */
-export function OrchestrationTab({ threadId, revealComposer, variant = "tab", noneAction }: { threadId: string; revealComposer?: () => Promise<void>; variant?: "tab" | "page"; noneAction?: ReactNode }) {
+export function OrchestrationTab({ threadId, revealComposer, variant = "tab", noneAction, openChild }: { threadId: string; revealComposer?: () => Promise<void>; variant?: "tab" | "page"; noneAction?: ReactNode; openChild?: (id: string) => void }) {
   const isOrchestrator = useIsOrchestrator(threadId);
   const state = useOrchestration(threadId, isOrchestrator);
   const composers = useComposers();
@@ -347,11 +351,16 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
     fill(key, text) {
       void (async () => {
         await revealComposer?.();
-        if (fillComposer(composersRef.current, threadId, text)) setSent(key);
+        const until = Date.now() + 3000;
+        while (Date.now() < until) {
+          if (fillComposer(composersRef.current, threadId, text)) { setSent(key); return; }
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        toast.error("Could not open the orchestrator composer. Try again.");
       })();
     },
     openThread(childId) {
-      if (childId) navigate.toThread(childId, { split: true });
+      if (childId) { if (openChild) openChild(childId); else navigate.toThread(childId); }
     },
   };
 

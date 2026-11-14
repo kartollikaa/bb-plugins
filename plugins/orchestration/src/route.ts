@@ -122,3 +122,23 @@ export function sheetGestureOwner({ open, dx, dy, inHandle, scrollTop }: { open:
   if (!open || inHandle || scrollTop === null) return "sheet";
   return dy > 0 && scrollTop <= 0 ? "sheet" : "content";
 }
+
+export function orchestrationPath(owner: string, chat = owner): string {
+  return chat === owner ? owner : `${owner}/chat/${chat}`;
+}
+
+export function chatFromSubPath(subPath: string): string | null {
+  const parts = subPath.split("/");
+  return parts[1] === "chat" && parts.length === 3 && isThreadId(parts[2] ?? "") ? parts[2]! : threadFromSubPath(subPath);
+}
+
+export async function resolveOwner(threadId: string, isOwner: (id: string) => boolean, parentOf: (id: string) => Promise<string | null>): Promise<string | null> {
+  const seen = new Set<string>();
+  let current: string | null = threadId;
+  while (current && isThreadId(current) && !seen.has(current) && seen.size < 100) {
+    if (isOwner(current)) return current;
+    seen.add(current);
+    current = await parentOf(current);
+  }
+  return null;
+}

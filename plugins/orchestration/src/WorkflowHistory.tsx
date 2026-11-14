@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { LedgerSummary, Subtask } from "./contract.ts";
+import { workCategory, WORK_CATEGORIES } from "./categories.ts";
 import { recentEvents } from "./history.ts";
 import type { View } from "./view.ts";
 
@@ -28,7 +29,9 @@ export function WorkflowHistory({ ledger, view, openThread, mode }: { ledger: Le
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-border" aria-label={`${done} of ${ledger.subtasks.length} tasks finished`}><div className="h-full bg-muted-foreground" style={{ width: `${ledger.subtasks.length ? done / ledger.subtasks.length * 100 : 0}%` }} /></div>
         {!tasks.length && <p className="m-0 text-sm text-muted-foreground">No tasks in this view.</p>}
-        <div className="-mx-2 flex flex-col gap-1">{tasks.map((task) => {
+        <div className="-mx-2 flex flex-col gap-4">{WORK_CATEGORIES.map((category) => {
+          const grouped = tasks.filter((task) => workCategory(task.status, rows.get(task.id)?.running ?? false, asking(task)) === category);
+          return grouped.length ? <section key={category} aria-label={category}><h3 className="m-0 px-2 pb-1 text-xs font-medium text-subtle-foreground">{category} · {grouped.length}</h3>{grouped.map((task) => {
           const open = selected === task.id;
           const row = rows.get(task.id);
           const resumed = activeAgain(task);
@@ -52,7 +55,7 @@ export function WorkflowHistory({ ledger, view, openThread, mode }: { ledger: Le
               {thread && <button type="button" onClick={() => openThread(thread)} className={`${control} self-start border border-border`}>Open task conversation ↗</button>}
             </div>}
           </article>;
-        })}</div>
+        })}</section> : null; })}</div>
       </> : <>
         <div className="flex items-center justify-between gap-3"><h2 className="m-0 text-sm font-medium">Decisions & delivery</h2><select aria-label="Activity task" value={selected ?? ""} onChange={(event) => { setSelected(event.target.value || null); setLimit(12); }} className="max-w-[55%] rounded-md border border-border bg-background px-2 py-1.5 text-xs"><option value="">All work</option>{ledger.subtasks.map((task) => <option key={task.id} value={task.id}>{task.id} · {title(task)}</option>)}</select></div>
         <p className="m-0 text-xs text-subtle-foreground">Latest recorded activity first. Open a delivery to read its checks, review and outcome.</p>

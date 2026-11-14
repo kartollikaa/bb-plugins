@@ -135,3 +135,18 @@ keep their reference. Filter by task and use Earlier activity for older records.
 Task names, coverage and outcomes come from the ledger; missing facts are not invented.
 A finished task running again is labeled Active again (Needs input again for an approval).
 It moves back to Remaining. Finished includes dropped tasks, whose status remains visible.
+
+## Navigating the team
+
+Opening a child thread opens its nearest ancestor orchestration with that child's conversation
+in the chat rail (or the open chat sheet on a phone). The URL records both the orchestration
+and selected conversation, so reloading restores them. Selecting the orchestrator opens its
+own conversation. An unrelated thread opens normally; another orchestrator switches the
+whole workspace. Full chat opens the selected conversation outside the workspace, and the
+existing view switch and split-pane opt-out still apply.
+
+Task conversation buttons select the child's chat inside the workspace. Owner questions
+still address the orchestrator: starting an owner reply first opens its composer.
+The chat header names the selected conversation. Work and the live team separate Active,
+Idle / waiting, Planned and Done. A running thread or pending input counts as Active;
+a delivered task waiting for its next gate is Idle / waiting, never Planned.

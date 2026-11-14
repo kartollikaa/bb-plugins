@@ -140,3 +140,30 @@ test("folded, a vertical drag anywhere on the dock moves the sheet; open, the tr
   assert.equal(g({ open: true, dy: -40, scrollTop: 0 }), "content", "pushing up at the top scrolls the transcript");
   assert.equal(g({ open: true, dy: 40, scrollTop: null }), "sheet", "outside any scroller the sheet moves");
 });
+
+
+test("authoritative parent graph resolves active, archived and nested children without sidebar rows", async () => {
+  const { resolveOwner, orchestrationPath, chatFromSubPath } = await import("../src/route.ts");
+  const parents: Record<string, string | null> = { thr_child: "thr_root", thr_archived: "thr_root", thr_nested: "thr_root", thr_other: null, thr_cycle: "thr_cycle" };
+  const owners = new Set(["thr_root", "thr_nested", "thr_second"]);
+  const resolve = (id: string) => resolveOwner(id, (key) => owners.has(key), async (key) => parents[key] ?? null);
+  assert.equal(await resolve("thr_child"), "thr_root");
+  assert.equal(await resolve("thr_archived"), "thr_root");
+  assert.equal(await resolve("thr_nested"), "thr_nested");
+  assert.equal(await resolve("thr_second"), "thr_second");
+  assert.equal(await resolve("thr_other"), null);
+  assert.equal(await resolve("thr_cycle"), null);
+  assert.equal(orchestrationPath("thr_root", "thr_child"), "thr_root/chat/thr_child");
+  assert.equal(chatFromSubPath("thr_root/chat/thr_child"), "thr_child");
+  assert.equal(chatFromSubPath("thr_root/chat/../thr_other"), "thr_root");
+});
+
+test("task categories distinguish live running, idle, planned, and done including restarted approvals", async () => {
+  const { workCategory } = await import("../src/categories.ts");
+  assert.equal(workCategory("working", true, false), "Active");
+  assert.equal(workCategory("working", false, false), "Idle / waiting");
+  assert.equal(workCategory("gate", false, false), "Idle / waiting");
+  assert.equal(workCategory("planned", false, false), "Planned");
+  assert.equal(workCategory("landed", false, false), "Done");
+  assert.equal(workCategory("landed", false, true), "Active");
+});

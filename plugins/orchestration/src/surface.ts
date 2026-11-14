@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { experimental_useRpcMutation, useBbNavigate, useSettings } from "@get-bb/plugin-sdk/app";
 import { contract } from "./contract.ts";
-import { chatPreference, viewEnabled, VIEW_PATH } from "./route.ts";
+import { chatPreference, viewEnabled, VIEW_PATH, orchestrationPath } from "./route.ts";
 import { pendingSwitch } from "./switch.ts";
 import { localStore } from "./storage.ts";
 
@@ -17,9 +17,9 @@ export function useOpenChat() {
 
 export function useOpenView() {
   const navigate = useBbNavigate();
-  return (threadId: string, replace: boolean) => {
+  return (threadId: string, replace: boolean, chatId = threadId) => {
     surfacePreference().set(threadId, "view");
-    navigate.toPluginPanel(VIEW_PATH, { subPath: threadId, replace });
+    navigate.toPluginPanel(VIEW_PATH, { subPath: orchestrationPath(threadId, chatId), replace });
   };
 }
 

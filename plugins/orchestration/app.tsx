@@ -17,13 +17,14 @@ import { OrchestratorHeader, OrchestratorPage } from "./src/OrchestratorPage";
 import { surfacePreference, useOpenView, useViewSwitch } from "./src/surface";
 import { shouldOpenView, threadFromSubPath, VIEW_PATH } from "./src/route";
 import { orchestratorLookupKeys } from "./src/switch";
-import { useIsOrchestrator, useOrchestration, useOrchestratorMembership } from "./src/useOrchestration";
+import { useIsOrchestrator, useOrchestration, useOrchestrationOwner } from "./src/useOrchestration";
 
 const TAB = { id: "orchestration", context: { kind: "thread" }, availability: "fixed" } as const;
 
 /** bb has no slot for a thread's main area, so the orchestrator's thread view hands over to the plugin page. */
 function useTabVisibleAndOpenViewByDefault({ threadId }: { threadId: string }) {
-  const membership = useOrchestratorMembership(threadId);
+  const owner = useOrchestrationOwner(threadId);
+  const membership = owner === undefined ? null : owner !== null;
   const inSplit = useSidebarSplitLayout() !== null;
   const openView = useOpenView();
   const viewSwitch = useViewSwitch();
@@ -32,9 +33,9 @@ function useTabVisibleAndOpenViewByDefault({ threadId }: { threadId: string }) {
     if (membership === null || viewSwitch.isLoading) return;
     const open = shouldOpenView({ enabled: viewSwitch.on, membership, prefersChat: surfacePreference().prefersChat(threadId), inSplit, decided: decided.current === threadId });
     decided.current = threadId;
-    if (open) openView(threadId, true);
-  }, [membership, threadId, inSplit, viewSwitch.isLoading]);
-  return membership === true;
+    if (open && owner) openView(owner, true, threadId);
+  }, [membership, owner, threadId, inSplit, viewSwitch.isLoading]);
+  return owner === threadId;
 }
 
 function StatusRow({ threadId }: ExperimentalThreadContextCardProps) {

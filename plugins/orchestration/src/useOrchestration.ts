@@ -93,3 +93,9 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
     return { kind: "ready", view, ledger: data.ledger, threadIds: view.threadIds };
   }, [query.data, query.error, query.refetch, live, threadId, now, repliesVersion]);
 }
+
+export function useOrchestrationOwner(threadId: string): string | null | undefined {
+  const query = experimental_useRpcQuery({ contract, method: "owner", input: { threadId }, enabled: /^thr_[a-z0-9]+$/i.test(threadId) });
+  useVisibleInterval(query.refetch, MEMBERSHIP_REFRESH_MS);
+  return query.data ? query.data.owner : query.error ? null : undefined;
+}
