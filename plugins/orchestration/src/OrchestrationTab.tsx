@@ -79,7 +79,7 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
             <Button variant="primary" onClick={() => actions.fill(ask.key, ask.drafts!.primary)}>Release</Button>
             <Button variant="quiet" onClick={() => actions.fill(ask.key, ask.drafts!.secondary!)}>Not yet</Button>
           </>
-        ) : ask.kind === "question" && ask.drafts ? (
+        ) : (ask.kind === "question" || ask.kind === "owner") && ask.drafts ? (
           <>
             <Button variant="primary" onClick={() => actions.fill(ask.key, ask.drafts!.primary)}>Answer</Button>
             {threadId && <Button variant="quiet" onClick={() => actions.openThread(threadId)}>Open thread</Button>}
@@ -187,9 +187,6 @@ function History({ view }: { view: View }) {
           {view.goal && <><dt className="text-subtle-foreground">Goal</dt><dd className="m-0 [overflow-wrap:anywhere]">{view.goal}</dd></>}
           <dt className="text-subtle-foreground">Sessions</dt><dd className="m-0">{history.sessions}</dd>
           {history.handover && <><dt className="text-subtle-foreground">Handover</dt><dd className="m-0 [overflow-wrap:anywhere]">{history.handover}</dd></>}
-          {history.notes.length > 0 && (
-            <><dt className="text-subtle-foreground">For you</dt><dd className="m-0 flex flex-col gap-1 [overflow-wrap:anywhere]">{history.notes.map((note, i) => <span key={i}>{note}</span>)}</dd></>
-          )}
           <dt className="text-subtle-foreground">Ledger</dt><dd className="m-0 [overflow-wrap:anywhere]">{history.ledger.replace(/^\/(Users|home)\/[^/]+/, "~")}</dd>
           {history.warnings.length > 0 && (
             <><dt className="text-subtle-foreground">Unread</dt><dd className="m-0 flex flex-col gap-1 [overflow-wrap:anywhere]">{history.warnings.map((w, i) => <span key={i}>{w}</span>)}</dd></>

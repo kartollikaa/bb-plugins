@@ -16,7 +16,10 @@
     "name": "Orchestration",
     "description": "An Orchestration tab on an orchestrator's thread: whether anything needs you, and whether the team is moving, read from the orchestrate plugin's ledger and bb's live thread state.",
     "branding": {
-      "icon": "Network"
+      "icon": "./assets/network.svg",
+      "experimental_icons": {
+        "network": "./assets/network.svg"
+      }
     },
     "server": "./server.ts",
     "app": "./app.tsx"

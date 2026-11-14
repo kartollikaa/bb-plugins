@@ -86,6 +86,17 @@ test("the orchestrator's own pending question needs you too", () => {
   assert.equal(v.asks[0]!.who, "Orchestrator");
 });
 
+test("each «For the owner» line needs you, after the timed asks", () => {
+  const v = view([subtask("S7", "ready"), subtask("S2", "working")], { thr_s7: live(5), thr_s2: live(1) }, {},
+    { forTheOwner: ["Waiting: owner merge of hub#38"] });
+  assert.equal(v.heading, "2 things need you");
+  assert.deepEqual(v.asks.map((a) => a.key), ["S7", "owner-0"]);
+  assert.equal(v.asks[1]!.drafts!.primary, "Re «Waiting: owner merge of hub#38»: ");
+  const only = view([subtask("S2", "working")], { thr_s2: live(1) }, {}, { forTheOwner: ["Confirm the window"] });
+  assert.equal(only.heading, "One thing waits on you");
+  assert.equal(only.state, "needs");
+});
+
 test("quiet for 30 min while working is stuck; 29 min is not", () => {
   const quiet = view([subtask("S5", "working"), subtask("S6", "working")], { thr_s5: live(52), thr_s6: live(4) },
     { thr_s5: agent({ lastOutput: "## Writing tests for the fold threshold\nmore" }) });
@@ -140,4 +151,5 @@ test("formatting helpers", () => {
   assert.equal(prettyModel("gpt-6"), "gpt-6");
   assert.equal(firstLine("\n\n**Done:** [PR](https://x) merged"), "Done: PR merged");
   assert.equal(firstLine("x".repeat(200), 10), "xxxxxxxxx…");
+  assert.equal(firstLine("_RO1_ says REQUEST_CHANGES on __S6__"), "RO1 says REQUEST_CHANGES on S6");
 });

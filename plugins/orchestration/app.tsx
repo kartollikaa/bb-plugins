@@ -31,7 +31,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_tab({
     ...TAB,
     title: "Orchestration",
-    icon: "Network",
+    icon: "orchestration/network",
     component: OrchestrationTab,
     layout: "flush",
     useVisible: ({ threadId }) => useIsOrchestrator(threadId),

@@ -32,8 +32,8 @@ export interface Ask {
   age: string;
   since: number | null;
   text: string;
-  /** question → Answer; decision → Release / Not yet; thread → the answer lives in a thread, not in a message. */
-  kind: "question" | "decision" | "thread";
+  /** question → Answer; decision → Release / Not yet; owner → a «For the owner» line; thread → the answer lives in a thread, not in a message. */
+  kind: "question" | "decision" | "owner" | "thread";
   drafts: { primary: string; secondary?: string } | null;
 }
 
@@ -48,7 +48,7 @@ export interface View {
   active: Row[];
   done: Row[];
   goal: string | null;
-  history: { sessions: string; handover: string | null; notes: string[]; ledger: string; warnings: string[] };
+  history: { sessions: string; handover: string | null; ledger: string; warnings: string[] };
 }
 
 export interface ViewInput {
@@ -97,7 +97,8 @@ export function firstLine(text: string | null, max = 140): string | null {
     const line = raw
       .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
       .replace(/^\s*(#+|[-*>]|\d+\.)\s*/, "")
-      .replace(/[*_`]/g, "")
+      .replace(/[*`]/g, "")
+      .replace(/(^|\s)_+(?=\S)|(?<=\S)_+(?=\s|$)/g, "$1")
       .trim();
     if (line) return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
   }
@@ -221,6 +222,17 @@ export function buildView(input: ViewInput): View {
       drafts: null,
     });
   }
+  ledger.forTheOwner.forEach((line, i) => {
+    asks.push({
+      key: `owner-${i}`,
+      who: "For you, from the ledger",
+      since: null,
+      age: "",
+      text: line,
+      kind: "owner",
+      drafts: { primary: `Re «${firstLine(line, 60)}»: ` },
+    });
+  });
   asks.sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));
 
   const active = rows.filter((r) => r.kind !== "done" && r.kind !== "you");
@@ -236,7 +248,6 @@ export function buildView(input: ViewInput): View {
       ? "This is the first orchestrator session."
       : `This is orchestrator session ${ledger.orchestratorSessions}. The team above includes subtasks from all ${ledger.orchestratorSessions}.`,
     handover: lastHandover?.why ?? null,
-    notes: ledger.forTheOwner,
     ledger: ledger.path,
     warnings: ledger.warnings,
   };
@@ -248,7 +259,8 @@ export function buildView(input: ViewInput): View {
 
   if (asks.length) {
     const first = asks[0]!;
-    const heading = asks.length > 1 ? `${asks.length} things need you` : first.kind === "decision" ? "One decision for you" : "One question for you";
+    const heading = asks.length > 1 ? `${asks.length} things need you`
+      : first.kind === "decision" ? "One decision for you" : first.kind === "owner" ? "One thing waits on you" : "One question for you";
     const subline = working.length ? `The rest of the team is moving · ${progress}` : progress;
     return { ...common, state: "needs", heading, subline, nudge: null };
   }
