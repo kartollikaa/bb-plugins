@@ -10,7 +10,8 @@ export interface OlderContext<T extends TreeThread> {
   now: number;
   activeThreadId: string | null;
   draftIds: ReadonlySet<string>;
-  pullRequestStates: (thread: T) => readonly string[];
+  /** Null while unknown, which keeps the thread out. */
+  pullRequestStates: (thread: T) => readonly string[] | null;
 }
 
 const SETTLED_PULL_REQUESTS: ReadonlySet<string> = new Set(["merged", "closed"]);
@@ -21,10 +22,15 @@ function isQuietAndOld<T extends TreeThread>(thread: T, context: OlderContext<T>
     !context.draftIds.has(thread.id) &&
     thread.id !== context.activeThreadId &&
     context.now - thread.updatedAt > OLDER_AFTER_MS &&
-    context.pullRequestStates(thread).every((state) => SETTLED_PULL_REQUESTS.has(state))
+    (context.pullRequestStates(thread)?.every((state) => SETTLED_PULL_REQUESTS.has(state)) ?? false)
   );
 }
 
-export function olderRoots<T extends TreeThread>(forest: Forest<T>, roots: readonly T[], context: OlderContext<T>): T[] {
-  return roots.filter((root) => !root.isPinned && [root, ...descendantsOf(forest, root.id)].every((thread) => isQuietAndOld(thread, context)));
+export function isOlderRoot<T extends TreeThread>(forest: Forest<T>, root: T, context: OlderContext<T>): boolean {
+  return !root.isPinned && [root, ...descendantsOf(forest, root.id)].every((thread) => isQuietAndOld(thread, context));
+}
+
+/** Ids of the forest's roots that fold into a folder's "N older" line. */
+export function olderRootIds<T extends TreeThread>(forest: Forest<T>, context: OlderContext<T>): Set<string> {
+  return new Set(forest.roots.filter((root) => isOlderRoot(forest, root, context)).map((root) => root.id));
 }

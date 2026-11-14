@@ -212,3 +212,13 @@ export function foldArchiveOutcome({
   if (!description) return null;
   return { tone: stop ? "warning" : "success", title: `Archived ${plural(archived, "thread")}`, description };
 }
+
+/** The uncommitted markers after a run: each thread it checked keeps one only if it was skipped for changes. */
+export function uncommittedAfterRun(
+  current: ReadonlySet<string>,
+  { checked, dirty, changed, stop }: { checked: readonly string[]; dirty: readonly string[]; changed: readonly string[]; stop: ArchiveRunStop | null },
+): ReadonlySet<string> {
+  if (stop === "busy") return current;
+  const seen = new Set(checked);
+  return new Set([...[...current].filter((id) => !seen.has(id)), ...dirty, ...changed]);
+}

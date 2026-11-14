@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createThreadPullRequestReader, excludeDescendantPullRequests, mergePullRequests, readThreadPullRequests, type ThreadPullRequest } from "../src/threadPullRequests.ts";
+import { createThreadPullRequestReader, excludeDescendantPullRequests, knownPullRequestStates, mergePullRequests, readThreadPullRequests, type ThreadPullRequest } from "../src/threadPullRequests.ts";
 
 const pr = (url: string, number = 1): ThreadPullRequest => ({ url, number, title: "Fix", state: "open", attention: "none", checks: { state: "none" } });
 
@@ -72,4 +72,14 @@ test("orchestrators keep unique PRs and hide PRs owned by descendants by full UR
   assert.deepEqual(excludeDescendantPullRequests([shared], []), [shared]);
   assert.deepEqual(excludeDescendantPullRequests([shared], [{ ...child, url: child.url.toUpperCase() }]), []);
   assert.deepEqual(excludeDescendantPullRequests([child], []), [child]);
+});
+
+test("PR states are unknown until both sources answered, and when bb's status is unavailable", () => {
+  const merged = { number: 1, title: "t", url: "https://github.com/o/r/pull/1", state: "merged" as const, attention: "none", checks: { state: "passing" } };
+  assert.equal(knownPullRequestStates({ hasEnvironment: true, statusRow: undefined, sessionRow: [] }), null);
+  assert.equal(knownPullRequestStates({ hasEnvironment: true, statusRow: { outcome: "unavailable", message: "x" }, sessionRow: [] }), null);
+  assert.equal(knownPullRequestStates({ hasEnvironment: false, statusRow: undefined, sessionRow: undefined }), null);
+  assert.deepEqual(knownPullRequestStates({ hasEnvironment: true, statusRow: { outcome: "absent" }, sessionRow: [] }), []);
+  assert.deepEqual(knownPullRequestStates({ hasEnvironment: false, statusRow: undefined, sessionRow: [] }), []);
+  assert.deepEqual(knownPullRequestStates({ hasEnvironment: true, statusRow: { outcome: "available", pullRequest: { ...merged, state: "open" } }, sessionRow: [merged] }), ["open"]);
 });

@@ -125,16 +125,16 @@ const scopes = new Map([
 ]);
 
 test("a clean fold is archived through its root alone, counting the hidden threads it takes along", () => {
-  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set()), { roots: ["root"], archiveCount: 7, skipped: 0, kept: 0 });
+  assert.deepEqual(foldArchivePlan(archiveTree(), ["root"], scopes, new Set()), { roots: ["root"], archiveCount: 7, skipped: 0, kept: 0 });
 });
 
 test("a dirty thread, hidden or not, keeps every thread whose archive would take it along", () => {
-  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["h1"])), { roots: ["b"], archiveCount: 2, skipped: 1, kept: 4 });
-  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["b1"])), { roots: ["a"], archiveCount: 3, skipped: 1, kept: 3 });
+  assert.deepEqual(foldArchivePlan(archiveTree(), ["root"], scopes, new Set(["h1"])), { roots: ["b"], archiveCount: 2, skipped: 1, kept: 4 });
+  assert.deepEqual(foldArchivePlan(archiveTree(), ["root"], scopes, new Set(["b1"])), { roots: ["a"], archiveCount: 3, skipped: 1, kept: 3 });
 });
 
 test("a dirty root still lets its clean subtrees go; a hidden thread left behind counts as kept", () => {
-  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["root"])), { roots: ["a", "b"], archiveCount: 5, skipped: 1, kept: 1 });
+  assert.deepEqual(foldArchivePlan(archiveTree(), ["root"], scopes, new Set(["root"])), { roots: ["a", "b"], archiveCount: 5, skipped: 1, kept: 1 });
 });
 
 test("several roots plan together: each clean one goes, a dirty one stays and counts once", () => {
@@ -143,9 +143,15 @@ test("several roots plan together: each clean one goes, a dirty one stays and co
   assert.deepEqual(foldArchivePlan(forest, ["x", "y"], twoRoots, new Set(["y1"])), { roots: ["x"], archiveCount: 1, skipped: 1, kept: 1 });
 });
 
+test("a root another root's archive already takes along is not archived again", () => {
+  const forest = buildForest([thread("x"), thread("y")]);
+  const shared = new Map([["x", ["x", "y"]], ["y", ["y"]]]);
+  assert.deepEqual(foldArchivePlan(forest, ["x", "y"], shared, new Set()), { roots: ["x"], archiveCount: 2, skipped: 0, kept: 0 });
+});
+
 test("a thread missing from the scope check counts as unsafe", () => {
   const partial = new Map([...scopes].filter(([id]) => id !== "b"));
-  assert.deepEqual(foldArchivePlan(archiveTree(), "root", partial, new Set(["h1"])).roots, ["b1"]);
+  assert.deepEqual(foldArchivePlan(archiveTree(), ["root"], partial, new Set(["h1"])).roots, ["b1"]);
 });
 
 test("a worktree counts as dirty when it has changes or untracked files, or its status can't be read", () => {

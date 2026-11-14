@@ -323,14 +323,17 @@ export function groupRows<T extends TreeThread>(
   }
   const makeGroup = (key: string, projectId: string | null, roots: T[]): TreeGroup<T> => {
     const sorted = key === "pinned" ? roots : sortRoots(forest, roots, folderSorts[key] ?? defaultSort);
-    const older = mode === "project" && key !== "pinned" ? sorted.filter(isOlder) : [];
+    const folds = mode === "project" && key !== "pinned";
+    const shown: T[] = [];
+    const older: T[] = [];
+    for (const root of sorted) (folds && isOlder(root) ? older : shown).push(root);
     const rows = (list: readonly T[]) => flattenRows(forest, list, collapsed, activeThreadId);
     return {
       key,
       projectId,
       rootCount: roots.length,
       latestActivityAt: Math.max(0, ...roots.map((root) => root.updatedAt)),
-      rows: rows(older.length > 0 ? sorted.filter((root) => !older.includes(root)) : sorted),
+      rows: rows(shown),
       older: older.length > 0 ? { rootCount: older.length, rows: rows(older) } : null,
     };
   };

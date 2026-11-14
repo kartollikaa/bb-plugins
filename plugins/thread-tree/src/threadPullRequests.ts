@@ -49,6 +49,26 @@ export async function readThreadPullRequests(threadId: string, call: Call): Prom
   return results;
 }
 
+export type PullRequestStatusRow =
+  | { outcome: "available"; pullRequest: ThreadPullRequest }
+  | { outcome: "absent" }
+  | { outcome: "unavailable"; message: string };
+
+/** A thread's PR states, or null while either source hasn't answered for it or bb's status is unavailable. */
+export function knownPullRequestStates({
+  hasEnvironment,
+  statusRow,
+  sessionRow,
+}: {
+  hasEnvironment: boolean;
+  statusRow: PullRequestStatusRow | undefined;
+  sessionRow: readonly ThreadPullRequest[] | undefined;
+}): ThreadPullRequest["state"][] | null {
+  if (!sessionRow) return null;
+  if (hasEnvironment && (!statusRow || statusRow.outcome === "unavailable")) return null;
+  return mergePullRequests(statusRow?.outcome === "available" ? statusRow.pullRequest : undefined, sessionRow).map((pr) => pr.state);
+}
+
 export function mergePullRequests(current: ThreadPullRequest | undefined, session: readonly ThreadPullRequest[]): ThreadPullRequest[] {
   const byUrl = new Map(session.map((pr) => [pr.url.toLowerCase(), pr]));
   if (current) byUrl.set(current.url.toLowerCase(), current);

@@ -91,7 +91,7 @@ import { Collapse } from "./Collapse";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
 import { canStop, END_SLOT_MIN_PX, NO_HOVER_QUERY, ROW_ACTION_BUTTON, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
-import { OLDER_RULE, olderRoots } from "./olderThreads";
+import { OLDER_RULE, olderRootIds } from "./olderThreads";
 import { RetryButton } from "./RetryButton";
 
 const ROW_PAD_PX = 6;
@@ -193,13 +193,16 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const shownProjectOrder = projectOrder && projectDrag.order;
   const sectionsRef = useRef<HTMLDivElement>(null);
   const prThreads = useMemo(() => pullRequestThreads(activeForest, forest), [activeForest, forest]);
-  const { pullRequestsOf, isLoading: pullRequestsLoading } = useThreadPullRequests(prThreads, sectionsRef);
+  const { pullRequestsOf, pullRequestStatesOf, isLoading: pullRequestsLoading } = useThreadPullRequests(prThreads, sectionsRef);
   const draftIds = useSidebarThreadDraftIds();
+  const olderKey = useMemo(
+    () => showArchived ? "" : [...olderRootIds(forest, { now, activeThreadId: activeThreadId ?? null, draftIds, pullRequestStates: pullRequestStatesOf })].sort().join(),
+    [showArchived, forest, now, activeThreadId, draftIds, pullRequestStatesOf],
+  );
   const isOlder = useMemo(() => {
-    if (showArchived || pullRequestsLoading) return undefined;
-    const context = { now, activeThreadId: activeThreadId ?? null, draftIds, pullRequestStates: (thread: PluginSidebarThread) => pullRequestsOf(thread).map((pr) => pr.state) };
-    return (root: PluginSidebarThread) => olderRoots(forest, [root], context).length > 0;
-  }, [showArchived, pullRequestsLoading, now, activeThreadId, draftIds, pullRequestsOf, forest]);
+    const ids = new Set(olderKey ? olderKey.split(",") : []);
+    return (root: PluginSidebarThread) => ids.has(root.id);
+  }, [olderKey]);
   const groups = useMemo(
     () => groupRows(forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId ?? null, folderSorts, threadSort, showArchived ? [] : retainedProjectIds, isOlder),
     [forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId, folderSorts, threadSort, showArchived, retainedProjectIds, isOlder],

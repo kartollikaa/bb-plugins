@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildForest, groupRows, type TreeThread } from "../src/tree.ts";
-import { OLDER_AFTER_MS, olderRoots, type OlderContext } from "../src/olderThreads.ts";
+import { isOlderRoot, OLDER_AFTER_MS, olderRootIds, type OlderContext } from "../src/olderThreads.ts";
 
 const NOW = Date.parse("2026-11-14T12:00:00Z");
 const OLD = NOW - OLDER_AFTER_MS - 1;
@@ -34,7 +34,7 @@ function context(over: Partial<OlderContext<TreeThread>> = {}): OlderContext<Tre
 
 const older = (threads: TreeThread[], ctx = context()) => {
   const forest = buildForest(threads);
-  return olderRoots(forest, forest.roots, ctx).map((root) => root.id).sort();
+  return [...olderRootIds(forest, ctx)].sort();
 };
 
 test("an idle, read root untouched for over a day folds", () => {
@@ -65,6 +65,10 @@ test("only merged, closed or no PRs let a root fold", () => {
   assert.deepEqual(older(Object.keys(states).map((id) => thread(id)), context({ pullRequestStates: (each) => states[each.id] ?? [] })), ["merged"]);
 });
 
+test("a thread whose PR state isn't known yet stays out, and so does its root", () => {
+  assert.deepEqual(older([thread("unknown"), thread("kid-unknown"), thread("kid", { parentThreadId: "kid-unknown" }), thread("known")], context({ pullRequestStates: (each) => (each.id === "unknown" || each.id === "kid" ? null : []) })), ["known"]);
+});
+
 test("a root folds only when its whole subtree is quiet and old too", () => {
   const threads = [
     thread("calm"),
@@ -90,7 +94,7 @@ test("project folders split older roots off their rows; pinned and other modes d
     thread("pinned", { isPinned: true }),
   ];
   const forest = buildForest(threads);
-  const isOlder = (root: TreeThread) => olderRoots(forest, [root], context()).length > 0;
+  const isOlder = (root: TreeThread) => isOlderRoot(forest, root, context());
   const groups = groupRows(forest, new Set(), "project", null, null, {}, "activity", [], isOlder);
   const project = groups.find((group) => group.key === "project:p")!;
   assert.deepEqual(project.rows.map((row) => row.thread.id), ["new"]);

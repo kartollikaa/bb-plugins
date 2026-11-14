@@ -6,6 +6,7 @@ import {
   archiveRunLifecycle,
   dialogOutsideSidebar,
   foldArchiveOutcome,
+  uncommittedAfterRun,
   runClaimedArchive,
   waitForArchive,
 } from "../src/archiveRun.ts";
@@ -273,4 +274,11 @@ test("an unmount after the run started stops it without ending the job twice", (
   deferred.splice(0).forEach((run) => run());
   assert.equal(signal.aborted, true);
   assert.equal(abandoned, 0);
+});
+
+test("after a run, the threads it checked keep a marker only when it skipped them for changes", () => {
+  const next = uncommittedAfterRun(new Set(["a", "b", "other"]), { checked: ["a", "b", "c", "d"], dirty: ["c"], changed: ["d"], stop: null });
+  assert.deepEqual([...next].sort(), ["c", "d", "other"]);
+  const busy = new Set(["a"]);
+  assert.equal(uncommittedAfterRun(busy, { checked: ["a"], dirty: [], changed: [], stop: "busy" }), busy);
 });
