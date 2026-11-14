@@ -15,7 +15,12 @@ test("valid values pass through", () => {
   assert.equal(view.showAge, false);
   assert.equal(view.recentLimit, 3);
   assert.equal(view.recentMoreLimit, 8);
-  assert.equal(view.showRecent, true);
+  assert.equal(view.showRecent, false);
+});
+
+test("Recent Activity is hidden unless the user turned it on", () => {
+  assert.equal(readViewSettings({}).showRecent, false);
+  assert.equal(readViewSettings({ showRecent: true }).showRecent, true);
 });
 
 test("wrong types and out-of-range counts are replaced by defaults", () => {

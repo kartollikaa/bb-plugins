@@ -17,7 +17,8 @@ export const SETTINGS = {
   showRecent: {
     type: "boolean",
     label: "Show Recent Activity",
-    default: true,
+    description: "Off by default: the status line filters and Needs you cover it.",
+    default: false,
   },
   recentLimit: {
     type: "number",
