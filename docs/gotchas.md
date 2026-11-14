@@ -147,6 +147,9 @@ can find it by the error text.
   true})` and `page.touchscreen` (`touchStart`/`touchMove`/`touchEnd`, `tap`). The sidebar sits
   under the chat at `z-0`, so a sidebar button can be laid out and still not take the tap. Tap
   `Toggle sidebar` first and check `elementFromPoint` before every gesture.
+- **One-finger CDP touches** (`Input.dispatchTouchEvent`, stepped `touchMove`) scroll the page and
+  reach a plugin's own `touchmove` listeners, so they test a drag-to-open sheet. bb's sidebar edge
+  swipe didn't respond to them, even on a plain thread page.
 - **Multi-touch in DevBrowser:** `page.touchscreen` drives one finger. For a pinch, send
   `Input.dispatchTouchEvent` (`touchStart`, stepped `touchMove`, `touchEnd`) with two `touchPoints`
   through `p.createCDPSession()`. It zooms the page for real (`visualViewport.scale`), so it is a
