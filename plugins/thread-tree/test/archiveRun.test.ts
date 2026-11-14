@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { archiveInTurn, foldArchiveOutcome, waitForArchive } from "../src/archiveRun.ts";
+import {
+  archiveInTurn,
+  dialogOutsideSidebar,
+  foldArchiveOutcome,
+  waitForArchive,
+} from "../src/archiveRun.ts";
 
 const clean = async () => true;
 
@@ -139,4 +144,14 @@ test("silent endings get a reason", () => {
   });
   assert.equal(foldArchiveOutcome({ archived: 0, skipped: 0, kept: 0, changed: 0, stop: "timeout" })?.description, "bb's confirmation wasn't answered in time");
   assert.equal(foldArchiveOutcome({ archived: 0, skipped: 0, kept: 0, changed: 2, stop: null })?.title, "Nothing archived");
+});
+
+test("a dialog that holds the sidebar itself, the compact-width drawer, is not bb's confirmation", () => {
+  const sidebar = { id: "sidebar" };
+  const drawer = { contains: (node: unknown) => node === sidebar };
+  const confirm = { contains: () => false };
+  assert.equal(dialogOutsideSidebar([drawer], sidebar), false);
+  assert.equal(dialogOutsideSidebar([drawer, confirm], sidebar), true);
+  assert.equal(dialogOutsideSidebar([confirm], null), true);
+  assert.equal(dialogOutsideSidebar([], sidebar), false);
 });

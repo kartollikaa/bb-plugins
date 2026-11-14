@@ -80,7 +80,7 @@ import {
   type TreeRow,
 } from "./tree";
 import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver, MAX_THREADS_PER_CALL } from "./orchestrations";
-import { archiveInTurn, foldArchiveOutcome, skippedSummary, waitForArchive, type ArchiveRunResult } from "./archiveRun";
+import { archiveInTurn, dialogOutsideSidebar, foldArchiveOutcome, skippedSummary, waitForArchive, type ArchiveRunResult } from "./archiveRun";
 import { ARCHIVE_CONFIRM_WAIT_MS } from "./archiveUndo";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
@@ -641,7 +641,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       </>
       )}
       </div>
-      {archiveJob ? <BbArchiveRun job={archiveJob} /> : null}
+      {archiveJob ? <BbArchiveRun job={archiveJob} sidebarRef={sectionsRef} /> : null}
     </ReduceMotionContext.Provider>
   );
 }
@@ -1443,10 +1443,11 @@ const ARCHIVE_LANDING_GRACE_MS = 3_000;
 const ARCHIVE_WAIT_TOAST_ID = "thread-tree-fold-archive-wait";
 
 /** Any dialog counts, a Radix modal carries no aria-modal; a stray popover only makes the wait longer. */
-const anyDialogOpen = () => document.querySelector(`[role="dialog"], ${MODAL_DIALOG_SELECTOR}`) !== null;
+const dialogOpenBesides = (sidebar: Element | null) => () =>
+  dialogOutsideSidebar(Array.from(document.querySelectorAll(`[role="dialog"], ${MODAL_DIALOG_SELECTOR}`)), sidebar);
 
 /** Lives at list level: archiving a fold's root unmounts its fold line while later roots still wait for bb's confirmation. */
-function BbArchiveRun({ job }: { job: BbArchiveJob }) {
+function BbArchiveRun({ job, sidebarRef }: { job: BbArchiveJob; sidebarRef: React.RefObject<HTMLElement | null> }) {
   const sdk = useSdk();
   const actions = useRef(new Map<string, () => Promise<void>>());
   const started = useRef(false);
@@ -1470,7 +1471,7 @@ function BbArchiveRun({ job }: { job: BbArchiveJob }) {
         action: { label: "Stop", onClick: () => stop.current.abort() },
       });
       return waitForArchive(() => sdk.threads.get({ threadId }).then((thread) => thread.archivedAt !== null, () => false), {
-        dialogOpen: anyDialogOpen,
+        dialogOpen: dialogOpenBesides(sidebarRef.current),
         deadline,
         graceMs: ARCHIVE_LANDING_GRACE_MS,
         intervalMs: ARCHIVE_POLL_MS,

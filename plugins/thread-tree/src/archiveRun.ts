@@ -76,6 +76,12 @@ export async function waitForArchive(
   }
 }
 
+/** On compact width the sidebar itself sits in a dialog drawer, which is not bb's confirmation. */
+export function dialogOutsideSidebar(dialogs: Iterable<{ contains(node: never): boolean }>, sidebar: unknown): boolean {
+  for (const dialog of dialogs) if (!sidebar || !dialog.contains(sidebar as never)) return true;
+  return false;
+}
+
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 export function skippedSummary({ skipped, kept }: { skipped: number; kept: number }): string | null {
