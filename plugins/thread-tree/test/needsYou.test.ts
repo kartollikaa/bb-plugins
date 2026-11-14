@@ -24,6 +24,7 @@ import {
   type PendingInteraction,
 } from "../src/needsYou.ts";
 import { openNextInboxItem, setInboxHandler } from "../src/inbox.ts";
+import { STUCK_AFTER_MS, type ThreadSignals } from "../src/threadSignals.ts";
 import type { ThreadPullRequest } from "../src/threadPullRequests.ts";
 import type { AutomationSummary } from "../src/automations.ts";
 import type { GithubFolderItem } from "../src/githubFolder.ts";
@@ -368,4 +369,59 @@ test("opening a failed thread keeps its place among the failed: reading bumps up
     thread("newer", { status: "error", latestAttentionAt: 30, updatedAt: 30 }),
   ]);
   assert.deepEqual(items.map((item) => item.threadId), ["newer", "opened"]);
+});
+
+const quiet = (patch: Partial<ThreadSignals> = {}): ThreadSignals => ({
+  turnStartedAt: null,
+  step: null,
+  lastProgressAt: null,
+  rateLimitedAt: null,
+  failedTurnsInARow: 0,
+  lastFailureRateLimited: false,
+  context: null,
+  ...patch,
+});
+
+test("a working thread with no progress for 30 minutes is a stuck item with Stop, after failures and before results", () => {
+  const now = 100 * STUCK_AFTER_MS;
+  const signalsById = new Map<string, ThreadSignals>([
+    ["long", quiet({ lastProgressAt: now - 3 * STUCK_AFTER_MS })],
+    ["short", quiet({ lastProgressAt: now - STUCK_AFTER_MS })],
+    ["busy", quiet({ lastProgressAt: now - 60_000 })],
+    ["asking", quiet({ lastProgressAt: 0 })],
+  ]);
+  const items = build(
+    [
+      thread("short", { status: "active", indicator: "running", latestAttentionAt: 9 }),
+      thread("busy", { status: "active", indicator: "running" }),
+      thread("long", { status: "active", indicator: "running", latestAttentionAt: 1 }),
+      thread("asking", { status: "active", hasPendingInteraction: true }),
+      thread("result", { isUnread: true }),
+      thread("failed", { status: "error" }),
+      thread("unknown", { status: "active", indicator: "running" }),
+    ],
+    { signalsOf: (id) => signalsById.get(id), now },
+  );
+  assert.deepEqual(items.map((item) => [item.threadId, item.kind]), [
+    ["asking", "input"],
+    ["failed", "failed"],
+    ["long", "stuck"],
+    ["short", "stuck"],
+    ["result", "unread"],
+  ], "longest silence first; no signals yet means no claim");
+  const long = items.find((item) => item.threadId === "long")!;
+  assert.equal(long.reason, "Running, no progress for 2h");
+  assert.equal(long.signature, `stuck:${now - 3 * STUCK_AFTER_MS}`, "a snooze lasts until it makes progress and stalls again");
+});
+
+test("a failed item names a rate limit or a third failure in a row", () => {
+  const signalsById = new Map<string, ThreadSignals>([
+    ["limit", quiet({ failedTurnsInARow: 1, lastFailureRateLimited: true })],
+    ["third", quiet({ failedTurnsInARow: 3 })],
+  ]);
+  const items = build([thread("limit", { status: "error" }), thread("third", { status: "error" }), thread("plain", { status: "error" })], { signalsOf: (id) => signalsById.get(id) });
+  const reason = (id: string) => items.find((item) => item.threadId === id)!.reason;
+  assert.equal(reason("limit"), "Last turn failed · rate limit");
+  assert.equal(reason("third"), "Last turn failed · failed 3 times in a row");
+  assert.equal(reason("plain"), "Last turn failed");
 });

@@ -33,13 +33,20 @@ Needs you sits above the sections in an amber card and hides when nothing
 waits. Its header shows the count and the next-item key; the card lists the first
 five items and "N more" opens the rest. In order:
 threads asking a question (the question and how long they have waited, longest
-first), failed turns, failed queued messages, and finished results not read
-yet; then pull requests of the user's threads with failing checks, conflicts or
+first), failed turns, failed queued messages, threads stuck in a turn, and
+finished results not read yet; then pull requests of the user's threads with failing checks, conflicts or
 changes requested (ready to merge stays a row icon); then enabled automations
 whose last run failed. Each item is two lines, title then reason; a subthread's
 reason names its orchestration. Clicking an item opens its thread; a PR with no
 thread opens GitHub Folder's PR page, an automation with no run the Automations
-page. A failed turn offers Retry, a failed queued message Resend. Hovering an
+page. A failed turn offers Retry, a failed queued message Resend. A failed
+turn's reason adds "rate limit" when the turn hit one, or "failed 3 times in a
+row" from the third failure without a completed turn between. A thread is stuck
+when its turn has made no progress for 30 minutes (one threshold for every
+thread, orchestrator or subthread): no step, output or report in its event log.
+A thread waiting on the user is a question instead, and a turn that ended is
+never stuck. Stuck items go longest silence first, read "Running, no progress
+for 42m" and offer Stop. Hovering an
 item shows Snooze, which hides it until it changes and offers Undo, and Mark
 read on a result; on a phone or touch screen both stay in the row. ⇧⌘I (Ctrl+Shift+I on Windows and Linux) opens the next item, stepping on from the last one it
 opened, always past the open thread's items, and says "Nothing else needs you" when only that
@@ -50,8 +57,10 @@ hint shows the default for the platform, not a rebinding. Each browser client ke
 Under the search field, a line counts threads that need input, failed, are running, and
 finished but are not read yet. Each count is a toggle: it swaps the sections and
 the tree for a flat list of those threads, children included, most recently
-active first. Running rows add a second line with the project and the
-orchestration they run under. Click the count again, Clear, or press Escape to
+active first. Running rows add a second line: the turn's current step
+("Running npm test", "Thinking", or "Rate limited" while a rate limit holds
+it), the context fill once it reaches 80%, the project and the orchestration
+they run under. The age gives way to a live timer of the current turn. Click the count again, Clear, or press Escape to
 go back. The search field above the counts, or `/` outside a text field, opens
 search, which matches the title, branch, PR number (`#123`) and project of the
 threads the tree lists, archived ones when Archived is on. Escape clears it, and
@@ -60,7 +69,11 @@ picking a count closes it.
 Every thread row keeps one height whatever its state; rows are taller on a
 phone-sized viewport. A row is one line, except under the Running filter. Left to right: status glyph, title, Retry on a
 failed turn, PR icon, shared-branch warning, subagent counter, provider icon, age.
-Hovering the row shows its title, branch, provider and its last activity.
+Hovering the row shows its title, branch, provider and its last activity; a
+working or failed row adds how long its turn has run and its step, a rate limit
+holding it, and how full its context is. The server reads these signals from
+each working or failed thread's event log and refreshes a thread's when its
+events move.
 
 Hovering a row, or focusing it with the keyboard, fades Archive and ⋯ in over
 its right end at once; nothing under them moves. They cover only the provider

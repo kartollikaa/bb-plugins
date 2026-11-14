@@ -48,7 +48,7 @@ import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph, rollupGlyph } from "./statusGlyph";
 import { SearchField, StatusLine } from "./StatusLine";
 import { DOT_CLASS } from "./StatusDot";
-import { countStatusFilters, filterThreads, handleFlatListEscape, handleSearchKey, isModalDialog, MODAL_DIALOG_SELECTOR, orchestrationTitle, refocusAfterClose, returnFocus, runningContext, type CloseReason, sidebarBehindModal, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
+import { countStatusFilters, filterThreads, handleFlatListEscape, handleSearchKey, isModalDialog, MODAL_DIALOG_SELECTOR, orchestrationTitle, refocusAfterClose, returnFocus, type CloseReason, sidebarBehindModal, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
 import type { rpcContract } from "../server";
 import {
   moveSection,
@@ -84,6 +84,8 @@ import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold,
 import { archiveInTurn, archiveRunLifecycle, dialogOutsideSidebar, foldArchiveOutcome, runClaimedArchive, skippedSummary, uncommittedAfterRun, waitForArchive, type ArchiveRunResult } from "./archiveRun";
 import { ARCHIVE_CONFIRM_WAIT_MS } from "./archiveUndo";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
+import { useThreadSignals } from "./useThreadSignals";
+import { formatClock, runningSubtitle, signalTooltipLines, type ThreadSignals } from "./threadSignals";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
 import { useDragReorder, useFlipOrder } from "./useReorder";
 import { ReduceMotionContext, useStill } from "./motion";
@@ -249,6 +251,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   );
   const orchestrationOf = useMemo(() => orchestrationTitle(threads), [threads]);
   const automations = useAutomations();
+  const signalsOf = useThreadSignals(threads);
   const descendantIdsOf = useCallback((threadId: string) => descendantsOf(activeForest, threadId).map((thread) => thread.id), [activeForest]);
   const needsYou = useNeedsYou({
     threads,
@@ -260,6 +263,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     pullRequestMode: view.needsYouPullRequests,
     pullRequestsSettled: pullRequestSourcesSettled({ threadsStatus: status, folderLoaded: githubFolder.isLoaded, pullRequestsLoading }),
     orchestrationOf,
+    signalsOf,
+    now,
     activeThreadId: activeThreadId ?? null,
     onNavigate,
   });
@@ -439,7 +444,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const renderRow = (
     row: TreeRow<PluginSidebarThread>,
     variant: "tree" | "flat",
-    { subtitle, numbered = variant === "tree", rollup, muted = false }: { subtitle?: string | readonly SummaryPart[]; numbered?: boolean; rollup?: RollupState | null; muted?: boolean } = {},
+    { subtitle, numbered = variant === "tree", rollup, muted = false, timerSince = null }: { subtitle?: string | readonly SummaryPart[]; numbered?: boolean; rollup?: RollupState | null; muted?: boolean; timerSince?: number | null } = {},
   ) => (
     <Fragment key={row.thread.id}>
       <ThreadRowView
@@ -450,6 +455,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         context={variant === "flat" ? projectById.get(row.thread.projectId)?.name : undefined}
         subtitle={subtitle}
         muted={muted}
+        signals={signalsOf(row.thread.id)}
+        timerSince={timerSince}
         isActive={row.thread.id === activeThreadId}
         rollup={rollup}
         isCompactViewport={isCompactViewport}
@@ -512,7 +519,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         >
           {flatList.map((thread) => renderRow(flatRow(thread), "flat", {
             numbered: true,
-            subtitle: statusFilter === "running" ? runningContext(projectById.get(thread.projectId)?.name ?? null, orchestrationOf(thread.id)) : undefined,
+            subtitle: statusFilter === "running" ? runningSubtitle(signalsOf(thread.id), projectById.get(thread.projectId)?.name ?? null, orchestrationOf(thread.id)) : undefined,
+            timerSince: statusFilter === "running" ? signalsOf(thread.id)?.turnStartedAt ?? null : null,
           }))}
         </FlatListSection>
       ) : (
@@ -968,6 +976,8 @@ function ThreadRowView({
   context,
   subtitle,
   muted = false,
+  signals,
+  timerSince,
   isActive,
   rollup,
   isCompactViewport,
@@ -992,6 +1002,9 @@ function ThreadRowView({
   /** A second line under the title: the Running filter's context or an orchestration's progress. */
   subtitle?: string | readonly SummaryPart[];
   muted?: boolean;
+  signals: ThreadSignals | undefined;
+  /** Replaces the age with a live turn timer: the Running list's rows. */
+  timerSince: number | null;
   isActive: boolean;
   /** The subtree's state drawn in place of the thread's own; a folded tree row works it out itself. */
   rollup?: RollupState | null;
@@ -1033,6 +1046,7 @@ function ThreadRowView({
     branch ? `Branch: ${branch}` : null,
     `Provider: ${providerName}`,
     `Last activity ${age === "now" ? "just now" : `${age} ago`}`,
+    ...signalTooltipLines(signals, now),
   ].filter(Boolean).join("\n");
 
   const heightPx = rowHeightPx(isCompactViewport, subtitle ? 2 : 1);
@@ -1143,7 +1157,9 @@ function ThreadRowView({
           </span>
           <span className="flex shrink-0 items-center justify-end gap-2" style={{ minWidth: isCompactViewport ? undefined : END_SLOT_MIN_PX }}>
             <ProviderSlot providerId={thread.providerId} provider={provider} style={view.providerIconStyle} />
-            {view.showAge ? (
+            {timerSince !== null ? (
+              <TurnTimer since={timerSince} />
+            ) : view.showAge ? (
               <span data-row-age="" className="-mr-1 shrink-0 whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45">
                 {age}
               </span>
@@ -1722,6 +1738,16 @@ function useMediaQuery(query: string): boolean {
     return () => list.removeEventListener("change", update);
   }, [query]);
   return matches;
+}
+
+/** Ticks on its own each second, so only the timer re-renders. */
+function TurnTimer({ since }: { since: number }) {
+  const now = useNow(1_000);
+  return (
+    <span data-turn-timer="" title="Time in this turn" className="-mr-1 shrink-0 whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45">
+      {formatClock(now - since)}
+    </span>
+  );
 }
 
 function useNow(intervalMs: number): number {

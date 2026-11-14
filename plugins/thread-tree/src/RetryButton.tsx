@@ -41,7 +41,28 @@ export function ResendButton({ threadId }: { threadId: string }) {
   );
 }
 
-function FailurePill({ label, pendingKey, ariaLabel, icon, errorTitle, run }: { label: string; pendingKey: string; ariaLabel: string; icon: string; errorTitle: string; run: () => Promise<unknown> }) {
+/** Ends a stuck thread's turn, the same as Stop on its glyph. */
+export function StopButton({ threadId }: { threadId: string }) {
+  const sdk = useSdk();
+  return (
+    <FailurePill
+      label="Stop"
+      pendingKey={`stop:${threadId}`}
+      ariaLabel="Stop the stuck turn"
+      icon="Square"
+      errorTitle="Stop failed"
+      tone="neutral"
+      run={() => sdk.threads.stop({ threadId })}
+    />
+  );
+}
+
+const PILL_TONE = {
+  danger: "border-destructive/40 text-destructive hover:bg-destructive/10",
+  neutral: "border-sidebar-foreground/25 text-sidebar-foreground/80 hover:bg-sidebar-foreground/10",
+} as const;
+
+function FailurePill({ label, pendingKey, ariaLabel, icon, errorTitle, run, tone = "danger" }: { label: string; pendingKey: string; ariaLabel: string; icon: string; errorTitle: string; run: () => Promise<unknown>; tone?: keyof typeof PILL_TONE }) {
   const pending = useSyncExternalStore(pendingActions.subscribe, () => pendingActions.has(pendingKey));
   return (
     <button
@@ -60,7 +81,7 @@ function FailurePill({ label, pendingKey, ariaLabel, icon, errorTitle, run }: { 
         }
       }}
       aria-label={ariaLabel}
-      className="flex h-5 shrink-0 items-center gap-1 rounded-full border border-destructive/40 px-1.5 text-2xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-60"
+      className={`flex h-5 shrink-0 items-center gap-1 rounded-full border px-1.5 text-2xs font-medium disabled:opacity-60 ${PILL_TONE[tone]}`}
     >
       <Icon name={pending ? "Loading" : icon} aria-hidden className="size-3" />
       {label}

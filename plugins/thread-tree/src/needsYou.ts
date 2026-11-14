@@ -6,8 +6,10 @@ import { excludeDescendantPullRequests, type ThreadPullRequest } from "./threadP
 import { ATTENTION_LABEL, prOpenTarget, type GithubFolderItem } from "./githubFolder.ts";
 import { automationDot, type AutomationSummary } from "./automations.ts";
 import type { NeedsYouPullRequests } from "./settings.ts";
+import { failureNote, isStuck, silentSince, type ThreadSignals } from "./threadSignals.ts";
+import { formatAge } from "./time.ts";
 
-export type ThreadItemKind = "input" | "failed" | "queued-failed" | "unread";
+export type ThreadItemKind = "input" | "failed" | "queued-failed" | "stuck" | "unread";
 export type NeedsYouKind = ThreadItemKind | "pr" | "automation";
 
 export interface NeedsYouThread extends FilterThread {
@@ -28,7 +30,7 @@ interface BaseItem {
 export interface ThreadItem extends BaseItem {
   kind: ThreadItemKind;
   threadId: string;
-  /** When the thread started waiting on the user; only for questions. */
+  /** When a question was asked, or when a stuck thread last made progress. */
   since: number | null;
   orchestration: string | null;
   /** The thread's turn failed and can be re-submitted; an unread failure may have moved on. */
@@ -102,7 +104,7 @@ export function describeQuestion(interactions: readonly PendingInteraction[]): T
   return { text: text && extra > 0 ? `${text} (+${extra} more)` : text, since: first.createdAt };
 }
 
-const THREAD_REASON: Record<Exclude<ThreadItemKind, "input">, string> = {
+const THREAD_REASON: Record<Exclude<ThreadItemKind, "input" | "stuck">, string> = {
   failed: "Last turn failed",
   "queued-failed": "A queued message failed to send",
   unread: "Finished · review the result",
@@ -114,25 +116,36 @@ export interface ThreadItemsInput<T extends NeedsYouThread> {
   /** When the client first saw a thread need input; the fallback wait for a question bb gave no time for. */
   firstSeen: ReadonlyMap<string, number>;
   orchestrationOf: (threadId: string) => string | null;
+  /** The thread's turn signals from its event log; without them nothing is called stuck. */
+  signalsOf?: (threadId: string) => ThreadSignals | undefined;
+  now?: number;
 }
 
-const KIND_ORDER: readonly ThreadItemKind[] = ["input", "failed", "queued-failed", "unread"];
+const KIND_ORDER: readonly ThreadItemKind[] = ["input", "failed", "queued-failed", "stuck", "unread"];
 
-/** Questions first, longest wait first; then failures, failed queued messages and results, most recent first. */
-export function threadItems<T extends NeedsYouThread>({ threads, questions, firstSeen, orchestrationOf }: ThreadItemsInput<T>): ThreadItem[] {
+function threadReason(kind: Exclude<ThreadItemKind, "input">, signals: ThreadSignals | undefined, now: number): string {
+  if (kind === "stuck") return `Running, no progress for ${formatAge(silentSince(signals!)!, now)}`;
+  const note = kind === "failed" ? failureNote(signals) : null;
+  return note ? `${THREAD_REASON[kind]} · ${note}` : THREAD_REASON[kind];
+}
+
+/** Questions first, longest wait first; then failures and failed queued messages, most recent first; stuck threads, longest silence first; then results. */
+export function threadItems<T extends NeedsYouThread>({ threads, questions, firstSeen, orchestrationOf, signalsOf = () => undefined, now = Date.now() }: ThreadItemsInput<T>): ThreadItem[] {
   const items: (ThreadItem & { latestAttentionAt: number })[] = [];
   for (const thread of threads) {
-    const kind = threadItemKind(thread);
+    const signals = signalsOf(thread.id);
+    const kind = threadItemKind(thread) ?? (!thread.isHidden && !thread.isArchived && isStuck(thread, signals, now) ? "stuck" : null);
     if (!kind) continue;
     const question = kind === "input" ? questions.get(thread.id) : undefined;
+    const silent = kind === "stuck" ? silentSince(signals!) : null;
     items.push({
       kind,
       key: `thread:${thread.id}`,
-      signature: `${kind}:${thread.updatedAt}`,
+      signature: kind === "stuck" ? `stuck:${silent}` : `${kind}:${thread.updatedAt}`,
       threadId: thread.id,
       title: thread.displayTitle,
-      reason: kind === "input" ? question?.text ?? "Needs your input" : THREAD_REASON[kind],
-      since: kind === "input" ? question?.since ?? firstSeen.get(thread.id) ?? null : null,
+      reason: kind === "input" ? question?.text ?? "Needs your input" : threadReason(kind, signals, now),
+      since: kind === "input" ? question?.since ?? firstSeen.get(thread.id) ?? null : silent,
       orchestration: orchestrationOf(thread.id),
       canRetry: kind === "failed" && thread.status === "error",
       latestAttentionAt: thread.latestAttentionAt,
@@ -140,7 +153,7 @@ export function threadItems<T extends NeedsYouThread>({ threads, questions, firs
   }
   items.sort((a, b) =>
     KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) ||
-    (a.kind === "input" ? (a.since ?? Infinity) - (b.since ?? Infinity) : b.latestAttentionAt - a.latestAttentionAt) ||
+    (a.kind === "input" || a.kind === "stuck" ? (a.since ?? Infinity) - (b.since ?? Infinity) : b.latestAttentionAt - a.latestAttentionAt) ||
     a.key.localeCompare(b.key));
   return items.map(({ latestAttentionAt: _latestAttentionAt, ...item }) => item);
 }

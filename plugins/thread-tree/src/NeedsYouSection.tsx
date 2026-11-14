@@ -42,7 +42,8 @@ import { GroupHeader } from "./GroupHeader";
 import { Collapse } from "./Collapse";
 import { StillGlyph } from "./ThreadGlyph";
 import { StatusDot } from "./StatusDot";
-import { ResendButton, RetryButton } from "./RetryButton";
+import { ResendButton, RetryButton, StopButton } from "./RetryButton";
+import type { ThreadSignals } from "./threadSignals";
 import { formatAge } from "./time";
 import { actionsInline, ROW_ACTION_BUTTON, hoverActionsClass, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX } from "./rowActions";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT } from "./rowStyles";
@@ -54,6 +55,7 @@ const THREAD_GLYPH: Record<ThreadItemKind, PluginSidebarThreadIndicator> = {
   input: "waiting-for-input",
   failed: "unread-error",
   "queued-failed": "queued-failed",
+  stuck: "runtime",
   unread: "unread-success",
 };
 
@@ -67,13 +69,15 @@ interface NeedsYouSources {
   pullRequestMode: NeedsYouPullRequests;
   pullRequestsSettled: boolean;
   orchestrationOf: (threadId: string) => string | null;
+  signalsOf: (threadId: string) => ThreadSignals | undefined;
+  now: number;
   activeThreadId: string | null;
   onNavigate: () => void;
 }
 
 /** The queue's visible items, snoozing, and ⇧⌘I, which works while the section is folded or replaced by a flat list. */
 export function useNeedsYou(sources: NeedsYouSources) {
-  const { threads, activeThreadId, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, pullRequestsSettled, orchestrationOf, onNavigate } = sources;
+  const { threads, activeThreadId, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, pullRequestsSettled, orchestrationOf, signalsOf, now, onNavigate } = sources;
   const waiting = useMemo(() => threads.filter((thread) => threadItemKind(thread) === "input"), [threads]);
   const questions = useQuestions(waiting);
   const firstSeenRef = useRef<ReadonlyMap<string, number>>(new Map());
@@ -91,11 +95,11 @@ export function useNeedsYou(sources: NeedsYouSources) {
 
   const all = useMemo(
     () => [
-      ...threadItems({ threads, questions, firstSeen, orchestrationOf }),
+      ...threadItems({ threads, questions, firstSeen, orchestrationOf, signalsOf, now }),
       ...(pullRequestMode === "none" ? [] : pullRequestItems(pullRequestMode, linked, folderAttention, folderItems, threadOfPullRequest)),
       ...automationItems(automations),
     ],
-    [threads, questions, firstSeen, orchestrationOf, pullRequestMode, linked, folderAttention, folderItems, threadOfPullRequest, automations],
+    [threads, questions, firstSeen, orchestrationOf, signalsOf, now, pullRequestMode, linked, folderAttention, folderItems, threadOfPullRequest, automations],
   );
 
   const [snoozes, saveSnooze] = usePersistentRecord("needs-you-snoozes", readSnoozes);
@@ -290,7 +294,11 @@ function NeedsYouRow({
     ? () => void sdk.threads.markRead({ threadId: item.threadId }).catch((error: unknown) =>
         toast.error("Couldn't mark it read", { description: error instanceof Error ? error.message : String(error) }))
     : null;
-  const failure = item.kind === "failed" && item.canRetry ? <RetryButton threadId={item.threadId} /> : item.kind === "queued-failed" ? <ResendButton threadId={item.threadId} /> : null;
+  const failure = item.kind === "failed" && item.canRetry
+    ? <RetryButton threadId={item.threadId} />
+    : item.kind === "queued-failed"
+      ? <ResendButton threadId={item.threadId} />
+      : item.kind === "stuck" ? <StopButton threadId={item.threadId} /> : null;
   const actionButtons = (
     <>
       {failure ? <span className="pointer-events-auto flex">{failure}</span> : null}

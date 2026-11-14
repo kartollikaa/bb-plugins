@@ -43,7 +43,11 @@ that don't move or change height while agents work.
 - The overview line ("1 need input · 1 failed · 2 running") becomes four counts: need input,
   failed, running, finished but unread. Each count is a toggle filter that shows a flat list of
   those threads. The Running filter is the one place that shows each thread's current step and a
-  live timer.
+  live timer: the second line reads step, context fill from 80%, project and orchestration
+  ("Running npm test · bb-plugins · under Orchestrate…"), and the timer of the current turn takes
+  the age's place. A turn held by a rate limit reads "Rate limited" instead of its step. A tree
+  row's tooltip carries the same turn time, step, rate limit and context fill, so the tree gains
+  no text.
 - A full-width search field sits above the counts, beside the Sections button: a comfortable
   hit target with a search icon, "Search threads" and a `/` key chip. Clicking it or pressing `/` turns it into the
   input in place, matching title, branch, PR number and project. Escape clears it. Picking a count
@@ -58,9 +62,17 @@ One queue above the other sections, hidden when empty. ⇧⌘I ("inbox") opens t
 bb's side chat (`panel.toggle`) and is not available.
 
 - **Items, in order:** threads asking a question (with the question and how long they waited,
-  longest first); failed turns; failed queued messages; running threads silent for 10 minutes
-  (a setting) while no background agent, command or workflow of theirs is active; finished threads not yet read ("review the result"); PRs of the user's own threads that
-  need action; failed automations.
+  longest first); failed turns; failed queued messages; stuck threads; finished threads not yet
+  read ("review the result"); PRs of the user's own threads that need action; failed automations.
+- **Stuck** (owner: no report or progress for 30 minutes while working, or a delivery failing for
+  the third time where detectable; one threshold for every role). A thread in a live turn whose
+  event log shows no step, output or report for 30 minutes is a stuck item, longest silence
+  first, "Running, no progress for 42m", with Stop. Bookkeeping events (context and token
+  counts, provider errors and warnings, bb's own turn watchdog) don't count as progress. A thread
+  waiting on the user is a question, not stuck; background work after the turn ended isn't a
+  live turn. The threshold is a constant, not a setting. The detectable form of a failing
+  delivery is a turn failing for the third time with no completed turn between: its failed item
+  says "failed 3 times in a row". A failed turn that hit a rate limit says "rate limit".
 - A subthread's item names its orchestration ("under Orchestrate PR review…").
 - **Row click opens the thread.** Buttons only for actions that aren't navigation: Retry, Resend,
   Stop, Merge (with confirmation). Hover shows snooze ("until it changes") and, for results,
@@ -144,6 +156,10 @@ and in folder there are gonna be the whole … with nested tree."
   you's failed items. The thread a click opens keeps its side of the "N older" fold until another
   thread is opened: one opened from the expanded list stays in it, one opened from outside stays
   out, even if reading it made it quiet.
+- **Two accepted cases** (owner: «Keep both»). A thread opened from search or Needs you while its
+  folder's "N older" fold is collapsed shows outside the fold until another thread is opened.
+  An old unread thread folds in once it is read and another thread is opened. Both follow from
+  the rule above: the open thread holds its side, and the next open releases it.
 - **What `latestAttentionAt` is** (checked in bb's server source): set when a thread is created,
   when a top-level thread goes from working to idle, and when any thread errors. A read, a
   message or a subthread finishing work never sets it, so a subthread keeps its spawn time until
@@ -199,13 +215,13 @@ and a user who has it turned on keeps it. Removal is reconsidered after v2 has b
 | Stop | `sdk.threads.stop` | Low; behaviour unverified |
 | Question text for Needs you | `sdk.threads.interactions` | Medium |
 | Waiting since | first seen in the client | Medium |
-| Stuck agent | server reads the turn watchdog event (`provider-turn-idle`) | Medium |
-| Step text, turn timer | server subscribes to turn events and pushes to the app | High |
+| Stuck agent | server folds the thread's events (`experimental_thread.events` → `threads.events.list`); last progress is the newest non-bookkeeping event. bb's watchdog event (`system/provider-turn-watchdog`) never appeared in sampled threads and isn't used | Done (S9a) |
+| Step text, turn timer | same fold: `item/started` (bb's labels; a command's first real words), top-level `turn/started`; pushed by keyed RPC `threadSignals` and tag invalidation | Done (S9a) |
 | PR attention on rows | Failing/Conflicts from bb GitHub PR Status and Thread Links; Changes/Ready need GitHub Folder's `attention` joined by URL | Medium |
 | Merge | bb GitHub PR Status merge over plugin RPC (unverified) | Medium |
 | Agent review of an unclaimed PR | `threads.spawn`; repo → project mapping unverified | Medium |
 | ⇧⌘I | `app.commands.register` with `defaultShortcut`; free in bb's own keymap (`bb settings keyboard list`), bb leaves colliding plugin defaults unbound | Low |
-| Context-window fill, rate limits | thread events only | High, later |
+| Context-window fill, rate limits | same fold: `thread/contextWindowUsage/updated` (reset by compaction); `provider/error` with category `rate-limit` or HTTP 429 (Codex reports it as a stream disconnect). `provider/rateLimits/updated` (windows, reset times) never appeared in sampled Claude or Codex threads, so reset times aren't shown | Done (S9a) |
 
 Dependencies on other plugins degrade quietly: without GitHub Folder, Thread Links, bb GitHub PR
 Status or Automations, their parts hide, and counts never imply they are complete.
@@ -233,8 +249,8 @@ the live bb, and is released per [docs/workflow.md](../../../docs/workflow.md).
 7. **Section summaries.** PR and Automations collapsed by default with summary headers; PR rows
    with the reason glyph.
 8. **Older threads** fold.
-9. **Later, costlier:** stuck-agent items, step text and turn timer, Merge, Agent review,
-   context and rate-limit signals, diff stat for results to review.
+9. **Later, costlier.** Part a (done): stuck-agent items, step text and turn timer, context and
+   rate-limit signals. Part b: Merge, Agent review, diff stat for results to review.
 
 ## Settled questions
 
@@ -243,7 +259,8 @@ The owner delegated these; answers are folded into the sections above.
 - Recent Activity: hidden by default, still in Sections.
 - PRs in Needs you: linked PRs with failing checks, conflicts or changes requested.
 - Needs you shortcut: ⇧⌘I; check Settings → Keyboard for a clash with another plugin's command.
-- Stuck: 10 silent minutes, as a setting, ignoring threads with background work running.
+- Stuck: 30 minutes without progress in a live turn, one threshold for every role, not a setting
+  (owner, slice 9; replaces the earlier 10 silent minutes as a setting).
 - Archiving can remove worktrees with uncommitted changes, so bulk archive skips dirty worktrees.
 - Orchestrations shortcut click (owner, slice 6 review): «when I click the orchestration dialog, I
   just open it like it is normal dialog, without scrolling and without highlighting anything».
