@@ -169,10 +169,10 @@ export function linkedPullRequests(
   pullRequestsOf: (threadId: string) => readonly ThreadPullRequest[],
   descendantIdsOf: (threadId: string) => readonly string[],
 ): LinkedPullRequests[] {
-  return threadIds.map((threadId) => ({
-    threadId,
-    pullRequests: excludeDescendantPullRequests(pullRequestsOf(threadId), descendantIdsOf(threadId).flatMap(pullRequestsOf)),
-  }));
+  return threadIds.flatMap((threadId) => {
+    const own = pullRequestsOf(threadId);
+    return own.length === 0 ? [] : [{ threadId, pullRequests: excludeDescendantPullRequests(own, descendantIdsOf(threadId).flatMap(pullRequestsOf)) }];
+  });
 }
 
 export function pullRequestItems(

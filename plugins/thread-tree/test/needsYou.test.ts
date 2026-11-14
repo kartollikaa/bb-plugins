@@ -303,3 +303,10 @@ test("a PR's snooze survives switching the PR setting between linked and all", (
   const [fixed] = pullRequestItems("all", [{ threadId: "t1", pullRequests: [pr(8)] }], folder, [folderItem(8, ["review", "ci_failed"])]);
   assert.notEqual(fixed!.signature, inAll!.signature, "the PR's own checks still count");
 });
+
+test("linked PRs skip threads with none, without walking their subthreads", () => {
+  const walked: string[] = [];
+  const linked = linkedPullRequests(["root", "bare"], (id) => (id === "root" ? [pr(1)] : []), (id) => { walked.push(id); return []; });
+  assert.deepEqual(linked.map((entry) => entry.threadId), ["root"]);
+  assert.deepEqual(walked, ["root"]);
+});
