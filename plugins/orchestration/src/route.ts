@@ -48,8 +48,14 @@ export function chatPreference(storage: PreferenceStorage | null) {
  * `membership` is null until the ledger lookup answers; `decided` is true once this thread view has
  * seen an answer, so a later flip never yanks the owner out of the chat.
  */
-export function shouldOpenView({ membership, prefersChat, inSplit, decided }: { membership: boolean | null; prefersChat: boolean; inSplit: boolean; decided: boolean }): boolean {
-  return membership === true && !decided && !prefersChat && !inSplit;
+export function shouldOpenView({ enabled, membership, prefersChat, inSplit, decided }: { enabled: boolean; membership: boolean | null; prefersChat: boolean; inSplit: boolean; decided: boolean }): boolean {
+  return enabled && membership === true && !decided && !prefersChat && !inSplit;
+}
+
+export const VIEW_SETTING = "orchestrationView";
+
+export function viewEnabled(values: Record<string, unknown> | undefined): boolean {
+  return values?.[VIEW_SETTING] !== false;
 }
 
 export const RAIL = { default: 400, min: 340, max: 560, drawerBelow: 900 } as const;

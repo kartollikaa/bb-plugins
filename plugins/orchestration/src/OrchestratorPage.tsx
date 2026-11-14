@@ -1,29 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
-import { ThreadChat, useBbNavigate, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
+import { ThreadChat, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Button, Message, OrchestrationTab } from "./OrchestrationTab.tsx";
-import { chatPreference, clampRailWidth, RAIL, railMode, railOpen, threadFromSubPath, type RailChoice, type RailMode } from "./route.ts";
+import { clampRailWidth, RAIL, railMode, railOpen, threadFromSubPath, type RailChoice, type RailMode } from "./route.ts";
 import { useOrchestratorMembership } from "./useOrchestration.ts";
+import { useOpenChat } from "./surface.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 const WIDTH_KEY = "orchestration.railWidth";
-
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-export const surfacePreference = () => chatPreference(storage());
-
-export function useOpenChat() {
-  const navigate = useBbNavigate();
-  return (threadId: string) => {
-    surfacePreference().set(threadId, "chat");
-    navigate.toThread(threadId);
-  };
-}
 
 /** The page body and the title-bar toggle are mounted separately by bb, so they share the rail state here. */
 const rail = (() => {
@@ -55,6 +38,14 @@ const rail = (() => {
 
 const useRailOpen = () => useSyncExternalStore(rail.subscribe, rail.get, rail.get);
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
+function storage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 function readWidth(): number {
   try {

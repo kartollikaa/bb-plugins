@@ -28,6 +28,12 @@ export default async function plugin(bb: BbPluginApi) {
       description: "Path to the orchestrate plugin's scripts/orchestration_ledger.py. Leave empty to use the newest installed orchestrate plugin that has the export command.",
       default: "",
     },
+    orchestrationView: {
+      type: "boolean",
+      label: "Open orchestrators on the Orchestration view",
+      description: "On: an orchestrator's thread opens on the Orchestration view with its chat in a side rail. Off: it opens in bb's normal thread view. The switch in the view's corner changes this setting.",
+      default: true,
+    },
   });
   const claudeDir = join(homedir(), ".claude");
   const projectsDir = join(claudeDir, "projects");
@@ -134,5 +140,6 @@ export default async function plugin(bb: BbPluginApi) {
       return Object.fromEntries(keys.map((key) => [key, ledgerFor(all, key) !== null]));
     },
     snapshot: ({ threadId }) => snapshot(threadId),
+    setOrchestrationView: async ({ on }) => ({ on: (await settings.experimental_set({ orchestrationView: on })).orchestrationView }),
   });
 }
