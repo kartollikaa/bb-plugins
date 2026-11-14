@@ -377,6 +377,7 @@ const quiet = (patch: Partial<ThreadSignals> = {}): ThreadSignals => ({
   lastProgressAt: null,
   rateLimitedAt: null,
   failedTurnsInARow: 0,
+  toolRunning: false,
   lastFailureRateLimited: false,
   context: null,
   ...patch,

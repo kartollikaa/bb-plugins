@@ -70,7 +70,13 @@ bb's side chat (`panel.toggle`) and is not available.
   first, "Running, no progress for 42m", with Stop. Bookkeeping events (context and token
   counts, provider errors and warnings, bb's own turn watchdog) don't count as progress. A thread
   waiting on the user is a question, not stuck; background work after the turn ended isn't a
-  live turn. The threshold is a constant, not a setting. The detectable form of a failing
+  live turn. A command or tool call (a subagent included) that started and hasn't completed is
+  work in flight, not silence: an orchestrator blocked in `bb thread wait` or a long test run is
+  doing what it chose to do, and Stop there would kill a legitimate wait. Its children carry
+  their own stuck signals, and the Running list shows the open step with its timer, so a hung
+  command stays visible. Silence counts again from the item's completion. A subagent's
+  `turn/completed` carries no parent marker, so only the completion of the top-level turn's id
+  ends the turn. The threshold is a constant, not a setting. The detectable form of a failing
   delivery is a turn failing for the third time with no completed turn between: its failed item
   says "failed 3 times in a row". A failed turn that hit a rate limit says "rate limit".
 - A subthread's item names its orchestration ("under Orchestrate PR review…").

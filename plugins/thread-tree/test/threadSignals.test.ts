@@ -27,6 +27,7 @@ const signals = (patch: Partial<ThreadSignals> = {}): ThreadSignals => ({
   lastProgressAt: null,
   rateLimitedAt: null,
   failedTurnsInARow: 0,
+  toolRunning: false,
   lastFailureRateLimited: false,
   context: null,
   ...patch,
@@ -244,4 +245,140 @@ test("a first read of a long turn still finds the turn's start and the failures 
   assert.equal(out.turnStartedAt, events[2]!.createdAt);
   assert.equal(out.failedTurnsInARow, 1);
   assert.equal(out.step, "Thinking");
+});
+
+const inTurn = (type: string, createdAt: number, turnId: string, data: Record<string, unknown> = {}): SignalEventRow => ({ seq: ++seq, type, createdAt, data, scope: { kind: "turn", turnId } });
+
+function fakeLog(events: SignalEventRow[]) {
+  return async ({ types, order, beforeSeq, afterSeq, limit }: { types?: readonly string[]; order: string; beforeSeq?: string; afterSeq?: string; limit: string }) => {
+    let rows = events.filter((event) => (!types || types.includes(event.type)) && event.seq < Number(beforeSeq ?? Infinity) && event.seq > Number(afterSeq ?? 0));
+    if (order === "desc") rows = rows.reverse();
+    return rows.slice(0, Number(limit));
+  };
+}
+
+test("a subagent's turn/completed, which carries no parent marker, leaves the parent's turn running", () => {
+  // Shape of a real orchestrator log: nested turns t2..t3 start and finish inside top-level t1.
+  const fold = foldSignalEvents(emptySignalFold(), [
+    inTurn("turn/started", 20, "t1"),
+    inTurn("item/started", 30, "t1", { item: { type: "commandExecution", id: "i3", command: "npm test" } }),
+    inTurn("turn/started", 190, "t2", { parentToolCallId: "i29" }),
+    inTurn("turn/started", 202, "t3", { parentToolCallId: "i31" }),
+    inTurn("turn/completed", 821, "t2", { status: "completed" }),
+    inTurn("turn/completed", 900, "t3", { status: "failed" }),
+  ]);
+  assert.equal(fold.turnStartedAt, 20);
+  assert.equal(fold.step, "Running npm test");
+  assert.equal(fold.failedTurnsInARow, 0, "a nested failure is not the thread's failure");
+  const ended = foldSignalEvents(fold, [inTurn("turn/completed", 1000, "t1", { status: "interrupted" })]);
+  assert.equal(ended.turnStartedAt, null);
+});
+
+test("a nested completion is ignored even when the top-level start is outside the window", () => {
+  const fold = foldSignalEvents(emptySignalFold(), [
+    inTurn("turn/started", 5, "t7", { parentToolCallId: "i1" }),
+    inTurn("turn/completed", 6, "t7", { status: "failed" }),
+  ]);
+  assert.equal(fold.failedTurnsInARow, 0);
+});
+
+test("a failed first read keeps the thread watched, and the next read starts over", async () => {
+  const events = [row("turn/started", 100)];
+  let fail = true;
+  const list = fakeLog(events);
+  const reader = createSignalReader({
+    listEvents: async (args) => {
+      if (fail) throw new Error("boom");
+      return list(args);
+    },
+    log: () => {},
+  });
+  await assert.rejects(reader.read("t1"));
+  assert.equal(reader.has("t1"), true, "the next event still invalidates its key");
+  fail = false;
+  const out = await reader.read("t1");
+  assert.equal(out.turnStartedAt, 100);
+});
+
+test("a thread with no signal events is read without a boundary query", async () => {
+  const calls: { beforeSeq?: string; types?: readonly string[] }[] = [];
+  const list = fakeLog([row("system/thread-provisioning", 1)]);
+  const reader = createSignalReader({ listEvents: async (args) => { calls.push(args); return list(args); }, log: () => {} });
+  await reader.read("t1");
+  assert.ok(calls.every((args) => args.beforeSeq === undefined || Number.isFinite(Number(args.beforeSeq))), "no beforeSeq Infinity");
+  assert.equal(calls.filter((args) => args.types?.length === 2).length, 0, "a short history needs no boundary lookup");
+});
+
+test("a read that arrives while a load runs gets a fresh load that sees the new event", async () => {
+  const events = [row("turn/started", 100)];
+  const list = fakeLog(events);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let calls = 0;
+  const reader = createSignalReader({
+    listEvents: async (args) => {
+      const rows = await list(args);
+      if (calls++ === 0) await gate;
+      return rows;
+    },
+    log: () => {},
+  });
+  const first = reader.read("t1");
+  await new Promise((resolve) => setImmediate(resolve));
+  events.push(row("item/started", 200, { item: { type: "agentMessage" } }));
+  const second = reader.read("t1");
+  release();
+  await first;
+  assert.equal((await second).step, "Writing");
+});
+
+test("progress survives a reload when the newest events are all bookkeeping", async () => {
+  const events = [
+    row("turn/started", 100),
+    row("item/started", 200, { item: { type: "reasoning" } }),
+    ...Array.from({ length: 40 }, (_, index) => row("provider/error", 300 + index, { errorInfo: { category: "server" } })),
+  ];
+  const reader = createSignalReader({ listEvents: fakeLog(events), log: () => {} });
+  assert.equal((await reader.read("t1")).lastProgressAt, 200);
+});
+
+test("signal reads share one limit across every thread", async () => {
+  const { SIGNAL_READ_CONCURRENCY } = await import("../src/threadSignals.ts");
+  let running = 0;
+  let peak = 0;
+  const list = fakeLog([row("turn/started", 1)]);
+  const reader = createSignalReader({
+    listEvents: async (args) => {
+      running++;
+      peak = Math.max(peak, running);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      running--;
+      return list(args);
+    },
+    log: () => {},
+  });
+  await Promise.all(Array.from({ length: 20 }, (_, index) => reader.read(`t${index}`)));
+  assert.ok(peak <= SIGNAL_READ_CONCURRENCY, `peak ${peak}`);
+});
+
+test("a tool call still running is work in flight, not silence", () => {
+  const started = foldSignalEvents(emptySignalFold(), [
+    inTurn("turn/started", 0, "t1"),
+    inTurn("item/started", 1, "t1", { item: { type: "commandExecution", id: "i1", command: "bb thread wait thr_x" } }),
+  ]);
+  const thread = { status: "active", hasPendingInteraction: false, indicator: "runtime" };
+  const late = STUCK_AFTER_MS + 10;
+  assert.equal(isStuck(thread, toThreadSignals(started, 1), late), false);
+  const done = foldSignalEvents(started, [inTurn("item/completed", 2, "t1", { item: { type: "commandExecution", id: "i1" } })]);
+  assert.equal(isStuck(thread, toThreadSignals(done, 2), late + 2), true);
+});
+
+test("unread-error threads get signals too", async () => {
+  const { signalThreadIds } = await import("../src/signalThreads.ts");
+  const base = { activity: { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 }, isHidden: false, isArchived: false } as const;
+  assert.deepEqual(signalThreadIds([{ ...base, id: "u", status: "idle", indicator: "unread-error" }] as never), ["u"]);
+});
+
+test("commandGist drops leading variable assignments of a command", () => {
+  assert.equal(stepText({ type: "commandExecution", command: "CI=1 FOO=bar npm run build -- --verbose" }), "Running npm run build");
 });
