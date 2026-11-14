@@ -74,4 +74,5 @@ test("links are deduplicated by address, not by label", () => {
   assert.equal(item.kind, "free");
   if (item.kind !== "free") return;
   assert.deepEqual(item.links.map((l) => l.href), [`${long}1`, `${long}2`, "https://github.com/o/r/pull/3", "https://github.com/o/r/pull/3/files"]);
+  assert.deepEqual(item.links.slice(2).map((l) => l.label), ["r#3", "r#3/files"]);
 });

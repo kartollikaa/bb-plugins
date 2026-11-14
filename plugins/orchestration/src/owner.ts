@@ -13,7 +13,7 @@ export type OwnerItem =
 
 const URL = /https?:\/\/[^\s<>()|]+[^\s<>()|.,;:!?'"»]/g;
 const GITHUB_REF = /(?<![\w./-])([A-Za-z0-9][\w.-]*)\/([\w.-]+)#(\d+)\b/g;
-const GITHUB_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:pull|issues)\/(\d+)$/;
+const GITHUB_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:pull|issues)\/(\d+)(\/[^?#]*)?/;
 const THREAD = /\bthr_[a-z0-9]+\b/gi;
 /** «Nothing», «Nothing waiting.», «Nothing waits on owner input.» — but not «Nothing lands until you approve». */
 const NOTHING_STATUS = /^nothing(?:\s+(?:waiting|pending|to ask|left|(?:needs|waits on|for)\s+(?:you|the owner|owner)(?:\s+input)?))?\s*(?:[.;:!—–-]|$)/i;
@@ -21,7 +21,7 @@ const ASK_KEYS = new Set(["why", "link", "links", "thread", "threads", "option",
 
 function urlLink(href: string): Link {
   const gh = GITHUB_URL.exec(href);
-  if (gh) return { label: `${gh[2]}#${gh[3]}`, title: `${gh[1]}/${gh[2]}#${gh[3]}`, href };
+  if (gh) return { label: `${gh[2]}#${gh[3]}${(gh[4] ?? "").replace(/\/$/, "")}`, title: `${gh[1]}/${gh[2]}#${gh[3]}${gh[4] ?? ""}`, href };
   const bare = href.replace(/^https?:\/\//, "").replace(/\/$/, "");
   return { label: bare.length > 48 ? `${bare.slice(0, 47)}…` : bare, title: href, href };
 }

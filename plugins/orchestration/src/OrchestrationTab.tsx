@@ -85,7 +85,7 @@ function Expandable({ children }: { children: ReactNode }) {
   );
 }
 
-const linkButton = "inline-flex h-[26px] items-center rounded-md border border-border px-2.5 text-xs font-medium text-foreground no-underline hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+const linkButton = "block h-[26px] max-w-full truncate whitespace-nowrap leading-[24px] rounded-md border border-border px-2.5 text-xs font-medium text-foreground no-underline hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
   const sent = actions.sent === askIdentity(ask);
