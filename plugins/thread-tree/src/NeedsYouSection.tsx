@@ -62,13 +62,12 @@ interface NeedsYouSources {
   /** Both PR sources have loaded, so a PR item's signature is final. */
   pullRequestsSettled: boolean;
   orchestrationOf: (threadId: string) => string | null;
-  activeThreadId: string | null;
   onNavigate: () => void;
 }
 
 /** The queue's visible items, snoozing, and ⇧⌘I, which works while the section is folded or replaced by a flat list. */
 export function useNeedsYou(sources: NeedsYouSources) {
-  const { threads, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, pullRequestsSettled, orchestrationOf, activeThreadId, onNavigate } = sources;
+  const { threads, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, pullRequestsSettled, orchestrationOf, onNavigate } = sources;
   const questions = useQuestions(threads);
   const firstSeen = useRef<ReadonlyMap<string, number>>(new Map());
   const waitingIds = threads.filter((thread) => threadItemKind(thread) === "input").map((thread) => thread.id);
@@ -117,13 +116,13 @@ export function useNeedsYou(sources: NeedsYouSources) {
     });
   };
 
-  const latest = useRef({ items, activeThreadId, open });
-  latest.current = { items, activeThreadId, open };
+  const latest = useRef({ items, open });
+  latest.current = { items, open };
   useEffect(() => setInboxHandler((threadId) => {
-    const { items: current, activeThreadId: active, open: openItem } = latest.current;
-    const item = nextItem(current, threadId ?? active, cursor.current);
+    const { items: current, open: openItem } = latest.current;
+    const item = nextItem(current, threadId, cursor.current);
     if (item) openItem(item);
-    else toast("Nothing needs you");
+    else toast(current.length > 0 ? "Nothing else needs you" : "Nothing needs you");
     return item !== null;
   }), []);
 

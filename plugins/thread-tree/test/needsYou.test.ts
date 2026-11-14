@@ -289,7 +289,8 @@ test("⇧⌘I from its cursor steps past the other items of the thread it opened
   const items = [...prs, question!];
   assert.equal(nextItem(items, "a", { key: prs[0]!.key, index: 0, threadId: "a" })?.threadId, "b");
   const lone = [prs[0]!];
-  assert.equal(nextItem(lone, "a", { key: prs[0]!.key, index: 0, threadId: "a" })?.key, prs[0]!.key, "the only item stays offered");
+  assert.equal(nextItem(lone, "a", { key: prs[0]!.key, index: 0, threadId: "a" }), null, "nothing else needs you");
+  assert.equal(nextItem(prs, "a"), null, "every item is the open thread's");
   const folderOnly = pullRequestItems("all", [], new Map(), [folderItem(8, ["ci_failed"]), folderItem(9, ["review"])]);
   assert.equal(nextItem(folderOnly, null, { key: folderOnly[0]!.key, index: 0, threadId: null })?.key, folderOnly[1]!.key, "thread-less items still step one by one");
 });

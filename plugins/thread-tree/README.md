@@ -26,8 +26,10 @@ thread opens GitHub Folder's PR page, an automation with no run the Automations
 page. A failed turn offers Retry, a failed queued message Resend. Hovering an
 item shows Snooze, which hides it until it changes and offers Undo, and Mark
 read on a result; on a phone or touch screen both stay in the row. ⇧⌘I opens the next item, stepping on from the last one it
-opened, or past the open thread's items; it works anywhere in bb while the
-sidebar thread list is loaded, and Settings → Keyboard rebinds it. Each browser client keeps its own snoozes.
+opened, always past the open thread's items, and says "Nothing else needs you" when only that
+thread is left; it works anywhere in bb while the
+sidebar thread list is loaded, and Settings → Keyboard rebinds it. On Windows and Linux it is Ctrl+Shift+I, which browsers
+also use for DevTools. Each browser client keeps its own snoozes.
 
 The line at the top counts threads that need input, failed, are running, and
 finished but are not read yet. Each count is a toggle: it swaps the sections and

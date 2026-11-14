@@ -231,7 +231,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     pullRequestMode: view.needsYouPullRequests,
     pullRequestsSettled: githubFolder.isLoaded && !pullRequestsLoading,
     orchestrationOf,
-    activeThreadId: activeThreadId ?? null,
     onNavigate,
   });
   const sharedBranches = useMemo(() => sharedBranchThreads(threads, familyRootOf(threads)), [threads]);

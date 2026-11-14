@@ -302,21 +302,20 @@ export interface InboxCursor {
   threadId: string | null;
 }
 
-/** ⇧⌘I: the item after the last one opened, else after the open thread's items, wrapping; the first when neither is in the queue. */
+/** ⇧⌘I: the item after the last one opened, else after the open thread's items, wrapping and skipping the open thread's; null when only it needs you. */
 export function nextItem(items: readonly NeedsYouItem[], activeThreadId: string | null, cursor: InboxCursor | null = null): NeedsYouItem | null {
-  if (items.length === 0) return null;
+  let start = 0;
   if (cursor && cursor.threadId === activeThreadId) {
     const at = items.findIndex((item) => item.key === cursor.key);
-    const start = at >= 0 ? at + 1 : cursor.index;
-    for (let step = 0; step < items.length; step++) {
-      const item = items[(start + step) % items.length]!;
-      if (!activeThreadId || item.threadId !== activeThreadId) return item;
-    }
-    return items[start % items.length] ?? null;
+    start = at >= 0 ? at + 1 : cursor.index;
+  } else {
+    items.forEach((item, index) => {
+      if (activeThreadId && item.threadId === activeThreadId) start = index + 1;
+    });
   }
-  let last = -1;
-  items.forEach((item, index) => {
-    if (activeThreadId && item.threadId === activeThreadId) last = index;
-  });
-  return items[(last + 1) % items.length] ?? null;
+  for (let step = 0; step < items.length; step++) {
+    const item = items[(start + step) % items.length]!;
+    if (!activeThreadId || item.threadId !== activeThreadId) return item;
+  }
+  return null;
 }
