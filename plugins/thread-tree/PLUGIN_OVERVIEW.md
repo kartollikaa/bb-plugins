@@ -10,7 +10,7 @@ under it, and the subagents it runs inside its own session show on its row.
 - Needs you, above the sections: threads asking a question (with how long
   they waited), failed turns and queued messages, unread results, then failing
   PRs of your threads and failed automations. Retry or Resend in place; hover
-  to snooze an item until it changes. ⇧⌘I opens the next one.
+  to snooze an item until it changes. ⇧⌘I (Ctrl+Shift+I) opens the next.
 - Pull requests (from GitHub Folder) and Automations start folded, with a
   summary in the header: "1 failing · 5", "1 failed · next in 12m". A PR's
   reason is its icon; hover to snooze or open its thread. Hover an automation

@@ -207,6 +207,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     () => groupRows(forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId ?? null, folderSorts, threadSort, showArchived ? [] : retainedProjectIds, isOlder),
     [forest, collapsedThreads.values, groupMode, shownProjectOrder, activeThreadId, folderSorts, threadSort, showArchived, retainedProjectIds, isOlder],
   );
+  const pinnedGroup = groups.find((group) => group.key === "pinned");
+  const folderGroups = groups.filter((group) => group.key !== "pinned");
   const olderShown = useCallback((groupKey: string) => flags.has(`older:${groupKey}`), [flags]);
   const showMoreRecent = flags.has("recent-more");
   const recentHidden = !view.showRecent || collapsedGroups.has("recent");
@@ -231,7 +233,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const shownSections = shownSectionIds(sectionDrag.order, view, presentSections);
   const treeRef = useRef<HTMLDivElement>(null);
   useFlipOrder(sectionsRef, shownSections.join(), view.reduceMotion);
-  useFlipOrder(treeRef, groups.map((group) => group.key).join(), view.reduceMotion);
+  useFlipOrder(treeRef, folderGroups.map((group) => group.key).join(), view.reduceMotion);
   const moveSectionBy = (id: SectionId, step: -1 | 1) => setSavedSectionOrder(moveSection(sectionOrder, shownSections, id, step));
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const folderItems = githubFolder.view;
@@ -362,8 +364,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             ? "No archived threads."
             : "Loading archived threads…";
 
-  const pinnedGroup = groups.find((group) => group.key === "pinned");
-  const folderGroups = groups.filter((group) => group.key !== "pinned");
   const renderGroup = (group: (typeof groups)[number]) => {
     const isCollapsed = (view.foldOnDrag && canReorder && projectDrag.isDragging) || collapsedGroups.has(group.key);
     const project = group.projectId ? projectById.get(group.projectId) : undefined;
@@ -488,7 +488,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           onCloseSearch={closeSearch}
           inputRef={searchInputRef}
         />
-        <SectionsMenu view={view} order={sectionOrder.filter((id) => presentSections.includes(id))} onChange={setSection} />
+        <SectionsMenu view={view} order={sectionOrder.filter((id) => presentSections.includes(id))} hidden={presentSections.length - shownSections.length} onChange={setSection} />
       </div>
       {flatList ? (
         <FlatListSection
@@ -647,15 +647,17 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
           </Collapse>
         </section>
       ) : null}
-      <div
-        ref={treeRef}
-        role="tree"
-        aria-label={showArchived ? "Archived threads" : "Threads"}
-        className="relative flex flex-col gap-2"
-        {...(canReorder ? projectDrag.containerProps : {})}
-      >
-        {folderGroups.map(renderGroup)}
-      </div>
+      {folderGroups.length > 0 ? (
+        <div
+          ref={treeRef}
+          role="tree"
+          aria-label={showArchived ? "Archived threads" : "Threads"}
+          className="relative flex flex-col gap-2"
+          {...(canReorder ? projectDrag.containerProps : {})}
+        >
+          {folderGroups.map(renderGroup)}
+        </div>
+      ) : null}
 
       {archivedPages?.hasNextPage ? (
         <button
@@ -820,15 +822,16 @@ function useSectionToggles(saved: ViewSettings): [ViewSettings, (key: SectionKey
 function SectionsMenu({
   view,
   order,
+  hidden,
   onChange,
 }: {
   view: ViewSettings;
   order: readonly SectionId[];
+  hidden: number;
   onChange: (key: SectionKey, shown: boolean) => void;
 }) {
   const portalProps = usePortalScopeProps();
   const menu = useTapToOpenMenu();
-  const hidden = order.filter((id) => !view[SECTION_BY_ID[id].key]).length;
   return (
     <DropdownMenu.Root {...menu.rootProps}>
       <DropdownMenu.Trigger asChild {...menu.triggerProps}>
