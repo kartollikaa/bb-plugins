@@ -455,8 +455,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
               <GithubSection
                 folder={githubFolder}
                 threadOfPullRequest={needsYou.threadOfPullRequest}
-                onOpenThread={(threadId) => {
-                  navigate.toThread(threadId);
+                onOpenThread={(threadId, split) => {
+                  navigate.toThread(threadId, { split });
                   onNavigate();
                 }}
                 isCollapsed={foldSections || isSectionCollapsed(collapsedGroups.values, "github")}

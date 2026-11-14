@@ -95,7 +95,7 @@ export function GithubSection({
   folder: GithubFolder;
   /** Lowercased PR URL → a thread that links it. */
   threadOfPullRequest: ReadonlyMap<string, string>;
-  onOpenThread: (threadId: string) => void;
+  onOpenThread: (threadId: string, split: boolean) => void;
   isCollapsed: boolean;
   onToggle: () => void;
   /** The header's right-click menu. */
@@ -141,7 +141,7 @@ export function GithubSection({
             <PullRequestRow
               key={item.pr.url}
               item={item}
-              onOpenThread={threadId ? () => onOpenThread(threadId) : undefined}
+              onOpenThread={threadId ? (split) => onOpenThread(threadId, split) : undefined}
               isSnoozed={view.snoozed.includes(item)}
               now={now}
               onHover={() => prefetch(item.pr.url)}
@@ -192,7 +192,7 @@ function PullRequestRow({
   onToggleSnoozed,
 }: {
   item: GithubFolderItem;
-  onOpenThread?: () => void;
+  onOpenThread?: (split: boolean) => void;
   isSnoozed: boolean;
   now: number;
   onHover: () => void;
@@ -233,7 +233,10 @@ function PullRequestRow({
       <span data-pr-repo="" className="max-w-[30%] shrink-0 truncate text-2xs text-sidebar-foreground/45 group-hover/row:invisible">
         {pr.repo.split("/")[1] ?? pr.repo}
       </span>
-      <span className={cn("absolute inset-y-0 right-1 hidden items-center gap-0.5 pl-2 group-hover/row:flex", ROW_HOVER_SOLID_BG)}>
+      <span
+        onAuxClick={(event) => event.stopPropagation()}
+        className={cn("absolute inset-y-0 right-1 hidden items-center gap-0.5 pl-2 group-hover/row:flex", ROW_HOVER_SOLID_BG)}
+      >
         {onOpenThread ? (
           <button
             type="button"
@@ -241,7 +244,7 @@ function PullRequestRow({
             title="Open its thread"
             onClick={(event) => {
               event.stopPropagation();
-              onOpenThread();
+              onOpenThread(event.metaKey || event.ctrlKey);
             }}
             className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
           >
