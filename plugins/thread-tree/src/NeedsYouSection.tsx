@@ -14,6 +14,7 @@ import {
   pruneSnoozes,
   pullRequestItems,
   readSnoozes,
+  threadItemKind,
   threadItems,
   trackFirstSeen,
   type InboxCursor,
@@ -65,7 +66,7 @@ export function useNeedsYou(sources: NeedsYouSources) {
   const { threads, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, orchestrationOf, activeThreadId, onNavigate } = sources;
   const questions = useQuestions(threads);
   const firstSeen = useRef<ReadonlyMap<string, number>>(new Map());
-  const waitingIds = threads.filter((thread) => thread.hasPendingInteraction || thread.indicator === "waiting-for-input").map((thread) => thread.id);
+  const waitingIds = threads.filter((thread) => threadItemKind(thread) === "input").map((thread) => thread.id);
   firstSeen.current = trackFirstSeen(firstSeen.current, waitingIds, Date.now());
 
   const all = useMemo(() => {
@@ -123,13 +124,17 @@ export function useNeedsYou(sources: NeedsYouSources) {
   return { items, open, snooze };
 }
 
+const QUESTION_RETRY_MS = 10_000;
+
 /** Pending requests of the threads that need input, read again only for a thread that changed. */
 function useQuestions(threads: readonly PluginSidebarThread[]): ReadonlyMap<string, ThreadQuestion> {
   const sdk = useSdk();
   const [questions, setQuestions] = useState<ReadonlyMap<string, ThreadQuestion>>(new Map());
   const readAt = useRef(new Map<string, number>());
+  const [retryRound, setRetryRound] = useState(0);
+  const retryTimer = useRef<number | undefined>(undefined);
   const waitingKey = threads
-    .filter((thread) => thread.hasPendingInteraction || thread.indicator === "waiting-for-input")
+    .filter((thread) => threadItemKind(thread) === "input")
     .map((thread) => `${thread.id}@${thread.updatedAt}`)
     .sort()
     .join();
@@ -151,11 +156,17 @@ function useQuestions(threads: readonly PluginSidebarThread[]): ReadonlyMap<stri
           if (readAt.current.get(id) === updatedAt) setQuestions((previous) => new Map(previous).set(id, describeQuestion(pending as unknown as PendingInteraction[])));
         },
         () => {
-          if (readAt.current.get(id) === updatedAt) readAt.current.delete(id);
+          if (readAt.current.get(id) !== updatedAt) return;
+          readAt.current.delete(id);
+          retryTimer.current ??= window.setTimeout(() => {
+            retryTimer.current = undefined;
+            setRetryRound((round) => round + 1);
+          }, QUESTION_RETRY_MS);
         },
       );
     }
-  }, [sdk, waitingKey]);
+  }, [sdk, waitingKey, retryRound]);
+  useEffect(() => () => window.clearTimeout(retryTimer.current), []);
   return questions;
 }
 
