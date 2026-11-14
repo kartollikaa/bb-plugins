@@ -11,6 +11,7 @@ import {
   isStuck,
   lastProgressAt,
   runningSubtitle,
+  signalTooltipLines,
   stepText,
   toThreadSignals,
   type SignalEventRow,
@@ -34,6 +35,10 @@ const signals = (patch: Partial<ThreadSignals> = {}): ThreadSignals => ({
 test("stepText names a command by its text and a tool by bb's own label", () => {
   assert.equal(stepText({ type: "commandExecution", command: "npm test", presentation: { label: { pending: "Running command" }, title: "npm test" } }), "Running npm test");
   assert.equal(stepText({ type: "commandExecution", command: "git status\ngit log" }), "Running git status");
+  assert.equal(stepText({ type: "commandExecution", command: "D=$(mktemp -d) && git archive c149e40 plugins/x | tar -x -C $D" }), "Running git archive c149e40", "assignments and pipes are dropped");
+  assert.equal(stepText({ type: "commandExecution", command: "S=abc; bb browser-automation run $S --script 'x'" }), "Running bb browser-automation run");
+  assert.equal(stepText({ type: "commandExecution", command: "cd /Users/me/Projects/bb && npm test 2>&1 | tail -5" }), "Running npm test");
+  assert.equal(stepText({ type: "commandExecution", command: "VAR=1" }), "Running VAR=1", "a bare assignment stays as it is");
   assert.equal(stepText({ type: "toolCall", tool: "ctx_execute", presentation: { label: { pending: "Running ctx_execute" } } }), "Running ctx_execute");
   assert.equal(stepText({ type: "toolCall", tool: "search" }), "Running search");
   assert.equal(stepText({ type: "reasoning" }), "Thinking");
@@ -195,4 +200,48 @@ test("the reader folds incrementally and reads progress from the newest events",
   assert.equal(reader.has("t1"), true);
   reader.forget("t1");
   assert.equal(reader.has("t1"), false);
+});
+
+test("signals are read for working and failed threads only", async () => {
+  const { signalThreadIds } = await import("../src/signalThreads.ts");
+  const base = { indicator: "none", activity: { backgroundAgents: 0, backgroundCommands: 0, workflows: 0 }, isHidden: false, isArchived: false } as const;
+  assert.deepEqual(signalThreadIds([
+    { ...base, id: "z-run", status: "active" },
+    { ...base, id: "a-fail", status: "error" },
+    { ...base, id: "idle", status: "idle" },
+    { ...base, id: "bg", status: "idle", activity: { ...base.activity, backgroundAgents: 1 } },
+    { ...base, id: "hidden", status: "active", isHidden: true },
+    { ...base, id: "archived", status: "error", isArchived: true },
+  ] as never), ["a-fail", "bg", "z-run"]);
+});
+
+test("signalTooltipLines: the turn's time and step, a rate limit while running, the context fill", () => {
+  assert.deepEqual(signalTooltipLines(signals({ turnStartedAt: 0, step: "Running npm test", context: { usedTokens: 1, windowTokens: 4 } }), 65_000), [
+    "Turn running 1:05 · Running npm test",
+    "Context 25% full",
+  ]);
+  assert.deepEqual(signalTooltipLines(signals({ turnStartedAt: 0, rateLimitedAt: 1 }), 2), ["Turn running 0:00", "Rate limited, waiting to retry"]);
+  assert.deepEqual(signalTooltipLines(signals({ rateLimitedAt: 1 }), 2), [], "a finished turn says nothing about the limit");
+  assert.deepEqual(signalTooltipLines(undefined, 0), []);
+});
+
+test("a first read of a long turn still finds the turn's start and the failures before it", async () => {
+  const events: SignalEventRow[] = [
+    row("turn/started", 1),
+    row("turn/completed", 2, { status: "failed" }),
+    row("turn/started", 3),
+    ...Array.from({ length: 450 }, (_, index) => row("item/started", 10 + index, { item: { type: "reasoning" } })),
+  ];
+  const reader = createSignalReader({
+    listEvents: async ({ types, order, beforeSeq, afterSeq, limit }) => {
+      let rows = events.filter((event) => (!types || types.includes(event.type)) && event.seq < Number(beforeSeq ?? Infinity) && event.seq > Number(afterSeq ?? 0));
+      if (order === "desc") rows = rows.reverse();
+      return rows.slice(0, Number(limit));
+    },
+    log: () => {},
+  });
+  const out = await reader.read("long");
+  assert.equal(out.turnStartedAt, events[2]!.createdAt);
+  assert.equal(out.failedTurnsInARow, 1);
+  assert.equal(out.step, "Thinking");
 });

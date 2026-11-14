@@ -1,5 +1,6 @@
 // What a thread's own event log says about its current turn: step, timer, progress, context fill, rate limits, failures.
 import { z } from "zod";
+import { runningContext } from "./statusFilters.ts";
 
 /** Owner's rule: a working thread with no progress for this long is stuck, whatever its role. */
 export const STUCK_AFTER_MS = 30 * 60_000;
@@ -68,6 +69,17 @@ const record = (value: unknown): Loose => (value && typeof value === "object" ? 
 const text = (value: unknown): string | null => (typeof value === "string" && value.trim() !== "" ? value : null);
 const firstLine = (value: string) => value.trim().split("\n")[0]!.trim();
 
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const GIST_WORDS = 3;
+
+/** The first real command of a shell line, in a few words: no variable setup, `cd`, pipes or redirects. */
+export function commandGist(command: string): string {
+  const line = firstLine(command);
+  const parts = line.split(/\s*(?:&&|\|\||;|\|)\s*/).map((part) => part.trim()).filter(Boolean);
+  const real = parts.find((part) => !ASSIGNMENT.test(part) && !/^cd(\s|$)/.test(part));
+  return real ? real.split(/\s+/).filter((word) => !/^\d*[<>]/.test(word)).slice(0, GIST_WORDS).join(" ") : line;
+}
+
 /** A started item in a few words, as bb's own timeline labels it; null for items that aren't a step. */
 export function stepText(item: unknown): string | null {
   const entry = record(item);
@@ -77,8 +89,8 @@ export function stepText(item: unknown): string | null {
   const pending = text(record(presentation?.label)?.pending);
   switch (entry.type) {
     case "commandExecution": {
-      const command = text(presentation?.title) ?? text(entry.command);
-      return command ? `Running ${firstLine(command)}` : pending ?? "Running a command";
+      const command = text(entry.command) ?? text(presentation?.title);
+      return command ? `Running ${commandGist(command)}` : pending ?? "Running a command";
     }
     case "toolCall":
       return pending ?? (text(entry.tool) ? `Running ${entry.tool}` : null);
@@ -201,8 +213,7 @@ export function runningSubtitle(signals: ThreadSignals | undefined, projectName:
   return [
     signals ? (isRateLimited(signals) ? "Rate limited" : signals.step) : null,
     percent !== null && percent >= CONTEXT_NOTE_PERCENT ? `${percent}% context` : null,
-    projectName,
-    parentTitle ? `under ${parentTitle}` : null,
+    runningContext(projectName, parentTitle),
   ].filter(Boolean).join(" · ");
 }
 
@@ -211,6 +222,17 @@ export function failureNote(signals: ThreadSignals | undefined): string | null {
   if (!signals) return null;
   if (signals.failedTurnsInARow >= FAILURES_IN_A_ROW_NOTE) return `failed ${signals.failedTurnsInARow} times in a row`;
   return signals.lastFailureRateLimited ? "rate limit" : null;
+}
+
+/** Tooltip lines for a row: what the turn is doing and for how long, its context fill, a rate limit. */
+export function signalTooltipLines(signals: ThreadSignals | undefined, now: number): string[] {
+  if (!signals) return [];
+  const percent = contextPercent(signals.context);
+  return [
+    signals.turnStartedAt !== null ? `Turn running ${formatClock(now - signals.turnStartedAt)}${signals.step ? ` · ${signals.step}` : ""}` : null,
+    isRateLimited(signals) && signals.turnStartedAt !== null ? "Rate limited, waiting to retry" : null,
+    percent !== null ? `Context ${percent}% full` : null,
+  ].filter((line): line is string => line !== null);
 }
 
 export function formatClock(ms: number): string {
@@ -234,6 +256,9 @@ const PAGE_SIZE = 100;
 /** A long thread's first read looks this far back; older failures don't change today's signals. */
 const FIRST_READ_PAGES = 3;
 const PROGRESS_WINDOW = 25;
+/** A long turn's start, and the failed turns before it, can sit behind the first read's pages. */
+const TURN_BOUNDARY_TYPES = ["turn/started", "turn/completed"] as const;
+const TURN_BOUNDARY_LOOKBACK = 50;
 const MAX_CACHED_THREADS = 400;
 
 /** Per-thread folds: the first read looks back a few pages, later reads take only newer events. */
@@ -250,7 +275,9 @@ export function createSignalReader(deps: { listEvents: (args: SignalListArgs) =>
       if (rows.length < PAGE_SIZE) break;
       before = rows.at(-1)!.seq;
     }
-    return foldSignalEvents(emptySignalFold(), newestFirst.reverse());
+    const oldest = newestFirst.at(-1)?.seq ?? Infinity;
+    const boundaries = await deps.listEvents({ threadId, types: TURN_BOUNDARY_TYPES, order: "desc", limit: String(TURN_BOUNDARY_LOOKBACK), beforeSeq: String(oldest) });
+    return foldSignalEvents(emptySignalFold(), [...newestFirst, ...boundaries].reverse());
   }
 
   async function catchUp(threadId: string, fold: SignalFold): Promise<SignalFold> {
