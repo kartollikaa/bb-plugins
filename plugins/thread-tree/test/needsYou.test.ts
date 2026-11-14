@@ -282,3 +282,14 @@ test("questions are read again only for waiting threads that changed since the l
   const read = new Map([["a", 1], ["b", 1], ["gone", 1]]);
   assert.deepEqual(questionsToRead([{ id: "a", updatedAt: 1 }, { id: "b", updatedAt: 2 }, { id: "c", updatedAt: 1 }], read), ["b", "c"]);
 });
+
+test("⇧⌘I from its cursor steps past the other items of the thread it opened", () => {
+  const prs = pullRequestItems("linked", [{ threadId: "a", pullRequests: [pr(1, { checks: { state: "failing" } }), pr(2, { checks: { state: "failing" } })] }], new Map(), []);
+  const [question] = build([thread("b", { status: "error" })]);
+  const items = [...prs, question!];
+  assert.equal(nextItem(items, "a", { key: prs[0]!.key, index: 0, threadId: "a" })?.threadId, "b");
+  const lone = [prs[0]!];
+  assert.equal(nextItem(lone, "a", { key: prs[0]!.key, index: 0, threadId: "a" })?.key, prs[0]!.key, "the only item stays offered");
+  const folderOnly = pullRequestItems("all", [], new Map(), [folderItem(8, ["ci_failed"]), folderItem(9, ["review"])]);
+  assert.equal(nextItem(folderOnly, null, { key: folderOnly[0]!.key, index: 0, threadId: null })?.key, folderOnly[1]!.key, "thread-less items still step one by one");
+});

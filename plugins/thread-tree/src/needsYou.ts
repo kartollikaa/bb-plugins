@@ -286,7 +286,12 @@ export function nextItem(items: readonly NeedsYouItem[], activeThreadId: string 
   if (items.length === 0) return null;
   if (cursor && cursor.threadId === activeThreadId) {
     const at = items.findIndex((item) => item.key === cursor.key);
-    return items[at >= 0 ? (at + 1) % items.length : cursor.index % items.length] ?? null;
+    const start = at >= 0 ? at + 1 : cursor.index;
+    for (let step = 0; step < items.length; step++) {
+      const item = items[(start + step) % items.length]!;
+      if (!activeThreadId || item.threadId !== activeThreadId) return item;
+    }
+    return items[start % items.length] ?? null;
   }
   let last = -1;
   items.forEach((item, index) => {
