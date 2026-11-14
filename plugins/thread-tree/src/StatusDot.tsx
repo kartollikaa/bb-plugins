@@ -4,7 +4,7 @@ import type { SubagentState } from "./subagents";
 import type { DotState } from "./tree";
 
 // bb's theme has no blue status token, so running uses Tailwind's palette.
-const DOT_CLASS: Record<DotState, string> = {
+export const DOT_CLASS: Record<DotState, string> = {
   running: "bg-blue-500",
   input: "bg-attention",
   error: "bg-destructive",

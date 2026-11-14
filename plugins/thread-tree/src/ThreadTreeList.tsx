@@ -45,6 +45,7 @@ import { GithubSection, useGithubFolder } from "./GithubSection";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph, rollupGlyph } from "./statusGlyph";
 import { StatusLine } from "./StatusLine";
+import { DOT_CLASS } from "./StatusDot";
 import { countStatusFilters, filterThreads, handleFlatListEscape, handleSearchKey, isModalDialog, MODAL_DIALOG_SELECTOR, orchestrationTitle, refocusAfterClose, returnFocus, runningContext, type CloseReason, sidebarBehindModal, searchThreads, STATUS_FILTERS, type ClosedView, type StatusFilter } from "./statusFilters";
 import type { rpcContract } from "../server";
 import {
@@ -1274,13 +1275,12 @@ const FOLD_STATES: readonly { state: FoldState; label: string }[] = [
   { state: "done", label: "done" },
 ];
 
-// bb's theme has no blue status token, so running uses Tailwind's palette, as the status dots do.
 const FOLD_BAR_CLASS: Record<FoldState, string> = {
-  input: "bg-attention",
-  error: "bg-destructive",
-  running: "bg-blue-500",
+  input: DOT_CLASS.input,
+  error: DOT_CLASS.error,
+  running: DOT_CLASS.running,
   waiting: "bg-blue-500/40",
-  unread: "bg-success",
+  unread: DOT_CLASS.done,
   done: "bg-sidebar-foreground/20",
 };
 
