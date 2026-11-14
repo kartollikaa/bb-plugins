@@ -41,6 +41,9 @@ import { formatAge } from "./time";
 import { actionsInline, ROW_ACTION_BUTTON, hoverActionsClass, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX } from "./rowActions";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT } from "./rowStyles";
 
+/** The strip repeats the pill beside Snooze, so the row's own copy steps aside under it. */
+const HIDDEN_UNDER_STRIP = "group-hover/row:invisible group-data-[keyboard-focus]/row:invisible";
+
 const THREAD_GLYPH: Record<ThreadItemKind, PluginSidebarThreadIndicator> = {
   input: "waiting-for-input",
   failed: "unread-error",
@@ -252,8 +255,10 @@ function NeedsYouRow({
     ? () => void sdk.threads.markRead({ threadId: item.threadId }).catch((error: unknown) =>
         toast.error("Couldn't mark it read", { description: error instanceof Error ? error.message : String(error) }))
     : null;
+  const failure = item.kind === "failed" && item.canRetry ? <RetryButton threadId={item.threadId} /> : item.kind === "queued-failed" ? <ResendButton threadId={item.threadId} /> : null;
   const actionButtons = (
     <>
+      {failure ? <span className="pointer-events-auto flex">{failure}</span> : null}
       {markRead ? <OverlayButton label="Mark read" icon="CheckCheck" fallback="Check" onClick={markRead} /> : null}
       <OverlayButton label="Snooze until it changes" icon="BellOff" fallback="Clock" onClick={onSnooze} />
     </>
@@ -294,8 +299,7 @@ function NeedsYouRow({
         </span>
         <span data-row-subtitle="" className="truncate text-2xs text-sidebar-foreground/50">{reason}</span>
       </span>
-      {item.kind === "failed" && item.canRetry ? <span className="relative z-[1] flex shrink-0"><RetryButton threadId={item.threadId} /></span> : null}
-      {item.kind === "queued-failed" ? <span className="relative z-[1] flex shrink-0"><ResendButton threadId={item.threadId} /></span> : null}
+      {failure && !inlineActions ? <span className={cn("flex shrink-0", HIDDEN_UNDER_STRIP)}>{failure}</span> : null}
       {inlineActions ? (
         <span data-inline-actions="" className="relative z-[1] flex shrink-0 items-center" style={{ gap: STRIP_GAP_PX }}>
           {actionButtons}
