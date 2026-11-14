@@ -49,7 +49,8 @@ can find it by the error text.
 - **No plugin slot owns a thread's main area**, and a plugin can't collapse the conversation or
   maximize the side panel (`panel.fullScreen.toggle` is a keybinding only). orchestration takes the
   main area with a `navPanel` page that embeds `ThreadChat`, and redirects to it from the thread
-  tab's `useVisible` hook with `toPluginPanel(…, { replace: true })`. `useComposers()` lists a
+  tab's `useVisible` hook with `toPluginPanel(…, { replace: true })`, skipped while
+  `useSidebarSplitLayout()` is non-null, because a plugin page can't be one pane of a split. `useComposers()` lists a
   `ThreadChat`'s composer, so filling it works there too.
 - **Filling a composer without sending:** `useComposers()` lists composer handles; pick the one with
   `scope.kind === "thread"` and the thread's id, then `replace`/`insert` and `focus()`. Never `submit()`.
