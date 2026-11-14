@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Agent, LedgerSummary, Subtask } from "../src/contract.ts";
-import { buildView, firstLine, longAge, prettyModel, QUIET_MS, shortAge, type LiveThread } from "../src/view.ts";
+import { buildView, firstLine, longAge, prettyModel, shortAge, type LiveThread } from "../src/view.ts";
 
 const NOW = Date.UTC(2026, 10, 14, 12, 0);
 const MIN = 60_000;
@@ -97,7 +97,7 @@ test("quiet for 30 min while working is stuck; 29 min is not", () => {
   assert.equal(quiet.nudge!.draft, "What is S5 doing? It hasn't reported for 52 min.");
   assert.equal(view([subtask("S5", "working")], { thr_s5: live(29) }).state, "moving");
   const edge = buildView({ ledger: ledger([subtask("S5", "working")]), agents: {}, orchestratorThreadId: "x", now: NOW,
-    live: { thr_s5: { ...live(0), latestAttentionAt: NOW - QUIET_MS } } });
+    live: { thr_s5: { ...live(0), latestAttentionAt: NOW - 30 * MIN } } });
   assert.equal(edge.state, "stuck");
 });
 

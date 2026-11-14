@@ -48,6 +48,14 @@ test("counts failed checks and reviews across the subtask's open gates, not arch
   assert.equal(s6!.gateLine, "Checks failed · review failed · 3 failures");
 });
 
+test("a status cell with more text falls back to its first word when that is a status", () => {
+  const row = (raw: string) => ({ ...fixture.subtasks[0], status: { value: null, raw } });
+  const [a, b] = summarizeExport({ ...fixture, subtasks: [row("delivered; review RO1, merge = owner"), row("someday")] }, "/x.md").subtasks;
+  assert.equal(a!.status, "delivered");
+  assert.equal(b!.status, null);
+  assert.equal(b!.statusRaw, "someday");
+});
+
 test("a wrong schema or a newer version is a warning, not a crash", () => {
   assert.match(summarizeExport({ schema: "other" }, "/x.md").warnings[0]!, /Unexpected export schema/);
   assert.match(summarizeExport({ ...fixture, schema_version: 2 }, "/x.md").warnings[0]!, /version 2/);

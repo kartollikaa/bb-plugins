@@ -5,6 +5,7 @@ export const EXPORT_SCHEMA = "orchestrate-ledger-export";
 export const EXPORT_VERSION = 1;
 
 const THREAD_ID = /\bthr_[a-z0-9]+\b/;
+const STATUSES = new Set(["planned", "card", "briefed", "waiting-dependency", "working", "question", "delivered", "gate", "ready", "landed", "verified", "dropped"]);
 const FAILURE_KINDS = new Set(["checks", "review", "done_when", "conflicts"]);
 const GATE_LINE_KINDS = ["checks", "review", "done_when", "conflicts", "landing", "after_landing"] as const;
 const KIND_LABEL: Record<string, string> = {
@@ -32,6 +33,12 @@ const str = (value: unknown): string | null => (typeof value === "string" && val
 function threadIdOf(value: unknown): string | null {
   const text = str(value);
   return text ? (THREAD_ID.exec(text)?.[0] ?? null) : null;
+}
+
+/** The export maps only an exact status cell; «delivered; review R1» still starts with one. */
+function statusFromRaw(raw: string | null): string | null {
+  const word = raw?.trim().split(/[\s;,(]/)[0]?.toLowerCase() ?? "";
+  return STATUSES.has(word) ? word : null;
 }
 
 function gateLine(summary: Json, failures: number): string {
@@ -77,7 +84,7 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
       id,
       name: str(row.name),
       threadId: threadIdOf(row.session) ?? threadIdOf(roleHandovers.at(-1)?.to_id),
-      status: str(status.value),
+      status: str(status.value) ?? statusFromRaw(str(status.raw)),
       statusRaw: str(status.raw),
       modelRaw: str(obj(row.model_effort).raw),
       dependsOn: arr(row.depends_on).flatMap((d) => (typeof d === "string" ? [d] : [])),
