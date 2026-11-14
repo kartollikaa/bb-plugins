@@ -19,7 +19,7 @@ import {
 import { sectionPatchSchema, SETTINGS } from "./src/settings";
 import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/threadPullRequests";
 import { createProjectFolderHistory } from "./src/projectFolders";
-import { ARCHIVE_CLAIM_TTL_MS, createArchiveClaims, createArchiveHistory } from "./src/archiveUndo";
+import { ARCHIVE_CLAIM_TTL_MS, createArchiveClaims, createArchiveHistory, releaseUnarchived } from "./src/archiveUndo";
 import { archiveScopes, dirtyEnvironmentIds, MAX_THREADS_PER_CALL } from "./src/orchestrations";
 
 
@@ -186,8 +186,9 @@ export default async function plugin(bb: BbPluginApi) {
     archiveRelease: async ({ claimId }) => {
       const claim = claims.take(claimId);
       if (claim) {
-        const archived = new Set((await inChunks([...claim.threadIds], (chunk) => bb.sdk.threads.list({ threadIds: chunk, includeHidden: true, archived: true }))).map((thread) => thread.id));
-        claim.release(claim.threadIds.filter((id) => !archived.has(id)));
+        await releaseUnarchived(claim, async (threadIds) =>
+          (await inChunks([...threadIds], (chunk) => bb.sdk.threads.list({ threadIds: chunk, includeHidden: true, archived: true }))).map((thread) => thread.id),
+        );
       }
       return { ok: true as const };
     },

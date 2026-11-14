@@ -129,3 +129,18 @@ export function createArchiveClaims({
     },
   };
 }
+
+/** Lets go of the claimed threads that didn't archive; all of them when that can't be read. */
+export async function releaseUnarchived(
+  claim: { threadIds: readonly string[]; release(threadIds?: readonly string[]): void },
+  archivedOf: (threadIds: readonly string[]) => Promise<readonly string[]>,
+): Promise<void> {
+  let archived: Set<string>;
+  try {
+    archived = new Set(await archivedOf(claim.threadIds));
+  } catch {
+    claim.release();
+    return;
+  }
+  claim.release(claim.threadIds.filter((id) => !archived.has(id)));
+}

@@ -7,6 +7,7 @@ import {
   archiveIsNewerThanTyping,
   createArchiveHistory,
   isUndoKey,
+  releaseUnarchived,
   removedThreadIds,
 } from "../src/archiveUndo.ts";
 
@@ -151,4 +152,18 @@ test("an archive claim nobody releases ends by itself, and claim ids don't repea
   assert.equal(claims.take(first), null, "an expired claim can't be released twice");
   assert.deepEqual(claims.take(second)?.threadIds, ["c"]);
   assert.equal(claims.take("unknown"), null);
+});
+
+test("a claim release lets go of the threads that didn't archive", async () => {
+  const released: (readonly string[] | undefined)[] = [];
+  await releaseUnarchived({ threadIds: ["a", "b"], release: (ids) => void released.push(ids) }, async () => ["a"]);
+  assert.deepEqual(released, [["b"]]);
+});
+
+test("a claim release lets go of everything when the archived read fails", async () => {
+  const released: (readonly string[] | undefined)[] = [];
+  await releaseUnarchived({ threadIds: ["a", "b"], release: (ids) => void released.push(ids) }, async () => {
+    throw new Error("list failed");
+  });
+  assert.deepEqual(released, [undefined]);
 });
