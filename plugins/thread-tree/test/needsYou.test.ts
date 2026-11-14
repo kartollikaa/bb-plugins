@@ -1,3 +1,4 @@
+import { withEntry } from "../src/usePersistentSet.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -324,4 +325,9 @@ test("a snoozed PR stays hidden and keeps its snooze while its PR sources are ha
   assert.deepEqual(pruneSnoozes(snoozes, [half!], { settled: loading }), snoozes);
   assert.equal(isSnoozed(half!, snoozes), false, "once loaded, a real change shows the PR again");
   assert.deepEqual(pruneSnoozes(snoozes, [half!]), {});
+});
+
+test("snoozing an item again makes it the newest, so the store's cap drops older ones first", () => {
+  assert.deepEqual(Object.keys(withEntry({ a: "1", b: "2" }, "a", "3")), ["b", "a"]);
+  assert.deepEqual(withEntry({ a: "1", b: "2" }, "a", undefined), { b: "2" });
 });

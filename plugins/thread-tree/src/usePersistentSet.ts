@@ -84,6 +84,12 @@ export function usePersistentList(key: string) {
   return [values, save] as const;
 }
 
+/** A set entry moves to the end, so trimming the oldest keeps what was set last. */
+export function withEntry<T>(record: Readonly<Record<string, T>>, entry: string, value: T | undefined): Readonly<Record<string, T>> {
+  const { [entry]: _removed, ...rest } = record;
+  return value === undefined ? rest : { ...rest, [entry]: value };
+}
+
 export function usePersistentRecord<T>(key: string, parse: (raw: unknown) => Readonly<Record<string, T>>) {
   const [values, setValues] = useState(() => {
     try {
@@ -94,8 +100,7 @@ export function usePersistentRecord<T>(key: string, parse: (raw: unknown) => Rea
   });
   const save = useCallback((entry: string, value: T | undefined) => {
     setValues((previous) => {
-      const { [entry]: _removed, ...rest } = previous;
-      const next = value === undefined ? rest : { ...previous, [entry]: value };
+      const next = withEntry(previous, entry, value);
       try {
         window.localStorage.setItem(PREFIX + key, JSON.stringify(next));
       } catch {
