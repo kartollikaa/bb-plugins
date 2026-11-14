@@ -100,10 +100,10 @@ skip, Archive goes straight to bb's action on the parent. Otherwise the fold
 line first asks "Archive N · skip M" with the real counts, then bb's action
 runs on each clean subtree in turn, and a toast says what was skipped.
 Each subtree's worktrees are checked again right before its turn, and one that
-got changes meanwhile is skipped too. While bb's confirmation is open, a
-"Waiting for bb's confirmation…" toast offers Stop. Cancelling bb's
-confirmation, Stop, or closing the sidebar stops the rest, and a run that ends
-early says why. One Cmd/Ctrl+Z restores everything that Archive took.
+got changes meanwhile is skipped too. While the run waits, a "Waiting for bb's
+confirmation…" toast shows. Cancelling bb's confirmation stops the rest, as do
+the toast's Stop when no dialog covers it and closing the sidebar; a run that
+ends early says why. One Cmd/Ctrl+Z restores everything that Archive took.
 
 The provider icon sits in a fixed slot before the age, in the provider's brand
 tint (Claude orange, Codex blue-violet), or in the text colour with the
