@@ -9,12 +9,14 @@ under it, and the subagents it runs inside its own session show on its row.
   timer, a high context fill and the orchestration.
 - Needs you, above the sections: threads asking a question (with how long
   they waited), failed turns and queued messages, threads stuck with no
-  progress, unread results with their diff, then failing PRs of your threads and failed
-  automations. Retry, Resend or Stop in place; hover to snooze. ⇧⌘I (Ctrl+Shift+I) opens the next.
+  progress, unread results with their diff, then failing PRs of your threads
+  and failed automations. Retry, Resend or Stop in place; hover to snooze.
+  ⇧⌘I (Ctrl+Shift+I) opens the next.
 - Pull requests (from GitHub Folder) and Automations start folded, with a
   summary in the header: "1 failing · 5", "1 failed · next in 12m". A PR's
-  reason is its icon; hover to snooze, open its thread, merge or start an agent review. Hover an automation
-  to run, pause or resume it; click to open its last run.
+  reason is its icon; hover to snooze, open its thread, merge or start an
+  agent review. Hover an automation to run, pause or resume it; click to open
+  its last run.
 - Threads grouped by Project, by Status or not at all, with Pinned on top.
   Projects keep the order you drag them into, or follow recent activity. The +
   on a project header starts a new thread there.
@@ -47,19 +49,17 @@ under it, and the subagents it runs inside its own session show on its row.
 
 ## Arranging the sidebar
 
-Right-click a section header to remove it; the sliders icon beside the search field
-brings it back, as well as Recent Activity, off by default. Drag a header, or use Move up
-and Move down in its menu, to reorder sections. While you drag, the blocks fold
-to their headers and reopen on drop.
+Right-click a section header to remove it; the sliders icon beside the search
+field brings it back, as well as Recent Activity, off by default. Drag a header,
+or use Move up and Move down in its menu, to reorder sections. While you drag,
+the blocks fold to their headers and reopen on drop.
 
 ## Settings
 
-Thread Tree's settings hold the section switches, Recent
-Activity row counts, which PRs Needs you lists, provider icon colour, the
-inactive-project window, and
-switches for the subagent counters and the age label. Reduce motion stops the
-sidebar animations and holds spinners still; so does the system's
-reduced-motion preference.
+Thread Tree's settings hold the section switches, Recent Activity row counts,
+which PRs Needs you lists, provider icon colour, the inactive-project window,
+and switches for the subagent counters and the age label. Reduce motion stops the sidebar animations and
+holds spinners still; so does the system's reduced-motion preference.
 
 ## How it works
 
