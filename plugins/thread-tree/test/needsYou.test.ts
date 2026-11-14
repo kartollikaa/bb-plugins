@@ -11,6 +11,7 @@ import {
   nextItem,
   pruneSnoozes,
   pullRequestItems,
+  pullRequestSourcesSettled,
   questionsToRead,
   readSnoozes,
   threadItemKind,
@@ -330,4 +331,12 @@ test("a snoozed PR stays hidden and keeps its snooze while its PR sources are ha
 test("snoozing an item again makes it the newest, so the store's cap drops older ones first", () => {
   assert.deepEqual(Object.keys(withEntry({ a: "1", b: "2" }, "a", "3")), ["b", "a"]);
   assert.deepEqual(withEntry({ a: "1", b: "2" }, "a", undefined), { b: "2" });
+});
+
+test("PR sources count as settled only once the thread list has loaded too", () => {
+  assert.equal(pullRequestSourcesSettled({ threadsStatus: "loading", folderLoaded: true, pullRequestsLoading: false }), false);
+  assert.equal(pullRequestSourcesSettled({ threadsStatus: "error", folderLoaded: true, pullRequestsLoading: false }), false);
+  assert.equal(pullRequestSourcesSettled({ threadsStatus: "ready", folderLoaded: false, pullRequestsLoading: false }), false);
+  assert.equal(pullRequestSourcesSettled({ threadsStatus: "ready", folderLoaded: true, pullRequestsLoading: true }), false);
+  assert.equal(pullRequestSourcesSettled({ threadsStatus: "ready", folderLoaded: true, pullRequestsLoading: false }), true);
 });

@@ -256,6 +256,11 @@ export function automationItems(automations: readonly AutomationSummary[]): Auto
 
 export type Snoozes = Readonly<Record<string, string>>;
 
+/** Folder items exist before the thread list loads, but their linked PR's checks don't. */
+export function pullRequestSourcesSettled({ threadsStatus, folderLoaded, pullRequestsLoading }: { threadsStatus: string; folderLoaded: boolean; pullRequestsLoading: boolean }): boolean {
+  return threadsStatus === "ready" && folderLoaded && !pullRequestsLoading;
+}
+
 /** Whether an item's sources have all loaded, so its signature is final. */
 export type SettledCheck = (item: NeedsYouItem) => boolean;
 const ALWAYS_SETTLED: SettledCheck = () => true;

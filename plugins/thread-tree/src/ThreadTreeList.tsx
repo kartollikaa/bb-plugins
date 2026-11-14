@@ -40,6 +40,7 @@ import { SubagentBadge } from "./SubagentBadge";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { AutomationsSection, useAutomations } from "./AutomationsSection";
 import { NeedsYouSection, useNeedsYou } from "./NeedsYouSection";
+import { pullRequestSourcesSettled } from "./needsYou";
 import { GithubSection, useGithubFolder } from "./GithubSection";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph } from "./statusGlyph";
@@ -229,7 +230,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     folderItems: useMemo(() => folderItems?.items ?? [], [folderItems]),
     automations: useMemo(() => automations.state?.automations ?? [], [automations.state]),
     pullRequestMode: view.needsYouPullRequests,
-    pullRequestsSettled: githubFolder.isLoaded && !pullRequestsLoading,
+    pullRequestsSettled: pullRequestSourcesSettled({ threadsStatus: status, folderLoaded: githubFolder.isLoaded, pullRequestsLoading }),
     orchestrationOf,
     onNavigate,
   });
