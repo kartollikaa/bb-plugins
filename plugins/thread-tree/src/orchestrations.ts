@@ -78,7 +78,7 @@ function inTreeOrder<T extends TreeThread>(forest: Forest<T>, rootId: string): T
   return out;
 }
 
-/** The orchestrator and every thread below it: what a shortcut click unfolds and highlights. */
+/** The orchestrator and every thread below it in the sidebar. */
 export function orchestrationTreeIds<T extends TreeThread>(forest: Forest<T>, rootId: string): string[] {
   return [rootId, ...descendantsOf(forest, rootId).map((thread) => thread.id)];
 }
@@ -100,7 +100,7 @@ export interface FoldArchivePlan {
   /** Every thread those archives take, hidden ones included. */
   archiveCount: number;
   skipped: number;
-  /** Sidebar threads that stay because archiving them would take a dirty one along. */
+  /** Clean threads, hidden ones included, that stay because archiving them would take a dirty one along. */
   kept: number;
 }
 
@@ -123,12 +123,12 @@ export function foldArchivePlan<T extends TreeThread>(
     for (const kid of forest.children.get(id) ?? []) visit(kid.id);
   };
   visit(rootId);
-  const rootScope = new Set([rootId, ...(scopes.get(rootId) ?? []), ...orchestrationTreeIds(forest, rootId)]);
+  const fold = [...new Set([...orchestrationTreeIds(forest, rootId), ...(scopes.get(rootId) ?? [])])];
   return {
     roots,
     archiveCount: covered.size,
-    skipped: [...dirty].filter((id) => rootScope.has(id)).length,
-    kept: orchestrationTreeIds(forest, rootId).filter((id) => !covered.has(id) && !dirty.has(id)).length,
+    skipped: fold.filter((id) => dirty.has(id)).length,
+    kept: fold.filter((id) => !covered.has(id) && !dirty.has(id)).length,
   };
 }
 
@@ -143,6 +143,9 @@ export function archiveScopes(
   descendants.forEach(({ threadId, descendantIds }) => descendantIds.forEach((id) => scopes.get(threadId)?.add(id)));
   return Object.fromEntries([...scopes].map(([id, scope]) => [id, [...scope]]));
 }
+
+/** The server's cap on thread ids per call, shared so the client chunks to match. */
+export const MAX_THREADS_PER_CALL = 200;
 
 const NOTHING_TO_LOSE = new Set(["path_not_found"]);
 

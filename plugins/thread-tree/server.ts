@@ -20,9 +20,8 @@ import { sectionPatchSchema, SETTINGS } from "./src/settings";
 import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/threadPullRequests";
 import { createProjectFolderHistory } from "./src/projectFolders";
 import { createArchiveHistory } from "./src/archiveUndo";
-import { archiveScopes, dirtyEnvironmentIds } from "./src/orchestrations";
+import { archiveScopes, dirtyEnvironmentIds, MAX_THREADS_PER_CALL } from "./src/orchestrations";
 
-const MAX_THREADS_PER_CALL = 200;
 
 export const rpcContract = defineRpcContract({
   threadPullRequests: {

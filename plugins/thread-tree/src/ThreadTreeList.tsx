@@ -78,7 +78,7 @@ import {
   foldState,
   type TreeRow,
 } from "./tree";
-import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver } from "./orchestrations";
+import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver, MAX_THREADS_PER_CALL } from "./orchestrations";
 import { archiveInTurn, settlesTrue } from "./archiveRun";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
@@ -95,7 +95,6 @@ const ROW_PAD_PX = 6;
 const INDENT_PX = 24;
 
 const ARCHIVE_ACTION_KEY = "bb--core/archive";
-const ARCHIVE_SCOPE_CHUNK = 200;
 
 const GROUP_MODES: readonly { id: GroupMode; label: string; chip: string; icon: React.ReactNode }[] = [
   { id: "project", label: "Project", chip: "Group: Project", icon: <Icon name="Folder" aria-hidden className="size-3.5" /> },
@@ -935,7 +934,6 @@ function ThreadRowView({
   /** A second line under the title: the Running filter's context or an orchestration's progress. */
   subtitle?: string;
   isActive: boolean;
-  /** Lit briefly after its orchestration shortcut was clicked. */
   /** The subtree's state drawn in place of the thread's own; a folded tree row works it out itself. */
   rollup?: RollupState | null;
   isCompactViewport: boolean;
@@ -1408,8 +1406,8 @@ async function prepareFoldArchive(
   const scopes = new Map<string, string[]>();
   const dirty = new Set<string>();
   try {
-    for (let index = 0; index < ids.length; index += ARCHIVE_SCOPE_CHUNK) {
-      const result = await rpc.call("archiveScope", { threadIds: ids.slice(index, index + ARCHIVE_SCOPE_CHUNK) });
+    for (let index = 0; index < ids.length; index += MAX_THREADS_PER_CALL) {
+      const result = await rpc.call("archiveScope", { threadIds: ids.slice(index, index + MAX_THREADS_PER_CALL) });
       Object.entries(result.scopes).forEach(([id, scope]) => scopes.set(id, scope));
       result.dirty.forEach((id) => dirty.add(id));
     }

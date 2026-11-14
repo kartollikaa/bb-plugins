@@ -129,12 +129,12 @@ test("a clean fold is archived through its root alone, counting the hidden threa
 });
 
 test("a dirty thread, hidden or not, keeps every thread whose archive would take it along", () => {
-  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["h1"])), { roots: ["b"], archiveCount: 2, skipped: 1, kept: 3 });
-  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["b1"])), { roots: ["a"], archiveCount: 3, skipped: 1, kept: 2 });
+  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["h1"])), { roots: ["b"], archiveCount: 2, skipped: 1, kept: 4 });
+  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["b1"])), { roots: ["a"], archiveCount: 3, skipped: 1, kept: 3 });
 });
 
-test("a dirty root still lets its clean subtrees go", () => {
-  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["root"])), { roots: ["a", "b"], archiveCount: 5, skipped: 1, kept: 0 });
+test("a dirty root still lets its clean subtrees go; a hidden thread left behind counts as kept", () => {
+  assert.deepEqual(foldArchivePlan(archiveTree(), "root", scopes, new Set(["root"])), { roots: ["a", "b"], archiveCount: 5, skipped: 1, kept: 1 });
 });
 
 test("a thread missing from the scope check counts as unsafe", () => {
