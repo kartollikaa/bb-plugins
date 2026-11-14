@@ -22,7 +22,7 @@ test("bb's Archive runs on each root in turn, waiting for the one before", async
     isStillClean: clean,
     landed: async (id) => (archived.has(id) ? "archived" : "cancelled"),
   });
-  assert.deepEqual(result, { archived: ["a", "b"], changed: [], stop: null });
+  assert.deepEqual(result, { archived: ["a", "b"], changed: [], unchecked: [], stop: null });
   assert.deepEqual(log, ["run a", "run b"]);
 });
 
@@ -33,7 +33,7 @@ test("a cancelled confirmation stops the run, so later roots aren't asked about"
     isStillClean: clean,
     landed: async (id) => (id === "a" ? "archived" : "cancelled"),
   });
-  assert.deepEqual(result, { archived: ["a"], changed: [], stop: "cancelled" });
+  assert.deepEqual(result, { archived: ["a"], changed: [], unchecked: [], stop: "cancelled" });
   assert.deepEqual(log, ["a", "b"]);
 });
 
@@ -43,7 +43,7 @@ test("a root bb offers no Archive for stops the run", async () => {
     isStillClean: clean,
     landed: async () => "archived",
   });
-  assert.deepEqual(result, { archived: [], changed: [], stop: "unavailable" });
+  assert.deepEqual(result, { archived: [], changed: [], unchecked: [], stop: "unavailable" });
 });
 
 test("a root whose worktree got changes since the click is skipped, and the run goes on", async () => {
@@ -53,7 +53,7 @@ test("a root whose worktree got changes since the click is skipped, and the run 
     isStillClean: async (id) => id !== "b",
     landed: async () => "archived",
   });
-  assert.deepEqual(result, { archived: ["a", "c"], changed: ["b"], stop: null });
+  assert.deepEqual(result, { archived: ["a", "c"], changed: ["b"], unchecked: [], stop: null });
   assert.deepEqual(log, ["a", "c"]);
 });
 
@@ -69,7 +69,7 @@ test("a stopped run asks about no further root", async () => {
     },
     signal: controller.signal,
   });
-  assert.deepEqual(result, { archived: ["a"], changed: [], stop: "stopped" });
+  assert.deepEqual(result, { archived: ["a"], changed: [], unchecked: [], stop: "stopped" });
   assert.deepEqual(log, ["a"]);
 });
 
@@ -155,6 +155,22 @@ test("a dialog that holds the sidebar itself, the compact-width drawer, is not b
   assert.equal(dialogOutsideSidebar([drawer, confirm], sidebar), true);
   assert.equal(dialogOutsideSidebar([confirm], null), true);
   assert.equal(dialogOutsideSidebar([], sidebar), false);
+});
+
+test("a worktree check that fails skips the root as unchecked, not as changed", async () => {
+  const result = await archiveInTurn(["a", "b"], {
+    actionOf: () => async () => undefined,
+    isStillClean: async (id) => {
+      if (id === "a") throw new Error("rpc down");
+      return true;
+    },
+    landed: async () => "archived",
+  });
+  assert.deepEqual(result, { archived: ["b"], changed: [], unchecked: ["a"], stop: null });
+  assert.equal(
+    foldArchiveOutcome({ archived: 1, skipped: 0, kept: 0, changed: 0, unchecked: 2, stop: null })?.description,
+    "Skipped 2 threads whose worktrees couldn't be checked",
+  );
 });
 
 test("the landing grace covers a slow cascade that takes several seconds to record", async () => {

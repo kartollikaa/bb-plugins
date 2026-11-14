@@ -5,6 +5,8 @@ export interface ArchiveRunResult {
   archived: string[];
   /** Roots whose worktrees got changes after the click; skipped, not archived. */
   changed: string[];
+  /** Roots skipped because their worktrees couldn't be checked again. */
+  unchecked: string[];
   stop: ArchiveRunStop | null;
 }
 
@@ -25,20 +27,26 @@ export async function archiveInTurn(
 ): Promise<ArchiveRunResult> {
   const archived: string[] = [];
   const changed: string[] = [];
+  const unchecked: string[] = [];
   for (const id of rootIds) {
-    if (signal?.aborted) return { archived, changed, stop: "stopped" };
-    if (!(await isStillClean(id))) {
+    if (signal?.aborted) return { archived, changed, unchecked, stop: "stopped" };
+    const clean = await isStillClean(id).catch(() => null);
+    if (clean === null) {
+      unchecked.push(id);
+      continue;
+    }
+    if (!clean) {
       changed.push(id);
       continue;
     }
     const run = actionOf(id);
-    if (!run) return { archived, changed, stop: "unavailable" };
+    if (!run) return { archived, changed, unchecked, stop: "unavailable" };
     await run();
     const landing = await landed(id);
-    if (landing !== "archived") return { archived, changed, stop: landing };
+    if (landing !== "archived") return { archived, changed, unchecked, stop: landing };
     archived.push(id);
   }
-  return { archived, changed, stop: null };
+  return { archived, changed, unchecked, stop: null };
 }
 
 /** How long an archive may take to land once no dialog is open; a large cascade can take seconds to record. */
@@ -109,18 +117,22 @@ export function foldArchiveOutcome({
   skipped,
   kept,
   changed,
+  unchecked = 0,
   stop,
 }: {
   archived: number;
   skipped: number;
   kept: number;
   changed: number;
+  unchecked?: number;
   stop: ArchiveRunStop | null;
 }): FoldArchiveOutcome | null {
   if (stop === "busy") return { tone: "info", title: "Another fold is still archiving" };
   const reason = stop ? STOP_REASON[stop] : undefined;
   if (reason) return { tone: stop === "unavailable" ? "error" : "warning", title: archived > 0 ? `Archived ${plural(archived, "thread")}` : "Archive stopped", description: reason };
-  const parts = [skippedSummary({ skipped, kept }), changed > 0 ? `Skipped ${plural(changed, "thread")} that got changes since` : null];
+  const parts = [skippedSummary({ skipped, kept }), changed > 0 ? `Skipped ${plural(changed, "thread")} that got changes since` : null,
+    unchecked > 0 ? `Skipped ${plural(unchecked, "thread")} whose worktrees couldn't be checked` : null,
+  ];
   if (stop && archived > 0) parts.push("Stopped before the rest");
   const description = parts.filter((part) => part !== null).join(". ");
   if (archived === 0) return stop || !description ? null : { tone: "warning", title: "Nothing archived", description };

@@ -310,7 +310,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const [archiveJob, setArchiveJob] = useState<BbArchiveJob | null>(null);
   const archiveJobRunning = useRef(false);
   const runBbArchive = useCallback((targets: PluginThreadActionTarget[], isStillClean: (id: string) => Promise<boolean>) => {
-    if (archiveJobRunning.current) return Promise.resolve<ArchiveRunResult>({ archived: [], changed: [], stop: "busy" });
+    if (archiveJobRunning.current) return Promise.resolve<ArchiveRunResult>({ archived: [], changed: [], unchecked: [], stop: "busy" });
     archiveJobRunning.current = true;
     return new Promise<ArchiveRunResult>((resolve) => setArchiveJob({
       targets,
@@ -1417,7 +1417,7 @@ async function prepareFoldArchive(
     return null;
   }
   const plan = foldArchivePlan(forest, root.id, scopes, dirty);
-  const isStillClean = (id: string) => rpc.call("archiveScope", { threadIds: [id] }).then(({ dirty }) => dirty.length === 0, () => false);
+  const isStillClean = (id: string) => rpc.call("archiveScope", { threadIds: [id] }).then(({ dirty }) => dirty.length === 0);
   return {
     plan,
     async run() {
@@ -1430,7 +1430,7 @@ async function prepareFoldArchive(
         if (claimId !== null) await rpc.call("archiveRelease", { claimId }).catch(() => undefined);
       }
       const threadCount = (roots: readonly string[]) => new Set(roots.flatMap((id) => scopes.get(id) ?? [id])).size;
-      const outcome = foldArchiveOutcome({ archived: threadCount(result.archived), skipped: plan.skipped, kept: plan.kept, changed: threadCount(result.changed), stop: result.stop });
+      const outcome = foldArchiveOutcome({ archived: threadCount(result.archived), skipped: plan.skipped, kept: plan.kept, changed: threadCount(result.changed), unchecked: threadCount(result.unchecked), stop: result.stop });
       if (outcome) toast[outcome.tone](outcome.title, { description: outcome.description });
     },
   };
@@ -1476,7 +1476,7 @@ function BbArchiveRun({ job, sidebarRef }: { job: BbArchiveJob; sidebarRef: Reac
       });
     };
     archiveInTurn(job.targets.map((target) => target.id), { actionOf: (id) => actions.current.get(id), isStillClean: job.isStillClean, landed, signal })
-      .catch((): ArchiveRunResult => ({ archived: [], changed: [], stop: "stopped" }))
+      .catch((): ArchiveRunResult => ({ archived: [], changed: [], unchecked: [], stop: "stopped" }))
       .then((result) => {
         toast.dismiss(ARCHIVE_WAIT_TOAST_ID);
         job.finish(result);

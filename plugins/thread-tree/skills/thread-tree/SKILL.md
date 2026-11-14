@@ -109,7 +109,8 @@ skip, Archive goes straight to bb's action on the parent. Otherwise the fold
 line first asks "Archive N · skip M" with the real counts, then bb's action
 runs on each clean subtree in turn, and a toast says what was skipped.
 Each subtree's worktrees are checked again right before its turn, and one that
-got changes meanwhile is skipped too. While the run waits, a "Waiting for bb's
+got changes meanwhile is skipped too, as is one whose worktree can't be checked
+again; the toast tells the two apart. While the run waits, a "Waiting for bb's
 confirmation…" toast shows. Cancelling bb's confirmation stops the rest, as do
 the toast's Stop when no dialog covers it and closing the sidebar; a run that
 ends early says why. One Cmd/Ctrl+Z restores everything that Archive took.
