@@ -9,7 +9,8 @@ one question: does anything need you, and is the team moving?
   thread. The Orchestration view switch in the title bar (also in plugin settings) turns the view off or on for every orchestrator.
 - One status sentence on top: "Nothing needs you", "One decision for you", or "S5 has gone quiet".
 - A card for each thing that waits on you: a subtask's question, a delivery ready to land, a pending
-  approval, a line the ledger keeps for the owner. Answer and Release start a reply in the
+  approval, an ask the ledger keeps for the owner, titled with what is asked, with quick replies and
+  links to its PR and thread. Answer, quick replies and Release start a reply in the
   orchestrator's composer; you send it yourself.
 - The team: one row per subtask with its state and latest step. A row opens to show the model,
   context use, rotations and the gate.

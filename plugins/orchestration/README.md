@@ -46,12 +46,32 @@ same title bar.
 ## What counts as what
 
 - **Needs you:** a subtask at `question` or `ready`, one waiting for its card, a pending approval in
-  any subtask's thread or the orchestrator's own, and each line under the ledger's «For the owner».
+  any subtask's thread or the orchestrator's own, and each ask under the ledger's «For the owner»
+  (notes there are not asks; see the format below).
 - **Stuck:** a `working` or `briefed` subtask that hasn't reported for too long, or one whose
   checks, review, done-when or conflict stages keep failing. A report is the end of the thread's
   latest turn. Both limits are the owner's and live in `src/view.ts` (`QUIET_MS`, `FAILURES_STUCK`).
   A stuck agent is named even while something else needs you.
 - **Done:** `landed`, `verified` or `dropped`.
+
+## «For the owner» format
+
+One bullet per item. A bullet that starts with `ask:` becomes a card that says what is asked:
+
+```
+- ask: Merge kartollika-ai-hub#38 | why: S5 passed review and checks | link: kartollikaa/kartollika-ai-hub#38 | thread: thr_abc123 | options: Go as you recommend / Not now
+- note: Store PR get-bb/marketplace#958 waits on a maintainer label
+```
+
+- `ask:` is the card's title: what the owner is asked to do or decide. The other fields are
+  optional, separated by ` | `, in any order: `why:` (one line of context), `link:` (URLs or
+  `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
+  ` / `). Each option fills the composer with `Re «<title>»: <option>`; Other answer fills
+  `Re «<title>»: `.
+- `note:`, and any line that starts with «Nothing», is information, not an ask: it shows under Goal
+  and history and never counts as needs you.
+- Any other line stays a card with its full text, expandable, with its URLs, `owner/repo#N` refs and
+  thread ids as buttons.
 
 ## Data
 

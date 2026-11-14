@@ -32,7 +32,8 @@ several name the thread, the newest wins.
 ## What it shows
 
 - **Needs you:** subtasks at `question`, `ready` or `card`, a pending approval in any subtask's
-  thread or the orchestrator's own, and every line under the ledger's «For the owner».
+  thread or the orchestrator's own, and every ask under the ledger's «For the owner» (`note:` lines
+  and lines starting with «Nothing» are not asks).
 - **Stuck:** a `working` or `briefed` subtask that hasn't reported for `QUIET_MS` (a report is the
   end of the thread's latest turn), or `FAILURES_STUCK` failed checks, review, done-when or conflicts
   stages across its open gates; both constants are in `src/view.ts`. A subtask at `gate` is waiting
@@ -40,8 +41,27 @@ several name the thread, the newest wins.
   context-card row still name a stuck agent.
 - **Done:** `landed`, `verified`, `dropped`, or the ledger's status `closed`.
 
-The Answer, Release and Not yet buttons only put a draft into the orchestrator's composer and focus
+The Answer, Release, Not yet and quick-reply buttons only put a draft into the orchestrator's composer and focus
 it, wherever the composer currently is (rail, sheet or dock). They never send. Keep ledger statuses and «For the owner» current: the tab reads nothing else.
+
+## Writing «For the owner»
+
+One bullet per item. A bullet that starts with `ask:` becomes a card that says what is asked:
+
+```
+- ask: Merge kartollika-ai-hub#38 | why: S5 passed review and checks | link: kartollikaa/kartollika-ai-hub#38 | thread: thr_abc123 | options: Go as you recommend / Not now
+- note: Store PR get-bb/marketplace#958 waits on a maintainer label
+```
+
+- `ask:` is the card's title: what the owner is asked to do or decide. The other fields are
+  optional, separated by ` | `, in any order: `why:` (one line of context), `link:` (URLs or
+  `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
+  ` / `). Each option fills the composer with `Re «<title>»: <option>`; Other answer fills
+  `Re «<title>»: `.
+- `note:`, and any line that starts with «Nothing», is information, not an ask: it shows under Goal
+  and history and never counts as needs you.
+- Any other line stays a card with its full text, expandable, with its URLs, `owner/repo#N` refs and
+  thread ids as buttons.
 
 ## Settings
 
