@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { ThreadChat, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Button, Message, OrchestrationTab } from "./OrchestrationTab.tsx";
-import { clampRailWidth, RAIL, railMode, railOpen, threadFromSubPath, type RailChoice, type RailMode } from "./route.ts";
+import { chatPlacement, clampRailWidth, dockHeight, RAIL, railMode, railOpen, threadFromSubPath, type ChatPlacement, type RailChoice, type RailMode } from "./route.ts";
 import { useOrchestratorMembership } from "./useOrchestration.ts";
 import { useOpenChat, useViewSwitch } from "./surface.ts";
 
@@ -37,7 +37,6 @@ const rail = (() => {
 })();
 
 const useRailOpen = () => useSyncExternalStore(rail.subscribe, rail.get, rail.get);
-const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 
 function storage(): Storage | null {
   try {
@@ -55,18 +54,18 @@ function readWidth(): number {
   }
 }
 
-function useElementWidth<T extends HTMLElement>() {
+function useElementSize<T extends HTMLElement>() {
   const ref = useRef<T>(null);
-  const [width, setWidth] = useState(0);
+  const [size, setSize] = useState({ width: 0, height: 0 });
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    setWidth(el.clientWidth);
-    const ro = new ResizeObserver(([entry]) => setWidth(entry!.contentRect.width));
+    setSize({ width: el.clientWidth, height: el.clientHeight });
+    const ro = new ResizeObserver(([entry]) => setSize({ width: entry!.contentRect.width, height: entry!.contentRect.height }));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  return [ref, width] as const;
+  return [ref, size.width, size.height] as const;
 }
 
 function PanelIcon() {
@@ -165,10 +164,65 @@ function ResizeHandle({ width, onDrag, onDone }: { width: number; onDrag: (w: nu
   );
 }
 
-function Rail({ threadId, mode, open, pageWidth, focusRequest }: { threadId: string; mode: RailMode; open: boolean; pageWidth: number; focusRequest: number }) {
+/** bb's composer is the sticky footer of `ThreadChat`'s scroller; the dock sizes itself to it. */
+function useComposerHeight(ref: RefObject<HTMLElement | null>) {
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    let observed: Element | null = null;
+    let frame = 0;
+    const ro = new ResizeObserver(([entry]) => setHeight(entry!.target.getBoundingClientRect().height));
+    const attach = () => {
+      frame = 0;
+      const all = root.querySelectorAll('[class~="sticky"][class~="bottom-0"]');
+      const el = all[all.length - 1] ?? null;
+      if (el === observed) return;
+      if (observed) ro.unobserve(observed);
+      observed = el;
+      if (el) ro.observe(el);
+      else setHeight(null);
+    };
+    attach();
+    const mo = new MutationObserver(() => {
+      if (!frame) frame = requestAnimationFrame(attach);
+    });
+    mo.observe(root, { childList: true, subtree: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      mo.disconnect();
+      ro.disconnect();
+    };
+  }, [ref]);
+  return height;
+}
+
+const GRABBER = 16;
+
+function Grabber({ placement }: { placement: ChatPlacement }) {
+  const expand = placement === "docked";
+  return (
+    <button
+      type="button"
+      aria-label={expand ? "Show chat" : "Hide chat"}
+      title={expand ? "Show chat" : "Hide chat"}
+      onClick={() => rail.set(expand)}
+      style={{ height: GRABBER }}
+      className="group flex w-full shrink-0 items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+    >
+      <span aria-hidden className="h-1 w-9 rounded-full bg-border group-hover:bg-muted-foreground" />
+    </button>
+  );
+}
+
+function Rail({ threadId, placement, pageWidth, pageHeight, focusRequest, onDockHeight }: { threadId: string; placement: ChatPlacement; pageWidth: number; pageHeight: number; focusRequest: number; onDockHeight: (h: number) => void }) {
   const [saved, setSaved] = useState(readWidth);
   const [dragging, setDragging] = useState<number | null>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
+  const composer = useComposerHeight(chatRef);
   const width = clampRailWidth(dragging ?? saved, pageWidth);
+  const dock = dockHeight(composer, pageHeight || 800);
+  useLayoutEffect(() => onDockHeight(dock + GRABBER), [dock, onDockHeight]);
   const persist = (w: number) => {
     const next = clampRailWidth(w, pageWidth);
     setSaved(next);
@@ -178,21 +232,26 @@ function Rail({ threadId, mode, open, pageWidth, focusRequest }: { threadId: str
       // Width just isn't remembered.
     }
   };
+  const style =
+    placement === "rail" ? { width }
+    : placement === "sheet" ? { height: "calc(100% - 48px)" }
+    : { height: `calc(${dock + GRABBER}px + env(safe-area-inset-bottom))` };
   return (
     <aside
       aria-label="Orchestrator chat"
-      inert={!open}
-      style={mode === "rail" ? { width: open ? width : 0 } : { width: `min(${RAIL.default}px, calc(100% - 48px))` }}
+      data-placement={placement}
+      style={style}
       className={cx(
-        "flex shrink-0 flex-col overflow-hidden border-l border-border bg-sidebar",
-        dragging === null && "motion-safe:transition-[width,transform,opacity] motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-opacity motion-reduce:duration-150",
-        mode === "rail" ? "relative h-full" : "absolute inset-y-0 right-0 z-10 shadow-xl",
-        mode === "drawer" && (open ? "translate-x-0" : "translate-x-full"),
-        open ? "opacity-100" : "opacity-0",
+        "flex shrink-0 flex-col overflow-hidden bg-sidebar",
+        dragging === null && "motion-safe:transition-[width,height] motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]",
+        placement === "rail" && "relative h-full border-l border-border",
+        placement === "sheet" && "absolute inset-x-0 bottom-0 z-20 rounded-t-xl border-t border-border pb-[env(safe-area-inset-bottom)] shadow-xl",
+        placement === "docked" && "absolute inset-x-0 bottom-0 z-10 border-t border-border pb-[env(safe-area-inset-bottom)]",
       )}
     >
-      {mode === "rail" && open && <ResizeHandle width={width} onDrag={setDragging} onDone={persist} />}
-      <div className="flex h-full min-w-[340px] flex-col">
+      {placement === "rail" && <ResizeHandle width={width} onDrag={setDragging} onDone={persist} />}
+      {placement !== "rail" && <Grabber placement={placement} />}
+      <div ref={chatRef} className={cx("flex min-h-0 flex-1 flex-col", placement === "rail" ? "min-w-[340px]" : "mx-auto w-full max-w-[720px]")}>
         <ThreadChat threadId={threadId} variant="compact" layout="contained" focusRequest={focusRequest} className="min-h-0 flex-1" />
       </div>
     </aside>
@@ -211,33 +270,29 @@ function NotHere({ threadId }: { threadId: string }) {
 }
 
 function View({ threadId }: { threadId: string }) {
-  const [ref, pageWidth] = useElementWidth<HTMLDivElement>();
+  const [ref, pageWidth, pageHeight] = useElementSize<HTMLDivElement>();
   const mode = railMode(pageWidth || 1200);
   const openChat = useOpenChat();
   useLayoutEffect(() => rail.place(`${threadId}:${mode}`, mode), [threadId, mode]);
   const open = useRailOpen();
+  const placement = chatPlacement(mode, open);
   const [focusRequest, setFocusRequest] = useState(0);
+  const [dockSpace, setDockSpace] = useState(0);
 
   useEffect(() => {
-    if (mode !== "drawer" || !open) return;
+    if (placement !== "sheet") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !e.defaultPrevented) rail.set(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, open]);
+  }, [placement]);
 
-  const revealComposer = useCallback(async () => {
-    if (!rail.get()) {
-      rail.set(true);
-      await nextFrame();
-    }
-    setFocusRequest((n) => n + 1);
-  }, []);
+  const revealComposer = useCallback(async () => setFocusRequest((n) => n + 1), []);
 
   return (
     <div ref={ref} className="relative flex h-full min-h-0 w-full overflow-hidden bg-background">
-      <div className="min-w-0 flex-1 overflow-y-auto">
+      <div inert={placement === "sheet"} style={{ paddingBottom: placement === "docked" ? dockSpace : 0 }} className="min-w-0 flex-1 overflow-y-auto">
         <OrchestrationTab
           key={threadId}
           threadId={threadId}
@@ -246,7 +301,8 @@ function View({ threadId }: { threadId: string }) {
           noneAction={<Button variant="primary" onClick={() => openChat(threadId)}>Open chat</Button>}
         />
       </div>
-      <Rail threadId={threadId} mode={mode} open={open} pageWidth={pageWidth || 1200} focusRequest={focusRequest} />
+      {placement === "sheet" && <button type="button" aria-label="Hide chat" tabIndex={-1} onClick={() => rail.set(false)} className="absolute inset-0 z-20 bg-background/40" />}
+      <Rail threadId={threadId} placement={placement} pageWidth={pageWidth || 1200} pageHeight={pageHeight} focusRequest={focusRequest} onDockHeight={setDockSpace} />
     </div>
   );
 }
