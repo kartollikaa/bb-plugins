@@ -210,6 +210,21 @@ test("notes from «For the owner» stay out of what needs you and show in the hi
   assert.deepEqual(v.history.notes, ["Nothing waiting. Store PR get-bb/marketplace#958 waits on a maintainer.", "T4 accepted the pager slide"]);
 });
 
+test("an answered ledger ask stops needing you at once and waits on the orchestrator", () => {
+  const line = "ask: Remove orchestration bits from thread-tree? | options: keep both / remove";
+  const title = "Remove orchestration bits from thread-tree?";
+  const at = (answered: Record<string, { answer: string; at: number }>) =>
+    buildView({ ledger: ledger([subtask("S2", "landed")], { forTheOwner: [line] }), agents: {}, live: {}, orchestratorThreadId: "thr_orch", now: NOW, answered });
+  const open = at({});
+  assert.equal(open.heading, "One thing waits on you", "positive control: unanswered, it needs you");
+  assert.equal(open.asks.length, 1);
+  const done = at({ [title]: { answer: "keep both", at: NOW - MIN } });
+  assert.deepEqual(done.asks, []);
+  assert.equal(done.state, "done");
+  assert.deepEqual(done.answered.map((a) => [a.title, a.answered]), [[title, { answer: "keep both", at: NOW - MIN }]]);
+  assert.equal(at({ "Another ask": { answer: "x", at: NOW } }).asks.length, 1, "an answer to another title changes nothing");
+});
+
 test("a «For the owner» line that is not `ask:` is a note, never a card", () => {
   const answered = "answered 2026-11-14: Remove orchestration bits from thread-tree? → «keep both (recommended)»";
   const v = view([subtask("S2", "landed")], {}, {}, { forTheOwner: [answered, "Waiting: owner merge of kartollikaa/bb-plugins#12"] });

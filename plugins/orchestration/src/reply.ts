@@ -1,3 +1,4 @@
+import type { Answer } from "./answered.ts";
 import { parseOwnerItem } from "./owner.ts";
 import { shortAge } from "./age.ts";
 import type { PreferenceStorage } from "./route.ts";
@@ -153,6 +154,15 @@ export function createReplyTracker(
       let changed = false;
       for (const ask of m.keys()) if (!live.has(ask)) changed = m.delete(ask) || changed;
       if (changed) emit();
+    },
+    /** Ask title → the quick reply sent from this client, before the orchestrator chat shows it. */
+    answers(threadId: string): Record<string, Answer> {
+      const found: Record<string, Answer> = {};
+      for (const [ask, entry] of states.get(threadId) ?? []) {
+        const title = (JSON.parse(ask) as unknown[])[0];
+        if (entry.kind === "sent" && typeof title === "string") found[title] = { answer: entry.option, at: entry.at };
+      }
+      return found;
     },
     subscribe(listener: () => void): () => void {
       listeners.add(listener);

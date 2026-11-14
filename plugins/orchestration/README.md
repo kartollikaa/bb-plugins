@@ -32,11 +32,17 @@ question: does anything need you, and is the team moving?
 - **Quick replies send.** A click on an ask's option (Merge it, Not now) sends
   `Re «<title>»: <option>` to the orchestrator at once, as you asked: «when I click on the button
   on the suggestion it just puts the text in the chat. I suggest that it should send the message by
-  itself». A busy orchestrator gets it in bb's queue, after its current turn. The card then reads
-  «Sent «option» · 2h ago» until the orchestrator takes the ask off the ledger, with Send again and
-  Other answer still there; a failed send shows an error and brings the buttons back.
+  itself». A busy orchestrator gets it in bb's queue, after its current turn. A failed send shows an
+  error and brings the buttons back.
 - **Answer, Other answer, Release, Not yet** only start a reply in the orchestrator's composer.
   Nothing is sent until you send it.
+- **An answered ask stops waiting on you at once.** Once a quick reply is sent, or a
+  `Re «<title>»: <answer>` from you shows in the orchestrator chat after that ask line appeared,
+  the ask leaves «needs you» and shows as a quiet card, «Answered «answer» 2m ago · waiting for the
+  orchestrator», with Other answer, until the orchestrator rewrites or removes the line. Owner, on the
+  change: «The dialog keep showing even when i answered». The server keeps when it first saw each
+  ask line in plugin storage, so an old answer doesn't close a re-asked line; an identical line
+  re-added after an answer still reads as answered, so a re-ask should be reworded.
 
 ## Why this layout
 
@@ -106,7 +112,8 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
   takes the path from the `exportScript` setting.
 - Ledgers are read from `~/.claude/projects/*/orchestrate/*.md`; the newest one naming the thread wins.
 - Live state (status, pending approvals, last report, model, effort, context use, last reply) comes
-  from bb's thread API.
+  from bb's thread API. Answers are the owner's latest messages in the orchestrator thread that
+  start with `Re «<ask title>»:`.
 
 Runs on the bb server's own machine; it reads local files.
 

@@ -12,7 +12,7 @@ one question: does anything need you, and is the team moving?
   approval, an ask the ledger keeps for the owner, titled with what is asked, with quick replies and
   links to its PR and thread. A quick reply sends itself to the orchestrator in one click
   (queued if it is mid-turn). Answer and Release start a reply in the orchestrator's composer;
-  you send it yourself.
+  you send it yourself. An ask you answered stops counting as waiting on you right away.
 - The team: one row per subtask with its state and latest step. A row opens to show the model,
   context use, rotations and the gate.
 - The same sentence as a row in the thread's context card.

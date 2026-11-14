@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { experimental_useRpcKeyedQuery, experimental_useRpcQuery, experimental_useSidebarThreads } from "@get-bb/plugin-sdk/app";
+import { mergeAnswers } from "./answered.ts";
 import { contract } from "./contract.ts";
+import { createReplyTracker } from "./reply.ts";
+import { localStore } from "./storage.ts";
 import { orchestratorLookupKeys } from "./switch.ts";
 import { buildView, type LiveThread, type View } from "./view.ts";
+
+/** Quick replies this client sent, shared by the tab, the page and the context-card row. */
+export const replies = createReplyTracker(localStore());
 
 const SNAPSHOT_REFRESH_MS = 20_000;
 const MEMBERSHIP_REFRESH_MS = 60_000;
@@ -55,6 +61,7 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
   useVisibleInterval(query.refetch, SNAPSHOT_REFRESH_MS, enabled);
   const sidebar = experimental_useSidebarThreads();
   const now = useNow();
+  const repliesVersion = useSyncExternalStore(replies.subscribe, replies.version);
 
   const live = useMemo(() => {
     const map: Record<string, LiveThread> = {};
@@ -80,7 +87,8 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
     }
     if (data.state === "none") return { kind: "none" };
     if (data.state === "error") return { kind: "error", message: data.message, retry: () => void query.refetch() };
-    const view = buildView({ ledger: data.ledger, agents: data.agents, live, orchestratorThreadId: threadId, now: Math.max(now, data.readAt) });
+    const answered = mergeAnswers(data.answered, replies.answers(threadId));
+    const view = buildView({ ledger: data.ledger, agents: data.agents, live, orchestratorThreadId: threadId, now: Math.max(now, data.readAt), answered });
     return { kind: "ready", view, threadIds: view.threadIds };
-  }, [query.data, query.error, query.refetch, live, threadId, now]);
+  }, [query.data, query.error, query.refetch, live, threadId, now, repliesVersion]);
 }

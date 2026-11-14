@@ -2,14 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, typ
 import { experimental_useRpcMutation, experimental_useSidebarThreads, Markdown, UrlLink, useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { contract } from "./contract.ts";
-import { createReplyTracker, replyKey, replyStatus, type ReplyState } from "./reply.ts";
+import { answeredStatus } from "./answered.ts";
+import { replyKey, replyStatus, type ReplyState } from "./reply.ts";
 import { askIdentity, type Ask, type RecapLine, type Row, type RowKind, type View } from "./view.ts";
-import { useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
-import { localStore } from "./storage.ts";
+import { replies, useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 
-const replies = createReplyTracker(localStore());
 const replyKeyOf = (ask: Ask) => replyKey(ask.replyTitle ?? "", ask.replies.map((r) => r.label));
 
 /** Puts text into the orchestrator's composer and focuses it; never sends. Keeps a draft the owner already started. */
@@ -95,6 +94,27 @@ function Expandable({ children }: { children: ReactNode }) {
 }
 
 const linkButton = "block h-[26px] max-w-full truncate whitespace-nowrap leading-[24px] rounded-md border border-border px-2.5 text-xs font-medium text-foreground no-underline hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+
+/** An ask the owner already answered: no attention colour, it waits on the orchestrator to rewrite the line. */
+function AnsweredCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
+  const threads = threadId ? [threadId] : ask.threads;
+  return (
+    <div className="flex flex-col gap-1.5 rounded-[10px] border border-border px-3 pb-2.5 pt-3">
+      <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <Dot kind="wait" />
+        <b className="min-w-0 truncate font-medium text-foreground">{ask.who}</b>
+      </div>
+      {ask.title && <p className="m-0 text-sm leading-[1.4] text-muted-foreground [overflow-wrap:anywhere]">{ask.title}</p>}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span role="status" className="text-xs text-muted-foreground">{answeredStatus(ask.answered!, Date.now())}</span>
+        {actions.sent === askIdentity(ask)
+          ? <span className="text-xs text-muted-foreground">Reply started in the chat composer</span>
+          : ask.drafts && <Button variant="quiet" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.primary)}>Other answer</Button>}
+        {threads.map((t) => <Button key={t} variant="quiet" onClick={() => actions.openThread(t)}>{threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
+      </div>
+    </div>
+  );
+}
 
 function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
   const sent = actions.sent === askIdentity(ask);
@@ -311,7 +331,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   const [showAllAsks, setShowAllAsks] = useState(false);
   const replyMutation = experimental_useRpcMutation({ contract, method: "reply" });
   useSyncExternalStore(replies.subscribe, replies.version);
-  const liveAsks = state.kind === "ready" ? state.view.asks.filter((ask) => ask.replies.length).map(replyKeyOf) : null;
+  const liveAsks = state.kind === "ready" ? [...state.view.asks, ...state.view.answered].filter((ask) => ask.replies.length).map(replyKeyOf) : null;
   const liveKey = liveAsks?.join("\u0001") ?? null;
   useEffect(() => {
     if (liveAsks) replies.prune(threadId, liveAsks);
@@ -377,6 +397,12 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
                 {rest.length} more, oldest first
               </button>
             ))}
+        </section>
+      )}
+
+      {view.answered.length > 0 && (
+        <section className="flex flex-col gap-2">
+          {view.answered.map((ask) => <AnsweredCard key={ask.key} ask={ask} actions={actions} threadId={askThread(ask)} />)}
         </section>
       )}
 

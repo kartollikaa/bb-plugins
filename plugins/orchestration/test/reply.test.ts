@@ -216,3 +216,16 @@ test("the sent status says what went and how long ago", () => {
   assert.equal(replyStatus({ kind: "sent", option: "Yes", delivery: "queued", at: 0 }, 5 * 60_000), "Sent «Yes», queued behind the orchestrator's turn · 5m ago");
   assert.equal(replyStatus({ kind: "sent", option: "Yes", delivery: "already", at: 0 }, 5 * 60_000), "«Yes» was already sent · 5m ago");
 });
+
+test("a sent quick reply is an answer to its ask title right away; a sending or failed one is not", () => {
+  const tracker = createReplyTracker(null, { now: () => 42 });
+  const key = replyKey("Merge PR #12?", ["Merge it", "Not now"]);
+  const token = tracker.begin("thr_o", key, "Merge it")!;
+  assert.deepEqual(tracker.answers("thr_o"), {});
+  tracker.done("thr_o", key, token, "queued");
+  assert.deepEqual(tracker.answers("thr_o"), { "Merge PR #12?": { answer: "Merge it", at: 42 } });
+  assert.deepEqual(tracker.answers("thr_other"), {});
+  const other = replyKey("Pick one", ["A"]);
+  tracker.fail("thr_o", other, tracker.begin("thr_o", other, "A")!);
+  assert.deepEqual(Object.keys(tracker.answers("thr_o")), ["Merge PR #12?"]);
+});

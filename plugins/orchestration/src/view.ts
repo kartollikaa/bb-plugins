@@ -1,5 +1,6 @@
 // Turns a ledger snapshot plus bb's live thread state into the tab's one answer: does anything need you, and is the team moving.
 import type { Agent, LedgerSummary, Subtask } from "./contract.ts";
+import type { Answer } from "./answered.ts";
 import { parseOwnerItem, type Link } from "./owner.ts";
 import { replyDraft, replyPrefix } from "./reply.ts";
 import { shortAge } from "./age.ts";
@@ -55,6 +56,8 @@ export interface Ask {
   /** question → Answer; decision → Release / Not yet; owner → a «For the owner» line; thread → the answer lives in a thread, not in a message. */
   kind: "question" | "decision" | "owner" | "thread";
   drafts: { primary: string; secondary?: string } | null;
+  /** The owner's reply to this ledger ask, while the orchestrator hasn't rewritten the line yet. */
+  answered: Answer | null;
 }
 
 export interface RecapLine {
@@ -71,6 +74,8 @@ export interface View {
   /** The context-card row: the heading, plus the stuck agent when an ask holds the heading. */
   rowLabel: string;
   asks: Ask[];
+  /** Ledger asks the owner answered; they wait on the orchestrator, not on the owner. */
+  answered: Ask[];
   nudge: { label: string; draft: string } | null;
   teamLabel: string;
   activeLabel: string;
@@ -87,6 +92,8 @@ export interface ViewInput {
   live: Record<string, LiveThread>;
   orchestratorThreadId: string;
   now: number;
+  /** Ask title → the owner's reply, from the orchestrator chat and from this client's quick replies. */
+  answered?: Record<string, Answer>;
 }
 
 const DONE = new Set(["landed", "verified", "dropped"]);
@@ -220,7 +227,7 @@ function askOf(c: Classified, now: number): Ask {
   const { subtask, agent } = c;
   const who = c.child ? c.child.label || c.child.name : subtask.name ? `${subtask.id} · ${subtask.name}` : subtask.id;
   const since = c.lastReport;
-  const base = { key: subtask.id, who, subtask: subtask.id, since, age: since === null ? "" : shortAge(now - since), title: null, replyTitle: null, links: [], threads: [], replies: [] };
+  const base = { key: subtask.id, who, subtask: subtask.id, since, age: since === null ? "" : shortAge(now - since), title: null, replyTitle: null, links: [], threads: [], replies: [], answered: null };
   if (subtask.status === "ready") {
     return {
       ...base,
@@ -308,10 +315,10 @@ export function buildView(input: ViewInput): View {
   const doneCount = doneIds.size;
   const progress = `${doneCount} of ${total} done`;
 
-  const asks = classified.filter((c) => c.kind === "you").map((c) => askOf(c, now));
+  const allAsks = classified.filter((c) => c.kind === "you").map((c) => askOf(c, now));
   const orchestrator = input.live[input.orchestratorThreadId];
   if (orchestrator?.hasPendingInteraction) {
-    asks.push({
+    allAsks.push({
       key: "orchestrator",
       who: "Orchestrator",
       subtask: null,
@@ -325,6 +332,7 @@ export function buildView(input: ViewInput): View {
       replies: [],
       kind: "thread",
       drafts: null,
+      answered: null,
     });
   }
   const notes: string[] = [];
@@ -338,13 +346,16 @@ export function buildView(input: ViewInput): View {
     const named = subtaskNamed(item.title, byId);
     const who = named ? `${named.subtask.id}${named.subtask.name ? ` · ${named.subtask.name}` : ""}` : "For you, from the ledger";
     const threads = named?.subtask.threadId && !item.threads.includes(named.subtask.threadId) ? [...item.threads, named.subtask.threadId] : item.threads;
-    asks.push({
+    allAsks.push({
       key: `owner-${i}`, who, subtask: named?.subtask.id ?? null, since: null, age: "", kind: "owner", links: item.links, threads,
       title: named?.rest ?? item.title, replyTitle: item.title, text: item.why ?? "", drafts: { primary: replyPrefix(item.title) },
       replies: item.options.map((label) => ({ label, draft: replyDraft(item.title, label) })),
+      answered: input.answered?.[item.title] ?? null,
     });
   });
-  asks.sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));
+  allAsks.sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));
+  const answered = allAsks.filter((a) => a.answered);
+  const asks = allAsks.filter((a) => !a.answered);
 
   const active = rows.filter((r) => r.kind !== "done" && r.kind !== "you");
   const stuck = classified.filter((c) => c.kind === "stuck")
@@ -365,7 +376,7 @@ export function buildView(input: ViewInput): View {
   };
   const recap = { goal: ledger.goal, now: recapLine(ledger.checkpoint, now), last: recapLine(ledger.lastDecision, now) };
   const threadIds = Object.fromEntries(classified.flatMap((c) => (c.subtask.threadId ? [[c.subtask.id, c.subtask.threadId]] : [])));
-  const common = { recap, asks, active, done, threadIds, history, activeLabel: `${active.length} active`, teamLabel: asks.length ? "Rest of the team" : "Team" };
+  const common = { recap, asks, answered, active, done, threadIds, history, activeLabel: `${active.length} active`, teamLabel: asks.length ? "Rest of the team" : "Team" };
 
   const askHeading = asks.length > 1 ? `${asks.length} things need you`
     : asks[0]?.kind === "decision" ? "One decision for you" : asks[0]?.kind === "owner" ? "One thing waits on you" : "One question for you";

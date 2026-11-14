@@ -53,6 +53,8 @@ export const snapshotSchema = z.discriminatedUnion("state", [
     state: z.literal("ledger"),
     ledger: ledgerSummarySchema,
     agents: z.record(z.string(), agentSchema),
+    /** Ask title → the owner's reply in the orchestrator chat since that ask line appeared. */
+    answered: z.record(z.string(), z.object({ answer: z.string(), at: z.number() })),
     readAt: z.number(),
   }),
 ]);
