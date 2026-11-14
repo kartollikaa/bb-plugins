@@ -233,7 +233,8 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 - **What:** a full-page Orchestration view that an orchestrator's thread redirects to (chat in a
   collapsible `ThreadChat` rail, Full chat goes back), plus a fixed side-panel tab and a context-card
-  row, all only on a thread that an orchestrate ledger's first line names. One status sentence, a card per thing that needs the
+  row, all only on a thread that an orchestrate ledger's first line names. The `orchestrationView`
+  setting (on by default) is written by the title-bar switch and a matching thread-header action. One status sentence, a card per thing that needs the
   owner, the team as one row per subtask, and a goal/history fold. Answer and Release only fill the
   orchestrator's composer.
 - **How:** the server scans `~/.claude/projects/*/orchestrate/*.md` first lines, runs orchestrate's

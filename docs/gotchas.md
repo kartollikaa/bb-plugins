@@ -52,6 +52,9 @@ can find it by the error text.
   tab's `useVisible` hook with `toPluginPanel(…, { replace: true })`, skipped while
   `useSidebarSplitLayout()` is non-null, because a plugin page can't be one pane of a split. `useComposers()` lists a
   `ThreadChat`'s composer, so filling it works there too.
+- **A thread-header control can only be a labelled button.** `experimental_threadAction` with
+  `placement: "header"` renders an outline button showing `label` only (no icon, no `detail`, no
+  switch), after the workspace's Open button, and folds into the thread menu at compact width.
 - **Filling a composer without sending:** `useComposers()` lists composer handles; pick the one with
   `scope.kind === "thread"` and the thread's id, then `replace`/`insert` and `focus()`. Never `submit()`.
 - **A thread's context card collapses while the side panel is open**, so a probe for a
