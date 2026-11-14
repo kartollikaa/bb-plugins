@@ -58,6 +58,10 @@ can find it by the error text.
 - **One bad key fails every keyed read of that method.** `experimental_useRpcKeyedQuery` shares one
   key set per method across all callers and refetches them together, so a key the RPC's input rejects
   (an empty thread id) breaks every lookup. Filter keys to real ids at each call site.
+- **No standalone composer for an existing thread.** `ThreadChat` is the only host composer for one;
+  its composer is the `sticky bottom-0` footer of the transcript scroller. orchestration docks it by
+  sizing the container to that footer's height (ResizeObserver), so only the composer shows. If the
+  dock shows transcript or cuts the composer after a bb upgrade, check that selector first.
 - **Filling a composer without sending:** `useComposers()` lists composer handles; pick the one with
   `scope.kind === "thread"` and the thread's id, then `replace`/`insert` and `focus()`. Never `submit()`.
 - **A thread's context card collapses while the side panel is open**, so a probe for a
