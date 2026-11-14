@@ -235,7 +235,8 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   collapsible `ThreadChat` rail that docks to its composer when folded, Full chat goes back), plus a fixed side-panel tab and a context-card
   row, all only on a thread that an orchestrate ledger's first line names. The `orchestrationView`
   setting (on by default) is written by the title-bar switch and a matching thread-header action. One status sentence, a card per thing that needs the
-  owner, the team as one row per subtask, and a goal/history fold. A quick-reply option sends
+  owner, the team as one row per subtask plus the orchestrator's running child threads the ledger
+  doesn't list yet (bb's `parentThreadId`), and a goal/history fold. A quick-reply option sends
   `Re «title»: option` to the orchestrator (`threads.send`, `queue-if-active`); Answer and Release
   only fill its composer.
 - **How:** the server scans `~/.claude/projects/*/orchestrate/*.md` first lines, runs orchestrate's
