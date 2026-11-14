@@ -40,10 +40,8 @@ whose last run failed. Each item is two lines, title then reason; a subthread's
 reason names its orchestration. Clicking an item opens its thread; a PR with no
 thread opens GitHub Folder's PR page, an automation with no run the Automations
 page. A failed turn offers Retry, a failed queued message Resend. A failed
-turn's reason adds "rate limit" when the turn hit one, or "failed 3 times in a
-row" from the third failure without a completed turn between. A thread is stuck
-when its turn has made no progress for 30 minutes (one threshold for every
-thread, orchestrator or subthread): no step, output or report in its event log.
+turn's reason adds "rate limit" when the turn hit one, or "failed N times in a row" once failures repeat without a completed turn between. A thread is stuck
+when its turn has gone a long time without progress (one threshold for every thread, orchestrator or subthread): no step, output or report in its event log. A command or tool call still running counts as work, so an agent waiting on a long test run or `bb thread wait` is not stuck; the Running list shows that step and its timer.
 A thread waiting on the user is a question instead, and a turn that ended is
 never stuck. Stuck items go longest silence first, read "Running, no progress
 for 42m" and offer Stop. Hovering an
@@ -59,7 +57,7 @@ finished but are not read yet. Each count is a toggle: it swaps the sections and
 the tree for a flat list of those threads, children included, most recently
 active first. Running rows add a second line: the turn's current step
 ("Running npm test", "Thinking", or "Rate limited" while a rate limit holds
-it), the context fill once it reaches 80%, the project and the orchestration
+it), the context fill once it runs high, the project and the orchestration
 they run under. The age gives way to a live timer of the current turn. Click the count again, Clear, or press Escape to
 go back. The search field above the counts, or `/` outside a text field, opens
 search, which matches the title, branch, PR number (`#123`) and project of the

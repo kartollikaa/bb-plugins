@@ -8,8 +8,8 @@ under it, and the subagents it runs inside its own session show on its row.
   unread; click one for a flat list. Running rows show the current step, a turn
   timer, a high context fill and the orchestration.
 - Needs you, above the sections: threads asking a question (with how long
-  they waited), failed turns and queued messages, threads with no progress for
-  30 minutes, unread results, then failing PRs of your threads and failed
+  they waited), failed turns and queued messages, threads stuck with no
+  progress, unread results, then failing PRs of your threads and failed
   automations. Retry, Resend or Stop in place; hover to snooze. ⇧⌘I (Ctrl+Shift+I) opens the next.
 - Pull requests (from GitHub Folder) and Automations start folded, with a
   summary in the header: "1 failing · 5", "1 failed · next in 12m". A PR's
