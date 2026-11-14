@@ -124,9 +124,14 @@ export function foldArchivePlan<T extends TreeThread>(
     for (const kid of forest.children.get(id) ?? []) visit(kid.id);
   };
   rootIds.forEach(visit);
+  const planned = roots.reduce<string[]>((kept, id) => {
+    if (kept.some((other) => scopes.get(other)!.includes(id))) return kept;
+    const scope = scopes.get(id)!;
+    return [...kept.filter((other) => !scope.includes(other)), id];
+  }, []);
   const fold = [...new Set(rootIds.flatMap((id) => [...orchestrationTreeIds(forest, id), ...(scopes.get(id) ?? [])]))];
   return {
-    roots,
+    roots: planned,
     archiveCount: covered.size,
     skipped: fold.filter((id) => dirty.has(id)).length,
     kept: fold.filter((id) => !covered.has(id) && !dirty.has(id)).length,

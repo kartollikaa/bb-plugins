@@ -147,6 +147,9 @@ test("a root another root's archive already takes along is not archived again", 
   const forest = buildForest([thread("x"), thread("y")]);
   const shared = new Map([["x", ["x", "y"]], ["y", ["y"]]]);
   assert.deepEqual(foldArchivePlan(forest, ["x", "y"], shared, new Set()), { roots: ["x"], archiveCount: 2, skipped: 0, kept: 0 });
+  assert.deepEqual(foldArchivePlan(forest, ["y", "x"], shared, new Set()), { roots: ["x"], archiveCount: 2, skipped: 0, kept: 0 });
+  const mutual = new Map([["x", ["x", "y"]], ["y", ["y", "x"]]]);
+  assert.deepEqual(foldArchivePlan(forest, ["y", "x"], mutual, new Set()).roots, ["y"]);
 });
 
 test("a thread missing from the scope check counts as unsafe", () => {
