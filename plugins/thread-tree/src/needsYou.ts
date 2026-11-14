@@ -8,6 +8,7 @@ import { automationDot, type AutomationSummary } from "./automations.ts";
 import type { NeedsYouPullRequests } from "./settings.ts";
 import { failureNote, isStuck, silentSince, type ThreadSignals } from "./threadSignals.ts";
 import { formatAge } from "./time.ts";
+import { repoSlugFromPrUrl } from "./pullRequestActions.ts";
 
 export type ThreadItemKind = "input" | "failed" | "queued-failed" | "stuck" | "unread";
 export type NeedsYouKind = ThreadItemKind | "pr" | "automation";
@@ -41,6 +42,10 @@ export interface PullRequestItem extends BaseItem {
   kind: "pr";
   url: string;
   number: number;
+  /** `owner/repo`; empty when the URL names none. */
+  repo: string;
+  /** GitHub Folder's signals for it; empty when that plugin doesn't list it. */
+  attention: readonly string[];
   tone: PrReason | null;
 }
 
@@ -118,19 +123,22 @@ export interface ThreadItemsInput<T extends NeedsYouThread> {
   orchestrationOf: (threadId: string) => string | null;
   /** The thread's turn signals from its event log; without them nothing is called stuck. */
   signalsOf?: (threadId: string) => ThreadSignals | undefined;
+  /** A result's diff in one line, when the thread's worktree is its own. */
+  diffStatOf?: (threadId: string) => string | null;
   now?: number;
 }
 
 const KIND_ORDER: readonly ThreadItemKind[] = ["input", "failed", "queued-failed", "stuck", "unread"];
 
-function threadReason(kind: Exclude<ThreadItemKind, "input">, signals: ThreadSignals | undefined, now: number): string {
+function threadReason(kind: Exclude<ThreadItemKind, "input">, signals: ThreadSignals | undefined, diffStat: string | null, now: number): string {
+  if (kind === "unread" && diffStat) return `Finished · ${diffStat}`;
   if (kind === "stuck") return `Running, no progress for ${formatAge(silentSince(signals!)!, now)}`;
   const note = kind === "failed" ? failureNote(signals) : null;
   return note ? `${THREAD_REASON[kind]} · ${note}` : THREAD_REASON[kind];
 }
 
 /** Questions first, longest wait first; then failures and failed queued messages, most recent first; stuck threads, longest silence first; then results. */
-export function threadItems<T extends NeedsYouThread>({ threads, questions, firstSeen, orchestrationOf, signalsOf = () => undefined, now = Date.now() }: ThreadItemsInput<T>): ThreadItem[] {
+export function threadItems<T extends NeedsYouThread>({ threads, questions, firstSeen, orchestrationOf, signalsOf = () => undefined, diffStatOf = () => null, now = Date.now() }: ThreadItemsInput<T>): ThreadItem[] {
   const items: (ThreadItem & { latestAttentionAt: number })[] = [];
   for (const thread of threads) {
     const signals = signalsOf(thread.id);
@@ -144,7 +152,7 @@ export function threadItems<T extends NeedsYouThread>({ threads, questions, firs
       signature: kind === "stuck" ? `stuck:${silent}` : `${kind}:${thread.updatedAt}`,
       threadId: thread.id,
       title: thread.displayTitle,
-      reason: kind === "input" ? question?.text ?? "Needs your input" : threadReason(kind, signals, now),
+      reason: kind === "input" ? question?.text ?? "Needs your input" : threadReason(kind, signals, kind === "unread" ? diffStatOf(thread.id) : null, now),
       since: kind === "input" ? question?.since ?? firstSeen.get(thread.id) ?? null : silent,
       orchestration: orchestrationOf(thread.id),
       canRetry: kind === "failed" && thread.status === "error",
@@ -221,6 +229,8 @@ export function pullRequestItems(
         reason: `#${item.pr.number} · ${attention ? ATTENTION_LABEL[attention] : item.pr.repo}`,
         url: item.pr.url,
         number: item.pr.number,
+        repo: item.pr.repo,
+        attention: folder.get(item.pr.url.toLowerCase()) ?? item.attention,
         tone: null,
       };
     });
@@ -240,6 +250,8 @@ export function pullRequestItems(
         reason: `#${pr.number} · ${PR_REASON_LOOK[reason].label}`,
         url: pr.url,
         number: pr.number,
+        repo: repoSlugFromPrUrl(pr.url) ?? "",
+        attention: folder.get(url) ?? [],
         tone: reason,
         rank: [...QUEUE_PR_REASONS].indexOf(reason),
       });

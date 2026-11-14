@@ -171,6 +171,24 @@ test("the PR setting can switch to every GitHub Folder item, or to none", () => 
   assert.deepEqual(all.map((item) => [item.number, item.threadId, item.reason]), [[8, "t1", "#8 · Checks failing"], [9, null, "#9 · Review requested"]]);
 });
 
+test("PR items carry their repo and GitHub's signals, so a row can offer Merge or Agent review", () => {
+  const linked = [{ threadId: "t1", pullRequests: [pr(8, { checks: { state: "failing" } })] }];
+  const all = pullRequestItems("all", linked, new Map(), [folderItem(8, ["ci_failed"]), folderItem(9, ["ready", "review"])]);
+  assert.deepEqual(all.map((item) => [item.number, item.repo, item.attention]), [[8, "o/r", ["ci_failed"]], [9, "o/r", ["ready", "review"]]]);
+  const own = pullRequestItems("linked", linked, new Map(), []);
+  assert.deepEqual(own.map((item) => [item.repo, item.attention]), [["o/r", []]], "a linked PR's repo comes from its URL");
+});
+
+test("a result to review names its diff when the thread's worktree has one", () => {
+  const items = build([thread("r", { isUnread: true }), thread("plain", { isUnread: true })], {
+    orchestrationOf: (id) => (id === "r" ? "Orchestrate" : null),
+    diffStatOf: (id) => (id === "r" ? "+825 −36 · 4 files" : null),
+  });
+  const reasons = Object.fromEntries(items.map((item) => [item.threadId, item.reason]));
+  assert.deepEqual(reasons, { r: "Finished · +825 −36 · 4 files", plain: "Finished · review the result" });
+  assert.equal(items.find((item) => item.threadId === "r")!.signature, `unread:${JUST_READ}`, "the diff changing doesn't wake a snooze");
+});
+
 const automation = (id: string, extra: Partial<AutomationSummary> = {}): AutomationSummary => ({
   id, projectId: "p", projectName: null, name: id, enabled: true, nextRunAt: null, lastRunAt: 0, lastRunStatus: "succeeded", lastRunThreadId: null, lastError: null, ...extra,
 });
