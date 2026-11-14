@@ -49,10 +49,22 @@ export async function readThreadPullRequests(threadId: string, call: Call): Prom
   return results;
 }
 
-export type PullRequestStatusRow =
-  | { outcome: "available"; pullRequest: ThreadPullRequest }
-  | { outcome: "absent" }
-  | { outcome: "unavailable"; message: string };
+export const pullRequestStatusRowSchema = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("available"),
+    pullRequest: z.object({
+      number: z.number(),
+      title: z.string(),
+      url: z.string(),
+      state: z.enum(["draft", "open", "merged", "closed"]),
+      attention: z.string(),
+      checks: z.object({ state: z.string() }),
+    }),
+  }),
+  z.object({ outcome: z.literal("absent") }),
+  z.object({ outcome: z.literal("unavailable"), message: z.string() }),
+]);
+export type PullRequestStatusRow = z.infer<typeof pullRequestStatusRowSchema>;
 
 /** A thread's PR states, or null while either source hasn't answered for it or bb's status is unavailable. */
 export function knownPullRequestStates({

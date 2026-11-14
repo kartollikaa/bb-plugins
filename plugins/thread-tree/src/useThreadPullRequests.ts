@@ -3,7 +3,7 @@ import { experimental_useRpcKeyedQuery, type PluginSidebarThread } from "@get-bb
 import { z } from "zod";
 import { createRefreshScheduler } from "./refreshScheduler";
 import { activitySignatures, changedKeys } from "./pullRequestKeys";
-import { knownPullRequestStates, mergePullRequests, threadPullRequestSchema, type ThreadPullRequest } from "./threadPullRequests";
+import { knownPullRequestStates, mergePullRequests, pullRequestStatusRowSchema, threadPullRequestSchema, type ThreadPullRequest } from "./threadPullRequests";
 
 const REFRESH_MS = 60_000;
 const ACTIVITY_DEBOUNCE_MS = 500;
@@ -15,21 +15,7 @@ const contract = {
   },
   pullRequests: {
     input: z.object({ keys: z.array(z.string()) }),
-    output: z.record(z.string(), z.discriminatedUnion("outcome", [
-      z.object({
-        outcome: z.literal("available"),
-        pullRequest: z.object({
-          number: z.number(),
-          title: z.string(),
-          url: z.string(),
-          state: z.enum(["draft", "open", "merged", "closed"]),
-          attention: z.string(),
-          checks: z.object({ state: z.string() }),
-        }),
-      }),
-      z.object({ outcome: z.literal("absent") }),
-      z.object({ outcome: z.literal("unavailable"), message: z.string() }),
-    ])),
+    output: z.record(z.string(), pullRequestStatusRowSchema),
   },
 };
 
@@ -96,17 +82,18 @@ export function useThreadPullRequests(threads: readonly PluginSidebarThread[], c
 
   const statusData = status.error ? undefined : status.data;
   const sessionData = session.data;
-  const pullRequestsOf = useCallback((thread: PluginSidebarThread): ThreadPullRequest[] => {
-    const row = thread.environment?.id ? statusData?.[thread.environment.id] : undefined;
-    return mergePullRequests(row?.outcome === "available" ? row.pullRequest : undefined, sessionData?.[thread.id] ?? []);
-  }, [statusData, sessionData]);
-  const pullRequestStatesOf = useCallback((thread: PluginSidebarThread) => {
+  const rowsOf = useCallback((thread: PluginSidebarThread) => {
     const environmentId = thread.environment?.id;
-    return knownPullRequestStates({
+    return {
       hasEnvironment: !!environmentId,
-      statusRow: environmentId && statusData ? statusData[environmentId] : undefined,
+      statusRow: environmentId ? statusData?.[environmentId] : undefined,
       sessionRow: sessionData?.[thread.id],
-    });
+    };
   }, [statusData, sessionData]);
+  const pullRequestsOf = useCallback((thread: PluginSidebarThread): ThreadPullRequest[] => {
+    const { statusRow, sessionRow } = rowsOf(thread);
+    return mergePullRequests(statusRow?.outcome === "available" ? statusRow.pullRequest : undefined, sessionRow ?? []);
+  }, [rowsOf]);
+  const pullRequestStatesOf = useCallback((thread: PluginSidebarThread) => knownPullRequestStates(rowsOf(thread)), [rowsOf]);
   return { pullRequestsOf, pullRequestStatesOf, isLoading: status.isLoading || session.isLoading };
 }
