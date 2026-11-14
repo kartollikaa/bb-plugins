@@ -362,7 +362,67 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             ? "No archived threads."
             : "Loading archived threads…";
 
-  const firstFolderIndex = groups.findIndex((group) => group.key !== "pinned");
+  const pinnedGroup = groups.find((group) => group.key === "pinned");
+  const folderGroups = groups.filter((group) => group.key !== "pinned");
+  const renderGroup = (group: (typeof groups)[number]) => {
+    const isCollapsed = (view.foldOnDrag && canReorder && projectDrag.isDragging) || collapsedGroups.has(group.key);
+    const project = group.projectId ? projectById.get(group.projectId) : undefined;
+    const { title, icon } = groupLook(group.key, project, isCollapsed);
+    const projectId = group.projectId;
+    const startThread = projectId ? () => {
+      navigate.toCompose({ projectId, focusPrompt: true });
+      onNavigate();
+    } : undefined;
+    const reorderable = canReorder && projectId !== null;
+    return (
+      <section
+        key={group.key}
+        data-flip-key={group.key}
+        {...(reorderable ? projectDrag.itemProps(projectId) : {})}
+        className={cn("rounded-md transition-opacity", reorderable && "select-none", reorderable && projectDrag.draggingId === projectId && "opacity-40")}
+      >
+        <GroupHeader
+          title={title}
+          icon={icon}
+          isCollapsed={isCollapsed}
+          extra={group.key !== "pinned" ? (
+            <ThreadSortMenu
+              title={title}
+              value={folderSorts[group.key] ?? "inherit"}
+              defaultSort={threadSort}
+              onChange={(sort) => setFolderSort(group.key, sort === "inherit" ? undefined : sort)}
+            />
+          ) : undefined}
+          count={group.rootCount === 0 ? null : group.rootCount}
+          onToggle={() => collapsedGroups.toggle(group.key)}
+          action={
+            startThread
+              ? {
+                  label: `New thread in ${title}`,
+                  icon: "Plus",
+                  onClick: startThread,
+                }
+              : undefined
+          }
+        />
+        <Collapse open={!isCollapsed}>
+          <div role="group" className="mt-0.5 flex flex-col gap-0.5">
+            {group.rows.map((row) => renderRow(row, "tree"))}
+            {group.older ? (
+              <OlderThreads
+                count={group.older.rootCount}
+                isOpen={olderShown(group.key)}
+                onToggle={() => flags.toggle(`older:${group.key}`)}
+                onArchive={() => archiveFold(group.older!.rows.filter((row) => row.depth === 0).map((row) => row.thread))}
+              >
+                {group.older.rows.map((row) => renderRow(row, "tree"))}
+              </OlderThreads>
+            ) : null}
+          </div>
+        </Collapse>
+      </section>
+    );
+  };
   const renderRow = (
     row: TreeRow<PluginSidebarThread>,
     variant: "tree" | "flat",
@@ -561,6 +621,32 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
       {treePlaceholder ? <div className="px-3 text-xs text-muted-foreground">{treePlaceholder}</div> : null}
 
+      {pinnedGroup ? (
+        <div role="tree" aria-label="Pinned threads" className="flex flex-col">
+          {renderGroup(pinnedGroup)}
+        </div>
+      ) : null}
+      {!showArchived && orchestrationList.length > 0 ? (
+        <section aria-label="Orchestrations" data-orchestrations="">
+          <GroupHeader
+            title="Orchestrations"
+            icon={<Icon name="thread-tree/network" fallback="Layers" aria-hidden className="size-3.5" />}
+            isCollapsed={collapsedGroups.has("orchestrations")}
+            count={orchestrationList.length}
+            onToggle={() => collapsedGroups.toggle("orchestrations")}
+          />
+          <Collapse open={!collapsedGroups.has("orchestrations")}>
+            <div role="list" className="mt-0.5 flex flex-col gap-0.5">
+              {orchestrationList.map((entry) => renderRow(flatRow(entry.thread), "flat", {
+                numbered: false,
+                subtitle: orchestrationSubtitleParts(entry, (projectId) => projectById.get(projectId)?.name ?? null),
+                rollup: entry.rollup,
+                muted: entry.finished,
+              }))}
+            </div>
+          </Collapse>
+        </section>
+      ) : null}
       <div
         ref={treeRef}
         role="tree"
@@ -568,89 +654,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         className="relative flex flex-col gap-2"
         {...(canReorder ? projectDrag.containerProps : {})}
       >
-        {groups.map((group, groupIndex) => {
-          const orchestrationsHere = groupIndex === firstFolderIndex && !showArchived && orchestrationList.length > 0;
-          const isCollapsed = (view.foldOnDrag && canReorder && projectDrag.isDragging) || collapsedGroups.has(group.key);
-          const project = group.projectId ? projectById.get(group.projectId) : undefined;
-          const { title, icon } = groupLook(group.key, project, isCollapsed);
-          const projectId = group.projectId;
-          const startThread = projectId ? () => {
-            navigate.toCompose({ projectId, focusPrompt: true });
-            onNavigate();
-          } : undefined;
-          const reorderable = canReorder && projectId !== null;
-          return (
-            <Fragment key={group.key}>
-            {orchestrationsHere ? (
-              <section aria-label="Orchestrations" data-orchestrations="">
-                <GroupHeader
-                  title="Orchestrations"
-                  icon={<Icon name="thread-tree/network" fallback="Layers" aria-hidden className="size-3.5" />}
-                  isCollapsed={collapsedGroups.has("orchestrations")}
-                  count={orchestrationList.length}
-                  onToggle={() => collapsedGroups.toggle("orchestrations")}
-                />
-                <Collapse open={!collapsedGroups.has("orchestrations")}>
-                  <div role="list" className="mt-0.5 flex flex-col gap-0.5">
-                    {orchestrationList.map((entry) => renderRow(flatRow(entry.thread), "flat", {
-                      numbered: false,
-                      subtitle: orchestrationSubtitleParts(entry, (projectId) => projectById.get(projectId)?.name ?? null),
-                      rollup: entry.rollup,
-                      muted: entry.finished,
-                    }))}
-                  </div>
-                </Collapse>
-              </section>
-            ) : null}
-            <section
-              key={group.key}
-              data-flip-key={group.key}
-              {...(reorderable ? projectDrag.itemProps(projectId) : {})}
-              className={cn("rounded-md transition-opacity", reorderable && "select-none", reorderable && projectDrag.draggingId === projectId && "opacity-40")}
-            >
-              <GroupHeader
-                title={title}
-                icon={icon}
-                isCollapsed={isCollapsed}
-                extra={group.key !== "pinned" ? (
-                  <ThreadSortMenu
-                    title={title}
-                    value={folderSorts[group.key] ?? "inherit"}
-                    defaultSort={threadSort}
-                    onChange={(sort) => setFolderSort(group.key, sort === "inherit" ? undefined : sort)}
-                  />
-                ) : undefined}
-                count={group.rootCount === 0 ? null : group.rootCount}
-                onToggle={() => collapsedGroups.toggle(group.key)}
-                action={
-                  startThread
-                    ? {
-                        label: `New thread in ${title}`,
-                        icon: "Plus",
-                        onClick: startThread,
-                      }
-                    : undefined
-                }
-              />
-              <Collapse open={!isCollapsed}>
-                <div role="group" className="mt-0.5 flex flex-col gap-0.5">
-                  {group.rows.map((row) => renderRow(row, "tree"))}
-                  {group.older ? (
-                    <OlderThreads
-                      count={group.older.rootCount}
-                      isOpen={olderShown(group.key)}
-                      onToggle={() => flags.toggle(`older:${group.key}`)}
-                      onArchive={() => archiveFold(group.older!.rows.filter((row) => row.depth === 0).map((row) => row.thread))}
-                    >
-                      {group.older.rows.map((row) => renderRow(row, "tree"))}
-                    </OlderThreads>
-                  ) : null}
-                </div>
-              </Collapse>
-            </section>
-            </Fragment>
-          );
-        })}
+        {folderGroups.map(renderGroup)}
       </div>
 
       {archivedPages?.hasNextPage ? (
