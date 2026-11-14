@@ -57,3 +57,8 @@ export const ATTENTION_LABEL: Record<Attention, string> = {
   assigned: "Assigned to you",
   mentioned: "Mentions you",
 };
+
+export function githubFolderPrPath(url: string): string | null {
+  const match = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/.exec(url);
+  return match ? `/plugins/github-folder/pr/${match[1]}/${match[2]}/${match[3]}` : null;
+}

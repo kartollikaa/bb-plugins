@@ -14,6 +14,7 @@ import {
   type GithubFolderView,
   type GithubSettings,
   type GithubSettingsPatch,
+  githubFolderPrPath,
 } from "./githubFolder";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { ROW_HOVER_SOLID_BG, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
@@ -23,10 +24,14 @@ import { Collapse } from "./Collapse";
 const POLL_MS = 60_000;
 
 /** The GitHub Folder plugin's PR page; `toPluginPanel` only reaches this plugin's own panels, so go through the router's history. */
+/** Opens the PR in GitHub Folder; a PR on another host opens its own URL in a new tab. */
 export function openGithubFolderPrPage(url: string) {
-  const match = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/.exec(url);
-  if (!match) return;
-  window.history.pushState(window.history.state, "", `/plugins/github-folder/pr/${match[1]}/${match[2]}/${match[3]}`);
+  const path = githubFolderPrPath(url);
+  if (!path) {
+    window.open(url, "_blank", "noopener");
+    return;
+  }
+  window.history.pushState(window.history.state, "", path);
   window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
 }
 const PULLS_URL = "https://github.com/pulls/review-requested";
