@@ -183,14 +183,21 @@ export function pullRequestItems(
 ): PullRequestItem[] {
   if (mode === "none") return [];
   const threadOf = new Map<string, string>();
-  for (const { threadId, pullRequests } of linked) for (const pr of pullRequests) if (!threadOf.has(pr.url.toLowerCase())) threadOf.set(pr.url.toLowerCase(), threadId);
+  const linkedPr = new Map<string, ThreadPullRequest>();
+  for (const { threadId, pullRequests } of linked) {
+    for (const pr of pullRequests) {
+      if (threadOf.has(pr.url.toLowerCase())) continue;
+      threadOf.set(pr.url.toLowerCase(), threadId);
+      linkedPr.set(pr.url.toLowerCase(), pr);
+    }
+  }
   if (mode === "all") {
     return folderItems.map((item) => {
       const attention = item.attention[0];
       return {
         kind: "pr",
         key: `pr:${item.pr.url.toLowerCase()}`,
-        signature: `pr:${[...item.attention].sort().join(",")}`,
+        signature: prSignature(folder.get(item.pr.url.toLowerCase()) ?? item.attention, linkedPr.get(item.pr.url.toLowerCase())),
         threadId: threadOf.get(item.pr.url.toLowerCase()) ?? null,
         title: item.pr.title,
         reason: `#${item.pr.number} · ${attention ? ATTENTION_LABEL[attention] : item.pr.repo}`,
@@ -209,7 +216,7 @@ export function pullRequestItems(
       items.set(url, {
         kind: "pr",
         key: `pr:${url}`,
-        signature: `pr:${reason}`,
+        signature: prSignature(folder.get(url) ?? [], pr),
         threadId,
         title: pr.title,
         reason: `#${pr.number} · ${PR_REASON_LOOK[reason].label}`,
@@ -221,6 +228,14 @@ export function pullRequestItems(
     }
   }
   return [...items.values()].sort((a, b) => a.rank - b.rank || a.number - b.number).map(({ rank: _rank, ...item }) => item);
+}
+
+/** The same in either PR setting, so switching it keeps a snooze. */
+function prSignature(attention: readonly string[], pr: ThreadPullRequest | undefined): string {
+  const signals = new Set(attention);
+  if (pr && pr.state !== "unknown" && pr.checks.state === "failing") signals.add("checks_failing");
+  if (pr?.attention === "conflicts") signals.add("conflicts");
+  return `pr:${[...signals].sort().join(",")}`;
 }
 
 /** Enabled automations whose last run failed, most recent first; paused ones stay in their section. */

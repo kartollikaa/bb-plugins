@@ -293,3 +293,13 @@ test("⇧⌘I from its cursor steps past the other items of the thread it opened
   const folderOnly = pullRequestItems("all", [], new Map(), [folderItem(8, ["ci_failed"]), folderItem(9, ["review"])]);
   assert.equal(nextItem(folderOnly, null, { key: folderOnly[0]!.key, index: 0, threadId: null })?.key, folderOnly[1]!.key, "thread-less items still step one by one");
 });
+
+test("a PR's snooze survives switching the PR setting between linked and all", () => {
+  const folder = new Map([["https://github.com/o/r/pull/8", ["ci_failed", "review"] as const]]);
+  const linked = [{ threadId: "t1", pullRequests: [pr(8, { checks: { state: "failing" } })] }];
+  const [inLinked] = pullRequestItems("linked", linked, folder, []);
+  const [inAll] = pullRequestItems("all", linked, folder, [folderItem(8, ["review", "ci_failed"])]);
+  assert.equal(inAll!.signature, inLinked!.signature);
+  const [fixed] = pullRequestItems("all", [{ threadId: "t1", pullRequests: [pr(8)] }], folder, [folderItem(8, ["review", "ci_failed"])]);
+  assert.notEqual(fixed!.signature, inAll!.signature, "the PR's own checks still count");
+});
