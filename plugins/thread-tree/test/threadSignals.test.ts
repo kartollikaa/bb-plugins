@@ -382,3 +382,8 @@ test("unread-error threads get signals too", async () => {
 test("commandGist drops leading variable assignments of a command", () => {
   assert.equal(stepText({ type: "commandExecution", command: "CI=1 FOO=bar npm run build -- --verbose" }), "Running npm run build");
 });
+
+test("commandGist looks inside a shell wrapper", () => {
+  assert.equal(stepText({ type: "commandExecution", command: `/bin/zsh -lc "sed -n 1,20p src/a.ts"` }), "Running sed -n 1,20p");
+  assert.equal(stepText({ type: "commandExecution", command: `bash -c 'cd x && npm test'` }), "Running npm test");
+});

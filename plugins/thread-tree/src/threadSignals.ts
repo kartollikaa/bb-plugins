@@ -91,8 +91,12 @@ function withoutAssignments(part: string): string[] {
 }
 
 /** The first real command of a shell line, in a few words: no variable setup, `cd`, pipes or redirects. */
+const SHELL_WRAPPER = /^(?:\S*\/)?(?:ba|z)?sh\s+-l?c\s+(["'])(.*?)\1?\s*$/;
+
 export function commandGist(command: string): string {
   const line = firstLine(command);
+  const wrapped = SHELL_WRAPPER.exec(line);
+  if (wrapped?.[2]) return commandGist(wrapped[2]);
   const parts = line.split(/\s*(?:&&|\|\||;|\|)\s*/).map((part) => part.trim()).filter(Boolean);
   const commands = parts.map(withoutAssignments).filter((words) => words.length > 0 && words[0] !== "cd");
   return commands[0]?.filter((word) => !/^\d*[<>]/.test(word)).slice(0, GIST_WORDS).join(" ") ?? line;
