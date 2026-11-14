@@ -48,8 +48,10 @@ several name the thread, the newest wins.
 - **Done:** `landed`, `verified`, `dropped`, or the ledger's status `closed`. A done subtask whose
   thread is running again shows as working («Running again · …») and keeps the view out of «done».
 - **Running children:** child threads of the orchestrator (bb's `parentThreadId`) the ledger doesn't
-  name. One titled `… · <id>` fills that ledger row's empty session; otherwise it gets its own row
-  («Running, not in the ledger yet») while a turn runs, or a card while it waits on an approval.
+  name. One titled `… · <id>` (uppercase id: S11, O8, R2b) fills that ledger row's empty session,
+  running and newest first; otherwise it gets its own row («Running, not in the ledger yet»), never a
+  second row under an id that already has a thread, while a turn runs, or a card while it waits on an
+  approval (a card even before the ledger has subtasks).
   Idle unlisted children are left out. To have a child show under its subtask, end its title with
   ` · <subtask id>` or record its thread in the Subtasks table.
 

@@ -268,7 +268,7 @@ test("a running child thread the ledger doesn't list shows in the team, labelled
   });
   assert.deepEqual(v.active.map((r) => [r.id, r.label, r.name, r.kind, r.running]), [
     ["S2", "S2", "S2 name", "work", false],
-    ["thr_kid", "S11", "", "work", true],
+    ["thr_kid", "S11", "orch", "work", true],
     ["thr_free", "", "Fix the build", "work", true],
   ]);
   assert.equal(v.active[1]!.step, "Running, not in the ledger yet");
@@ -287,7 +287,7 @@ test("a child waiting on approval is an ask; a landed subtask running again is a
     thr_s1: live(1, { status: "active" }),
     thr_kid: live(4, { parentThreadId: "thr_orch", title: "orch · R2", hasPendingInteraction: true }),
   });
-  assert.deepEqual(v.asks.map((a) => [a.key, a.who, a.kind]), [["thr_kid", "R2", "thread"]]);
+  assert.deepEqual(v.asks.map((a) => [a.key, a.who, a.kind, a.text]), [["thr_kid", "R2", "thread", "R2 waits on an approval or a question in its thread."]]);
   assert.equal(v.threadIds.thr_kid, "thr_kid");
   assert.deepEqual(v.active.map((r) => [r.id, r.kind, r.step]), [["S1", "work", "Running again · landed abc; follow-up working"]]);
   assert.equal(v.state, "needs");
@@ -295,9 +295,36 @@ test("a child waiting on approval is an ask; a landed subtask running again is a
 });
 
 test("child labels: an id after the last « · », else none", () => {
-  assert.equal(childLabel("thread-tree-sidebar-v2 · O8"), "O8");
-  assert.equal(childLabel("a · S9a"), "S9a");
+  assert.deepEqual(childLabel("thread-tree-sidebar-v2 · O8"), { label: "O8", rest: "thread-tree-sidebar-v2" });
+  assert.equal(childLabel("a · S9a")?.label, "S9a");
   assert.equal(childLabel("S11"), null);
   assert.equal(childLabel("a · review of the thing"), null);
+  assert.equal(childLabel("tree · v2"), null);
+  assert.equal(childLabel("app · iOS17"), null);
   assert.equal(childLabel(null), null);
+});
+
+test("a landed subtask running again that stops on an approval needs you", () => {
+  const v = view([subtask("S1", "landed")], { thr_s1: live(1, { status: "active", hasPendingInteraction: true }) });
+  assert.equal(v.state, "needs");
+  assert.deepEqual(v.asks.map((a) => [a.key, a.kind, a.text]), [["S1", "thread", "S1 waits on an approval or a question in its thread."]]);
+});
+
+test("a child asking while the ledger has no subtasks yet needs you", () => {
+  const v = view([], { thr_kid: live(1, { parentThreadId: "thr_orch", title: "orch · S1", hasPendingInteraction: true }) });
+  assert.equal(v.state, "needs");
+  assert.equal(v.heading, "One question for you");
+  assert.equal(v.rowLabel, "One question for you");
+  assert.equal(v.subline, "The orchestrator is splitting the goal into subtasks.");
+});
+
+test("children bind the live, newest session and never duplicate a row that has a thread", () => {
+  const kid = (minutes: number, extra: Partial<LiveThread>) => live(1, { parentThreadId: "thr_orch", createdAt: NOW - minutes * MIN, ...extra });
+  const v = view([subtask("S11", "working", { threadId: null }), subtask("S2", "gate")], {
+    thr_old: kid(90, { title: "orch · S11" }),
+    thr_new: kid(10, { title: "orch · S11", status: "active" }),
+    thr_rev: kid(5, { title: "orch · S2", status: "active" }),
+  });
+  assert.equal(v.threadIds.S11, "thr_new");
+  assert.deepEqual(v.active.map((r) => [r.id, r.label, r.name]), [["S11", "S11", "S11 name"], ["S2", "S2", "S2 name"], ["thr_rev", "", "orch · S2"]]);
 });

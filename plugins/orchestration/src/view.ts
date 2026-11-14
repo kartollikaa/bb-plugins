@@ -135,7 +135,7 @@ const capitalize = (text: string) => text[0]!.toUpperCase() + text.slice(1);
 interface Classified {
   subtask: Subtask;
   /** A child thread of the orchestrator that no ledger row names: shown while it runs or asks. */
-  child: { label: string; title: string } | null;
+  child: { label: string; name: string } | null;
   kind: RowKind;
   reason: "quiet" | "circles" | "blocked" | null;
   lastReport: number | null;
@@ -149,8 +149,9 @@ function classify(subtask: Subtask, input: ViewInput): Classified {
   const reported = live?.latestAttentionAt || agent?.lastReportAt || live?.createdAt || null;
   const base = { subtask, child: null, live, agent, lastReport: reported, reason: null };
   const status = subtask.status ?? "";
+  if (live?.hasPendingInteraction) return { ...base, kind: "you" };
   if (DONE.has(status)) return { ...base, kind: isBusy(live) ? "work" : "done" };
-  if (ASKING.has(status) || live?.hasPendingInteraction) return { ...base, kind: "you" };
+  if (ASKING.has(status)) return { ...base, kind: "you" };
   if (subtask.gateFailures >= FAILURES_STUCK) return { ...base, kind: "stuck", reason: "circles" };
   if (status === "blocked") return { ...base, kind: "stuck", reason: "blocked" };
   if (QUIET_WATCHED.has(status) && reported !== null && input.now - reported >= QUIET_MS) {
@@ -204,7 +205,7 @@ function toRow(c: Classified, doneIds: Set<string>, now: number): Row {
   return {
     id: subtask.id,
     label: c.child ? c.child.label : subtask.id,
-    name: c.child ? (c.child.label ? "" : c.child.title) : subtask.name ?? "",
+    name: c.child ? c.child.name : subtask.name ?? "",
     kind: c.kind,
     running: isBusy(c.live),
     step: stepOf(c, doneIds, now),
@@ -217,7 +218,7 @@ function toRow(c: Classified, doneIds: Set<string>, now: number): Row {
 
 function askOf(c: Classified, now: number): Ask {
   const { subtask, agent } = c;
-  const who = c.child ? c.child.label || c.child.title : subtask.name ? `${subtask.id} · ${subtask.name}` : subtask.id;
+  const who = c.child ? c.child.label || c.child.name : subtask.name ? `${subtask.id} · ${subtask.name}` : subtask.id;
   const since = c.lastReport;
   const base = { key: subtask.id, who, subtask: subtask.id, since, age: since === null ? "" : shortAge(now - since), title: null, replyTitle: null, links: [], threads: [], replies: [] };
   if (subtask.status === "ready") {
@@ -232,7 +233,7 @@ function askOf(c: Classified, now: number): Ask {
     return { ...base, kind: "thread", text: `${subtask.id} waits for you to start its card in this chat.`, drafts: null };
   }
   if (subtask.status !== "question" && c.live?.hasPendingInteraction) {
-    return { ...base, kind: "thread", text: `${subtask.id} waits on an approval or a question in its thread.`, drafts: null };
+    return { ...base, kind: "thread", text: `${c.child ? who : subtask.id} waits on an approval or a question in its thread.`, drafts: null };
   }
   const text = agent?.lastOutput?.trim() || `${subtask.id} asked a question. It is in its thread.`;
   return { ...base, kind: "question", text, drafts: { primary: `Re ${subtask.id}: ` } };
@@ -253,29 +254,31 @@ function recapLine(entry: { text: string; at: string | null } | null, now: numbe
 }
 
 /** «thread-tree-sidebar-v2 · S11» → S11: the id an orchestrator puts after its children's titles. */
-export function childLabel(title: string | null | undefined): string | null {
-  const last = title?.split(" · ").at(-1)?.trim() ?? "";
-  return title?.includes(" · ") && /^[A-Za-z]{1,4}\d+[a-z]?$/.test(last) ? last : null;
+export function childLabel(title: string | null | undefined): { label: string; rest: string } | null {
+  const match = / · ([A-Z]{1,4}\d+[a-z]?)$/.exec(title?.trim() ?? "");
+  return match ? { label: match[1]!, rest: title!.trim().slice(0, match.index) } : null;
 }
 
 const childSubtask = (id: string, threadId: string): Subtask => ({
   id, name: null, threadId, status: null, statusRaw: null, modelRaw: null, dependsOn: [], gateLine: null, gateFailures: 0, lastFailedKind: null, rotations: 0,
 });
 
-/**
- * The orchestrator's child threads, bound to the ledger: a child whose title ends with the id of a
- * session-less ledger row becomes that row's thread; any other child that runs or asks gets its own row.
- */
+const liveFirst = (t: LiveThread) => (isBusy(t) || t.hasPendingInteraction ? 1 : 0);
+
+/** Child threads the ledger doesn't name: one fills its id's session-less row, the rest show while they run or ask. */
 function withChildren(input: ViewInput): { subtasks: Subtask[]; children: Classified[] } {
   const subtasks = [...input.ledger.subtasks];
   const named = new Set(subtasks.flatMap((s) => (s.threadId ? [s.threadId] : [])));
+  const taken = new Set(subtasks.flatMap((s) => (s.threadId ? [s.id] : [])));
   const children: Classified[] = [];
   const own = Object.entries(input.live)
     .filter(([id, t]) => t.parentThreadId === input.orchestratorThreadId && !t.hidden && !named.has(id))
-    .sort(([, a], [, b]) => a.createdAt - b.createdAt);
+    .sort(([, a], [, b]) => liveFirst(b) - liveFirst(a) || b.createdAt - a.createdAt);
   for (const [threadId, live] of own) {
-    const label = childLabel(live.title);
-    const row = label ? subtasks.findIndex((s) => s.id === label && !s.threadId) : -1;
+    const parsed = childLabel(live.title);
+    const label = parsed && !taken.has(parsed.label) ? parsed.label : null;
+    if (label) taken.add(label);
+    const row = label ? subtasks.findIndex((s) => s.id === label) : -1;
     if (row >= 0) {
       subtasks[row] = { ...subtasks[row]!, threadId };
       continue;
@@ -283,7 +286,7 @@ function withChildren(input: ViewInput): { subtasks: Subtask[]; children: Classi
     if (!isBusy(live) && !live.hasPendingInteraction) continue;
     children.push({
       subtask: childSubtask(threadId, threadId),
-      child: { label: label ?? "", title: live.title ?? threadId },
+      child: { label: label ?? "", name: label ? parsed!.rest : live.title ?? threadId },
       kind: live.hasPendingInteraction ? "you" : "work",
       reason: null,
       lastReport: live.latestAttentionAt || live.createdAt || null,
@@ -365,8 +368,12 @@ export function buildView(input: ViewInput): View {
   const threadIds = Object.fromEntries(classified.flatMap((c) => (c.subtask.threadId ? [[c.subtask.id, c.subtask.threadId]] : [])));
   const common = { recap, asks, active, done, threadIds, history, activeLabel: `${active.length} active`, teamLabel: asks.length ? "Rest of the team" : "Team" };
 
+  const askHeading = asks.length > 1 ? `${asks.length} things need you`
+    : asks[0]?.kind === "decision" ? "One decision for you" : asks[0]?.kind === "owner" ? "One thing waits on you" : "One question for you";
   if (total === 0) {
-    return { ...common, state: "planning", heading: "Planning the work", subline: "The orchestrator is splitting the goal into subtasks.", rowLabel: "Planning the work", nudge: null };
+    const planning = "The orchestrator is splitting the goal into subtasks.";
+    if (asks.length) return { ...common, state: "needs", heading: askHeading, subline: planning, rowLabel: askHeading, nudge: null };
+    return { ...common, state: "planning", heading: "Planning the work", subline: planning, rowLabel: "Planning the work", nudge: null };
   }
 
   const head = stuck[0];
@@ -382,9 +389,7 @@ export function buildView(input: ViewInput): View {
   const more = stuck.length > 1 ? ` ${plural(stuck.length - 1, "other agent looks", "other agents look")} stuck too.` : "";
 
   if (asks.length) {
-    const first = asks[0]!;
-    const heading = asks.length > 1 ? `${asks.length} things need you`
-      : first.kind === "decision" ? "One decision for you" : first.kind === "owner" ? "One thing waits on you" : "One question for you";
+    const heading = askHeading;
     if (stuckNote) {
       const note = stuck.length > 1 ? `${stuckNote}, ${plural(stuck.length - 1, "other", "others")} stuck too` : stuckNote;
       return { ...common, state: "needs", heading, subline: `${capitalize(note)} · ${progress}`, rowLabel: `${heading} · ${note}`, nudge: stuckNudge };
