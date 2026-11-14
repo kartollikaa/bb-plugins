@@ -197,7 +197,7 @@ test("a structured «For the owner» ask says what is asked, and its options bec
     { label: "Go as you recommend", draft: "Re «Merge kartollika-ai-hub#38»: Go as you recommend" },
     { label: "Not now", draft: "Re «Merge kartollika-ai-hub#38»: Not now" },
   ]);
-  assert.deepEqual(ask.links, [{ label: "kartollikaa/kartollika-ai-hub#38", href: "https://github.com/kartollikaa/kartollika-ai-hub/pull/38" }]);
+  assert.deepEqual(ask.links, [{ label: "kartollika-ai-hub#38", title: "kartollikaa/kartollika-ai-hub#38", href: "https://github.com/kartollikaa/kartollika-ai-hub/pull/38" }]);
   assert.deepEqual(ask.threads, ["thr_s5x"]);
 });
 
@@ -214,7 +214,7 @@ test("a free «For the owner» line keeps its full text and gets its links and t
   const ask = view([], {}, {}, { forTheOwner: ["Waiting: owner merge of kartollikaa/bb-plugins#12 (thread thr_q1)"] }).asks[0]!;
   assert.equal(ask.title, null);
   assert.equal(ask.text, "Waiting: owner merge of kartollikaa/bb-plugins#12 (thread thr_q1)");
-  assert.deepEqual(ask.links.map((l) => l.label), ["kartollikaa/bb-plugins#12"]);
+  assert.deepEqual(ask.links.map((l) => l.label), ["bb-plugins#12"]);
   assert.deepEqual(ask.threads, ["thr_q1"]);
   assert.deepEqual(ask.replies, []);
 });
