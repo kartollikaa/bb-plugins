@@ -85,6 +85,37 @@ export async function runClaimedArchive({
   }
 }
 
+/** Survives StrictMode's remount; a real unmount aborts the run, and ends the job when it never started. */
+export function archiveRunLifecycle(onAbandoned: () => void, defer: (run: () => void) => void = queueMicrotask) {
+  const controller = new AbortController();
+  let mounted = false;
+  let started = false;
+  return {
+    mount() {
+      mounted = true;
+    },
+    unmount() {
+      mounted = false;
+      defer(() => {
+        if (mounted) return;
+        controller.abort();
+        if (!started) {
+          started = true;
+          onAbandoned();
+        }
+      });
+    },
+    start(): AbortSignal | null {
+      if (started || controller.signal.aborted) return null;
+      started = true;
+      return controller.signal;
+    },
+    stop() {
+      controller.abort();
+    },
+  };
+}
+
 /** How long an archive may take to land once no dialog is open; a large cascade can take seconds to record. */
 export const ARCHIVE_LANDING_GRACE_MS = 10_000;
 

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   ARCHIVE_LANDING_GRACE_MS,
   archiveInTurn,
+  archiveRunLifecycle,
   dialogOutsideSidebar,
   foldArchiveOutcome,
   runClaimedArchive,
@@ -224,4 +225,36 @@ test("a fold run claims after taking the slot and lets both go, even when archiv
   log.length = 0;
   await assert.rejects(runClaimedArchive({ ...steps, archive: async () => { throw new Error("x"); } }));
   assert.deepEqual(log, ["acquire", "claim", "unclaim c1", "release"]);
+});
+
+test("the archive run survives StrictMode's remount, and an unmount before it starts ends the job", () => {
+  const deferred: (() => void)[] = [];
+  let abandoned = 0;
+  const life = archiveRunLifecycle(() => abandoned++, (run) => deferred.push(run));
+  life.mount();
+  life.unmount();
+  life.mount();
+  deferred.splice(0).forEach((run) => run());
+  const signal = life.start();
+  assert.equal(signal?.aborted, false);
+  assert.equal(abandoned, 0);
+
+  const early = archiveRunLifecycle(() => abandoned++, (run) => deferred.push(run));
+  early.mount();
+  early.unmount();
+  deferred.splice(0).forEach((run) => run());
+  assert.equal(abandoned, 1);
+  assert.equal(early.start(), null);
+});
+
+test("an unmount after the run started stops it without ending the job twice", () => {
+  const deferred: (() => void)[] = [];
+  let abandoned = 0;
+  const life = archiveRunLifecycle(() => abandoned++, (run) => deferred.push(run));
+  life.mount();
+  const signal = life.start()!;
+  life.unmount();
+  deferred.splice(0).forEach((run) => run());
+  assert.equal(signal.aborted, true);
+  assert.equal(abandoned, 0);
 });

@@ -80,7 +80,7 @@ import {
   type TreeRow,
 } from "./tree";
 import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver, MAX_THREADS_PER_CALL } from "./orchestrations";
-import { archiveInTurn, dialogOutsideSidebar, foldArchiveOutcome, runClaimedArchive, skippedSummary, waitForArchive, type ArchiveRunResult } from "./archiveRun";
+import { archiveInTurn, archiveRunLifecycle, dialogOutsideSidebar, foldArchiveOutcome, runClaimedArchive, skippedSummary, waitForArchive, type ArchiveRunResult } from "./archiveRun";
 import { ARCHIVE_CONFIRM_WAIT_MS } from "./archiveUndo";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
@@ -1459,25 +1459,28 @@ const dialogOpenBesides = (sidebar: Element | null) => () =>
 function BbArchiveRun({ job, sidebarRef }: { job: BbArchiveJob; sidebarRef: React.RefObject<HTMLElement | null> }) {
   const sdk = useSdk();
   const actions = useRef(new Map<string, () => Promise<void>>());
-  const started = useRef(false);
-  const stop = useRef(new AbortController());
+  const life = useRef<ReturnType<typeof archiveRunLifecycle> | null>(null);
+  life.current ??= archiveRunLifecycle(() => job.finish({ archived: [], changed: [], unchecked: [], stop: "stopped" }));
   const [bound, setBound] = useState(0);
   const [waited, setWaited] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setWaited(true), BOUND_ARCHIVE_WAIT_MS);
     return () => clearTimeout(timer);
   }, []);
-  useEffect(() => () => stop.current.abort(), []);
   useEffect(() => {
-    if (started.current || (bound < job.targets.length && !waited)) return;
-    started.current = true;
-    const { signal } = stop.current;
+    life.current!.mount();
+    return () => life.current!.unmount();
+  }, []);
+  useEffect(() => {
+    if (bound < job.targets.length && !waited) return;
+    const signal = life.current!.start();
+    if (!signal) return;
     const deadline = Date.now() + ARCHIVE_CONFIRM_WAIT_MS;
     const landed = (threadId: string) => {
       toast.loading("Waiting for bb's confirmation…", {
         id: ARCHIVE_WAIT_TOAST_ID,
         duration: Infinity,
-        action: { label: "Stop", onClick: () => stop.current.abort() },
+        action: { label: "Stop", onClick: () => life.current!.stop() },
       });
       return waitForArchive(() => sdk.threads.get({ threadId }).then((thread) => thread.archivedAt !== null, () => false), {
         dialogOpen: dialogOpenBesides(sidebarRef.current),
