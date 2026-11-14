@@ -387,3 +387,9 @@ test("commandGist looks inside a shell wrapper", () => {
   assert.equal(stepText({ type: "commandExecution", command: `/bin/zsh -lc "sed -n 1,20p src/a.ts"` }), "Running sed -n 1,20p");
   assert.equal(stepText({ type: "commandExecution", command: `bash -c 'cd x && npm test'` }), "Running npm test");
 });
+
+test("commandGist keeps quoted separators and drops a redirect's target", () => {
+  assert.equal(stepText({ type: "commandExecution", command: `grep -n "30\\|80%" README.md` }), `Running grep -n "30\\|80%"`);
+  assert.equal(stepText({ type: "commandExecution", command: "echo abc > session && ls" }), "Running echo abc");
+  assert.equal(stepText({ type: "commandExecution", command: "npm test 2>&1 | tail -5" }), "Running npm test");
+});

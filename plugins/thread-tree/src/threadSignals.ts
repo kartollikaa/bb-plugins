@@ -97,9 +97,35 @@ export function commandGist(command: string): string {
   const line = firstLine(command);
   const wrapped = SHELL_WRAPPER.exec(line);
   if (wrapped?.[2]) return commandGist(wrapped[2]);
-  const parts = line.split(/\s*(?:&&|\|\||;|\|)\s*/).map((part) => part.trim()).filter(Boolean);
-  const commands = parts.map(withoutAssignments).filter((words) => words.length > 0 && words[0] !== "cd");
-  return commands[0]?.filter((word) => !/^\d*[<>]/.test(word)).slice(0, GIST_WORDS).join(" ") ?? line;
+  const commands = shellParts(line).map(withoutAssignments).filter((words) => words.length > 0 && words[0] !== "cd");
+  if (!commands[0]) return line;
+  const redirect = commands[0].findIndex((word) => /^\d*[<>]/.test(word));
+  return commands[0].slice(0, redirect === -1 ? undefined : redirect).slice(0, GIST_WORDS).join(" ");
+}
+
+/** A line split at `&&`, `||`, `;` and `|` outside quotes. */
+function shellParts(line: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let quote: string | null = null;
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index]!;
+    if (quote) {
+      if (char === quote) quote = null;
+      current += char;
+    } else if (char === "'" || char === '"') {
+      quote = char;
+      current += char;
+    } else if (char === ";" || char === "|" || (char === "&" && line[index + 1] === "&")) {
+      parts.push(current);
+      current = "";
+      if (line[index + 1] === char) index++;
+    } else {
+      current += char;
+    }
+  }
+  parts.push(current);
+  return parts.map((part) => part.trim()).filter(Boolean);
 }
 
 /** A started item in a few words, as bb's own timeline labels it; null for items that aren't a step. */
