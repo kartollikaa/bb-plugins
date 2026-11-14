@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { experimental_useRpcMutation, useBbNavigate, useSettings } from "@get-bb/plugin-sdk/app";
 import { contract } from "./contract.ts";
 import { chatPreference, viewEnabled, VIEW_PATH } from "./route.ts";
+import { pendingSwitch } from "./switch.ts";
 
 function storage(): Storage | null {
   try {
@@ -29,21 +30,22 @@ export function useOpenView() {
   };
 }
 
+const pending = pendingSwitch();
+
 /** The `orchestrationView` setting, with the switch's last choice shown until the setting catches up. */
 export function useViewSwitch() {
   const settings = useSettings();
   const mutation = experimental_useRpcMutation({ contract, method: "setOrchestrationView" });
-  const [pending, setPending] = useState<boolean | null>(null);
+  const choice = useSyncExternalStore(pending.subscribe, pending.get);
   const stored = viewEnabled(settings.values);
-  const on = pending ?? stored;
-  if (pending !== null && pending === stored && !mutation.isPending) setPending(null);
+  useEffect(() => pending.settle(stored), [stored, choice]);
   const set = useCallback(async (next: boolean) => {
-    setPending(next);
+    pending.set(next);
     try {
       await mutation.mutate({ on: next });
     } catch {
-      setPending(null);
+      pending.clear();
     }
   }, [mutation]);
-  return { on, set, isLoading: settings.isLoading };
+  return { on: choice ?? stored, set, isLoading: settings.isLoading };
 }
