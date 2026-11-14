@@ -2,6 +2,10 @@
 export const ARCHIVE_BATCH_GAP_MS = 2_000;
 /** Older archives are not undone by a keystroke; the archived view still restores them. */
 export const ARCHIVE_UNDO_WINDOW_MS = 10 * 60_000;
+/** How long a fold Archive waits on bb's confirmation for one root before giving up. */
+export const ARCHIVE_CONFIRM_WAIT_MS = 10 * 60_000;
+/** Outlives the longest fold Archive run, so only an abandoned claim expires. */
+export const ARCHIVE_CLAIM_TTL_MS = 15 * 60_000;
 const MAX_ENTRIES = 200;
 
 interface ArchiveEntry {
@@ -83,4 +87,45 @@ export function removedThreadIds(previous: ReadonlySet<string>, current: readonl
  */
 export function archiveIsNewerThanTyping(latestArchiveAt: number | undefined, lastTypedAt: number): boolean {
   return latestArchiveAt !== undefined && latestArchiveAt > lastTypedAt;
+}
+
+export interface ArchiveClaims {
+  open(threadIds: readonly string[]): string;
+  /** Ends the claim and hands it over for release; null once it has expired or ended. */
+  take(claimId: string): { threadIds: readonly string[]; release(threadIds?: readonly string[]): void } | null;
+}
+
+/** Claims a client opened but never released (it unmounted or reloaded) end after `ttlMs`. */
+export function createArchiveClaims({
+  claim,
+  ttlMs,
+  newId = () => crypto.randomUUID(),
+  setTimer = (run, ms) => setTimeout(run, ms) as unknown as number,
+  clearTimer = (id) => clearTimeout(id),
+}: {
+  claim: ArchiveHistory["claim"];
+  ttlMs: number;
+  newId?: () => string;
+  setTimer?: (run: () => void, ms: number) => number;
+  clearTimer?: (id: number) => void;
+}): ArchiveClaims {
+  const open = new Map<string, { threadIds: readonly string[]; release(threadIds?: readonly string[]): void; timer: number }>();
+  return {
+    open(threadIds) {
+      const claimId = newId();
+      const handle = claim(threadIds);
+      const timer = setTimer(() => {
+        if (open.delete(claimId)) handle.release();
+      }, ttlMs);
+      open.set(claimId, { threadIds, release: handle.release, timer });
+      return claimId;
+    },
+    take(claimId) {
+      const entry = open.get(claimId);
+      if (!entry) return null;
+      open.delete(claimId);
+      clearTimer(entry.timer);
+      return { threadIds: entry.threadIds, release: entry.release };
+    },
+  };
 }

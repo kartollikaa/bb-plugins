@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  createArchiveClaims,
   ARCHIVE_BATCH_GAP_MS,
   ARCHIVE_UNDO_WINDOW_MS,
   archiveIsNewerThanTyping,
@@ -129,4 +130,25 @@ test("in a text field the archive wins only when nothing was typed after it", ()
   assert.equal(archiveIsNewerThanTyping(undefined, 0), false);
   assert.equal(archiveIsNewerThanTyping(200, 100), true);
   assert.equal(archiveIsNewerThanTyping(100, 200), false);
+});
+
+test("an archive claim nobody releases ends by itself, and claim ids don't repeat", () => {
+  const released: string[][] = [];
+  const timers: (() => void)[] = [];
+  let next = 0;
+  const claims = createArchiveClaims({
+    claim: (threadIds) => ({ release: (ids = threadIds) => void released.push([...ids]) }),
+    ttlMs: 60_000,
+    newId: () => `id-${++next}`,
+    setTimer: (run) => (timers.push(run), timers.length),
+    clearTimer: () => undefined,
+  });
+  const first = claims.open(["a", "b"]);
+  const second = claims.open(["c"]);
+  assert.notEqual(first, second);
+  timers[0]!();
+  assert.deepEqual(released, [["a", "b"]]);
+  assert.equal(claims.take(first), null, "an expired claim can't be released twice");
+  assert.deepEqual(claims.take(second)?.threadIds, ["c"]);
+  assert.equal(claims.take("unknown"), null);
 });

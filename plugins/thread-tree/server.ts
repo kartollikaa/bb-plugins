@@ -19,7 +19,7 @@ import {
 import { sectionPatchSchema, SETTINGS } from "./src/settings";
 import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/threadPullRequests";
 import { createProjectFolderHistory } from "./src/projectFolders";
-import { createArchiveHistory } from "./src/archiveUndo";
+import { ARCHIVE_CLAIM_TTL_MS, createArchiveClaims, createArchiveHistory } from "./src/archiveUndo";
 import { archiveScopes, dirtyEnvironmentIds, MAX_THREADS_PER_CALL } from "./src/orchestrations";
 
 
@@ -79,11 +79,11 @@ export const rpcContract = defineRpcContract({
   /** Groups the coming archives of these threads into one ⌘Z, however far apart they land. */
   archiveClaim: {
     input: z.object({ threadIds: z.array(z.string().min(1)).min(1) }).strict(),
-    output: z.object({ claimId: z.number() }),
+    output: z.object({ claimId: z.string() }),
   },
   /** Ends a claim; threads it covered that weren't archived go back to ordinary grouping. */
   archiveRelease: {
-    input: z.object({ claimId: z.number() }).strict(),
+    input: z.object({ claimId: z.string().min(1) }).strict(),
     output: z.object({ ok: z.literal(true) }),
   },
   /** Shows or hides sidebar sections from the sidebar itself. */
@@ -120,8 +120,7 @@ export default async function plugin(bb: BbPluginApi) {
   const ok = z.object({ ok: z.literal(true) });
 
   const archives = createArchiveHistory();
-  const claims = new Map<number, { threadIds: string[]; claim: ReturnType<typeof archives.claim> }>();
-  let lastClaimId = 0;
+  const claims = createArchiveClaims({ claim: archives.claim, ttlMs: ARCHIVE_CLAIM_TTL_MS });
   const projectFolders = createProjectFolderHistory(bb.storage.kv, async (args) => ({ threads: await bb.sdk.threads.list(args) }));
   for (const event of ["thread.created", "thread.archived", "thread.unarchived", "thread.deleted"] as const) {
     bb.events.on(event, ({ thread }) => projectFolders.record(thread));
@@ -183,17 +182,12 @@ export default async function plugin(bb: BbPluginApi) {
       const scopes = archiveScopes(threadIds, cascade.threads, descendants.threads);
       return { scopes, dirty: await dirtyThreadIds([...new Set(Object.values(scopes).flat())]) };
     },
-    archiveClaim: async ({ threadIds }) => {
-      const claimId = ++lastClaimId;
-      claims.set(claimId, { threadIds, claim: archives.claim(threadIds) });
-      return { claimId };
-    },
+    archiveClaim: async ({ threadIds }) => ({ claimId: claims.open(threadIds) }),
     archiveRelease: async ({ claimId }) => {
-      const entry = claims.get(claimId);
-      claims.delete(claimId);
-      if (entry) {
-        const archived = new Set((await inChunks(entry.threadIds, (chunk) => bb.sdk.threads.list({ threadIds: chunk, includeHidden: true, archived: true }))).map((thread) => thread.id));
-        entry.claim.release(entry.threadIds.filter((id) => !archived.has(id)));
+      const claim = claims.take(claimId);
+      if (claim) {
+        const archived = new Set((await inChunks([...claim.threadIds], (chunk) => bb.sdk.threads.list({ threadIds: chunk, includeHidden: true, archived: true }))).map((thread) => thread.id));
+        claim.release(claim.threadIds.filter((id) => !archived.has(id)));
       }
       return { ok: true as const };
     },
