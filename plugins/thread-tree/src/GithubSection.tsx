@@ -38,7 +38,7 @@ export function useGithubFolder() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const load = useCallback(
     (refresh: boolean) =>
-      rpc.call("githubFolder", { refresh }).then(setState, () => setState((previous) => previous)),
+      rpc.call("githubFolder", { refresh }).then(setState, () => setState((previous) => previous ?? { view: null })),
     [rpc],
   );
   useEffect(() => {
@@ -56,6 +56,7 @@ export function useGithubFolder() {
     toast.error(what, { description: error instanceof Error ? error.message : String(error) });
   return {
     view: state?.view ?? null,
+    isLoaded: state !== null,
     isRefreshing,
     refresh: () => {
       setIsRefreshing(true);

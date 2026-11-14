@@ -96,8 +96,9 @@ export function useThreadPullRequests(threads: readonly PluginSidebarThread[], c
 
   const statusData = status.error ? undefined : status.data;
   const sessionData = session.data;
-  return useCallback((thread: PluginSidebarThread): ThreadPullRequest[] => {
+  const pullRequestsOf = useCallback((thread: PluginSidebarThread): ThreadPullRequest[] => {
     const row = thread.environment?.id ? statusData?.[thread.environment.id] : undefined;
     return mergePullRequests(row?.outcome === "available" ? row.pullRequest : undefined, sessionData?.[thread.id] ?? []);
   }, [statusData, sessionData]);
+  return { pullRequestsOf, isLoading: status.isLoading || session.isLoading };
 }

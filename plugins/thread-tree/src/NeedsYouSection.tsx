@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBbNavigate, useSdk, type PluginSidebarThread, type PluginSidebarThreadIndicator } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon } from "@/components/ui/icon";
@@ -59,6 +59,8 @@ interface NeedsYouSources {
   folderItems: readonly GithubFolderItem[];
   automations: readonly AutomationSummary[];
   pullRequestMode: NeedsYouPullRequests;
+  /** Both PR sources have loaded, so a PR item's signature is final. */
+  pullRequestsSettled: boolean;
   orchestrationOf: (threadId: string) => string | null;
   activeThreadId: string | null;
   onNavigate: () => void;
@@ -66,7 +68,7 @@ interface NeedsYouSources {
 
 /** The queue's visible items, snoozing, and ⇧⌘I, which works while the section is folded or replaced by a flat list. */
 export function useNeedsYou(sources: NeedsYouSources) {
-  const { threads, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, orchestrationOf, activeThreadId, onNavigate } = sources;
+  const { threads, descendantIdsOf, pullRequestsOf, folderAttention, folderItems, automations, pullRequestMode, pullRequestsSettled, orchestrationOf, activeThreadId, onNavigate } = sources;
   const questions = useQuestions(threads);
   const firstSeen = useRef<ReadonlyMap<string, number>>(new Map());
   const waitingIds = threads.filter((thread) => threadItemKind(thread) === "input").map((thread) => thread.id);
@@ -86,11 +88,12 @@ export function useNeedsYou(sources: NeedsYouSources) {
   }, [threads, questions, orchestrationOf, pullRequestMode, pullRequestsOf, descendantIdsOf, folderAttention, folderItems, automations]);
 
   const [snoozes, saveSnooze] = usePersistentRecord("needs-you-snoozes", readSnoozes);
+  const settled = useCallback((item: NeedsYouItem) => item.kind !== "pr" || pullRequestsSettled, [pullRequestsSettled]);
   useEffect(() => {
-    const kept = pruneSnoozes(snoozes, all);
+    const kept = pruneSnoozes(snoozes, all, { settled });
     for (const key of Object.keys(snoozes)) if (!(key in kept)) saveSnooze(key, undefined);
-  }, [all, snoozes, saveSnooze]);
-  const items = useMemo(() => all.filter((item) => !isSnoozed(item, snoozes)), [all, snoozes]);
+  }, [all, snoozes, saveSnooze, settled]);
+  const items = useMemo(() => all.filter((item) => !isSnoozed(item, snoozes, settled)), [all, snoozes, settled]);
 
   const navigate = useBbNavigate();
   const openAutomationsPage = useOpenAutomationsPage(onNavigate);

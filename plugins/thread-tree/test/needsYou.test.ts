@@ -195,7 +195,7 @@ test("pruning drops snoozes of changed items, keeps those whose source hasn't lo
   const pruned = pruneSnoozes({ "thread:f": "failed:10", "pr:x": "pr:failing", "thread:same": "x" }, [item!]);
   assert.deepEqual(pruned, { "pr:x": "pr:failing", "thread:same": "x" });
   const many = Object.fromEntries(Array.from({ length: 5 }, (_, i) => [`k${i}`, "s"]));
-  assert.deepEqual(Object.keys(pruneSnoozes(many, [], 2)), ["k3", "k4"]);
+  assert.deepEqual(Object.keys(pruneSnoozes(many, [], { limit: 2 })), ["k3", "k4"]);
   assert.deepEqual(readSnoozes({ a: "1", b: 2 }), { a: "1" });
   assert.deepEqual(readSnoozes(["a"]), {});
   assert.deepEqual(readSnoozes(null), {});
@@ -309,4 +309,18 @@ test("linked PRs skip threads with none, without walking their subthreads", () =
   const linked = linkedPullRequests(["root", "bare"], (id) => (id === "root" ? [pr(1)] : []), (id) => { walked.push(id); return []; });
   assert.deepEqual(linked.map((entry) => entry.threadId), ["root"]);
   assert.deepEqual(walked, ["root"]);
+});
+
+test("a snoozed PR stays hidden and keeps its snooze while its PR sources are half loaded", () => {
+  const folder = new Map([["https://github.com/o/r/pull/8", ["changes_requested"] as const]]);
+  const failing = pr(8, { checks: { state: "failing" } });
+  const [full] = pullRequestItems("linked", [{ threadId: "t1", pullRequests: [failing] }], folder, []);
+  const snoozes = { [full!.key]: full!.signature };
+  const [half] = pullRequestItems("linked", [{ threadId: "t1", pullRequests: [failing] }], new Map(), []);
+  assert.notEqual(half!.signature, full!.signature);
+  const loading = (item: { kind: string }) => item.kind !== "pr";
+  assert.equal(isSnoozed(half!, snoozes, loading), true);
+  assert.deepEqual(pruneSnoozes(snoozes, [half!], { settled: loading }), snoozes);
+  assert.equal(isSnoozed(half!, snoozes), false, "once loaded, a real change shows the PR again");
+  assert.deepEqual(pruneSnoozes(snoozes, [half!]), {});
 });

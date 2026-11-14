@@ -212,7 +212,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const moveSectionBy = (id: SectionId, step: -1 | 1) => setSavedSectionOrder(moveSection(sectionOrder, shownSections, id, step));
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const prThreads = useMemo(() => pullRequestThreads(activeForest, forest), [activeForest, forest]);
-  const pullRequestsOf = useThreadPullRequests(prThreads, sectionsRef);
+  const { pullRequestsOf, isLoading: pullRequestsLoading } = useThreadPullRequests(prThreads, sectionsRef);
   const folderItems = githubFolder.view;
   const folderAttention = useMemo(
     () => folderAttentionByUrl(folderItems ? [...folderItems.items, ...folderItems.snoozed] : []),
@@ -229,6 +229,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     folderItems: useMemo(() => folderItems?.items ?? [], [folderItems]),
     automations: useMemo(() => automations.state?.automations ?? [], [automations.state]),
     pullRequestMode: view.needsYouPullRequests,
+    pullRequestsSettled: githubFolder.isLoaded && !pullRequestsLoading,
     orchestrationOf,
     activeThreadId: activeThreadId ?? null,
     onNavigate,
