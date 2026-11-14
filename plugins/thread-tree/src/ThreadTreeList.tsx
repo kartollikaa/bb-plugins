@@ -42,6 +42,7 @@ import { AutomationsSection, useAutomations } from "./AutomationsSection";
 import { NeedsYouSection, useNeedsYou } from "./NeedsYouSection";
 import { pullRequestSourcesSettled } from "./needsYou";
 import { GithubSection, useGithubFolder } from "./GithubSection";
+import { isSectionCollapsed, sectionToggleKey } from "./sectionSummaries";
 import { RollupGlyph, RowStatusGlyph } from "./ThreadGlyph";
 import { resolveRowGlyph, rollupGlyph } from "./statusGlyph";
 import { StatusLine } from "./StatusLine";
@@ -448,8 +449,13 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             {id === "github" ? (
               <GithubSection
                 folder={githubFolder}
-                isCollapsed={foldSections || collapsedGroups.has("github")}
-                onToggle={() => collapsedGroups.toggle("github")}
+                threadOfPullRequest={needsYou.threadOfPullRequest}
+                onOpenThread={(threadId) => {
+                  navigate.toThread(threadId);
+                  onNavigate();
+                }}
+                isCollapsed={foldSections || isSectionCollapsed(collapsedGroups.values, "github")}
+                onToggle={() => collapsedGroups.toggle(sectionToggleKey("github"))}
                 showSnoozed={flags.has("github-snoozed")}
                 onToggleSnoozed={() => flags.toggle("github-snoozed")}
                 menu={menu}
@@ -457,8 +463,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
             ) : id === "automations" ? (
               <AutomationsSection
                 automations={automations}
-                isCollapsed={foldSections || collapsedGroups.has("automations")}
-                onToggle={() => collapsedGroups.toggle("automations")}
+                isCollapsed={foldSections || isSectionCollapsed(collapsedGroups.values, "automations")}
+                onToggle={() => collapsedGroups.toggle(sectionToggleKey("automations"))}
                 showPaused={flags.has("automations-paused")}
                 onTogglePaused={() => flags.toggle("automations-paused")}
                 menu={menu}

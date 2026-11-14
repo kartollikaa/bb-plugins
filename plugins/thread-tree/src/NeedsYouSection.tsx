@@ -11,6 +11,7 @@ import {
   cursorThreadId,
   itemTarget,
   linkedPullRequests,
+  linkedThreadByUrl,
   nextItem,
   pruneSnoozes,
   pullRequestItems,
@@ -74,18 +75,24 @@ export function useNeedsYou(sources: NeedsYouSources) {
   const firstSeenRef = useRef<ReadonlyMap<string, number>>(new Map());
   const firstSeen = useMemo(() => (firstSeenRef.current = trackFirstSeen(firstSeenRef.current, waiting.map((thread) => thread.id), Date.now())), [waiting]);
 
-  const all = useMemo(() => {
+  const linked = useMemo(() => {
     const byId = new Map(threads.map((thread) => [thread.id, thread]));
     const prsOf = (threadId: string) => {
       const thread = byId.get(threadId);
       return thread ? pullRequestsOf(thread) : [];
     };
-    return [
+    return linkedPullRequests(threads.map((thread) => thread.id), prsOf, descendantIdsOf);
+  }, [threads, pullRequestsOf, descendantIdsOf]);
+  const threadOfPullRequest = useMemo(() => linkedThreadByUrl(linked), [linked]);
+
+  const all = useMemo(
+    () => [
       ...threadItems({ threads, questions, firstSeen, orchestrationOf }),
-      ...(pullRequestMode === "none" ? [] : pullRequestItems(pullRequestMode, linkedPullRequests(threads.map((thread) => thread.id), prsOf, descendantIdsOf), folderAttention, folderItems)),
+      ...(pullRequestMode === "none" ? [] : pullRequestItems(pullRequestMode, linked, folderAttention, folderItems)),
       ...automationItems(automations),
-    ];
-  }, [threads, questions, firstSeen, orchestrationOf, pullRequestMode, pullRequestsOf, descendantIdsOf, folderAttention, folderItems, automations]);
+    ],
+    [threads, questions, firstSeen, orchestrationOf, pullRequestMode, linked, folderAttention, folderItems, automations],
+  );
 
   const [snoozes, saveSnooze] = usePersistentRecord("needs-you-snoozes", readSnoozes);
   const settled = useCallback((item: NeedsYouItem) => item.kind !== "pr" || pullRequestsSettled, [pullRequestsSettled]);
@@ -127,7 +134,7 @@ export function useNeedsYou(sources: NeedsYouSources) {
     return item !== null;
   }), []);
 
-  return { items, open, snooze };
+  return { items, open, snooze, threadOfPullRequest };
 }
 
 const QUESTION_RETRY_MS = 10_000;

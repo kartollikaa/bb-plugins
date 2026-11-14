@@ -11,11 +11,10 @@ under it, and the subagents it runs inside its own session show on its row.
   they waited), failed turns and queued messages, unread results, then failing
   PRs of your threads and failed automations. Retry or Resend in place; hover
   to snooze an item until it changes. ⇧⌘I opens the next one.
-- With the GitHub Folder plugin installed, its pull requests that need you sit
-  at the top: review requests, changes requested, failing checks, conflicts,
-  ready to merge.
-- Automations: each scheduled automation with its status dot and next run.
-  Hover to run, pause or resume it; click to open its last run.
+- GitHub (from the GitHub Folder plugin) and Automations start folded, with a
+  summary in the header: "1 failing · 5", "1 failed · next in 12m". A PR's
+  reason is its icon; hover to snooze or open its thread. Hover an automation
+  to run, pause or resume it; click to open its last run.
 - Recent Activity: the most recently active threads, child threads included.
 - Threads grouped by Project, by Status or not at all, with Pinned on top.
   Projects keep the order you drag them into, or follow recent activity. The +

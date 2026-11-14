@@ -4,6 +4,7 @@ import { usePortalScopeProps } from "@/lib/portal-scope";
 import { cn } from "@/lib/utils";
 import { headerChevronMotion, TOUCH_DIMMED } from "./rowStyles";
 import { useStill } from "./motion";
+import type { SummaryPart } from "./sectionSummaries";
 
 export function GroupHeader({
   title,
@@ -11,6 +12,7 @@ export function GroupHeader({
   isCollapsed,
   count,
   alwaysShowCount,
+  summary,
   onToggle,
   extra,
   action,
@@ -22,6 +24,8 @@ export function GroupHeader({
   count: number;
   /** Keep the count visible while the group is expanded. */
   alwaysShowCount?: boolean;
+  /** Replaces the count, shown collapsed or not. */
+  summary?: readonly SummaryPart[];
   onToggle: () => void;
   /** Controls drawn before `action`, such as a menu trigger. */
   extra?: React.ReactNode;
@@ -40,8 +44,19 @@ export function GroupHeader({
         className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left text-xs font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground"
       >
         <span className="flex w-4 shrink-0 items-center justify-center text-sidebar-foreground/50">{icon}</span>
-        <span className="truncate">{title}</span>
-        {isCollapsed || alwaysShowCount ? <span className="tabular-nums text-sidebar-foreground/40">{count}</span> : null}
+        <span className={cn("truncate", summary && "shrink-0")}>{title}</span>
+        {summary ? (
+          <span data-section-summary="" title={summary.map((part) => part.text).join(" · ")} className="min-w-0 truncate tabular-nums text-sidebar-foreground/40">
+            {summary.map((part, index) => (
+              <span key={part.text} className={cn(part.tone === "bad" && "text-red-600/80 dark:text-red-400/80")}>
+                {index > 0 ? <span className="text-sidebar-foreground/40"> · </span> : null}
+                {part.text}
+              </span>
+            ))}
+          </span>
+        ) : isCollapsed || alwaysShowCount ? (
+          <span className="tabular-nums text-sidebar-foreground/40">{count}</span>
+        ) : null}
         <Icon
           name="ChevronRight"
           aria-hidden

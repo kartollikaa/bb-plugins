@@ -14,6 +14,7 @@ import { ROW_HOVER_SOLID_BG, ROW_TINT } from "./rowStyles";
 import { StatusDot } from "./StatusDot";
 import { formatUntil } from "./time";
 import { Collapse } from "./Collapse";
+import { automationsSummary } from "./sectionSummaries";
 
 const POLL_MS = 30_000;
 const AUTOMATIONS_NAV_ITEM = "__bb__/automations";
@@ -99,7 +100,7 @@ export function AutomationsSection({
         icon={<Icon name="Zap" aria-hidden className="size-3.5" />}
         isCollapsed={isCollapsed}
         count={active.length}
-        alwaysShowCount
+        summary={automationsSummary(sorted, now)}
         onToggle={onToggle}
         menu={menu}
         action={{ label: "Open Automations", icon: "ArrowUpRight", onClick: openAutomationsPage }}

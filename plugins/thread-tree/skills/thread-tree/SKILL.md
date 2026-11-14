@@ -14,9 +14,18 @@ row's link reads the state after the title for screen readers.
 The counter's card fits the available screen space on mobile and desktop;
 longer lists scroll inside it while the summary stays visible.
 
-When the GitHub Folder plugin is installed, the list's top section is its
+When the GitHub Folder plugin is installed, the GitHub section lists its
 folder of pull requests that need the user. Use that plugin's
-`bb github-folder list` to read it.
+`bb github-folder list` to read it. The GitHub and Automations sections start
+folded; their header carries a summary instead of a bare count. GitHub's leads
+with the problems ("1 failing · 1 conflicts · 1 changes"), then the total;
+Automations' gives failed and running automations and the soonest next run
+("1 failed · next in 12m"), or the active count when nothing is scheduled. An
+expanded PR row draws its most urgent reason as a tinted icon (the same look
+as a thread row's PR icon), then the title and repo; the number and reasons are
+in its tooltip. Hover shows "Open its thread" when one of the user's threads
+links the PR, Open on GitHub, and Snooze. Paused automations stay behind
+"N paused".
 
 Needs you sits above the sections and hides when nothing waits. In order:
 threads asking a question (the question and how long they have waited, longest

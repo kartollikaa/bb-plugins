@@ -9,7 +9,6 @@ import { useTapToOpenMenu } from "./useTapToOpenMenu";
 import type { rpcContract } from "../server";
 import {
   ATTENTION_LABEL,
-  type Attention,
   type GithubFolderItem,
   type GithubFolderView,
   type GithubSettings,
@@ -20,6 +19,7 @@ import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { ROW_HOVER_SOLID_BG, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
 import { formatAge } from "./time";
 import { Collapse } from "./Collapse";
+import { pullRequestLook, pullRequestSummary } from "./sectionSummaries";
 
 const POLL_MS = 60_000;
 
@@ -82,17 +82,6 @@ export function useGithubFolder() {
 
 type GithubFolder = ReturnType<typeof useGithubFolder>;
 
-const ATTENTION_STYLE: Record<Attention | "none", { short: string; className: string }> = {
-  review: { short: "review", className: "text-blue-600 dark:text-blue-400" },
-  changes_requested: { short: "changes", className: "text-red-600 dark:text-red-400" },
-  ci_failed: { short: "CI", className: "text-red-600 dark:text-red-400" },
-  conflicts: { short: "conflict", className: "text-red-600 dark:text-red-400" },
-  ready: { short: "ready", className: "text-green-600 dark:text-green-400" },
-  assigned: { short: "assigned", className: "text-sidebar-foreground/60" },
-  mentioned: { short: "@you", className: "text-sidebar-foreground/60" },
-  none: { short: "", className: "text-sidebar-foreground/45" },
-};
-
 export function GithubSection({
   isCollapsed,
   onToggle,
@@ -100,8 +89,13 @@ export function GithubSection({
   showSnoozed,
   onToggleSnoozed,
   folder,
+  threadOfPullRequest,
+  onOpenThread,
 }: {
   folder: GithubFolder;
+  /** Lowercased PR URL → a thread that links it. */
+  threadOfPullRequest: ReadonlyMap<string, string>;
+  onOpenThread: (threadId: string) => void;
   isCollapsed: boolean;
   onToggle: () => void;
   /** The header's right-click menu. */
@@ -123,7 +117,7 @@ export function GithubSection({
         icon={<Icon name="Github" aria-hidden className="size-3.5" />}
         isCollapsed={isCollapsed}
         count={view.items.length}
-        alwaysShowCount
+        summary={pullRequestSummary(view.items)}
         onToggle={onToggle}
         extra={
           <CustomizeMenu
@@ -141,10 +135,13 @@ export function GithubSection({
       />
       <Collapse open={!isCollapsed}>
         <div role="list" className="mt-0.5 flex flex-col gap-0.5">
-          {rows.map((item) => (
+          {rows.map((item) => {
+            const threadId = threadOfPullRequest.get(item.pr.url.toLowerCase());
+            return (
             <PullRequestRow
               key={item.pr.url}
               item={item}
+              onOpenThread={threadId ? () => onOpenThread(threadId) : undefined}
               isSnoozed={view.snoozed.includes(item)}
               now={now}
               onHover={() => prefetch(item.pr.url)}
@@ -152,7 +149,8 @@ export function GithubSection({
               onOpenOnGithub={() => navigate.openUrl(item.pr.url)}
               onToggleSnoozed={(snoozed) => snooze(item.snoozeKey, snoozed)}
             />
-          ))}
+            );
+          })}
           {view.error !== null && view.items.length === 0 ? (
             <Note title={view.error}>Can’t reach GitHub: {view.error}</Note>
           ) : view.fetchedAt === null ? (
@@ -190,9 +188,11 @@ function PullRequestRow({
   onHover,
   onOpen,
   onOpenOnGithub,
+  onOpenThread,
   onToggleSnoozed,
 }: {
   item: GithubFolderItem;
+  onOpenThread?: () => void;
   isSnoozed: boolean;
   now: number;
   onHover: () => void;
@@ -201,11 +201,11 @@ function PullRequestRow({
   onToggleSnoozed: (snoozed: boolean) => void;
 }) {
   const { pr, attention } = item;
-  const style = ATTENTION_STYLE[attention[0] ?? "none"];
+  const look = pullRequestLook(item);
   const tooltip = [
     `${pr.repo}#${pr.number} · ${pr.title}`,
-    attention.map((reason) => ATTENTION_LABEL[reason]).join(", ") || "Your pull request",
-    pr.isDraft ? "Draft" : "",
+    attention.map((reason) => ATTENTION_LABEL[reason]).join(", ") || look.label,
+    pr.isDraft && look.reason !== null ? "Draft" : "",
     `by @${pr.author} · updated ${formatAge(Date.parse(pr.updatedAt), now)} ago`,
     "Click: new thread about this PR · ⌘-click or middle-click: open on GitHub",
   ]
@@ -226,17 +226,28 @@ function PullRequestRow({
         isSnoozed && "text-sidebar-foreground/50",
       )}
     >
-      <span className={cn("flex size-4 shrink-0 items-center justify-center", style.className)}>
-        <Icon name={pr.isDraft ? "GitPullRequestDraft" : "GitPullRequest"} aria-hidden className="size-3.5" />
+      <span data-pr-reason={look.reason ?? "none"} className={cn("flex size-4 shrink-0 items-center justify-center", look.className)}>
+        <Icon name={look.icon} fallback="GitPullRequest" aria-label={look.label} className="size-3.5" />
       </span>
       <span className="min-w-0 flex-1 truncate">{pr.title}</span>
-      <span className={cn("shrink-0 text-2xs group-hover/row:invisible", style.className)}>
-        {style.short || formatAge(Date.parse(pr.updatedAt), now)}
+      <span data-pr-repo="" className="max-w-[30%] shrink-0 truncate text-2xs text-sidebar-foreground/45 group-hover/row:invisible">
+        {pr.repo.split("/")[1] ?? pr.repo}
       </span>
       <span className={cn("absolute inset-y-0 right-1 hidden items-center gap-0.5 pl-2 group-hover/row:flex", ROW_HOVER_SOLID_BG)}>
-        <span className="text-2xs text-sidebar-foreground/45">
-          {pr.repo.split("/")[1]}#{pr.number}
-        </span>
+        {onOpenThread ? (
+          <button
+            type="button"
+            aria-label="Open its thread"
+            title="Open its thread"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenThread();
+            }}
+            className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          >
+            <Icon name="MessageSquare" fallback="ArrowUpRight" aria-hidden className="size-3.5" />
+          </button>
+        ) : null}
         <button
           type="button"
           aria-label="Open on GitHub"

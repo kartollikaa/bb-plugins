@@ -15,6 +15,16 @@ the indicator the way bb's own list does.
 The subagent counter opens a list that fits the available screen space, including
 on mobile. Longer lists scroll inside the card while the summary stays visible.
 
+The GitHub and Automations sections start folded, with a summary in the header
+instead of a bare count: GitHub's leads with failing checks, conflicts and changes
+requested, then the total ("1 failing · 1 conflicts · 5"); Automations' gives
+failed and running automations and the soonest next run ("1 failed · next in
+12m"). An expanded PR row draws its most urgent reason as a tinted icon, then the
+title and repo; the number and reasons are in the tooltip. Hover offers "Open its
+thread" when one of your threads links the PR, Open on GitHub, and Snooze.
+`src/sectionSummaries.ts` holds the summaries, the reason glyphs and which
+sections start folded.
+
 Needs you sits above the sections and hides when nothing waits. In order:
 threads asking a question (the question and how long they have waited, longest
 first), failed turns, failed queued messages, and finished results not read
@@ -132,6 +142,7 @@ this one under Settings → Appearance → Sidebar, or run
 
 - `server.ts`: RPC `subagents`, `undoArchive`, `archiveScope`, `archiveClaim` and `archiveRelease`, the Automations and GitHub Folder proxies, and the `bb thread-tree` command.
 - `src/githubFolder.ts`: the slice of the GitHub Folder plugin's view that the GitHub section draws.
+- `src/sectionSummaries.ts`: the GitHub and Automations header summaries, PR reason glyphs, sections folded by default.
 - `src/subagents.ts`: folds a thread's event log into its subagents.
 - `src/tree.ts`: pure tree, grouping and subagent state logic.
 - `src/orchestrations.ts`: the Orchestrations shortcuts, the folded rollup and bar, and the archive plan.

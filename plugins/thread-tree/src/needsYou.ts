@@ -175,6 +175,15 @@ export function linkedPullRequests(
   });
 }
 
+/** Lowercased PR URL → the first thread that links it. */
+export function linkedThreadByUrl(linked: readonly LinkedPullRequests[]): Map<string, string> {
+  const threadOf = new Map<string, string>();
+  for (const { threadId, pullRequests } of linked) {
+    for (const pr of pullRequests) if (!threadOf.has(pr.url.toLowerCase())) threadOf.set(pr.url.toLowerCase(), threadId);
+  }
+  return threadOf;
+}
+
 export function pullRequestItems(
   mode: NeedsYouPullRequests,
   linked: readonly LinkedPullRequests[],
@@ -182,14 +191,10 @@ export function pullRequestItems(
   folderItems: readonly GithubFolderItem[],
 ): PullRequestItem[] {
   if (mode === "none") return [];
-  const threadOf = new Map<string, string>();
+  const threadOf = linkedThreadByUrl(linked);
   const linkedPr = new Map<string, ThreadPullRequest>();
-  for (const { threadId, pullRequests } of linked) {
-    for (const pr of pullRequests) {
-      if (threadOf.has(pr.url.toLowerCase())) continue;
-      threadOf.set(pr.url.toLowerCase(), threadId);
-      linkedPr.set(pr.url.toLowerCase(), pr);
-    }
+  for (const { pullRequests } of linked) {
+    for (const pr of pullRequests) if (!linkedPr.has(pr.url.toLowerCase())) linkedPr.set(pr.url.toLowerCase(), pr);
   }
   if (mode === "all") {
     return folderItems.map((item) => {
