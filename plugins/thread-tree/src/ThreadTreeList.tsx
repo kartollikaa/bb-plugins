@@ -409,7 +409,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     <ReduceMotionContext.Provider value={view.reduceMotion}>
       <div
         ref={sectionsRef}
-        className="relative flex flex-col gap-3 px-1.5 pb-3 pt-1"
+        className="relative flex flex-col gap-2 px-1.5 pb-3 pt-1"
         {...sectionDrag.containerProps}
         onKeyDown={(event) => {
           if (event.currentTarget.contains(event.target as Node)) handleFlatListEscape(event, !!(statusFilter || searchOpen), closeFlatList);
@@ -564,7 +564,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         ref={treeRef}
         role="tree"
         aria-label={showArchived ? "Archived threads" : "Threads"}
-        className="relative flex flex-col gap-3"
+        className="relative flex flex-col gap-2"
         {...(canReorder ? projectDrag.containerProps : {})}
       >
         {groups.map((group, groupIndex) => {
@@ -642,15 +642,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                     >
                       {group.older.rows.map((row) => renderRow(row, "tree"))}
                     </OlderThreads>
-                  ) : null}
-                  {group.rows.length === 0 && !group.older && startThread ? (
-                    <button
-                      type="button"
-                      onClick={startThread}
-                      className="ml-[26px] flex h-8 items-center rounded-md px-2 text-left text-xs text-sidebar-foreground/45 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
-                    >
-                      Start a new thread
-                    </button>
                   ) : null}
                 </div>
               </Collapse>
@@ -831,18 +822,16 @@ function SectionsMenu({
 }) {
   const portalProps = usePortalScopeProps();
   const menu = useTapToOpenMenu();
-  const hidden = order.filter((id) => !view[SECTION_BY_ID[id].key]).length;
   return (
     <DropdownMenu.Root {...menu.rootProps}>
       <DropdownMenu.Trigger asChild {...menu.triggerProps}>
         <button
           type="button"
-          title="Choose the sections shown in the sidebar"
-          className="flex h-5 items-center gap-1 rounded-md px-1.5 text-2xs text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
+          aria-label="Sections"
+          title="Sections: choose what the sidebar shows"
+          className="flex h-5 items-center rounded-md px-1 text-sidebar-foreground/50 outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
         >
-          <Icon name="LayoutList" fallback="Layers" aria-hidden className="size-3" />
-          Sections
-          {hidden > 0 ? <span className="tabular-nums text-sidebar-foreground/40">· {hidden} hidden</span> : null}
+          <Icon name="Layers" aria-hidden className="size-3" />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -1188,9 +1177,9 @@ function PullRequestIcon({ pullRequest }: { pullRequest: RowPullRequest }) {
         event.stopPropagation();
         navigate.openUrl(pullRequest.pr.url);
       }}
-      className={cn("flex size-4 shrink-0 items-center justify-center rounded outline-none hover:bg-sidebar-foreground/10 focus-visible:ring-1 focus-visible:ring-sidebar-ring", look.className)}
+      className={cn("flex size-[18px] shrink-0 items-center justify-center rounded-[5px] outline-none hover:brightness-125 focus-visible:ring-1 focus-visible:ring-sidebar-ring", look.className, look.chipClassName)}
     >
-      <Icon name={look.icon} aria-hidden className="size-3.5" />
+      <Icon name={look.icon} aria-hidden className="size-3" />
     </button>
   );
 }

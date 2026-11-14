@@ -7,11 +7,12 @@ export type PrReason = "failing" | "conflicts" | "changes" | "ready";
 /** Most urgent first; it also picks the one PR a row shows. */
 export const PR_REASONS: readonly PrReason[] = ["failing", "conflicts", "changes", "ready"];
 
-export const PR_REASON_LOOK: Record<PrReason, { label: string; icon: string; className: string }> = {
-  failing: { label: "Checks failing", icon: "GitPullRequest", className: "text-red-600 dark:text-red-400" },
-  conflicts: { label: "Has conflicts", icon: "GitPullRequest", className: "text-orange-600 dark:text-orange-400" },
-  changes: { label: "Changes requested", icon: "GitPullRequest", className: "text-amber-600 dark:text-amber-400" },
-  ready: { label: "Ready to merge", icon: "GitMerge", className: "text-green-600 dark:text-green-400" },
+/** `chipClassName`: the row icon's tinted square, as in the v2 prototype. */
+export const PR_REASON_LOOK: Record<PrReason, { label: string; icon: string; className: string; chipClassName: string }> = {
+  failing: { label: "Checks failing", icon: "GitPullRequest", className: "text-red-600 dark:text-red-400", chipClassName: "bg-red-500/15" },
+  conflicts: { label: "Has conflicts", icon: "GitPullRequest", className: "text-orange-600 dark:text-orange-400", chipClassName: "bg-orange-500/15" },
+  changes: { label: "Changes requested", icon: "GitPullRequest", className: "text-amber-600 dark:text-amber-400", chipClassName: "bg-amber-500/15" },
+  ready: { label: "Ready to merge", icon: "GitMerge", className: "text-green-600 dark:text-green-400", chipClassName: "bg-green-500/15" },
 };
 
 export type FolderAttention = ReadonlyMap<string, readonly Attention[]>;
