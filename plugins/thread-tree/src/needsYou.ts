@@ -261,17 +261,16 @@ export function pullRequestSourcesSettled({ threadsStatus, folderLoaded, pullReq
   return threadsStatus === "ready" && folderLoaded && !pullRequestsLoading;
 }
 
-/** Whether an item's sources have all loaded, so its signature is final. */
+/** Whether an item's sources have all loaded, so its signature is final; until then its snooze holds. */
 export type SettledCheck = (item: NeedsYouItem) => boolean;
 const ALWAYS_SETTLED: SettledCheck = () => true;
 
-/** An item still loading keeps a snooze on its key, since its signature isn't final yet. */
 export function isSnoozed(item: NeedsYouItem, snoozes: Snoozes, settled: SettledCheck = ALWAYS_SETTLED): boolean {
   if (!(item.key in snoozes)) return false;
   return !settled(item) || snoozes[item.key] === item.signature;
 }
 
-/** Drops snoozes whose item changed, so a later return of the same signature isn't hidden; keeps absent and still-loading ones. */
+/** Drops snoozes whose item changed, so a later return of the same signature isn't hidden. */
 export function pruneSnoozes(snoozes: Snoozes, items: readonly NeedsYouItem[], { limit = 200, settled = ALWAYS_SETTLED }: { limit?: number; settled?: SettledCheck } = {}): Snoozes {
   const current = new Map(items.filter(settled).map((item) => [item.key, item.signature]));
   const kept = Object.entries(snoozes).filter(([key, signature]) => (current.get(key) ?? signature) === signature);

@@ -60,7 +60,6 @@ interface NeedsYouSources {
   folderItems: readonly GithubFolderItem[];
   automations: readonly AutomationSummary[];
   pullRequestMode: NeedsYouPullRequests;
-  /** Both PR sources have loaded, so a PR item's signature is final. */
   pullRequestsSettled: boolean;
   orchestrationOf: (threadId: string) => string | null;
   activeThreadId: string | null;
