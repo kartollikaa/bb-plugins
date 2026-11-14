@@ -1,9 +1,14 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Markdown, UrlLink, useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { experimental_useRpcMutation, Markdown, UrlLink, useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
+import { toast } from "sonner";
+import { contract } from "./contract.ts";
+import { createReplyTracker, type ReplyState } from "./reply.ts";
 import { askIdentity, type Ask, type Row, type RowKind, type View } from "./view.ts";
 import { useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
+
+const replies = createReplyTracker();
 
 /** Puts text into the orchestrator's composer and focuses it; never sends. Keeps a draft the owner already started. */
 function fillComposer(composers: readonly PluginComposerApi[], threadId: string, text: string): boolean {
@@ -57,6 +62,8 @@ function Reveal({ open, children }: { open: boolean; children: ReactNode }) {
 interface Actions {
   fill(key: string, text: string): void;
   sent: string | null;
+  reply(key: string, label: string, text: string): void;
+  replyState(key: string): ReplyState | null;
   openThread(threadId: string | null): void;
 }
 
@@ -87,9 +94,15 @@ function Expandable({ children }: { children: ReactNode }) {
 
 const linkButton = "block h-[26px] max-w-full truncate whitespace-nowrap leading-[24px] rounded-md border border-border px-2.5 text-xs font-medium text-foreground no-underline hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
+function replyStatus(state: ReplyState): string {
+  if (state.kind === "sending") return `Sending «${state.option}»…`;
+  return state.delivery === "queued" ? `Sent «${state.option}», queued until the orchestrator's turn ends` : `Sent «${state.option}» to the orchestrator`;
+}
+
 function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
   const sent = actions.sent === askIdentity(ask);
   const id = askIdentity(ask);
+  const replied = actions.replyState(id);
   const threads = threadId ? [threadId] : ask.threads;
   const answerable = (ask.kind === "question" || ask.kind === "owner") && ask.drafts;
   return (
@@ -106,7 +119,9 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
         </Expandable>
       )}
       <div className="flex flex-wrap items-center gap-1.5">
-        {sent ? (
+        {replied ? (
+          <span role="status" className="text-xs text-muted-foreground">{replyStatus(replied)}</span>
+        ) : sent ? (
           <span className="text-xs text-muted-foreground">Reply started in the chat composer</span>
         ) : ask.kind === "decision" && ask.drafts ? (
           <>
@@ -115,7 +130,7 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
           </>
         ) : answerable ? (
           <>
-            {ask.replies.map((r, i) => <Button key={i} variant={i === 0 ? "primary" : "outline"} onClick={() => actions.fill(id, r.draft)}>{r.label}</Button>)}
+            {ask.replies.map((r, i) => <Button key={i} variant={i === 0 ? "primary" : "outline"} onClick={() => actions.reply(id, r.label, r.draft)}>{r.label}</Button>)}
             <Button variant={ask.replies.length ? "quiet" : "primary"} onClick={() => actions.fill(id, ask.drafts!.primary)}>{ask.replies.length ? "Other answer" : "Answer"}</Button>
           </>
         ) : null}
@@ -254,9 +269,27 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   const navigate = useBbNavigate();
   const [sent, setSent] = useState<string | null>(null);
   const [showAllAsks, setShowAllAsks] = useState(false);
+  const replyMutation = experimental_useRpcMutation({ contract, method: "reply" });
+  useSyncExternalStore(replies.subscribe, replies.version);
+  const liveAsks = state.kind === "ready" ? state.view.asks.map(askIdentity) : null;
+  const liveKey = liveAsks?.join("\u0001") ?? null;
+  useEffect(() => {
+    if (liveAsks) replies.prune(threadId, liveAsks);
+  }, [threadId, liveKey]);
 
   const actions: Actions = {
     sent,
+    replyState: (key) => replies.get(threadId, key),
+    reply(key, label, text) {
+      if (!replies.begin(threadId, key, label)) return;
+      replyMutation.mutate({ threadId, text }).then(
+        ({ delivery }) => replies.done(threadId, key, delivery),
+        (error: unknown) => {
+          replies.fail(threadId, key);
+          toast.error(`Couldn't send «${label}»`, { description: error instanceof Error ? error.message : String(error) });
+        },
+      );
+    },
     fill(key, text) {
       void (async () => {
         await revealComposer?.();

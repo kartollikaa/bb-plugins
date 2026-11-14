@@ -65,6 +65,11 @@ export const contract = {
     input: z.object({ threadId: z.string().min(1).max(100) }),
     output: snapshotSchema,
   },
+  /** Sends one of the ledger's quick-reply options to the orchestrator thread that the ledger names. */
+  reply: {
+    input: z.object({ threadId: z.string().min(1).max(100), text: z.string().min(1).max(2_000) }),
+    output: z.object({ delivery: z.enum(["sent", "queued"]) }),
+  },
   setOrchestrationView: {
     input: z.object({ on: z.boolean() }),
     output: z.object({ on: z.boolean() }),

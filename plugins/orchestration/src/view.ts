@@ -1,6 +1,7 @@
 // Turns a ledger snapshot plus bb's live thread state into the tab's one answer: does anything need you, and is the team moving.
 import type { Agent, LedgerSummary, Subtask } from "./contract.ts";
 import { parseOwnerItem, type Link } from "./owner.ts";
+import { replyDraft, replyPrefix } from "./reply.ts";
 
 /** Owner's rule: quiet this long while working, or the third failure of a delivery, means stuck. */
 export const QUIET_MS = 30 * 60_000;
@@ -241,10 +242,9 @@ export function buildView(input: ViewInput): View {
     }
     const base = { key: `owner-${i}`, who: "For you, from the ledger", since: null, age: "", kind: "owner" as const, links: item.links, threads: item.threads };
     if (item.kind === "ask") {
-      const re = `Re «${item.title}»: `;
-      asks.push({ ...base, title: item.title, text: item.why ?? "", drafts: { primary: re }, replies: item.options.map((label) => ({ label, draft: `${re}${label}` })) });
+      asks.push({ ...base, title: item.title, text: item.why ?? "", drafts: { primary: replyPrefix(item.title) }, replies: item.options.map((label) => ({ label, draft: replyDraft(item.title, label) })) });
     } else {
-      asks.push({ ...base, title: null, text: item.text, drafts: { primary: `Re «${firstLine(item.text, 60)}»: ` }, replies: [] });
+      asks.push({ ...base, title: null, text: item.text, drafts: { primary: replyPrefix(firstLine(item.text, 60) ?? "") }, replies: [] });
     }
   });
   asks.sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));

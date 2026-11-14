@@ -7,12 +7,14 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { contract, type Agent, type LedgerSummary, type Snapshot } from "./src/contract.ts";
 import { summarizeExport } from "./src/ledger.ts";
 import { exportScriptCandidates, ledgerFor, scanLedgers, type LedgerFile } from "./src/locate.ts";
+import { quickReplies, REPLY_MODE, replySender } from "./src/reply.ts";
 
 const run = promisify(execFile);
 const SCAN_TTL_MS = 10_000;
 const AGENT_TTL_MS = 15_000;
 const FINISHED_AGENT_TTL_MS = 10 * 60_000;
 const OUTPUT_LIMIT = 1_200;
+const REPLY_DEDUPE_MS = 10 * 60_000;
 const FINISHED_STATUSES = new Set(["landed", "verified", "dropped"]);
 const LIVE_STATUSES = new Set(["working", "briefed", "question", "delivered", "gate", "ready", "card"]);
 
@@ -134,12 +136,26 @@ export default async function plugin(bb: BbPluginApi) {
     return { state: "ledger", ledger: summary, agents, readAt: Date.now() };
   }
 
+  const sendReply = replySender(async (threadId, text) => {
+    const result = await bb.sdk.threads.send({ threadId, input: [{ type: "text", text, mentions: [] }], mode: REPLY_MODE });
+    return result.delivery;
+  }, { windowMs: REPLY_DEDUPE_MS, now: Date.now });
+
+  async function reply(threadId: string, text: string) {
+    const ledger = ledgerFor(await ledgers(), threadId);
+    if (!ledger) throw new Error("This thread is not an orchestrator, so nothing was sent.");
+    const summary = await exportLedger(ledger.path);
+    if (!quickReplies(summary.forTheOwner).includes(text)) throw new Error("The ledger no longer offers this answer, so nothing was sent.");
+    return { delivery: await sendReply(threadId, text) };
+  }
+
   bb.rpc.register(contract, {
     isOrchestrator: async ({ keys }) => {
       const all = await ledgers();
       return Object.fromEntries(keys.map((key) => [key, ledgerFor(all, key) !== null]));
     },
     snapshot: ({ threadId }) => snapshot(threadId),
+    reply: ({ threadId, text }) => reply(threadId, text),
     setOrchestrationView: async ({ on }) => ({ on: (await settings.experimental_set({ orchestrationView: on })).orchestrationView }),
   });
 }
