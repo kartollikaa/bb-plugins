@@ -12,6 +12,7 @@ export function GroupHeader({
   isCollapsed,
   count,
   summary,
+  hint,
   onToggle,
   extra,
   action,
@@ -22,6 +23,8 @@ export function GroupHeader({
   isCollapsed: boolean;
   /** Right-aligned, collapsed or not; null draws none. */
   count: number | null;
+  /** A key hint before the count. */
+  hint?: string;
   /** Replaces the count. */
   summary?: readonly SummaryPart[];
   onToggle: () => void;
@@ -61,8 +64,11 @@ export function GroupHeader({
               </span>
             ))}
           </span>
-        ) : count !== null && count !== undefined ? (
-          <span data-section-count="" className="ml-auto shrink-0 text-2xs font-normal tabular-nums text-sidebar-foreground/45">{count}</span>
+        ) : count !== null ? (
+          <span className="ml-auto flex shrink-0 items-center gap-1.5 text-2xs font-normal tabular-nums text-sidebar-foreground/45">
+            {hint ? <kbd data-section-hint="" className="rounded border border-sidebar-border px-1 font-sans text-[10px] leading-3.5">{hint}</kbd> : null}
+            <span data-section-count="">{count}</span>
+          </span>
         ) : null}
       </button>
       {extra}

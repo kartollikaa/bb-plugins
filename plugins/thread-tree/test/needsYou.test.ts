@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  queuePreview,
   automationItems,
   cursorThreadId,
   describeQuestion,
@@ -341,4 +342,11 @@ test("⇧⌘I's cursor keeps the thread in view when a PR opens in a new tab", (
   assert.equal(cursorThreadId({ kind: "pr", url: "https://github.com/o/r/pull/1" }, "t1"), null);
   assert.equal(cursorThreadId({ kind: "pr", url: "https://git.example.com/o/r/pull/1" }, "t1"), "t1");
   assert.equal(cursorThreadId({ kind: "automations" }, "t1"), null);
+});
+
+test("the queue shows five items and folds the rest into a count until expanded", () => {
+  const items = ["a", "b", "c", "d", "e", "f", "g"];
+  assert.deepEqual(queuePreview(items, false), { shown: ["a", "b", "c", "d", "e"], hidden: 2 });
+  assert.deepEqual(queuePreview(items, true), { shown: items, hidden: 0 });
+  assert.deepEqual(queuePreview(items.slice(0, 5), false), { shown: items.slice(0, 5), hidden: 0 });
 });

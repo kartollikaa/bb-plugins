@@ -335,3 +335,11 @@ export function nextItem(items: readonly NeedsYouItem[], activeThreadId: string 
   }
   return null;
 }
+
+/** The queue shows its first items and folds the rest into "N more". */
+export const QUEUE_PREVIEW = 5;
+
+export function queuePreview<T>(items: readonly T[], expanded: boolean, limit = QUEUE_PREVIEW): { shown: readonly T[]; hidden: number } {
+  if (expanded || items.length <= limit) return { shown: items, hidden: 0 };
+  return { shown: items.slice(0, limit), hidden: items.length - limit };
+}

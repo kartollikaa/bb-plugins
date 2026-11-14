@@ -308,6 +308,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   }, [openSearch]);
   const { providers } = useProviders();
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
+  const threadById = useMemo(() => new Map(threads.map((thread) => [thread.id, thread])), [threads]);
 
   const open = useCallback(
     (thread: PluginSidebarThread, event: MouseEvent) => {
@@ -452,6 +453,10 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         now={now}
         onOpen={needsYou.open}
         onSnooze={needsYou.snooze}
+        renderProvider={(threadId) => {
+          const providerId = threadById.get(threadId)?.providerId;
+          return providerId ? <ProviderSlot providerId={providerId} provider={providerById.get(providerId)} style={view.providerIconStyle} /> : null;
+        }}
       />
       {shownSections.map((id, index) => {
         const section = SECTION_BY_ID[id];
@@ -1112,14 +1117,7 @@ function ThreadRowView({
             {view.showSubagents ? <SubagentBadge thread={thread} data={subagents} /> : null}
           </span>
           <span className="flex shrink-0 items-center justify-end gap-2" style={{ minWidth: isCompactViewport ? undefined : END_SLOT_MIN_PX }}>
-            <span
-              data-provider-icon={thread.providerId}
-              title={providerName}
-              className="flex size-3.5 shrink-0 items-center justify-center text-sidebar-foreground"
-              style={{ color: providerTintColor(thread.providerId, view.providerIconStyle) ?? undefined }}
-            >
-              <ProviderIcon providerKind="agent" provider={untinted(provider, thread.providerId)} aria-label={providerName} className="size-3.5" />
-            </span>
+            <ProviderSlot providerId={thread.providerId} provider={provider} style={view.providerIconStyle} />
             {view.showAge ? (
               <span data-row-age="" className="-mr-1 shrink-0 whitespace-nowrap pr-1 text-right text-2xs tabular-nums text-sidebar-foreground/45">
                 {age}
@@ -1654,6 +1652,21 @@ function TreeGuides({
 type RowProvider = ReturnType<typeof useProviders>["providers"][number];
 
 /** Without bb's own tint the logo mask takes the slot's colour, which the plugin sets. */
+/** The provider logo in its fixed slot, brand-tinted unless the user picked monochrome. */
+function ProviderSlot({ providerId, provider, style }: { providerId: string; provider: RowProvider | undefined; style: ViewSettings["providerIconStyle"] }) {
+  const name = provider?.displayName ?? providerId;
+  return (
+    <span
+      data-provider-icon={providerId}
+      title={name}
+      className="flex size-3.5 shrink-0 items-center justify-center text-sidebar-foreground"
+      style={{ color: providerTintColor(providerId, style) ?? undefined }}
+    >
+      <ProviderIcon providerKind="agent" provider={untinted(provider, providerId)} aria-label={name} className="size-3.5" />
+    </span>
+  );
+}
+
 function untinted(provider: RowProvider | undefined, id: string) {
   return { id, logoUrl: provider?.logoUrl ?? null, icon: provider?.icon ?? null };
 }

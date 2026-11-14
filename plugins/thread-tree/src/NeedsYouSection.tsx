@@ -24,6 +24,8 @@ import {
   type PendingInteraction,
   type ThreadItemKind,
   type ThreadQuestion,
+  queuePreview,
+  QUEUE_PREVIEW,
 } from "./needsYou";
 import { PR_REASON_LOOK, type FolderAttention } from "./prAttention";
 import type { ThreadPullRequest } from "./threadPullRequests";
@@ -193,6 +195,7 @@ export function NeedsYouSection({
   now,
   onOpen,
   onSnooze,
+  renderProvider,
 }: {
   items: readonly NeedsYouItem[];
   isCollapsed: boolean;
@@ -204,20 +207,29 @@ export function NeedsYouSection({
   now: number;
   onOpen: (item: NeedsYouItem, split: boolean) => void;
   onSnooze: (item: NeedsYouItem) => void;
+  /** The provider slot a thread item shares with its tree row. */
+  renderProvider: (threadId: string) => React.ReactNode;
 }) {
+  const [showAll, setShowAll] = useState(false);
   if (items.length === 0) return null;
+  const { shown, hidden } = queuePreview(items, showAll);
   return (
     <section aria-label="Needs you" data-needs-you="">
       <GroupHeader
         title="Needs you"
-        icon={<Icon name="Inbox" aria-hidden className="size-3.5" />}
+        icon={<span className="size-[7px] rounded-full bg-attention" />}
         isCollapsed={isCollapsed}
         count={items.length}
+        hint="⇧⌘I next"
         onToggle={onToggle}
       />
       <Collapse open={!isCollapsed}>
-        <div role="list" className="mt-0.5 flex flex-col gap-0.5">
-          {items.map((item) => (
+        <div
+          role="list"
+          data-needs-you-queue=""
+          className="mt-0.5 flex flex-col gap-0.5 rounded-[9px] border border-[color-mix(in_oklab,var(--attention)_25%,transparent)] bg-[var(--row-base)] p-[3px] [--row-base:color-mix(in_oklab,var(--attention)_7%,var(--sidebar))]"
+        >
+          {shown.map((item) => (
             <NeedsYouRow
               key={item.key}
               item={item}
@@ -228,8 +240,19 @@ export function NeedsYouSection({
               now={now}
               onOpen={(split) => onOpen(item, split)}
               onSnooze={() => onSnooze(item)}
+              provider={item.kind === "pr" || item.kind === "automation" ? null : renderProvider(item.threadId)}
             />
           ))}
+          {items.length > QUEUE_PREVIEW ? (
+            <button
+              type="button"
+              data-needs-you-more=""
+              onClick={() => setShowAll((value) => !value)}
+              className="ml-[26px] h-6 self-start rounded-md px-1 text-2xs text-sidebar-foreground/50 outline-none hover:text-sidebar-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+            >
+              {hidden > 0 ? `${hidden} more` : "Show less"}
+            </button>
+          ) : null}
         </div>
       </Collapse>
     </section>
@@ -245,6 +268,7 @@ function NeedsYouRow({
   now,
   onOpen,
   onSnooze,
+  provider,
 }: {
   item: NeedsYouItem;
   isActive: boolean;
@@ -254,6 +278,7 @@ function NeedsYouRow({
   now: number;
   onOpen: (split: boolean) => void;
   onSnooze: () => void;
+  provider: React.ReactNode;
 }) {
   const sdk = useSdk();
   const [keyboardFocus, setKeyboardFocus] = useState(false);
@@ -308,6 +333,7 @@ function NeedsYouRow({
         <span data-row-subtitle="" className="truncate text-2xs text-sidebar-foreground/50">{reason}</span>
       </span>
       {failure && !inlineActions ? <span className={cn("flex shrink-0", HIDDEN_UNDER_STRIP)}>{failure}</span> : null}
+      {provider}
       {inlineActions ? (
         <span data-inline-actions="" className="relative z-[1] flex shrink-0 items-center" style={{ gap: STRIP_GAP_PX }}>
           {actionButtons}
