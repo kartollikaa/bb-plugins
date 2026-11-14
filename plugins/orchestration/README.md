@@ -6,13 +6,14 @@ question: does anything need you, and is the team moving?
 
 - **Orchestration view.** Opening an orchestrator's thread lands on a full-page view of its team,
   with the thread's chat in a rail on the right. **Chat** in the title bar folds the rail away;
-  below 900px of page width it becomes a drawer that Esc closes. **Full chat** goes back to bb's
-  normal thread view and remembers that choice for the thread; the context-card row there brings
-  the view back.
+  on a narrow page it becomes a drawer that Esc closes. **Full chat** goes back to bb's normal
+  thread view and remembers that choice for the thread; the context-card row there brings the view
+  back. The redirect happens only when the thread opens, and never while threads are split side by
+  side.
 - **Orchestration tab.** The same content as a fixed side-panel tab, shown only on a thread that a ledger's first line
   (`Orchestrator: thr_…`) names. On top: one status sentence. Below it: a card per thing that waits
   on you, then the team with one row per subtask, then a fold with the goal and history.
-- **Context-card row.** The same status sentence in the thread's context card. A click opens the tab.
+- **Context-card row.** The same status sentence in the thread's context card. A click opens the view.
 - **Answer, Release, Not yet** only start a reply in the orchestrator's composer. Nothing is sent
   until you send it.
 
