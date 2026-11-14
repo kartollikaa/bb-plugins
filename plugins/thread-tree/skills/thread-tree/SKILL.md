@@ -123,8 +123,9 @@ rule. A thread whose PR state isn't known yet stays out. Clicking the line shows
 them above it and turns it into "Hide older" with an "Archive these" button.
 That button works like a finished fold's Archive across all of them: bb's own
 Archive with its confirmation and Undo, worktrees with changes skipped, and a
-skip count before it starts. A thread skipped for uncommitted changes stays
-listed with a pencil marker. The Pinned group, Status and flat grouping, and
+skip count before it starts. Once an archive run ends, each thread it skipped
+for changes stays listed with a pencil marker until a later run finds it clean.
+A run cancelled at the skip count marks nothing. The Pinned group, Status and flat grouping, and
 the archived view don't fold older threads.
 
 The provider icon sits in a fixed slot before the age, in the provider's brand

@@ -81,7 +81,7 @@ import {
   type TreeRow,
 } from "./tree";
 import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver, MAX_THREADS_PER_CALL } from "./orchestrations";
-import { archiveInTurn, archiveRunLifecycle, dialogOutsideSidebar, foldArchiveOutcome, runClaimedArchive, skippedSummary, waitForArchive, type ArchiveRunResult } from "./archiveRun";
+import { archiveInTurn, archiveRunLifecycle, dialogOutsideSidebar, foldArchiveOutcome, runClaimedArchive, skippedSummary, uncommittedAfterRun, waitForArchive, type ArchiveRunResult } from "./archiveRun";
 import { ARCHIVE_CONFIRM_WAIT_MS } from "./archiveUndo";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
@@ -341,15 +341,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
       },
     })),
   }), []);
-  const archiveFold = useCallback((roots: readonly PluginSidebarThread[]) => prepareFoldArchive(rpc, activeForest, roots, archiveRunner), [rpc, activeForest, archiveRunner]);
   const [uncommittedIds, setUncommittedIds] = useState<ReadonlySet<string>>(new Set());
-  const archiveOlder = useCallback(async (roots: readonly PluginSidebarThread[]) => {
-    const prepared = await archiveFold(roots);
-    if (!prepared) return prepared;
-    const checked = new Set(roots.flatMap((root) => [root.id, ...descendantsOf(activeForest, root.id).map((thread) => thread.id)]));
-    setUncommittedIds((current) => new Set([...[...current].filter((id) => !checked.has(id)), ...prepared.dirty]));
-    return prepared;
-  }, [archiveFold, activeForest]);
+  const archiveFold = useCallback((roots: readonly PluginSidebarThread[]) => prepareFoldArchive(rpc, activeForest, roots, archiveRunner, setUncommittedIds), [rpc, activeForest, archiveRunner]);
 
   if (status === "loading" && threads.length === 0) {
     return <div className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</div>;
@@ -641,7 +634,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                       count={group.older.rootCount}
                       isOpen={olderShown(group.key)}
                       onToggle={() => flags.toggle(`older:${group.key}`)}
-                      onArchive={() => archiveOlder(group.older!.rows.filter((row) => row.depth === 0).map((row) => row.thread))}
+                      onArchive={() => archiveFold(group.older!.rows.filter((row) => row.depth === 0).map((row) => row.thread))}
                     >
                       {group.older.rows.map((row) => renderRow(row, "tree"))}
                     </OlderThreads>
@@ -1421,8 +1414,6 @@ function OlderThreads({
 
 interface PreparedFoldArchive {
   plan: FoldArchivePlan;
-  /** Threads whose worktrees have changes, so the run leaves them. */
-  dirty: ReadonlySet<string>;
   run(): Promise<void>;
 }
 
@@ -1499,6 +1490,7 @@ async function prepareFoldArchive(
   forest: Forest<PluginSidebarThread>,
   roots: readonly PluginSidebarThread[],
   runner: BbArchiveRunner,
+  updateUncommitted: (update: (current: ReadonlySet<string>) => ReadonlySet<string>) => void,
 ): Promise<PreparedFoldArchive | null> {
   const subtree = new Map(roots.flatMap((root) => [root, ...descendantsOf(forest, root.id)]).map((thread) => [thread.id, thread]));
   const ids = [...subtree.keys()];
@@ -1518,7 +1510,6 @@ async function prepareFoldArchive(
   const isStillClean = (id: string) => rpc.call("archiveScope", { threadIds: [id] }).then(({ dirty }) => dirty.length === 0);
   return {
     plan,
-    dirty,
     async run() {
       const claimed = [...new Set(plan.roots.flatMap((id) => scopes.get(id) ?? [id]))];
       const result = await runClaimedArchive({
@@ -1528,6 +1519,7 @@ async function prepareFoldArchive(
         unclaim: (claimId) => rpc.call("archiveRelease", { claimId }).then(() => undefined, () => undefined),
         archive: () => runner.run(plan.roots.map((id) => toActionTarget(subtree.get(id)!)), isStillClean),
       });
+      updateUncommitted((current) => uncommittedAfterRun(current, { checked: ids, dirty: [...dirty], changed: result.changed.flatMap((id) => scopes.get(id) ?? [id]), stop: result.stop }));
       const threadCount = (roots: readonly string[]) => new Set(roots.flatMap((id) => scopes.get(id) ?? [id])).size;
       const outcome = foldArchiveOutcome({ archived: threadCount(result.archived), skipped: plan.skipped, kept: plan.kept, changed: threadCount(result.changed), unchecked: threadCount(result.unchecked), stop: result.stop, error: result.error });
       if (outcome) toast[outcome.tone](outcome.title, { description: outcome.description });
