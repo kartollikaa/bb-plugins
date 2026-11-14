@@ -231,8 +231,9 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 ## orchestration — `plugins/orchestration/`
 
-- **What:** a fixed side-panel tab, Orchestration, and a context-card row, both only on a thread
-  that an orchestrate ledger's first line names. One status sentence, a card per thing that needs the
+- **What:** a full-page Orchestration view that an orchestrator's thread redirects to (chat in a
+  collapsible `ThreadChat` rail, Full chat goes back), plus a fixed side-panel tab and a context-card
+  row, all only on a thread that an orchestrate ledger's first line names. One status sentence, a card per thing that needs the
   owner, the team as one row per subtask, and a goal/history fold. Answer and Release only fill the
   orchestrator's composer.
 - **How:** the server scans `~/.claude/projects/*/orchestrate/*.md` first lines, runs orchestrate's
@@ -240,8 +241,8 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   adds per-agent model, effort, context and last output from `threads.*`. The app merges that with
   `experimental_useSidebarThreads()`; `src/view.ts` is the pure view model (needs you, stuck, done).
 - **Agent skill:** `skills/orchestration/`.
-- **Tests:** `npm test` covers `test/*.test.ts` (ledger export summary, ledger lookup, view model and
-  both stuck thresholds). Run `npm run typecheck`.
+- **Tests:** `npm test` covers `test/*.test.ts` (ledger export summary, ledger lookup, view model,
+  both stuck thresholds, and the view's route, chat preference and rail geometry). Run `npm run typecheck`.
 - MIT. Not released yet; not in `marketplace.json`.
 
 ## Retired repos
