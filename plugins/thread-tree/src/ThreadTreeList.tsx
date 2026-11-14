@@ -79,7 +79,8 @@ import {
   type TreeRow,
 } from "./tree";
 import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver, MAX_THREADS_PER_CALL } from "./orchestrations";
-import { archiveInTurn, settlesTrue } from "./archiveRun";
+import { archiveInTurn, foldArchiveOutcome, skippedSummary, waitForArchive, type ArchiveRunResult } from "./archiveRun";
+import { ARCHIVE_CONFIRM_WAIT_MS } from "./archiveUndo";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
 import { useDragReorder, useFlipOrder } from "./useReorder";
@@ -307,11 +308,12 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
 
   const [archiveJob, setArchiveJob] = useState<BbArchiveJob | null>(null);
   const archiveJobRunning = useRef(false);
-  const runBbArchive = useCallback((targets: PluginThreadActionTarget[]) => {
-    if (archiveJobRunning.current) return Promise.resolve<ArchiveRunResult>({ archived: [], stopped: true });
+  const runBbArchive = useCallback((targets: PluginThreadActionTarget[], isStillClean: (id: string) => Promise<boolean>) => {
+    if (archiveJobRunning.current) return Promise.resolve<ArchiveRunResult>({ archived: [], changed: [], stop: "busy" });
     archiveJobRunning.current = true;
     return new Promise<ArchiveRunResult>((resolve) => setArchiveJob({
       targets,
+      isStillClean,
       finish: (result) => {
         archiveJobRunning.current = false;
         setArchiveJob(null);
@@ -1381,16 +1383,9 @@ function FoldArchiveButton({ onArchive }: { onArchive: () => Promise<PreparedFol
   );
 }
 
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
-
-function skippedSummary({ skipped, kept }: FoldArchivePlan) {
-  if (skipped + kept === 0) return null;
-  return `Skipped ${plural(skipped, "thread")} with uncommitted changes${kept ? ` and ${plural(kept, "thread")} above them` : ""}`;
-}
-
-type ArchiveRunResult = Awaited<ReturnType<typeof archiveInTurn>>;
 interface BbArchiveJob {
   targets: PluginThreadActionTarget[];
+  isStillClean(id: string): Promise<boolean>;
   finish(result: ArchiveRunResult): void;
 }
 
@@ -1399,7 +1394,7 @@ async function prepareFoldArchive(
   rpc: ReturnType<typeof useRpc<typeof rpcContract>>,
   forest: Forest<PluginSidebarThread>,
   root: PluginSidebarThread,
-  runBbArchive: (targets: PluginThreadActionTarget[]) => Promise<ArchiveRunResult>,
+  runBbArchive: (targets: PluginThreadActionTarget[], isStillClean: (id: string) => Promise<boolean>) => Promise<ArchiveRunResult>,
 ): Promise<PreparedFoldArchive | null> {
   const subtree = new Map([root, ...descendantsOf(forest, root.id)].map((thread) => [thread.id, thread]));
   const ids = [...subtree.keys()];
@@ -1416,6 +1411,7 @@ async function prepareFoldArchive(
     return null;
   }
   const plan = foldArchivePlan(forest, root.id, scopes, dirty);
+  const isStillClean = (id: string) => rpc.call("archiveScope", { threadIds: [id] }).then(({ dirty }) => dirty.length === 0, () => false);
   return {
     plan,
     async run() {
@@ -1423,42 +1419,64 @@ async function prepareFoldArchive(
       const claimId = await rpc.call("archiveClaim", { threadIds: claimed }).then(({ claimId }) => claimId, () => null);
       let result: ArchiveRunResult;
       try {
-        result = await runBbArchive(plan.roots.map((id) => toActionTarget(subtree.get(id)!)));
+        result = await runBbArchive(plan.roots.map((id) => toActionTarget(subtree.get(id)!)), isStillClean);
       } finally {
         if (claimId !== null) await rpc.call("archiveRelease", { claimId }).catch(() => undefined);
       }
-      const summary = skippedSummary(plan);
-      if (!summary || result.archived.length === 0) return;
-      const archived = new Set(result.archived.flatMap((id) => scopes.get(id) ?? [id])).size;
-      toast.success(`Archived ${plural(archived, "thread")}`, { description: summary });
+      const threadCount = (roots: readonly string[]) => new Set(roots.flatMap((id) => scopes.get(id) ?? [id])).size;
+      const outcome = foldArchiveOutcome({ archived: threadCount(result.archived), skipped: plan.skipped, kept: plan.kept, changed: threadCount(result.changed), stop: result.stop });
+      if (outcome) toast[outcome.tone](outcome.title, { description: outcome.description });
     },
   };
 }
 
 const BOUND_ARCHIVE_WAIT_MS = 2_000;
-const ARCHIVE_LANDING_CHECKS = 10;
-const ARCHIVE_LANDING_DELAY_MS = 300;
+const ARCHIVE_POLL_MS = 500;
+/** How long an archive may take to land once no dialog is open. */
+const ARCHIVE_LANDING_GRACE_MS = 3_000;
+const ARCHIVE_WAIT_TOAST_ID = "thread-tree-fold-archive-wait";
+
+/** Any dialog counts, a Radix modal carries no aria-modal; a stray popover only makes the wait longer. */
+const anyDialogOpen = () => document.querySelector(`[role="dialog"], ${MODAL_DIALOG_SELECTOR}`) !== null;
 
 /** Lives at list level: archiving a fold's root unmounts its fold line while later roots still wait for bb's confirmation. */
 function BbArchiveRun({ job }: { job: BbArchiveJob }) {
   const sdk = useSdk();
   const actions = useRef(new Map<string, () => Promise<void>>());
   const started = useRef(false);
+  const stop = useRef(new AbortController());
   const [bound, setBound] = useState(0);
   const [waited, setWaited] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setWaited(true), BOUND_ARCHIVE_WAIT_MS);
     return () => clearTimeout(timer);
   }, []);
+  useEffect(() => () => stop.current.abort(), []);
   useEffect(() => {
     if (started.current || (bound < job.targets.length && !waited)) return;
     started.current = true;
-    const isArchived = (threadId: string) => settlesTrue(
-      () => sdk.threads.get({ threadId }).then((thread) => thread.archivedAt !== null, () => false),
-      { attempts: ARCHIVE_LANDING_CHECKS, delayMs: ARCHIVE_LANDING_DELAY_MS },
-    );
-    archiveInTurn(job.targets.map((target) => target.id), (id) => actions.current.get(id), isArchived)
-      .then(job.finish, () => job.finish({ archived: [], stopped: true }));
+    const { signal } = stop.current;
+    const deadline = Date.now() + ARCHIVE_CONFIRM_WAIT_MS;
+    const landed = (threadId: string) => {
+      toast.loading("Waiting for bb's confirmation…", {
+        id: ARCHIVE_WAIT_TOAST_ID,
+        duration: Infinity,
+        action: { label: "Stop", onClick: () => stop.current.abort() },
+      });
+      return waitForArchive(() => sdk.threads.get({ threadId }).then((thread) => thread.archivedAt !== null, () => false), {
+        dialogOpen: anyDialogOpen,
+        deadline,
+        graceMs: ARCHIVE_LANDING_GRACE_MS,
+        intervalMs: ARCHIVE_POLL_MS,
+        signal,
+      });
+    };
+    archiveInTurn(job.targets.map((target) => target.id), { actionOf: (id) => actions.current.get(id), isStillClean: job.isStillClean, landed, signal })
+      .catch((): ArchiveRunResult => ({ archived: [], changed: [], stop: "stopped" }))
+      .then((result) => {
+        toast.dismiss(ARCHIVE_WAIT_TOAST_ID);
+        job.finish(result);
+      });
   }, [bound, waited, job, sdk]);
   return job.targets.map((target) => (
     <BoundArchive

@@ -2,7 +2,7 @@
 export const ARCHIVE_BATCH_GAP_MS = 2_000;
 /** Older archives are not undone by a keystroke; the archived view still restores them. */
 export const ARCHIVE_UNDO_WINDOW_MS = 10 * 60_000;
-/** How long a fold Archive waits on bb's confirmation for one root before giving up. */
+/** How long a whole fold Archive run waits on bb's confirmations before giving up. */
 export const ARCHIVE_CONFIRM_WAIT_MS = 10 * 60_000;
 /** Outlives the longest fold Archive run, so only an abandoned claim expires. */
 export const ARCHIVE_CLAIM_TTL_MS = 15 * 60_000;
