@@ -129,7 +129,7 @@ and in folder there are gonna be the whole … with nested tree."
   subtree). No subthreads in the section.
 - **Shortcut row:** most urgent state of the subtree as the glyph, title, provider, age; second
   line with the projects it spans and progress ("bb-plugins · 2/4 done · 1 needs you").
-- Click opens the orchestrator and highlights its tree in the folder, unfolding as needed.
+- Click opens the orchestrator like a normal row: no scrolling, unfolding or highlighting in the tree.
 - Finished orchestrations leave the section by themselves; archiving happens in the folder. The
   section hides when empty.
 - An orchestrator is any thread with unarchived subthreads, detected automatically.
@@ -225,3 +225,5 @@ The owner delegated these; answers are folded into the sections above.
 - Needs you shortcut: ⇧⌘I; check Settings → Keyboard for a clash with another plugin's command.
 - Stuck: 10 silent minutes, as a setting, ignoring threads with background work running.
 - Archiving can remove worktrees with uncommitted changes, so bulk archive skips dirty worktrees.
+- Orchestrations shortcut click (owner, slice 6 review): «when I click the orchestration dialog, I
+  just open it like it is normal dialog, without scrolling and without highlighting anything».

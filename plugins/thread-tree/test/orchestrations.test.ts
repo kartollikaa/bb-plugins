@@ -103,7 +103,7 @@ test("a waiting subthread keeps its orchestration in the section", () => {
   assert.deepEqual(orchestrations(buildForest(threads)).map((o) => o.state), ["waiting"]);
 });
 
-test("revealing an orchestration covers its whole tree, nested subthreads included", () => {
+test("an orchestration's tree covers nested subthreads too", () => {
   const forest = buildForest([thread("root"), thread("a", { parentThreadId: "root" }), thread("a1", { parentThreadId: "a" }), thread("other")]);
   assert.deepEqual(orchestrationTreeIds(forest, "root").sort(), ["a", "a1", "root"]);
 });

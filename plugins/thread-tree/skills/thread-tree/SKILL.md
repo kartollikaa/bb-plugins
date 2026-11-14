@@ -82,8 +82,8 @@ section under the Threads heading has a shortcut for each top-level one that
 still has work going: something in its tree runs, waits, needs input, failed or
 finished unread. The shortcut's glyph is the most urgent of these, and its
 second line gives the projects it spans and its progress, such as
-`bb-plugins · 2/4 done · 1 needs you`. Clicking it opens the orchestrator,
-unfolds its project folder and its tree, and briefly lights the tree up.
+`bb-plugins · 2/4 done · 1 needs you`. Clicking it opens the orchestrator like
+any row, leaving the tree below as it is.
 Finished orchestrations drop out by themselves; the section hides when empty
 and in the archived view.
 

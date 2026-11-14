@@ -78,7 +78,7 @@ import {
   foldState,
   type TreeRow,
 } from "./tree";
-import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, orchestrationTreeIds, rollupOver } from "./orchestrations";
+import { foldArchivePlan, foldBarSegments, type FoldArchivePlan, isFinishedFold, orchestrations, orchestrationSubtitle, rollupOver } from "./orchestrations";
 import { archiveInTurn, settlesTrue } from "./archiveRun";
 import { useSubagents, type ThreadSubagents } from "./useSubagents";
 import { usePersistentChoice, usePersistentList, usePersistentRecord, usePersistentSet } from "./usePersistentSet";
@@ -244,7 +244,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   });
   const sharedBranches = useMemo(() => sharedBranchThreads(threads, familyRootOf(threads)), [threads]);
   const orchestrationList = useMemo(() => orchestrations(activeForest), [activeForest]);
-  const [revealed, setRevealed] = useState<{ id: string; ids: ReadonlySet<string> } | null>(null);
   const canHover = !useMediaQuery(NO_HOVER_QUERY);
   const searchPool = showArchived ? listed.threads : threads;
   const flatList = useMemo(() => {
@@ -307,31 +306,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
     [navigate, onNavigate],
   );
 
-  const revealOrchestration = useCallback(
-    (thread: PluginSidebarThread, event: MouseEvent) => {
-      if (event.button !== 0 || event.shiftKey || event.altKey) return;
-      event.preventDefault();
-      const group = groups.find((entry) => entry.rows.some((row) => row.thread.id === thread.id));
-      if (group) collapsedGroups.remove([group.key]);
-      const tree = orchestrationTreeIds(activeForest, thread.id);
-      collapsedThreads.remove(tree);
-      setRevealed({ id: thread.id, ids: new Set(tree) });
-      navigate.toThread(thread.id, { split: event.metaKey || event.ctrlKey });
-      onNavigate();
-    },
-    [groups, collapsedGroups, collapsedThreads, activeForest, navigate, onNavigate],
-  );
-  useEffect(() => {
-    if (!revealed) return;
-    const scroll = setTimeout(() => {
-      treeRef.current?.querySelector(`[data-thread-id="${CSS.escape(revealed.id)}"]`)?.scrollIntoView({ block: "nearest", behavior: view.reduceMotion ? "auto" : "smooth" });
-    }, REVEAL_SCROLL_DELAY_MS);
-    const clear = setTimeout(() => setRevealed(null), REVEAL_HIGHLIGHT_MS);
-    return () => {
-      clearTimeout(scroll);
-      clearTimeout(clear);
-    };
-  }, [revealed, view.reduceMotion]);
   const [archiveJob, setArchiveJob] = useState<BbArchiveJob | null>(null);
   const archiveJobRunning = useRef(false);
   const runBbArchive = useCallback((targets: PluginThreadActionTarget[]) => {
@@ -368,7 +342,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const renderRow = (
     row: TreeRow<PluginSidebarThread>,
     variant: "tree" | "flat",
-    { subtitle, numbered = variant === "tree", rollup, onOpen = open }: { subtitle?: string; numbered?: boolean; rollup?: RollupState | null; onOpen?: typeof open } = {},
+    { subtitle, numbered = variant === "tree", rollup }: { subtitle?: string; numbered?: boolean; rollup?: RollupState | null } = {},
   ) => (
     <Fragment key={row.thread.id}>
       <ThreadRowView
@@ -379,7 +353,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         context={variant === "flat" ? projectById.get(row.thread.projectId)?.name : undefined}
         subtitle={subtitle}
         isActive={row.thread.id === activeThreadId}
-        isRevealed={variant === "tree" && !!revealed?.ids.has(row.thread.id)}
         rollup={rollup}
         isCompactViewport={isCompactViewport}
         canHover={canHover}
@@ -391,7 +364,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
         view={view}
         now={now}
         onToggle={() => collapsedThreads.toggle(row.thread.id)}
-        onOpen={onOpen}
+        onOpen={open}
       />
       {variant === "tree" && row.foldCounts ? (
         <FoldLine
@@ -567,7 +540,6 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                 numbered: false,
                 subtitle: orchestrationSubtitle(entry, (projectId) => projectById.get(projectId)?.name ?? null),
                 rollup: entry.rollup,
-                onOpen: revealOrchestration,
               }))}
             </div>
           </Collapse>
@@ -941,7 +913,6 @@ function ThreadRowView({
   context,
   subtitle,
   isActive,
-  isRevealed,
   rollup,
   isCompactViewport,
   canHover,
@@ -965,7 +936,6 @@ function ThreadRowView({
   subtitle?: string;
   isActive: boolean;
   /** Lit briefly after its orchestration shortcut was clicked. */
-  isRevealed: boolean;
   /** The subtree's state drawn in place of the thread's own; a folded tree row works it out itself. */
   rollup?: RollupState | null;
   isCompactViewport: boolean;
@@ -1020,11 +990,9 @@ function ThreadRowView({
         data-thread-row=""
         data-thread-id={thread.id}
         data-rollup={rolledUp ?? undefined}
-        data-revealed={isRevealed || undefined}
         className={cn(
           "group/row relative rounded-md text-sm text-sidebar-foreground/90",
           isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : ROW_TINT,
-          REVEALED_RING,
         )}
         data-keyboard-focus={keyboardFocus || undefined}
         data-menu-open={menuOpen || undefined}
@@ -1301,9 +1269,6 @@ const FOLD_BAR_CLASS: Record<FoldState, string> = {
   done: "bg-sidebar-foreground/20",
 };
 
-const REVEAL_SCROLL_DELAY_MS = 220;
-const REVEAL_HIGHLIGHT_MS = 1_600;
-const REVEALED_RING = "data-[revealed]:bg-sidebar-accent/70 data-[revealed]:ring-1 data-[revealed]:ring-inset data-[revealed]:ring-sidebar-ring/40";
 
 /** The line under a folded parent: its whole subtree by state. Clicking it unfolds; a finished one offers Archive. */
 function FoldLine({

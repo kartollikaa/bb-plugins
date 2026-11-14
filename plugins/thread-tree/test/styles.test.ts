@@ -27,3 +27,8 @@ test("rows take their hover tint from ROW_TINT instead of spelling it again", ()
     );
   assert.deepEqual(offenders, []);
 });
+
+test("an Orchestrations shortcut opens its thread like any row: no scroll, unfold or highlight in the tree", () => {
+  const list = readFileSync(join(SRC, "ThreadTreeList.tsx"), "utf8");
+  assert.doesNotMatch(list, /data-revealed|scrollIntoView|revealOrchestration/);
+});

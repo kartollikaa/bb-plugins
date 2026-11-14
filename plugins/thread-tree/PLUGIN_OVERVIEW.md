@@ -27,7 +27,7 @@ under it, and the subagents it runs inside its own session show on its row.
   state; its glyph shows the most urgent state below. A finished fold offers
   Archive, skipping worktrees with uncommitted changes.
 - Orchestrations: a shortcut for each orchestrator with work going, with its
-  projects and progress. Click to open it and light up its tree.
+  projects and progress.
 - Before each title, bb's own status glyph: a spinner while the agent works, a
   question mark when it needs input, a red cross for a failure, a dot for an
   unread result, a pencil for a draft. A failed thread gets a Retry button.
