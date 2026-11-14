@@ -120,7 +120,8 @@ In each project folder, top-level threads that are idle and read, hold no draft
 or pending question, aren't pinned or open, have only such subthreads, whose
 pull requests are merged, closed or absent, and where nothing changed for over a
 day fold into one "N older" line at the folder's end; its tooltip states that
-rule. A thread whose PR state isn't known yet stays out. Clicking the line shows
+rule. A thread whose PR state isn't known yet stays out, so without bb's GitHub PR
+Status plugin a thread with an environment never folds. Clicking the line shows
 them above it and turns it into "Hide older" with an "Archive these" button.
 That button works like a finished fold's Archive across all of them: bb's own
 Archive with its confirmation and Undo, worktrees with changes skipped, and a
