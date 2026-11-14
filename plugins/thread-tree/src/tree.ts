@@ -19,6 +19,8 @@ export interface TreeThread {
   activity: { backgroundAgents: number; backgroundCommands: number; workflows: number };
   createdAt: number;
   updatedAt: number;
+  /** bb's own activity time and sort key; reading a thread moves `updatedAt`, not this. */
+  latestAttentionAt: number;
 }
 
 export interface TreeRow<T extends TreeThread> {
@@ -112,7 +114,7 @@ export function displayParentId<T extends TreeThread>(thread: T, byId: ReadonlyM
   return null;
 }
 
-const byActivity = (a: TreeThread, b: TreeThread) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id);
+export const byActivity = (a: TreeThread, b: TreeThread) => b.latestAttentionAt - a.latestAttentionAt || b.createdAt - a.createdAt || a.id.localeCompare(b.id);
 const bySpawnOrder = (a: TreeThread, b: TreeThread) => a.createdAt - b.createdAt || a.id.localeCompare(b.id);
 const byPinOrder = (a: TreeThread, b: TreeThread) =>
   (a.pinSortKey ?? "").localeCompare(b.pinSortKey ?? "") || (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || a.id.localeCompare(b.id);
@@ -332,7 +334,7 @@ export function groupRows<T extends TreeThread>(
       key,
       projectId,
       rootCount: roots.length,
-      latestActivityAt: Math.max(0, ...roots.map((root) => root.updatedAt)),
+      latestActivityAt: Math.max(0, ...roots.map((root) => root.latestAttentionAt)),
       rows: rows(shown),
       older: older.length > 0 ? { rootCount: older.length, rows: rows(older) } : null,
     };

@@ -34,6 +34,7 @@ const thread = (id: string, extra: Partial<FilterThread> = {}): FilterThread => 
   displayTitle: id,
   environment: null,
   ...extra,
+  latestAttentionAt: extra.latestAttentionAt ?? extra.updatedAt ?? 0,
 });
 
 const ids = (threads: readonly { id: string }[]) => threads.map((t) => t.id);
@@ -229,4 +230,12 @@ test("the empty search box closing on blur leaves focus where the click put it",
   assert.equal(refocusAfterClose({ search: true }, "blur"), null);
   assert.deepEqual(refocusAfterClose({ search: true }, "action"), { search: true });
   assert.deepEqual(refocusAfterClose({ filter: "input" }, "action"), { filter: "input" });
+});
+
+test("a filter's list keeps its order when a listed thread is opened", () => {
+  const threads = [
+    thread("a", { status: "active", latestAttentionAt: 5, updatedAt: 100 }),
+    thread("b", { status: "active", latestAttentionAt: 9, updatedAt: 9 }),
+  ];
+  assert.deepEqual(filterThreads(threads, "running").map((t) => t.id), ["b", "a"]);
 });

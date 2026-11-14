@@ -1,6 +1,6 @@
 // The status line's counts, the flat lists they filter to, and `/` search.
 import { familyRootOf } from "./sharedBranch.ts";
-import { threadDotState, type TreeThread } from "./tree.ts";
+import { byActivity, threadDotState, type TreeThread } from "./tree.ts";
 
 export type StatusFilter = "input" | "error" | "running" | "unread";
 
@@ -31,7 +31,6 @@ export function statusFilterOf(thread: FilterThread): StatusFilter | null {
 }
 
 const isListed = (thread: FilterThread) => !thread.isHidden && !thread.isArchived;
-const byActivity = (a: FilterThread, b: FilterThread) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id);
 
 export function countStatusFilters(threads: readonly FilterThread[]): StatusFilterCounts {
   const counts: StatusFilterCounts = { input: 0, error: 0, running: 0, unread: 0 };

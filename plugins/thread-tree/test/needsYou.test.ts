@@ -49,6 +49,7 @@ const thread = (id: string, extra: Partial<NeedsYouThread> = {}): NeedsYouThread
   environment: null,
   queuedWork: "none",
   ...extra,
+  latestAttentionAt: extra.latestAttentionAt ?? extra.updatedAt ?? 0,
 });
 
 const none = () => null;

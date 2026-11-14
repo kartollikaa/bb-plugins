@@ -130,9 +130,14 @@ and in folder there are gonna be the whole … with nested tree."
   considered and how they can be considered as orchestrators».
 - **An Orchestrations section** under the Threads heading, after Pinned, lists one shortcut row per
   orchestrator for as long as it is one: until the orchestrator or its last subthread is archived.
-  Idle and read does not hide it. Order: most urgent rolled-up state first (FOLD_PRIORITY), ties by
-  the tree's latest activity; finished ones (everything done and read) last, drawn muted, with no
-  extra action. No subthreads in the section.
+  Idle and read does not hide it. Order: most urgent rolled-up state first (FOLD_PRIORITY), with
+  unread and read finished trees sharing the last place; ties by the tree's `latestAttentionAt`
+  (bb's own activity sort key). Read finished ones draw muted, with no extra action. No subthreads
+  in the section.
+- **The user's clicks never reorder it** (owner: «Нужно оставлять их там, где они как бы и были.
+  Мои клики не должны менять их расположение.»). Reading a thread bumps `updatedAt` and clears
+  unread, so neither may key the order; folders, filters and Recent Activity sort on
+  `latestAttentionAt` for the same reason.
 - **Shortcut row:** most urgent state of the subtree as the glyph, title, provider, age; second
   line with the projects it spans and progress ("bb-plugins · 2/4 done · 1 needs you").
 - Click opens the orchestrator like a normal row: no scrolling, unfolding or highlighting in the tree.

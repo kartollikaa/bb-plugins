@@ -30,6 +30,7 @@ const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
   createdAt: 0,
   updatedAt: 0,
   ...extra,
+  latestAttentionAt: extra.latestAttentionAt ?? extra.updatedAt ?? 0,
 });
 const running = { status: "active" };
 const input = { hasPendingInteraction: true };
@@ -77,9 +78,9 @@ test("Orchestrations lists every root with subthreads, most urgent first, with t
     thread("l3", { parentThreadId: "live" }),
     thread("l4", { parentThreadId: "l3", ...unread }),
     thread("l5", { parentThreadId: "live", ...failed }),
-    thread("finished", { updatedAt: 8 }),
+    thread("finished", { updatedAt: 7 }),
     thread("f1", { parentThreadId: "finished" }),
-    thread("unreadOnly", { updatedAt: 7 }),
+    thread("unreadOnly", { updatedAt: 8 }),
     thread("u1", { parentThreadId: "unreadOnly", ...unread }),
     thread("selfRunning", { updatedAt: 6, ...running }),
     thread("s1", { parentThreadId: "selfRunning" }),
@@ -212,4 +213,18 @@ test("every asked thread gets an archive scope, a leaf with nothing below it too
     [{ threadId: "root", descendantIds: ["kid", "owned"] }, { threadId: "leaf", descendantIds: [] }],
   );
   assert.deepEqual(scopes, { root: ["root", "owned", "kid"], leaf: ["leaf"] });
+});
+
+test("opening an orchestration keeps its place: reading bumps updatedAt and clears unread, neither moves it", () => {
+  const tree = (readA: boolean) => [
+    thread("a", { latestAttentionAt: 5, updatedAt: readA ? 100 : 5 }),
+    thread("a1", { parentThreadId: "a", isUnread: !readA }),
+    thread("b", { latestAttentionAt: 9, updatedAt: 9 }),
+    thread("b1", { parentThreadId: "b" }),
+    thread("c", { latestAttentionAt: 1, updatedAt: 1 }),
+    thread("c1", { parentThreadId: "c", isUnread: true }),
+  ];
+  const order = (readA: boolean) => orchestrations(buildForest(tree(readA))).map((o) => o.thread.id);
+  assert.deepEqual(order(false), ["b", "a", "c"]);
+  assert.deepEqual(order(true), ["b", "a", "c"]);
 });

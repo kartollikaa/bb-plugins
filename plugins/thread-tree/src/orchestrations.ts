@@ -42,7 +42,7 @@ export interface Orchestration<T extends TreeThread> {
   running: number;
 }
 
-/** Every top-level thread with an unarchived subthread at any depth; most urgent first, then latest activity. */
+/** Every top-level thread with an unarchived subthread at any depth; most urgent first, then bb's latest activity. */
 export function orchestrations<T extends TreeThread>(forest: Forest<T>): Orchestration<T>[] {
   const out: Orchestration<T>[] = [];
   const latest = new Map<string, number>();
@@ -67,10 +67,13 @@ export function orchestrations<T extends TreeThread>(forest: Forest<T>): Orchest
       failed: counts.error ?? 0,
       running: counts.running ?? 0,
     });
-    latest.set(root.id, Math.max(root.updatedAt, ...subtree.map((kid) => kid.updatedAt)));
+    latest.set(root.id, Math.max(root.latestAttentionAt, ...subtree.map((kid) => kid.latestAttentionAt)));
   }
-  return out.sort((a, b) => rank(a.state) - rank(b.state) || latest.get(b.thread.id)! - latest.get(a.thread.id)! || a.thread.id.localeCompare(b.thread.id));
+  return out.sort((a, b) => orderRank(a.state) - orderRank(b.state) || latest.get(b.thread.id)! - latest.get(a.thread.id)! || a.thread.id.localeCompare(b.thread.id));
 }
+
+/** Read and unread finished trees share a place, so opening one never moves it. */
+const orderRank = (state: FoldState) => rank(state === "unread" ? "done" : state);
 
 function inTreeOrder<T extends TreeThread>(forest: Forest<T>, rootId: string): T[] {
   const out: T[] = [];

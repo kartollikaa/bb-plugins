@@ -95,9 +95,10 @@ unarchived subthread at any depth; nothing else counts, not a title or a name.
 The Orchestrations section under the Threads heading, after Pinned and before
 the project folders, has a shortcut for every orchestrator, idle and read ones
 included, until the orchestrator or its last subthread is archived. Shortcuts
-go most urgent first (needs input, failed, running, waiting, unread), ties by
-the tree's latest activity; finished ones (everything done and read) go last
-and draw muted. The shortcut's glyph is the most urgent state in the tree, and
+go most urgent first (needs input, failed, running, waiting), then finished
+ones, read or not, which draw muted once read; ties go by the tree's latest
+activity in bb's sense (`latestAttentionAt`). Opening or reading a thread
+never moves its shortcut. The shortcut's glyph is the most urgent state in the tree, and
 its second line gives the projects it spans and its progress, such as
 `bb-plugins · 2/4 done · 1 needs you`. Clicking it opens the orchestrator like
 any row, leaving the tree below as it is.
@@ -200,7 +201,8 @@ heading to choose the global thread order. Each folder follows it unless you
 open its Thread settings and choose an override. Use global setting clears that override. The global choice
 and folder overrides persist in this browser, including after a reload:
 
-- Last activity (default): most recently active first.
+- Last activity (default): most recently active first, by bb's own activity time,
+  so opening or reading a thread does not move it.
 - Creation date: newest first; message activity keeps rows in place.
 - Status: needs input, errors, working, waiting (a queued message or a goal between turns), then done, using the most urgent state
   in each thread's subtree. Within a status, newest threads come first.

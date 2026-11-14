@@ -20,6 +20,7 @@ const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
   createdAt: 0,
   updatedAt: 0,
   ...extra,
+  latestAttentionAt: extra.latestAttentionAt ?? extra.updatedAt ?? 0,
 });
 
 test("a streaming agent's updates never mark its PRs for refetch; the turn ending does", () => {

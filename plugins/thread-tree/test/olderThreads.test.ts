@@ -25,6 +25,7 @@ function thread(id: string, over: Partial<TreeThread> = {}): TreeThread {
     createdAt: OLD,
     updatedAt: OLD,
     ...over,
+    latestAttentionAt: over.latestAttentionAt ?? over.updatedAt ?? OLD,
   };
 }
 

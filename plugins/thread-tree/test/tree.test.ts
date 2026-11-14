@@ -20,6 +20,7 @@ const thread = (id: string, extra: Partial<TreeThread> = {}): TreeThread => ({
   createdAt: 0,
   updatedAt: 0,
   ...extra,
+  latestAttentionAt: extra.latestAttentionAt ?? extra.updatedAt ?? 0,
 });
 
 const ids = (rows: { thread: TreeThread; depth: number }[]) => rows.map((r) => `${"-".repeat(r.depth)}${r.thread.id}`);
@@ -290,8 +291,8 @@ test("folder creation order stays fixed when activity changes, with nested child
   const rows = (sort: "activity" | "created") => ids(groupRows(buildForest(threads), new Set(), "project", null, null, { "project:p1": sort })[0]!.rows);
   assert.deepEqual(rows("activity"), ["old", "new", "-kid"]);
   assert.deepEqual(rows("created"), ["new", "-kid", "old"]);
-  threads[0]!.updatedAt = 100;
-  threads[1]!.updatedAt = 200;
+  threads[0]!.latestAttentionAt = 100;
+  threads[1]!.latestAttentionAt = 200;
   assert.deepEqual(rows("activity"), ["new", "-kid", "old"]);
   assert.deepEqual(rows("created"), ["new", "-kid", "old"]);
 });
@@ -426,4 +427,15 @@ test("threads on screen are the flat list's while it replaces the tree, else Rec
   assert.deepEqual(threadsOnScreen({ flatList: [c], recent: [a], recentHidden: false, groups, collapsed: new Set() }).map((t) => t.id), ["c"]);
   assert.deepEqual(threadsOnScreen({ flatList: null, recent: [b], recentHidden: false, groups, collapsed: new Set(["p2"]) }).map((t) => t.id), ["b", "a"]);
   assert.deepEqual(threadsOnScreen({ flatList: null, recent: [c], recentHidden: true, groups, collapsed: new Set(["p1"]) }).map((t) => t.id), ["c"]);
+});
+
+test("activity order follows bb's latestAttentionAt, so opening a thread does not move it or its folder", () => {
+  const threads = (readOld: boolean) => [
+    thread("new", { projectId: "p1", latestAttentionAt: 9, updatedAt: 9 }),
+    thread("old", { projectId: "p2", latestAttentionAt: 1, updatedAt: readOld ? 100 : 1 }),
+    thread("mid", { projectId: "p2", latestAttentionAt: 5, updatedAt: 5 }),
+  ];
+  const layout = (readOld: boolean) => groupRows(buildForest(threads(readOld)), new Set(), "project").map((group) => [group.key, ...group.rows.map((row) => row.thread.id)]);
+  assert.deepEqual(layout(true), layout(false));
+  assert.deepEqual(recentThreads(threads(true), 3).map((t) => t.id), ["new", "mid", "old"]);
 });
