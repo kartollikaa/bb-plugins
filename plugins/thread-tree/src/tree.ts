@@ -62,6 +62,14 @@ export function foldState(thread: TreeThread): FoldState {
   return state === "done" && thread.isUnread ? "unread" : state;
 }
 
+/** A state a subtree can roll up into its parent's glyph: one more urgent than the parent's, so never done. */
+export type RollupState = Exclude<FoldState, "done">;
+
+export function addFoldState(counts: FoldCounts, thread: TreeThread): void {
+  const state = foldState(thread);
+  counts[state] = (counts[state] ?? 0) + 1;
+}
+
 /** Most urgent first: what needs the user, then what broke, then live work, then work parked between turns. */
 const THREAD_DOT_PRIORITY: readonly ThreadState[] = ["input", "error", "running", "waiting", "done"];
 
@@ -218,8 +226,7 @@ export function flattenRows<T extends TreeThread>(
     const visit = (kid: T, underPeek: boolean) => {
       const peeks = !underPeek && peeksOut(kid);
       if (peeks) peeking.push(kid);
-      const state = foldState(kid);
-      counts[state] = (counts[state] ?? 0) + 1;
+      addFoldState(counts, kid);
       for (const grandkid of kidsOf(kid)) visit(grandkid, underPeek || peeks);
     };
     for (const kid of kidsOf(thread)) visit(kid, false);

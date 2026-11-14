@@ -1,5 +1,5 @@
 // Orchestrators (threads with subthreads): the Orchestrations shortcuts, the folded rollup and fold bar, and archiving a finished fold.
-import { descendantsOf, FOLD_PRIORITY, foldState, type FoldCounts, type FoldState, type Forest, type TreeThread } from "./tree.ts";
+import { addFoldState, descendantsOf, FOLD_PRIORITY, foldState, type FoldCounts, type FoldState, type Forest, type RollupState, type TreeThread } from "./tree.ts";
 
 const rank = (state: FoldState) => FOLD_PRIORITY.indexOf(state);
 
@@ -8,9 +8,9 @@ export function mostUrgent(counts: FoldCounts): FoldState | null {
 }
 
 /** The subtree's most urgent state when it outranks the parent's own; null keeps the parent's glyph. */
-export function rollupOver(own: FoldState, counts: FoldCounts): FoldState | null {
+export function rollupOver(own: FoldState, counts: FoldCounts): RollupState | null {
   const below = mostUrgent(counts);
-  return below !== null && rank(below) < rank(own) ? below : null;
+  return below !== null && below !== "done" && rank(below) < rank(own) ? below : null;
 }
 
 export function isFinishedFold(own: FoldState, counts: FoldCounts): boolean {
@@ -28,6 +28,8 @@ export interface Orchestration<T extends TreeThread> {
   thread: T;
   /** Most urgent state across the orchestrator and its subtree. */
   state: FoldState;
+  /** The subtree's state when it outranks the orchestrator's own. */
+  rollup: RollupState | null;
   /** The orchestrator's project first, then its subthreads' in tree order. */
   projectIds: string[];
   total: number;
@@ -44,13 +46,15 @@ export function orchestrations<T extends TreeThread>(forest: Forest<T>): Orchest
     const subtree = descendantsOf(forest, root.id);
     if (subtree.length === 0) continue;
     const counts: FoldCounts = {};
-    for (const kid of subtree) counts[foldState(kid)] = (counts[foldState(kid)] ?? 0) + 1;
+    subtree.forEach((kid) => addFoldState(counts, kid));
     const own = foldState(root);
-    const state = rollupOver(own, counts) ?? own;
+    const rollup = rollupOver(own, counts);
+    const state = rollup ?? own;
     if (state === "done") continue;
     out.push({
       thread: root,
       state,
+      rollup,
       projectIds: [...new Set([root.projectId, ...inTreeOrder(forest, root.id).map((kid) => kid.projectId)])],
       total: subtree.length,
       done: (counts.done ?? 0) + (counts.unread ?? 0),

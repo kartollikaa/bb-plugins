@@ -74,6 +74,7 @@ import {
   type GroupMode,
   type FoldCounts,
   type FoldState,
+  type RollupState,
   foldState,
   type TreeRow,
 } from "./tree";
@@ -352,7 +353,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const renderRow = (
     row: TreeRow<PluginSidebarThread>,
     variant: "tree" | "flat",
-    { subtitle, numbered = variant === "tree", rollup, onOpen = open }: { subtitle?: string; numbered?: boolean; rollup?: FoldState | null; onOpen?: typeof open } = {},
+    { subtitle, numbered = variant === "tree", rollup, onOpen = open }: { subtitle?: string; numbered?: boolean; rollup?: RollupState | null; onOpen?: typeof open } = {},
   ) => (
     <Fragment key={row.thread.id}>
       <ThreadRowView
@@ -550,7 +551,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
               {orchestrationList.map((entry) => renderRow(flatRow(entry.thread), "flat", {
                 numbered: false,
                 subtitle: orchestrationSubtitle(entry, (projectId) => projectById.get(projectId)?.name ?? null),
-                rollup: entry.state === foldState(entry.thread) ? null : entry.state,
+                rollup: entry.rollup,
                 onOpen: revealOrchestration,
               }))}
             </div>
@@ -950,7 +951,7 @@ function ThreadRowView({
   /** Lit briefly after its orchestration shortcut was clicked. */
   isRevealed: boolean;
   /** The subtree's state drawn in place of the thread's own; a folded tree row works it out itself. */
-  rollup?: FoldState | null;
+  rollup?: RollupState | null;
   isCompactViewport: boolean;
   canHover: boolean;
   subagents: ThreadSubagents | undefined;

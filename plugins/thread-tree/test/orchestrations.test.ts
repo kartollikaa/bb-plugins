@@ -94,6 +94,7 @@ test("Orchestrations lists roots with subthreads that still have work going, wit
     { state: "input", projectIds: ["bb", "p1", "web"], total: 5, done: 2, needsYou: 1, failed: 1, running: 1 },
   );
   assert.equal(unreadOnly!.state, "unread");
+  assert.deepEqual(list.map((o) => o.rollup), ["input", "unread", null]);
   assert.equal(orchestrationSubtitle(live!, (id) => ({ bb: "bb-plugins", web: "web" })[id] ?? null), "bb-plugins + web · 2/5 done · 1 needs you · 1 failed · 1 running");
   assert.equal(orchestrationSubtitle(unreadOnly!, () => "bb-plugins"), "bb-plugins · 1/1 done");
 });
