@@ -32,13 +32,14 @@ under it, and the subagents it runs inside its own session show on its row.
   question mark when it needs input, a red cross for a failure, a dot for an
   unread result, a pencil for a draft. A failed thread gets a Retry button.
 - Rows are one line. A tinted PR icon appears only when a pull request needs
-  action: failing checks, conflicts, changes requested or ready to merge.
+  action.
 - A ⚠ warns when another live thread works on the same branch or worktree.
 - Each row shows its agent provider; hover for title, branch and age.
 - Hovering or focusing a row fades Archive and ⋯ in over its end; Archive keeps
   bb's confirmation and Undo. Cmd+Z or Ctrl+Z restores recently archived
   threads and their children.
-- Hover a running thread's spinner to stop it.
+- Hover a running thread's spinner to stop it; on a touch screen Stop is only
+  in the row's menu.
 - Provider subagents show a counter and status dot on the parent's row;
   hover for type, state, duration and tokens.
 - Hold Ctrl (or Cmd on a Mac) to see each row's jump key.
@@ -53,10 +54,11 @@ to their headers and reopen on drop.
 
 ## Settings
 
-Settings → Installed plugins → Thread Tree holds the section switches, Recent
+Thread Tree's settings hold the section switches, Recent
 Activity row counts, which PRs Needs you lists, provider icon colour (brand tint or monochrome), and
 switches for the subagent counters and the age label. Reduce motion stops the
-sidebar animations and spinners.
+sidebar animations and holds spinners still; so does the system's
+reduced-motion preference.
 
 ## How it works
 
