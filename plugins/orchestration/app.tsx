@@ -16,6 +16,7 @@ import { OrchestrationTab } from "./src/OrchestrationTab";
 import { OrchestratorHeader, OrchestratorPage } from "./src/OrchestratorPage";
 import { surfacePreference, useOpenView, useViewSwitch } from "./src/surface";
 import { shouldOpenView, threadFromSubPath, VIEW_PATH } from "./src/route";
+import { orchestratorLookupKeys } from "./src/switch";
 import { useIsOrchestrator, useOrchestration, useOrchestratorMembership } from "./src/useOrchestration";
 
 const TAB = { id: "orchestration", context: { kind: "thread" }, availability: "fixed" } as const;
@@ -62,7 +63,7 @@ interface SwitchData {
 
 /** The thread-header twin of the view's title-bar switch: it shows the view as off, and turning it on opens the view. */
 function useSwitchData({ threadIds }: { threadIds: readonly string[] }): SwitchData {
-  const keys = useMemo(() => threadIds.slice(0, 200), [threadIds]);
+  const keys = useMemo(() => orchestratorLookupKeys(threadIds), [threadIds]);
   const query = experimental_useRpcKeyedQuery({ contract, method: "isOrchestrator", keys, enabled: keys.length > 0 });
   const viewSwitch = useViewSwitch();
   const openView = useOpenView();

@@ -2,6 +2,8 @@ export const VIEW_PATH = "orchestrator";
 
 const THREAD_ID = /^thr_[a-z0-9]+$/i;
 
+export const isThreadId = (id: string) => THREAD_ID.test(id);
+
 export function threadFromSubPath(subPath: string): string | null {
   const [first = ""] = subPath.split("/");
   let id: string;
@@ -10,7 +12,7 @@ export function threadFromSubPath(subPath: string): string | null {
   } catch {
     return null;
   }
-  return THREAD_ID.test(id) ? id : null;
+  return isThreadId(id) ? id : null;
 }
 
 export interface PreferenceStorage {
