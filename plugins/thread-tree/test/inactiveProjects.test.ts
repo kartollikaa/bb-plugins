@@ -29,7 +29,7 @@ function thread(id: string, projectId: string, over: Partial<TreeThread> = {}): 
   };
 }
 
-const ctx = (over: Partial<InactiveContext> = {}): InactiveContext => ({ now: NOW, hideAfterHours: 24, activeThreadId: null, activeWasInactive: false, ...over });
+const ctx = (over: Partial<InactiveContext> = {}): InactiveContext => ({ now: NOW, hideAfterHours: 24, activeThreadId: null, activeWasInactive: false, lastActivityAt: {}, ...over });
 
 const inactive = (threads: TreeThread[], projects: string[], context = ctx()) => [...inactiveProjectIds(buildForest(threads), projects, context)].sort();
 
@@ -96,6 +96,18 @@ test("a thread's folder is its display root's project; a pinned tree has none", 
   assert.equal(folderProjectOf(forest, "pin"), null);
   assert.equal(folderProjectOf(forest, null), null);
   assert.equal(folderProjectOf(forest, "missing"), null);
+});
+
+test("all archived but one old thread left: the archived threads' recent turns keep the folder", () => {
+  const threads = [thread("left", "p", { latestAttentionAt: NOW - 25 * HOUR_MS })];
+  assert.deepEqual(inactive(threads, ["p"]), ["p"]);
+  assert.deepEqual(inactive(threads, ["p"], ctx({ lastActivityAt: { p: NOW - HOUR_MS } })), []);
+});
+
+test("work only in subthreads keeps the folder though no thread's latestAttentionAt moved", () => {
+  const threads = [thread("root", "p"), thread("kid", "p", { parentThreadId: "root" })];
+  assert.deepEqual(inactive(threads, ["p"], ctx({ lastActivityAt: { p: NOW - 2 * HOUR_MS } })), []);
+  assert.deepEqual(inactive(threads, ["p"], ctx({ lastActivityAt: { p: STALE } })), ["p"]);
 });
 
 test("the rule names the window", () => {

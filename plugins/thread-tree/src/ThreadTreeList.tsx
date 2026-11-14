@@ -161,14 +161,19 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const archivedPages = showArchived ? listed.experimental_archived : null;
   const rpc = useRpc<typeof rpcContract>();
   const [serverProjectFolders, setServerProjectFolders] = useState<readonly string[]>([]);
+  const [projectActivity, setProjectActivity] = useState<Readonly<Record<string, number>>>({});
   const projectPresence = [...new Set(threads.map((thread) => thread.projectId))].sort().join();
+  const turnsKey = threads.filter((thread) => thread.status !== "idle").map((thread) => thread.id).sort().join();
+  const activityPoll = useNow(ACTIVITY_POLL_MS);
   useEffect(() => {
     let cancelled = false;
-    void rpc.call("projectFolders", null).then(({ projectIds }) => {
-      if (!cancelled) setServerProjectFolders(projectIds);
+    void rpc.call("projectFolders", null).then(({ projectIds, lastActivityAt }) => {
+      if (cancelled) return;
+      setServerProjectFolders(projectIds);
+      setProjectActivity(lastActivityAt);
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [rpc, projectPresence, projects]);
+  }, [rpc, projectPresence, projects, turnsKey, activityPoll]);
   const [savedProjectFolders, setSavedProjectFolders] = usePersistentList("used-project-folders");
   const retainedProjectIds = useMemo(
     () => rememberProjectFolders([...savedProjectFolders, ...serverProjectFolders], projects, [...threads, ...listed.threads]),
@@ -236,8 +241,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const inactiveIds = useMemo(
     () => showArchived || groupMode !== "project"
       ? new Set<string>()
-      : inactiveProjectIds(forest, folderProjectIds, { now, hideAfterHours: view.hideInactiveProjectsAfterHours, activeThreadId: activeThreadId ?? null, activeWasInactive }),
-    [showArchived, groupMode, forest, folderProjectIds, now, view.hideInactiveProjectsAfterHours, activeThreadId, activeWasInactive],
+      : inactiveProjectIds(forest, folderProjectIds, { now, hideAfterHours: view.hideInactiveProjectsAfterHours, activeThreadId: activeThreadId ?? null, activeWasInactive, lastActivityAt: projectActivity }),
+    [showArchived, groupMode, forest, folderProjectIds, now, view.hideInactiveProjectsAfterHours, activeThreadId, activeWasInactive, projectActivity],
   );
   if (!sameIds(stableInactiveIds.current, inactiveIds)) stableInactiveIds.current = inactiveIds;
   const shownInactiveIds = stableInactiveIds.current;
@@ -1826,6 +1831,9 @@ function TurnTimer({ since }: { since: number }) {
     </span>
   );
 }
+
+/** Catches a turn end the server recorded after the refetch its status change triggered. */
+const ACTIVITY_POLL_MS = 10 * 60_000;
 
 function useNow(intervalMs: number): number {
   const [now, setNow] = useState(() => Date.now());

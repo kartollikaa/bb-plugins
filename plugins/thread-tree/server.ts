@@ -18,7 +18,7 @@ import {
 } from "./src/githubFolder";
 import { sectionPatchSchema, SETTINGS } from "./src/settings";
 import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/threadPullRequests";
-import { createProjectFolderHistory } from "./src/projectFolders";
+import { createProjectFolderHistory, lineageProjectIds } from "./src/projectFolders";
 import { ARCHIVE_CLAIM_TTL_MS, createArchiveClaims, createArchiveHistory, releaseUnarchived } from "./src/archiveUndo";
 import { archiveScopes, dirtyEnvironmentIds, MAX_THREADS_PER_CALL } from "./src/orchestrations";
 import { createSignalReader, threadSignalsSchema, type SignalListArgs } from "./src/threadSignals";
@@ -51,7 +51,7 @@ export const rpcContract = defineRpcContract({
     input: z.object({ keys: z.array(z.string().min(1)).min(1).max(200) }),
     output: z.record(z.string(), z.array(threadPullRequestSchema)),
   },
-  projectFolders: { input: z.null(), output: z.object({ projectIds: z.array(z.string()) }) },
+  projectFolders: { input: z.null(), output: z.object({ projectIds: z.array(z.string()), lastActivityAt: z.record(z.string(), z.number()) }) },
   /** Each thread's current turn as its event log tells it; null when the log couldn't be read. */
   threadSignals: {
     input: z.object({ keys: z.array(z.string().min(1)).min(1).max(200) }),
@@ -154,6 +154,25 @@ export default async function plugin(bb: BbPluginApi) {
   for (const event of ["thread.created", "thread.archived", "thread.unarchived", "thread.deleted"] as const) {
     bb.events.on(event, ({ thread }) => projectFolders.record(thread));
   }
+  const parentCache = new Map<string, { id: string; parentThreadId: string | null; projectId: string; visibility: string }>();
+  const threadLineageProjectIds = async (thread: { id: string; parentThreadId: string | null; projectId: string; visibility: string }) => {
+    const ancestors = new Map<string, typeof thread>();
+    for (let parentId = thread.parentThreadId; parentId && !ancestors.has(parentId) && ancestors.size < 32; ) {
+      const parent = parentCache.get(parentId) ?? await bb.sdk.threads.get({ threadId: parentId }).catch(() => null);
+      if (!parent) break;
+      parentCache.set(parent.id, parent);
+      ancestors.set(parent.id, parent);
+      parentId = parent.parentThreadId;
+    }
+    return lineageProjectIds(thread, (id) => ancestors.get(id));
+  };
+  for (const event of ["thread.active", "thread.idle", "thread.failed"] as const) {
+    bb.events.on(event, ({ thread }) => {
+      if (thread.visibility === "hidden") return;
+      const at = Date.now();
+      void threadLineageProjectIds(thread).then((projectIds) => projectFolders.recordActivity(projectIds, at)).catch((error) => bb.log.warn(`project activity: ${error}`));
+    });
+  }
 
   const signals = createSignalReader({
     listEvents: (args: SignalListArgs) => bb.sdk.threads.events.list(args as Parameters<typeof bb.sdk.threads.events.list>[0]),
@@ -242,7 +261,7 @@ export default async function plugin(bb: BbPluginApi) {
     threadPullRequests: async ({ keys }) => Object.fromEntries(await Promise.all(keys.map(async (threadId) =>
       [threadId, await readSessionPullRequests(threadId)],
     ))),
-    projectFolders: async () => ({ projectIds: await projectFolders.list() }),
+    projectFolders: () => projectFolders.list(),
     threadSignals: async ({ keys }) => Object.fromEntries(await Promise.all([...new Set(keys)].map(async (threadId) =>
       [threadId, await signals.read(threadId).catch(() => null)] as const,
     ))),

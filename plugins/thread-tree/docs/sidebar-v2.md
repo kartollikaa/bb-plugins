@@ -221,6 +221,13 @@ Owner: «хочу ещё чтобы проекты которые долго н�
   `latestAttentionAt` is older than `hideInactiveProjectsAfterHours` (default 24, 0 turns it off)
   moves into one "N inactive projects" line at the bottom of the tree, collapsed by default.
   `updatedAt` is not activity: reading a thread bumps it, and a click must not bring a folder back.
+- A turn within the window also keeps the folder. Owner: «Скрываются проекты, по которым была
+  работа и активные сессии за последние N времени». `latestAttentionAt` alone missed two cases:
+  bb doesn't move it on a subthread's turn, and threads archived after recent work leave the
+  active list, so a folder whose remaining thread was old hid. The server keeps each project's last
+  turn (`thread.active`/`idle`/`failed`, credited to the thread's project and every ancestor's),
+  seeded once from all threads' `latestAttentionAt`, archived included. Archiving is not activity:
+  cleaning up an old project must not hold it for another day.
 - A running, queued, asking or failed thread keeps the folder, and so does a pinned thread of
   that project. A finished but unread thread doesn't: Needs you lists it.
 - Hidden folders stay reachable: expanding the line shows them as normal folders, and search,

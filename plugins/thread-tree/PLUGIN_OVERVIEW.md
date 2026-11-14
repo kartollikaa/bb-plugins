@@ -28,7 +28,8 @@ under it, and the subagents it runs inside its own session show on its row.
   Archive, skipping worktrees with uncommitted changes.
 - Per project, threads idle, read and quiet for a day fold into "N older";
   expanded, it offers Archive these, skipping uncommitted worktrees.
-- Projects with no activity for 24 hours (a setting; 0 turns it off) move
+- Projects with no turn for 24 hours, subthreads and since-archived threads
+  included (a setting; 0 turns it off), move
   into "N inactive projects" at the bottom; running, asking, failed or pinned
   threads keep a project in place.
 - Orchestrations: a shortcut for each thread with live subthreads, most

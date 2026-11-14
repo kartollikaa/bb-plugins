@@ -170,8 +170,11 @@ A whole project folder whose threads have all been quiet for longer than the
 `hideInactiveProjectsAfterHours` setting (default 24 hours; 0 turns it off)
 moves into one "N inactive projects" line at the bottom of the tree, collapsed
 by default. Quiet means every thread in the folder's trees, subthreads
-included, is idle (read or not) and its last activity, bb's `latestAttentionAt`, is
-older than the window; reading a thread doesn't count as activity. A running,
+included, is idle (read or not), its last activity, bb's `latestAttentionAt`, is
+older than the window, and no turn ran in the project within the window. The
+plugin's server records each turn's start, end or failure per project, the
+project of every ancestor thread included, so turns in subthreads and in threads
+archived since then count. Reading or archiving a thread doesn't. A running,
 queued, asking or failed thread, or a pinned thread of that project, keeps the
 folder in place, and so does the open thread unless it was opened from the
 expanded line. Clicking the line shows those folders beneath it as normal
