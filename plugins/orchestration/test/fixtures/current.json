@@ -1,0 +1,239 @@
+{
+  "schema": "orchestrate-ledger-export",
+  "schema_version": 1,
+  "ledger": "current.md",
+  "orchestrator": {
+    "id": "self:20261114T1015-a1b2",
+    "raw": "self:20261114T1015-a1b2"
+  },
+  "goal": "Ship the export command",
+  "status": "active",
+  "backend": "cli-subagents",
+  "base": "main",
+  "project_profile": [
+    {
+      "row": "checks",
+      "value": "`make test`",
+      "source": "README «Development»"
+    }
+  ],
+  "subtasks": [
+    {
+      "id": "T1",
+      "name": null,
+      "session": "export-t1",
+      "session_raw": "export-t1",
+      "model_effort": {
+        "raw": "sonnet / high",
+        "model": "sonnet",
+        "effort": "high",
+        "inherits": false
+      },
+      "delivery": "feature/export",
+      "version": "9f1c2ab",
+      "areas": "scripts/**",
+      "depends_on": [],
+      "status": {
+        "value": "gate",
+        "raw": "gate"
+      },
+      "gate": "G1"
+    },
+    {
+      "id": "T2",
+      "name": null,
+      "session": "export-t2",
+      "session_raw": "export-t2",
+      "model_effort": {
+        "raw": "inherits: opus",
+        "model": "opus",
+        "effort": null,
+        "inherits": true
+      },
+      "delivery": "feature/docs",
+      "version": null,
+      "areas": "docs/**",
+      "depends_on": [
+        "T1"
+      ],
+      "status": {
+        "value": "waiting-dependency",
+        "raw": "waiting-dependency"
+      },
+      "gate": null
+    }
+  ],
+  "done_when": {},
+  "landing_queue": [],
+  "current_checkpoint": {
+    "text": "G1 waits on review of 9f1c2ab, since 2026-11-14T10:40+03:00.",
+    "time": {
+      "at": "2026-11-14T10:40+03:00",
+      "precision": "time",
+      "offset": true
+    },
+    "background_waits": [
+      "checks on 9f1c2ab; restart with `make wait-checks`"
+    ],
+    "archive_after_handover": []
+  },
+  "decisions_in_force": [],
+  "unacked_messages": [
+    {
+      "number": "2",
+      "to": "T2",
+      "first_line": "unblocked: T1 landed",
+      "sent": {
+        "raw": "2026-11-14T11:05+03:00",
+        "time": {
+          "at": "2026-11-14T11:05+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "send_result": "queued"
+    }
+  ],
+  "gates": [
+    {
+      "id": "G1",
+      "heading": "G1 — T1 @ 9f1c2ab",
+      "subtask": "T1",
+      "version": "9f1c2ab",
+      "archived": null,
+      "stages": [
+        {
+          "name": "checks",
+          "kind": "checks",
+          "state": "passed",
+          "state_source": "explicit",
+          "time": {
+            "at": "2026-11-14T10:32+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "passed · 2026-11-14T10:32+03:00 · make test 41/41"
+        },
+        {
+          "name": "review",
+          "kind": "review",
+          "state": "running",
+          "state_source": "explicit",
+          "time": {
+            "at": "2026-11-14T10:40+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "running · 2026-11-14T10:40+03:00 · reviewer R1"
+        },
+        {
+          "name": "done when",
+          "kind": "done_when",
+          "state": "pending",
+          "state_source": "explicit",
+          "time": null,
+          "text": "pending"
+        },
+        {
+          "name": "landing",
+          "kind": "landing",
+          "state": "pending",
+          "state_source": "explicit",
+          "time": null,
+          "text": "pending"
+        },
+        {
+          "name": "after landing",
+          "kind": "after_landing",
+          "state": "pending",
+          "state_source": "explicit",
+          "time": null,
+          "text": "pending"
+        }
+      ],
+      "summary": {
+        "checks": {
+          "state": "passed",
+          "state_source": "explicit",
+          "time": {
+            "at": "2026-11-14T10:32+03:00",
+            "precision": "time",
+            "offset": true
+          }
+        },
+        "review": {
+          "state": "running",
+          "state_source": "explicit",
+          "time": {
+            "at": "2026-11-14T10:40+03:00",
+            "precision": "time",
+            "offset": true
+          }
+        },
+        "done_when": {
+          "state": "pending",
+          "state_source": "explicit",
+          "time": null
+        },
+        "landing": {
+          "state": "pending",
+          "state_source": "explicit",
+          "time": null
+        },
+        "after_landing": {
+          "state": "pending",
+          "state_source": "explicit",
+          "time": null
+        }
+      }
+    }
+  ],
+  "decision_journal": [
+    {
+      "when": {
+        "raw": "2026-11-14T10:15+03:00",
+        "time": {
+          "at": "2026-11-14T10:15+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "owner",
+      "decision": "Start the export",
+      "basis": "«делаем экспорт»"
+    },
+    {
+      "when": {
+        "raw": "2026-11-14T10:41:07Z",
+        "time": {
+          "at": "2026-11-14T10:41:07Z",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Review by R1",
+      "basis": "profile «review»"
+    }
+  ],
+  "for_the_owner": [
+    "Confirm the release window for T1"
+  ],
+  "handovers": [
+    {
+      "id": "H1",
+      "role": "T1",
+      "from": "export-t1",
+      "to": "export-t1-2",
+      "to_id": "export-t1-2",
+      "why": "2026-11-14T10:50+03:00; session budget: context 210k (budget 200k)",
+      "time": {
+        "at": "2026-11-14T10:50+03:00",
+        "precision": "time",
+        "offset": true
+      },
+      "next_step": "finish review fixes"
+    }
+  ],
+  "warnings": []
+}
