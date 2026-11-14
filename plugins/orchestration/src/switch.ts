@@ -2,7 +2,7 @@ import { isThreadId } from "./route.ts";
 
 const LOOKUP_LIMIT = 200;
 
-/** One id the RPC rejects fails the whole batch, and every header then reads as a non-orchestrator. */
+/** Keyed reads share one key set per method, so one id the RPC rejects fails every caller's lookup. */
 export function orchestratorLookupKeys(threadIds: readonly string[]): string[] {
   return [...new Set(threadIds.filter(isThreadId))].slice(0, LOOKUP_LIMIT);
 }

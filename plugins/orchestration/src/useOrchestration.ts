@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { experimental_useRpcKeyedQuery, experimental_useRpcQuery, experimental_useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import { contract } from "./contract.ts";
+import { orchestratorLookupKeys } from "./switch.ts";
 import { buildView, type LiveThread, type View } from "./view.ts";
 
 const SNAPSHOT_REFRESH_MS = 20_000;
@@ -26,8 +27,8 @@ function useVisibleInterval(tick: () => void, ms: number, enabled = true) {
 
 /** Null until the ledger lookup has answered for this thread. */
 export function useOrchestratorMembership(threadId: string): boolean | null {
-  const keys = useMemo(() => [threadId], [threadId]);
-  const query = experimental_useRpcKeyedQuery({ contract, method: "isOrchestrator", keys });
+  const keys = useMemo(() => orchestratorLookupKeys([threadId]), [threadId]);
+  const query = experimental_useRpcKeyedQuery({ contract, method: "isOrchestrator", keys, enabled: keys.length > 0 });
   useVisibleInterval(query.refetch, MEMBERSHIP_REFRESH_MS);
   return query.data?.[threadId] ?? null;
 }
