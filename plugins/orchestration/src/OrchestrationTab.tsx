@@ -1,5 +1,5 @@
-import { useRef, useState, type ReactNode } from "react";
-import { useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Markdown, UrlLink, useBbNavigate, useComposers, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { askIdentity, type Ask, type Row, type RowKind, type View } from "./view.ts";
 import { useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 
@@ -60,8 +60,43 @@ interface Actions {
   openThread(threadId: string | null): void;
 }
 
+function Expandable({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setOverflows(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <div ref={ref} className={cx("w-full min-w-0 [overflow-wrap:anywhere]", !open && "max-h-[5.8em] overflow-hidden")}>{children}</div>
+      {(overflows || open) && (
+        <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-xs text-muted-foreground hover:text-foreground">
+          {open ? "Show less" : "Show all"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function linkName(href: string, label: string): string {
+  const gh = /^https:\/\/github\.com\/[^/]+\/[^/]+\/(pull|issues)\/(\d+)/.exec(href);
+  return gh ? `${gh[1] === "pull" ? "PR" : "issue"} #${gh[2]}` : label;
+}
+
+const linkButton = "inline-flex h-[26px] items-center rounded-md border border-border px-2.5 text-xs font-medium text-foreground no-underline hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+
 function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
   const sent = actions.sent === askIdentity(ask);
+  const id = askIdentity(ask);
+  const threads = threadId ? [threadId] : ask.threads;
+  const answerable = (ask.kind === "question" || ask.kind === "owner") && ask.drafts;
   return (
     <div className="flex flex-col gap-2 rounded-[10px] border border-[color-mix(in_oklab,var(--attention)_35%,transparent)] bg-[color-mix(in_oklab,var(--attention)_12%,var(--background))] px-3 pb-2.5 pt-3">
       <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -69,23 +104,28 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
         <b className="min-w-0 truncate font-medium text-foreground">{ask.who}</b>
         {ask.age && <span className="ml-auto shrink-0 tabular-nums">{ask.age === "now" ? "just now" : `${ask.age} ago`}</span>}
       </div>
-      <p className="line-clamp-4 whitespace-pre-line text-sm leading-[1.45] [overflow-wrap:anywhere]">{ask.text}</p>
+      {ask.title && <p className="m-0 text-sm font-semibold leading-[1.4] [overflow-wrap:anywhere]">{ask.title}</p>}
+      {ask.text && (
+        <Expandable>
+          <Markdown content={ask.text} className={cx("text-sm leading-[1.45]", ask.title && "text-muted-foreground")} />
+        </Expandable>
+      )}
       <div className="flex flex-wrap items-center gap-1.5">
         {sent ? (
           <span className="text-xs text-muted-foreground">Reply started in the chat composer</span>
         ) : ask.kind === "decision" && ask.drafts ? (
           <>
-            <Button variant="primary" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.primary)}>Release</Button>
-            <Button variant="quiet" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.secondary!)}>Not yet</Button>
+            <Button variant="primary" onClick={() => actions.fill(id, ask.drafts!.primary)}>Release</Button>
+            <Button variant="quiet" onClick={() => actions.fill(id, ask.drafts!.secondary!)}>Not yet</Button>
           </>
-        ) : (ask.kind === "question" || ask.kind === "owner") && ask.drafts ? (
+        ) : answerable ? (
           <>
-            <Button variant="primary" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.primary)}>Answer</Button>
-            {threadId && <Button variant="quiet" onClick={() => actions.openThread(threadId)}>Open thread</Button>}
+            {ask.replies.map((r, i) => <Button key={r.label} variant={i === 0 ? "primary" : "outline"} onClick={() => actions.fill(id, r.draft)}>{r.label}</Button>)}
+            <Button variant={ask.replies.length ? "quiet" : "primary"} onClick={() => actions.fill(id, ask.drafts!.primary)}>{ask.replies.length ? "Other answer" : "Answer"}</Button>
           </>
-        ) : threadId ? (
-          <Button variant="primary" onClick={() => actions.openThread(threadId)}>Open thread</Button>
         ) : null}
+        {ask.links.map((l) => <UrlLink key={l.href} href={l.href} target="_blank" title={l.label} className={linkButton}>Open {linkName(l.href, l.label)}</UrlLink>)}
+        {threads.map((t) => <Button key={t} variant={answerable || ask.kind === "decision" ? "quiet" : "primary"} onClick={() => actions.openThread(t)}>{threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
       </div>
     </div>
   );
@@ -187,6 +227,9 @@ function History({ view }: { view: View }) {
           <dt className="text-subtle-foreground">Sessions</dt><dd className="m-0">{history.sessions}</dd>
           {history.handover && <><dt className="text-subtle-foreground">Handover</dt><dd className="m-0 [overflow-wrap:anywhere]">{history.handover}</dd></>}
           <dt className="text-subtle-foreground">Ledger</dt><dd className="m-0 [overflow-wrap:anywhere]">{history.ledger.replace(/^\/(Users|home)\/[^/]+/, "~")}</dd>
+          {history.notes.length > 0 && (
+            <><dt className="text-subtle-foreground">Notes</dt><dd className="m-0 flex flex-col gap-1 [overflow-wrap:anywhere]">{history.notes.map((n, i) => <span key={i}>{n}</span>)}</dd></>
+          )}
           {history.warnings.length > 0 && (
             <><dt className="text-subtle-foreground">Unread</dt><dd className="m-0 flex flex-col gap-1 [overflow-wrap:anywhere]">{history.warnings.map((w, i) => <span key={i}>{w}</span>)}</dd></>
           )}
