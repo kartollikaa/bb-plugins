@@ -189,7 +189,7 @@ filters and Needs you still reach their threads. Status and flat grouping and
 the archived view don't hide folders.
 
 The provider icon sits in a fixed slot before the age, in the provider's brand
-tint (Claude orange, Codex blue-violet), or in the text colour with the
+tint (Claude orange, Codex ChatGPT gray), or in the text colour with the
 `providerIconStyle` setting set to `monochrome`. This setting replaces
 `showProviderIcon`: the icon can no longer be turned off, so a user who had
 turned it off sees it again.
