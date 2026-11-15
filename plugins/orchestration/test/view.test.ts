@@ -453,3 +453,18 @@ test("an answered ledger line no longer hides the landing card", () => {
     answered: { "T2: Pick a store name": { answer: "Atlas", at: NOW - MIN } } });
   assert.deepEqual(answered.asks.map((a) => a.kind), ["decision"]);
 });
+
+test("a hand-written `Q (asked …):` line needs you, and the owner's `Re «title»:` reply answers it", async () => {
+  const { askFirstSeen, answeredAsks } = await import("../src/answered.ts");
+  const line = "Q (asked 2026-11-16): accept T9 group 4 boards ThreatDrawIntro (thread-storage/thr_qvipv6ji7b/boards) — 4.2 red tests done @03169c0d8 local";
+  const at = (answered: Record<string, { answer: string; at: number }>) =>
+    buildView({ ledger: ledger([subtask("T9", "working")], { forTheOwner: [line] }), agents: {}, live: { thr_t9: live(1) }, orchestratorThreadId: "thr_orch", now: NOW, answered });
+  const open = at({});
+  assert.equal(open.heading, "One thing waits on you");
+  const ask = open.asks[0]!;
+  assert.equal(ask.title, "accept T9 group 4 boards ThreatDrawIntro (thread-storage/thr_qvipv6ji7b/boards) — 4.2 red tests done @03169c0d8 local");
+  const since = askFirstSeen([line], { [line]: NOW - 10 * MIN });
+  const answered = answeredAsks(since, [{ text: `Re «${ask.title}»: Accept all four`, at: NOW - MIN }]);
+  assert.deepEqual(at(answered).asks, []);
+  assert.deepEqual(answeredAsks(since, [{ text: `Re «${ask.title}»: Accept all four`, at: NOW - 20 * MIN }]), {}, "an answer from before the ask doesn't close it");
+});
