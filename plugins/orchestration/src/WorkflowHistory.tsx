@@ -26,10 +26,10 @@ export function WorkflowHistory({ ledger, view, openThread, mode, renderEvidence
     <section aria-label={mode === "work" ? "Work breakdown" : "Activity"} className="flex min-w-0 flex-col gap-4">
       {mode === "work" ? <>
         <dl className="m-0 grid grid-cols-2 gap-2" aria-label="Work summary">{[
-          ["Needs you", ledger.subtasks.filter(asking).length],
+          ["Needs you", view.asks.length],
           ["Blocked / failed gates", ledger.subtasks.filter(blocked).length],
-          ["Running now", ledger.subtasks.filter((task) => rows.get(task.id)?.running).length],
-          ["Evidence recorded", ledger.subtasks.filter((task) => task.evidence?.length).length],
+          ["Running now", [...view.active, ...view.done].filter((row) => row.running).length],
+          ["Tasks with evidence", ledger.subtasks.filter((task) => task.evidence?.length).length],
         ].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg border border-border bg-sidebar px-3 py-2"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="m-0 mt-1 text-xl font-medium tabular-nums">{value}</dd></div>)}</dl>
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex rounded-lg bg-sidebar p-0.5" aria-label="Work filter">{[["all", "All work"], ["active", "Remaining"], ["done", "Finished"]].map(([value, label]) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value!)} className={`${control} ${filter === value ? "bg-accent text-foreground" : ""}`}>{label}</button>)}</div>
@@ -48,7 +48,7 @@ export function WorkflowHistory({ ledger, view, openThread, mode, renderEvidence
           return <article key={task.id} className={`rounded-lg border ${asking(task) || blocked(task) ? "border-foreground/30 bg-sidebar" : "border-border"} ${open ? "bg-sidebar" : ""}`}>
             <button type="button" aria-expanded={open} onClick={() => setSelected(open ? null : task.id)} className="flex w-full items-start gap-3 rounded-lg px-2 py-3 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary">
               <span aria-hidden className={`mt-1.5 size-1.5 shrink-0 rounded-full ${isFinished(task) ? "bg-border" : "bg-foreground"}`} />
-              <span className="min-w-0 flex-1"><span className="block text-sm font-medium leading-snug [overflow-wrap:anywhere]">{title(task)}</span><span className="mt-1 block text-xs text-subtle-foreground">{task.id} · {state}{task.gateFailures > 0 ? ` · ${task.gateFailures} failed gates` : ""} · {task.evidence?.length ? `${task.evidence.length} evidence entries` : "Evidence not recorded"}</span></span>
+              <span className="min-w-0 flex-1"><span className="block text-sm font-medium leading-snug [overflow-wrap:anywhere]">{title(task)}</span><span className="mt-1 block text-xs text-subtle-foreground">{task.id} · {state}{task.gateFailures > 0 ? ` · ${task.gateFailures} recorded gate failures` : ""} · {task.evidence?.length ? `${task.evidence.length} evidence entries` : "Evidence not recorded"}</span></span>
               <span aria-hidden className="text-xs text-subtle-foreground">{open ? "−" : "+"}</span>
             </button>
             {open && <div className="flex flex-col gap-4 pb-4 pl-[26px] pr-3 text-xs">
