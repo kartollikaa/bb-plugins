@@ -39,6 +39,17 @@ test("one message answers several asks, one Re line each", () => {
   assert.deepEqual(found, { A: { answer: "yes", at: 5 }, B: { answer: "no, later", at: 5 } });
 });
 
+test("a Generative UI form's answers block, labels «Re «title»», answers every ask, with a note typed above it", () => {
+  const nested = "T1: Show «Banes N · Boons M» on the briefings";
+  const text = `Looks good, one change below.\n\nRe «T1: Who draws Threat cards»: Table draws, Imperial player records which came out\nRe «${nested}»: Show the counts\nRe «T1: Review the plan folder»: Approved`;
+  const found = answeredAsks({ "T1: Who draws Threat cards": 0, [nested]: 0, "T1: Review the plan folder": 0 }, [{ text, at: 9 }]);
+  assert.deepEqual(found, {
+    "T1: Who draws Threat cards": { answer: "Table draws, Imperial player records which came out", at: 9 },
+    [nested]: { answer: "Show the counts", at: 9 },
+    "T1: Review the plan folder": { answer: "Approved", at: 9 },
+  });
+});
+
 test("not an answer: an empty draft, another title, or a reply sent before the line appeared", () => {
   assert.deepEqual(answeredAsks({ [TITLE]: 0 }, [{ text: `Re «${TITLE}»:`, at: 100 }]), {});
   assert.deepEqual(answeredAsks({ [TITLE]: 0 }, [{ text: "Re «Merge #12»: go", at: 100 }]), {});

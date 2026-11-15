@@ -40,6 +40,9 @@ question: does anything need you, and is the team moving?
   error and brings the buttons back.
 - **Answer, Other answer, Land it, Not yet** only start a reply in the orchestrator's composer.
   Nothing is sent until you send it.
+- **Several questions at once.** With the Generative UI plugin installed, the orchestrator posts every
+  open question as one form in its chat. Your picks become one `Re «<title>»: <answer>` line per
+  question in the composer; send them together.
 - **An answered ask stops waiting on you at once.** Once a quick reply is sent, or a
   `Re «<title>»: <answer>` from you shows in the orchestrator chat after that ask line appeared,
   the ask leaves «needs you» and shows as a quiet card, «Answered «answer» 2m ago · waiting for the
