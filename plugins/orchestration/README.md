@@ -16,8 +16,11 @@ question: does anything need you, and is the team moving?
   delegated without opening the chat. The composer is never shown twice: it lives in the rail or
   sheet while that is open, and in the dock otherwise. **Full chat** goes back to bb's normal
   thread view and remembers that choice for the thread; the context-card row there brings the view
-  back. The redirect happens only when the thread opens, and never while threads are split side by
-  side.
+  back. Sidebar clicks choose the workspace before opening the conversation, using a preloaded
+  owner index and bb’s live parent links. Missing ancestry resolves before navigation. Modified
+  clicks and existing splits keep bb’s behavior. Thread Tree's button and keyboard requests
+  use the same direct path. Cold deep links and navigation from other plugins can still wait
+  for bb's thread context or an ownership lookup; bb exposes no before-navigation plugin hook.
 - **Orchestration view switch.** The last control in the view's title bar. Off goes to bb's thread
   view and stops the redirect for every orchestrator. In bb's thread view the same place holds an
   **Orchestration view** header button that turns it back on and opens the view. The switch writes
@@ -52,7 +55,7 @@ question: does anything need you, and is the team moving?
 The orchestrator's job is to run its team, so its thread opens on the orchestration view and keeps
 the chat open in a rail beside it. bb doesn't let a plugin replace or shrink a thread's
 conversation, so the view is a plugin page (`/plugins/orchestration/orchestrator/<thread>`) that the
-orchestrator's thread redirects to, and it embeds that thread's chat with bb's `ThreadChat`. The
+sidebar opens directly; the view embeds the selected thread's chat with bb's `ThreadChat`. The
 rail is the plugin's own column, not bb's side panel, so Answer can always open it and focus the
 composer. bb's own side panel was rejected because a plugin can't guarantee to reveal it from Answer.
 

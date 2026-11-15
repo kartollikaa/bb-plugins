@@ -13,9 +13,14 @@ several name the thread, the newest wins.
 
 ## Getting between the view and the chat
 
-- The thread redirects to the view when it opens, unless the owner last picked **Full chat** for it
-  (remembered per thread in this client's browser storage). The context-card row in the thread view
-  clears that and opens the view again.
+- Plain sidebar thread links open the workspace directly, using a preloaded owner index and live
+  parent links. Unknown or archived ancestry resolves before navigation. A later click or route
+  change cancels pending navigation. Full chat remains a per-thread choice in browser storage;
+  the context-card row clears it and opens the view again. Message links, modified clicks, new
+  windows and downloads keep bb’s behavior.
+- Thread Tree's button and keyboard requests use its cancelable `thread-tree:open-thread`
+  window event to open the workspace directly. bb has no before-navigation plugin hook: cold deep
+  links and navigation from other plugins may still wait for bb's context or an ownership lookup.
 - No redirect while threads are split side by side (bb has no plugin slot for a thread's main area,
   so the view would replace the whole split), and none when a thread becomes an orchestrator while
   it is open.

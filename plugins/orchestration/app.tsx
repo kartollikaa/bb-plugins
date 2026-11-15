@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import {
   definePluginApp,
   experimental_THREAD_ACTION_GROUPS as ACTION_GROUPS,
@@ -7,35 +7,22 @@ import {
   experimental_ThreadContextCardRow as ThreadContextCardRow,
   experimental_useSidebarThreads,
   experimental_useAppPanel,
-  useSidebarSplitLayout,
   type ExperimentalThreadContextCardProps,
   type PluginNavPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { contract } from "./src/contract";
 import { OrchestrationTab } from "./src/OrchestrationTab";
 import { OrchestratorHeader, OrchestratorPage } from "./src/OrchestratorPage";
-import { surfacePreference, useOpenView, useViewSwitch } from "./src/surface";
-import { shouldOpenView, threadFromSubPath, VIEW_PATH } from "./src/route";
+import { NavigationBridge } from "./src/NavigationBridge";
+import { useOpenView, useViewSwitch } from "./src/surface";
+import { threadFromSubPath, VIEW_PATH } from "./src/route";
 import { orchestratorLookupKeys } from "./src/switch";
-import { useIsOrchestrator, useOrchestration, useOrchestrationOwner } from "./src/useOrchestration";
+import { useIsOrchestrator, useOrchestration } from "./src/useOrchestration";
 
 const TAB = { id: "orchestration", context: { kind: "thread" }, availability: "fixed" } as const;
 
-/** bb has no slot for a thread's main area, so the orchestrator's thread view hands over to the plugin page. */
-function useTabVisibleAndOpenViewByDefault({ threadId }: { threadId: string }) {
-  const owner = useOrchestrationOwner(threadId);
-  const membership = owner === undefined ? null : owner !== null;
-  const inSplit = useSidebarSplitLayout() !== null;
-  const openView = useOpenView();
-  const viewSwitch = useViewSwitch();
-  const decided = useRef<string | null>(null);
-  useEffect(() => {
-    if (membership === null || viewSwitch.isLoading) return;
-    const open = shouldOpenView({ enabled: viewSwitch.on, membership, prefersChat: surfacePreference().prefersChat(threadId), inSplit, decided: decided.current === threadId });
-    decided.current = threadId;
-    if (open && owner) openView(owner, true, threadId);
-  }, [membership, owner, threadId, inSplit, viewSwitch.isLoading]);
-  return owner === threadId;
+function useTabVisible({ threadId }: { threadId: string }) {
+  return useIsOrchestrator(threadId);
 }
 
 function StatusRow({ threadId }: ExperimentalThreadContextCardProps) {
@@ -84,6 +71,7 @@ function usePageTitle({ subPath }: PluginNavPanelProps) {
 }
 
 export default definePluginApp((app) => {
+  app.slots.experimental_appOverlay({ id: "orchestration-navigation", component: NavigationBridge });
   app.slots.navPanel({
     id: "orchestrator",
     title: "Orchestration",
@@ -99,7 +87,7 @@ export default definePluginApp((app) => {
     icon: "orchestration/network",
     component: OrchestrationTab,
     layout: "flush",
-    useVisible: useTabVisibleAndOpenViewByDefault,
+    useVisible: useTabVisible,
   });
   app.slots.experimental_threadAction<SwitchData>({
     id: "orchestration-view",

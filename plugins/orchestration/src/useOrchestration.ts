@@ -7,6 +7,7 @@ import { createReplyTracker } from "./reply.ts";
 import { localStore } from "./storage.ts";
 import { orchestratorLookupKeys } from "./switch.ts";
 import { buildView, type LiveThread, type View } from "./view.ts";
+import { knownOwner, navigationOwners } from "./navigation.ts";
 
 /** Quick replies this client sent, shared by the tab, the page and the context-card row. */
 export const replies = createReplyTracker(localStore());
@@ -15,7 +16,7 @@ const SNAPSHOT_REFRESH_MS = 20_000;
 const MEMBERSHIP_REFRESH_MS = 60_000;
 const CLOCK_MS = 30_000;
 
-function useVisibleInterval(tick: () => void, ms: number, enabled = true) {
+export function useVisibleInterval(tick: () => void, ms: number, enabled = true) {
   useEffect(() => {
     if (!enabled) return;
     const id = setInterval(() => {
@@ -34,10 +35,11 @@ function useVisibleInterval(tick: () => void, ms: number, enabled = true) {
 
 /** Null until the ledger lookup has answered for this thread. */
 export function useOrchestratorMembership(threadId: string): boolean | null {
+  const index = useOwnershipIndex();
   const keys = useMemo(() => orchestratorLookupKeys([threadId]), [threadId]);
-  const query = experimental_useRpcKeyedQuery({ contract, method: "isOrchestrator", keys, enabled: keys.length > 0 });
-  useVisibleInterval(query.refetch, MEMBERSHIP_REFRESH_MS);
-  return query.data?.[threadId] ?? null;
+  const query = experimental_useRpcKeyedQuery({ contract, method: "isOrchestrator", keys, enabled: keys.length > 0 && index.roots === null });
+  useVisibleInterval(query.refetch, MEMBERSHIP_REFRESH_MS, index.roots === null);
+  return index.roots ? index.roots.has(threadId) : query.data?.[threadId] ?? null;
 }
 
 export function useIsOrchestrator(threadId: string): boolean {
@@ -95,7 +97,17 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
 }
 
 export function useOrchestrationOwner(threadId: string): string | null | undefined {
-  const query = experimental_useRpcQuery({ contract, method: "owner", input: { threadId }, enabled: /^thr_[a-z0-9]+$/i.test(threadId) });
-  useVisibleInterval(query.refetch, MEMBERSHIP_REFRESH_MS);
-  return query.data ? query.data.owner : query.error ? null : undefined;
+  const index = useOwnershipIndex();
+  const indexed = index.owner(threadId);
+  const known = indexed !== undefined ? indexed : navigationOwners.get(threadId);
+  const query = experimental_useRpcQuery({ contract, method: "owner", input: { threadId }, enabled: known === undefined && /^thr_[a-z0-9]+$/i.test(threadId) });
+  useVisibleInterval(query.refetch, MEMBERSHIP_REFRESH_MS, known === undefined);
+  return known !== undefined ? known : query.data ? query.data.owner : query.error ? null : undefined;
+}
+export function useOwnershipIndex() {
+  const query = experimental_useRpcQuery({ contract, method: "orchestrators", input: {} });
+  const sidebar = experimental_useSidebarThreads();
+  const roots = useMemo(() => query.data ? new Set(query.data.ids) : null, [query.data]);
+  const parents = useMemo(() => new Map(sidebar.threads.map((thread) => [thread.id, thread.parentThreadId])), [sidebar.threads]);
+  return { roots, refetch: query.refetch, owner: (id: string) => knownOwner(id, roots, parents) };
 }

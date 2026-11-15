@@ -77,6 +77,10 @@ export type Snapshot = z.infer<typeof snapshotSchema>;
 
 /** Shared by server.ts and the app; schema objects only, so the app bundle never imports the server SDK. */
 export const contract = {
+  orchestrators: {
+    input: z.object({}),
+    output: z.object({ ids: z.array(z.string()) }),
+  },
   owner: {
     input: z.object({ threadId: z.string().regex(/^thr_[a-z0-9]+$/i) }),
     output: z.object({ owner: z.string().nullable() }),

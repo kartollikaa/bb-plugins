@@ -197,6 +197,7 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   bb.rpc.register(contract, {
+    orchestrators: async () => ({ ids: [...new Set((await ledgers()).map((ledger) => ledger.orchestratorId))] }),
     owner: async ({ threadId }) => {
       const all = await ledgers();
       const owner = await resolveOwner(threadId, (id) => ledgerFor(all, id) !== null, async (id) => {
