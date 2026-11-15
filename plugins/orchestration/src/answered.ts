@@ -71,6 +71,9 @@ const keepNewer = (found: Record<string, Answer>, title: string, answer: Answer)
   if (!found[title] || found[title]!.at < answer.at) found[title] = answer;
 };
 
+/** What a Generative UI form writes for a field left empty. */
+const FORM_UNANSWERED = "—";
+
 /** One message may answer several asks, one `Re «title»: …` per line. */
 export function answeredAsks(since: Record<string, number>, messages: readonly OwnerMessage[]): Record<string, Answer> {
   const found: Record<string, Answer> = {};
@@ -80,7 +83,7 @@ export function answeredAsks(since: Record<string, number>, messages: readonly O
       for (const [title, prefix] of prefixes) {
         if (at < since[title]! || !segment.startsWith(prefix)) continue;
         const answer = segment.slice(prefix.length).trim();
-        if (answer) keepNewer(found, title, { answer, at });
+        if (answer && answer !== FORM_UNANSWERED) keepNewer(found, title, { answer, at });
       }
     }
   }

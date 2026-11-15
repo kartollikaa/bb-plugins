@@ -72,7 +72,7 @@ that it should send the message by itself».
 
 An answered `ask:` stops needing the owner at once: after a quick reply is sent from the card, or
 once the orchestrator thread has a user message line `Re «<title>»: <non-empty answer>` (one message
-may answer several asks, one line each, as a Generative UI form labelled `Re «<title>»` writes them) sent after that ask line appeared — dated from the server's
+may answer several asks, one line each, as a Generative UI form labelled `Re «<title>»` writes them; a form's `—` for an empty field is no answer) sent after that ask line appeared — dated from the server's
 last read of the ledger without it, kept per ledger in plugin storage; the browser's remembered
 quick replies obey the same date — the ask
 leaves «needs you», the heading and the context-card dot, and shows as a quiet card «Answered

@@ -50,6 +50,11 @@ test("a Generative UI form's answers block, labels «Re «title»», answers eve
   });
 });
 
+test("a form field left empty comes back as «—» and leaves its ask open", () => {
+  const found = answeredAsks({ A: 0, B: 0 }, [{ text: "Re «A»: Approved\nRe «B»: —", at: 4 }]);
+  assert.deepEqual(found, { A: { answer: "Approved", at: 4 } });
+});
+
 test("not an answer: an empty draft, another title, or a reply sent before the line appeared", () => {
   assert.deepEqual(answeredAsks({ [TITLE]: 0 }, [{ text: `Re «${TITLE}»:`, at: 100 }]), {});
   assert.deepEqual(answeredAsks({ [TITLE]: 0 }, [{ text: "Re «Merge #12»: go", at: 100 }]), {});
