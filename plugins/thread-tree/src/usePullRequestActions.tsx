@@ -6,6 +6,7 @@ import type { rpcContract } from "../server";
 import { Icon } from "@/components/ui/icon";
 import { pullRequestActions, type PullRequestActions } from "./pullRequestActions";
 import { ActionPill, runPending, usePending } from "./RetryButton";
+import { openThread } from "./navigation";
 
 const MERGE_CONFIRM_MS = 10_000;
 
@@ -82,7 +83,7 @@ export function usePullRequestActions({ repos, mergeEnvironmentOf, onMerged, onN
   const review = useCallback(async (pr: ActionablePullRequest) => {
     const { threadId } = await rpc.call("agentReview", { url: pr.url, number: pr.number, title: pr.title });
     setStartedReviews((previous) => new Map(previous).set(pr.url.toLowerCase(), threadId));
-    navigate.toThread(threadId);
+    openThread(navigate, threadId);
     onNavigate();
   }, [rpc, navigate, onNavigate]);
 

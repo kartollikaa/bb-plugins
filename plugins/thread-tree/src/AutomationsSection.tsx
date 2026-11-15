@@ -15,6 +15,7 @@ import { StatusDot } from "./StatusDot";
 import { formatUntil } from "./time";
 import { Collapse } from "./Collapse";
 import { automationsSummary } from "./sectionSummaries";
+import { openThread } from "./navigation";
 
 const POLL_MS = 30_000;
 const AUTOMATIONS_NAV_ITEM = "__bb__/automations";
@@ -115,7 +116,7 @@ export function AutomationsSection({
               now={now}
               onOpen={() => {
                 if (automation.lastRunThreadId) {
-                  navigate.toThread(automation.lastRunThreadId);
+                  openThread(navigate, automation.lastRunThreadId);
                   onNavigate();
                 } else {
                   openAutomationsPage();

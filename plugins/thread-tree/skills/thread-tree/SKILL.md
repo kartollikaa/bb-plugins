@@ -13,6 +13,11 @@ statuses other plugins set on the row; an idle row shows a faint dot. The
 row's link reads the state after the title for screen readers.
 The counter's card fits the available screen space on mobile and desktop;
 longer lists scroll inside it while the summary stays visible.
+Thread links respect navigation already handled by another plugin and still close
+the mobile sidebar after selection.
+Its button and keyboard paths emit the cancelable `thread-tree:open-thread` window
+event with `{ threadId, split }`; an optional workspace handler can take over before
+the chat opens. With no handler, bb navigation runs as usual.
 
 When the GitHub Folder plugin is installed, the Pull requests section lists its
 folder of pull requests that need the user. Use that plugin's

@@ -44,6 +44,7 @@ import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
 import { AutomationsSection, useAutomations } from "./AutomationsSection";
 import { NeedsYouSection, useNeedsYou } from "./NeedsYouSection";
 import { stopThread } from "./RetryButton";
+import { openThread } from "./navigation";
 import { pullRequestSourcesSettled } from "./needsYou";
 import { GithubSection, useGithubFolder } from "./GithubSection";
 import { isSectionCollapsed, sectionToggleKey, toneClass, type SummaryPart } from "./sectionSummaries";
@@ -376,8 +377,12 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const open = useCallback(
     (thread: PluginSidebarThread, event: MouseEvent) => {
       if (event.button !== 0 || event.shiftKey || event.altKey) return;
+      if (event.defaultPrevented) {
+        onNavigate();
+        return;
+      }
       event.preventDefault();
-      navigate.toThread(thread.id, { split: event.metaKey || event.ctrlKey });
+      openThread(navigate, thread.id, event.metaKey || event.ctrlKey);
       onNavigate();
     },
     [navigate, onNavigate],
@@ -605,7 +610,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                 threadOfPullRequest={needsYou.threadOfPullRequest}
                 pullRequestActions={pullRequestActions}
                 onOpenThread={(threadId, split) => {
-                  navigate.toThread(threadId, { split });
+                  openThread(navigate, threadId, split);
                   onNavigate();
                 }}
                 isCollapsed={foldSections || isSectionCollapsed(collapsedGroups.values, "github")}

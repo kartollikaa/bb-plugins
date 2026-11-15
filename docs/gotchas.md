@@ -1,5 +1,9 @@
 # Gotchas
 
+- **Direct plugin navigation still needs sidebar cleanup.** A capture listener can prevent a
+  thread link's default navigation, but must let the event bubble. Sidebar row handlers must
+  honor `defaultPrevented` and still call `onNavigate` so mobile selection dismisses the sheet.
+
 Traps already hit while building these plugins. Add a new one with its symptom, so the next agent
 can find it by the error text.
 

@@ -38,6 +38,7 @@ import type { NeedsYouPullRequests } from "./settings";
 import { openGithubFolderPrPage } from "./GithubSection";
 import { useOpenAutomationsPage } from "./AutomationsSection";
 import { setInboxHandler } from "./inbox";
+import { openThread } from "./navigation";
 import { usePersistentRecord } from "./usePersistentSet";
 import { GroupHeader } from "./GroupHeader";
 import { Collapse } from "./Collapse";
@@ -121,7 +122,7 @@ export function useNeedsYou(sources: NeedsYouSources) {
     const target = itemTarget(item);
     cursor.current = { key: item.key, index: Math.max(0, items.indexOf(item)), threadId: cursorThreadId(target, viewThreadId) };
     if (target.kind === "thread") {
-      navigate.toThread(target.threadId, { split });
+      openThread(navigate, target.threadId, split);
       onNavigate();
     } else if (target.kind === "pr") {
       openGithubFolderPrPage(target.url);

@@ -1,5 +1,11 @@
 # Thread Tree
 
+Thread links respect navigation handled by another plugin, including direct Orchestration
+workspace navigation, and still dismiss the mobile sidebar after selection.
+Thread Tree also offers its button and keyboard navigation through a cancelable
+`thread-tree:open-thread` window event (`{ threadId, split }`) before opening the chat.
+With no handler installed, navigation uses bb normally.
+
 A bb sidebar thread list where child threads nest under their parent and each
 thread's provider subagents show as a counter with a status dot.
 
