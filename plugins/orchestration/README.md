@@ -133,6 +133,8 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
   in orchestrate versions that have the export command. The plugin finds the script in Claude Code's plugin cache, or
   takes the path from the `exportScript` setting.
 - Ledgers are read from `~/.claude/projects/*/orchestrate/*.md`; the newest one naming the thread wins.
+- The view re-reads the ledger every 20 seconds while it is visible, and at once whenever the
+  orchestrator starts or ends a turn or opens a prompt, so questions it writes show up when its turn ends.
 - Live state (status, pending approvals, last report, model, effort, context use, last reply) comes
   from bb's thread API. Answers are the owner's latest messages in the orchestrator thread that
   start with `Re «<ask title>»:`.

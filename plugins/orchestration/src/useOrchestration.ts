@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { experimental_useRpcKeyedQuery, experimental_useRpcQuery, experimental_useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import { combineAnswers } from "./answered.ts";
 import { contract } from "./contract.ts";
 import type { LedgerSummary } from "./contract.ts";
+import { changeWatcher, turnSignal } from "./refresh.ts";
 import { createReplyTracker } from "./reply.ts";
 import { localStore } from "./storage.ts";
 import { orchestratorLookupKeys } from "./switch.ts";
@@ -16,21 +17,37 @@ const SNAPSHOT_REFRESH_MS = 20_000;
 const MEMBERSHIP_REFRESH_MS = 60_000;
 const CLOCK_MS = 30_000;
 
+function useLatest<T>(value: T) {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+}
+
+/** The SDK's `refetch` is a new function on every render, so the timer reads the latest tick instead of restarting. */
 export function useVisibleInterval(tick: () => void, ms: number, enabled = true) {
+  const latest = useLatest(tick);
   useEffect(() => {
     if (!enabled) return;
     const id = setInterval(() => {
-      if (document.visibilityState === "visible") tick();
+      if (document.visibilityState === "visible") latest.current();
     }, ms);
     const onVisible = () => {
-      if (document.visibilityState === "visible") tick();
+      if (document.visibilityState === "visible") latest.current();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [tick, ms, enabled]);
+  }, [latest, ms, enabled]);
+}
+
+function useRefetchOnChange(signal: string | null, refetch: () => void, enabled: boolean) {
+  const latest = useLatest(refetch);
+  const [watch] = useState(() => changeWatcher(() => latest.current()));
+  useEffect(() => {
+    if (enabled) watch(signal);
+  }, [watch, signal, enabled]);
 }
 
 /** Null until the ledger lookup has answered for this thread. */
@@ -63,6 +80,8 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
   const query = experimental_useRpcQuery({ contract, method: "snapshot", input: { threadId }, enabled });
   useVisibleInterval(query.refetch, SNAPSHOT_REFRESH_MS, enabled);
   const sidebar = experimental_useSidebarThreads();
+  const orchestratorSignal = turnSignal(sidebar.threads.find((t) => t.id === threadId));
+  useRefetchOnChange(orchestratorSignal, query.refetch, enabled);
   const now = useNow();
   const repliesVersion = useSyncExternalStore(replies.subscribe, replies.version);
   const ledgerThreads = query.data?.state === "ledger" ? query.data.ledger.subtasks : null;
