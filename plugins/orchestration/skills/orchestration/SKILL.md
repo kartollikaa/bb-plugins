@@ -111,11 +111,21 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
   `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
   ` / `). A GitHub link reads `repo#N` on its button. Each option sends `Re «<title>»: <option>` to the orchestrator; Other answer fills the composer with
   `Re «<title>»: `.
-- Only `ask:` is an ask. `note:` and every other line («Nothing waiting.», «answered 2026-11-14:
+- A hand-written `Q:`, `Q3:`, `Q (asked 2026-11-16):` or `question:` line reads as an `ask:` (the
+  parenthesis is dropped from the title), so a question written that way still reaches the owner;
+  write `ask:` with `options:` anyway, it gets quick replies.
+- Otherwise only `ask:` is an ask. `note:` and every other line («Nothing waiting.», «answered 2026-11-14:
   …») is information: it shows under History as a note and never counts as needs you. An `ask:`
   with no title is a note too. Owner, on the change: «The dialog keep showing even when i answered».
 - A ` | ` segment without one of the keys above stays with the field before it, so a title or a
   `why:` may contain ` | `.
+
+## Showing a subtask's images in the chat
+
+Generative UI (`Image`, `Gallery`, `Load`) reads only this thread's workspace, its thread storage
+and `/tmp`; a path in a subtask's thread storage fails with «only files in this thread's workspace,
+its thread storage or /tmp can be loaded». Copy the files into `$BB_THREAD_STORAGE/<folder>/` first
+and reference them as `$BB_THREAD_STORAGE/<folder>/<file>`.
 
 ## Settings
 

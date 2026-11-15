@@ -39,9 +39,12 @@ export function linksIn(text: string): Link[] {
 
 const threadsIn = (text: string) => [...new Set(text.match(THREAD) ?? [])];
 
+// Orchestrators editing the ledger by hand drift into `Q (asked 2026-11-16): …`, `Q3: …`, `question: …`.
+const ASK_PREFIX = /^(?:ask|q\d*|question)\s*(?:\([^)]*\))?\s*:/i;
+
 function parseAsk(text: string): OwnerItem | null {
   const fields: [string, string][] = [["ask", ""]];
-  for (const segment of text.replace(/^ask:/i, "").split(/\s+\|\s+/)) {
+  for (const segment of text.replace(ASK_PREFIX, "").split(/\s+\|\s+/)) {
     const match = /^([a-z]+):\s*(.*)$/i.exec(segment.trim());
     const key = match?.[1]!.toLowerCase();
     if (match && key && ASK_KEYS.has(key)) fields.push([key, match[2]!.trim()]);
@@ -63,9 +66,9 @@ function parseAsk(text: string): OwnerItem | null {
   };
 }
 
-/** The ledger schema has only `ask:` and `note:`; any other line («answered …», «Nothing waiting») is a note. */
+/** The ledger schema has only `ask:` and `note:`; besides the hand-written `Q:` forms, any other line («answered …», «Nothing waiting») is a note. */
 export function parseOwnerItem(raw: string): OwnerItem {
   const text = raw.trim();
-  const ask = /^ask:/i.test(text) ? parseAsk(text) : null;
+  const ask = ASK_PREFIX.test(text) ? parseAsk(text) : null;
   return ask ?? { kind: "note", text: text.replace(/^note:\s*/i, "") };
 }

@@ -66,3 +66,18 @@ test("links are deduplicated by address, not by label", () => {
   assert.deepEqual(links.map((l) => l.href), [`${long}1`, `${long}2`, "https://github.com/o/r/pull/3", "https://github.com/o/r/pull/3/files"]);
   assert.deepEqual(links.slice(2).map((l) => l.label), ["r#3", "r#3/files"]);
 });
+
+test("a hand-written `Q:` / `Q (asked …):` / `question:` line is an ask, its date dropped from the title", () => {
+  const real = "Q (asked 2026-11-16): accept T9 group 4 boards ThreatDrawIntro, MissionChoiceThreat (thread-storage/thr_qvipv6ji7b/boards) — 4.2 red tests done @03169c0d8 local";
+  const item = parseOwnerItem(real);
+  assert.equal(item.kind, "ask");
+  if (item.kind !== "ask") return;
+  assert.equal(item.title, "accept T9 group 4 boards ThreatDrawIntro, MissionChoiceThreat (thread-storage/thr_qvipv6ji7b/boards) — 4.2 red tests done @03169c0d8 local");
+  assert.deepEqual(item.options, []);
+  const q3 = parseOwnerItem("Q3: Merge #12? | options: Yes / No");
+  assert.equal(q3.kind === "ask" && q3.title, "Merge #12?");
+  assert.deepEqual(q3.kind === "ask" && q3.options, ["Yes", "No"]);
+  assert.equal(parseOwnerItem("Question: Keep both?").kind, "ask");
+  assert.equal(parseOwnerItem("Quiet: nothing runs").kind, "note");
+  assert.equal(parseOwnerItem("Q: ").kind, "note");
+});
