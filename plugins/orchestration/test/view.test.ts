@@ -394,3 +394,14 @@ test("a pending owner question does not hide the orchestration blocker", () => {
   assert.equal(v.phase.kind, "blocked");
   assert.match(v.subline, /Orchestration blocked/);
 });
+
+
+test("a missing goal does not erase phase or its recorded qualification", () => {
+  const v = view([subtask("T7", "delivered")], { thr_t7: live(1) }, {}, {
+    goal: null, status: "blocked", statusRaw: "blocked (activation route required)",
+  });
+  assert.equal(v.recap.goal, null);
+  assert.equal(v.phase.label, "Orchestration blocked");
+  assert.equal(v.phase.detail, "blocked (activation route required)");
+  assert.equal(v.heading, "Orchestration blocked");
+});

@@ -180,3 +180,9 @@ brief is never replaced with an invented success claim. New exports may provide 
 and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence. Latest orchestrator report opens the
 last assistant response in place, preserving its links; long reports explicitly say they were shortened.
 A report is a conversation record, not independent verification of its claims.
+
+Local evidence links in Brief and checkpoint resolve from the ledger file; report links resolve
+from the orchestrator workspace. Ordinary activation opens the host-owned file preview using
+explicit host identity. Ledger file routing is enabled only after the ledger contents match on
+that host. If its host cannot be established, the UI reports that the file location is unavailable.
+The phase remains visible even when the ledger has no goal.

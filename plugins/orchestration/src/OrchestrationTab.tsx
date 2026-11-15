@@ -277,7 +277,6 @@ function History({ view }: { view: View }) {
 function Recap({ view, threadId, withTitle }: { view: View; threadId: string; withTitle: boolean }) {
   const { goal } = view.recap;
   const title = experimental_useSidebarThreads().threads.find((t) => t.id === threadId)?.displayTitle ?? null;
-  if (!(withTitle && title) && !goal) return null;
   return (
     <header className="flex flex-col gap-2 border-b border-border pb-4">
       {withTitle && title && (
@@ -397,7 +396,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
         </section>
       )}
 
-      <Brief ledger={state.ledger} view={view} report={state.report} />
+      <Brief ledger={state.ledger} view={view} report={state.report} threadId={threadId} workspace={state.workspace} />
       <Team view={view} actions={actions} threadIds={threadIds} />
       {view.state !== "planning" && <History view={view} />}
       </> : <WorkflowHistory key={`${threadId}:${section}`} ledger={state.ledger} view={view} openThread={actions.openThread} mode={section} />}

@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -168,19 +168,29 @@ export default async function plugin(bb: BbPluginApi) {
       return { state: "error", message: error instanceof Error ? error.message : String(error) };
     }
     const agents: Record<string, Agent> = {};
-    const [answers, report] = await Promise.all([
+    const [answers, report, ownerThread] = await Promise.all([
       answersFor(threadId, summary).catch((error) => {
         bb.log.warn(`can't read the owner's answers: ${String(error)}`);
         return { answered: {}, askFirstSeen: {} };
       }),
       bb.sdk.threads.output({ threadId }).then((value) => reportOf(value.output)).catch(() => null),
+      bb.sdk.threads.get({ threadId }).catch(() => null),
       ...summary.subtasks.map(async (subtask) => {
         if (!subtask.threadId) return;
         const live = LIVE_STATUSES.has(subtask.status ?? "");
         agents[subtask.threadId] = await readAgent(subtask.threadId, live, FINISHED_STATUSES.has(subtask.status ?? ""));
       }),
     ]);
-    return { state: "ledger", ledger: summary, agents, report, ...answers, readAt: Date.now() };
+    const environment = ownerThread?.environmentId ? await bb.sdk.environments.get({ environmentId: ownerThread.environmentId }).catch(() => null) : null;
+    const workspace = environment?.id && environment.path ? { environmentId: environment.id, rootPath: environment.path, hostId: environment.hostId, ledgerHostId: null as string | null } : null;
+    if (workspace) {
+      const [local, remote] = await Promise.all([
+        readFile(summary.path, "utf8").catch(() => null),
+        bb.sdk.files.read({ hostId: workspace.hostId, path: summary.path }).catch(() => null),
+      ]);
+      if (local !== null && remote?.contentEncoding === "utf8" && remote.content === local) workspace.ledgerHostId = workspace.hostId;
+    }
+    return { state: "ledger", ledger: summary, agents, report, workspace, ...answers, readAt: Date.now() };
   }
 
   const sendReply = replySender(async (threadId, text) => {
