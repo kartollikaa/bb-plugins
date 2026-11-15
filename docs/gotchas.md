@@ -183,3 +183,5 @@ can find it by the error text.
 - **Frontend RPC contracts:** use a schema object directly or a type-only contract import.
   Importing `defineRpcContract` from the backend SDK in a frontend bundle can pass a dev
   build and fail a production-only install, where the SDK is not a runtime dependency.
+
+- **Canonical paths alone do not identify an opened file.** A parent directory can be swapped during open and restored before a second realpath check. Compare the opened descriptor dev/ino with the authorized path before returning content, and regression-test the swap.

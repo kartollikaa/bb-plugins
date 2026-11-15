@@ -74,3 +74,7 @@ of private thread names and paths.
 
 Thread Tree's GitHub folder section requires `github-folder` to be installed; that companion's
 submission is pending.
+
+Live UI (`live-ui`) is an unpublished development plugin with no public release tag,
+community listing or submission PR. Its self-hosted catalog entry tracks this repository's
+`main` branch and is not a store release. First publication needs a separate owner decision.

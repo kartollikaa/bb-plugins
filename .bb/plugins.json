@@ -15,6 +15,7 @@
     { "name": "thread-switcher", "source": "./plugins/thread-switcher" },
     { "name": "task-stop", "source": "./plugins/task-stop" },
     { "name": "kaiten", "source": "./plugins/kaiten" },
-    { "name": "orchestration", "source": "./plugins/orchestration" }
+    { "name": "orchestration", "source": "./plugins/orchestration" },
+    { "name": "live-ui", "source": "./plugins/live-ui" }
   ]
 }

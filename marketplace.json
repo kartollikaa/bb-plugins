@@ -181,6 +181,29 @@
           "tagPrefix": "thread-switcher/"
         }
       }
+    },
+    {
+      "id": "live-ui",
+      "displayName": "Live UI (development)",
+      "description": "Bounded live Metric, Table, Chart and Pipeline views of JSON reports. Development source; no store release.",
+      "icon": {
+        "url": "./icons/live-ui.svg"
+      },
+      "tags": [
+        "data",
+        "chat"
+      ],
+      "author": {
+        "name": "Dmitrii Maksimov",
+        "github": "kartollikaa"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/kartollikaa/bb-plugins.git",
+          "subdir": "plugins/live-ui",
+          "ref": "main"
+        }
+      }
     }
   ]
 }

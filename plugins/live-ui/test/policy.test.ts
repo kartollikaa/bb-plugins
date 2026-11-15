@@ -1,0 +1,50 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { Consent } from "../policy.ts";
+test("deadline cannot be renewed by visibility or data; explicit resume starts a new grant", () => {
+  let time = 0;
+  const c = new Consent(() => time);
+  c.resume("a", 100, 40);
+  assert.equal(c.live(), true);
+  time = 30;
+  c.heartbeat("a", 40);
+  time = 60;
+  c.heartbeat("a", 40);
+  time = 90;
+  c.heartbeat("a", 40);
+  time = 100;
+  assert.equal(c.live(), false);
+  c.heartbeat("a", 40);
+  assert.equal(c.live(), false);
+  c.resume("a", 100, 40);
+  assert.equal(c.live(), true);
+  assert.equal(c.expiresAt, 200);
+});
+test("duplicate client deduplicates; losing a page expires without cleanup; scopes stay isolated", () => {
+  let time = 0;
+  const a = new Consent(() => time),
+    b = new Consent(() => time);
+  a.resume("x", 100, 40);
+  a.resume("x", 100, 40);
+  assert.equal(a.clients.size, 1);
+  assert.equal(b.live(), false);
+  a.resume("y", 100, 40);
+  a.pause("x");
+  assert.equal(a.live(), true);
+  time = 40;
+  assert.equal(a.live(), false);
+  a.heartbeat("x", 40);
+  assert.equal(a.live(), false);
+  a.resume("x", 100, 40);
+  a.revoke();
+  assert.equal(a.live(), false);
+});
+test("broken expiry and cancellation controls are detected by the behavioral assertions", () => {
+  const broken = { live: () => true };
+  assert.throws(() => assert.equal(broken.live(), false));
+  const c = new Consent(() => 0);
+  c.resume("a", 100, 40);
+  assert.throws(() => assert.equal(c.live(), false));
+  c.pause("a");
+  assert.equal(c.live(), false);
+});

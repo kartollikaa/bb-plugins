@@ -1,0 +1,110 @@
+.live-ui {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 14px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.live-ui header,
+.live-ui-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.live-ui header > span {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.live-ui p {
+  margin: 8px 0;
+}
+.live-ui-source,
+.live-ui-meta,
+.live-ui footer {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.live-ui-controls {
+  justify-content: flex-start;
+}
+.live-ui button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-height: 44px;
+  background: var(--secondary);
+  color: var(--foreground);
+  cursor: pointer;
+}
+.live-ui button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.live-ui button:focus-visible,
+.live-ui-scroll:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.live-ui [role="alert"] {
+  border-left: 3px solid var(--destructive);
+  padding-left: 8px;
+}
+.live-ui-metrics {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 16px 0;
+}
+.live-ui-metrics strong {
+  font-size: 28px;
+}
+.live-ui-scroll {
+  overflow: auto;
+  max-width: 100%;
+}
+.live-ui table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+}
+.live-ui th,
+.live-ui td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  min-width: 90px;
+  max-width: 300px;
+  overflow-wrap: anywhere;
+}
+.live-ui-chart,
+.live-ui-pipeline {
+  list-style: none;
+  padding: 0;
+}
+.live-ui-chart li {
+  display: grid;
+  grid-template-columns: minmax(60px, 1fr) 2fr minmax(40px, auto);
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+}
+.live-ui meter {
+  width: 100%;
+}
+.live-ui-pipeline li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.live-ui-pipeline strong {
+  font-weight: 500;
+}
+.live-ui footer {
+  margin-top: 12px;
+}

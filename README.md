@@ -17,6 +17,7 @@ Plugins for [bb](https://getbb.app), each in its own folder with its own README.
 | [task-stop](plugins/task-stop) | A stop button on each running background command and background agent in the card above the composer, so one task stops without interrupting the turn. |
 | [kaiten](plugins/kaiten) | The Kaiten sprint board as a bb page; a click on a card starts a thread that works it. |
 | [orchestration](plugins/orchestration) | An Orchestration tab on an orchestrator's thread: what needs you and whether the team is moving, from the orchestrate ledger and bb's live thread state. |
+| [live-ui](plugins/live-ui) | Bounded live JSON Metric, Table, Chart and Pipeline views; unpublished development source |
 
 Marketplace listings, release tags and submission/update PRs for every plugin:
 [Publication status](docs/publication.md).

@@ -252,3 +252,10 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on
 2026-11-02; only Dmitrii had installed from them. Their history lives on here under `plugins/<id>/`.
+
+## live-ui — `plugins/live-ui/`
+
+- Unpublished development plugin: separate `live-ui` JSON fence, read-only Metric/Table/Chart/Pipeline report views.
+- File sources in authoritative thread workspace/storage roots, native host watcher, explicit Live/Pause/Refresh and bounded visibility/consent leases. No producer execution or polling fallback.
+- Syntax, limits and lifecycle: [README](../plugins/live-ui/README.md). Agent discovery: own `skills/live-ui/SKILL.md`; CLI `bb live-ui check '<json>'`.
+- Tests: `npm test`, `npm run typecheck`, `bb plugin build`. Self-hosted catalog tracks `main` for development; no public release or marketplace submission.
