@@ -32,3 +32,23 @@ Navigation, native ThreadChat, composer and reply validation are unchanged.
 The new presentation adds no animation and uses ordinary keyboard buttons.
 
 Validation results and independent review are recorded on issue #1 after execution.
+
+## Owner questions (2026-11-15)
+
+The owner asked for one block to answer every open question instead of a yellow card each, ideally
+GenUI's. Findings, on the same GenUI revision:
+
+- GenUI renders through `experimental_codeFenceRenderer`, which bb calls only for fences in real chat
+  messages. The SDK `Markdown` component a plugin renders does not route fences to it: a ```ui block
+  in the panel shows as code. `ThreadChat` in `timeline` mode would render it, but only as a whole
+  transcript, and a form's answers go to that thread. So the panel uses its own questions card.
+- A GenUI `Form` with labels `Re «<ask title>»` writes `Re «<title>»: <answer>` lines, which
+  `answeredAsks` reads; an empty field comes back as `—`, which counts as no answer. A form writes
+  nothing until the owner changes any field, then writes every field.
+- A form turns read-only after any later user row in bb's conversation outline, and a subtask's wake
+  (`[bb system] … completed`) is such a row. A form in a busy orchestrator chat freezes quickly.
+- Ownership: the `orchestrate` skill stays host-neutral and only writes `ask:` lines with options and
+  the recommended one marked. Asking through a GenUI form in the chat, if wanted, belongs to this
+  plugin, which can add instructions to orchestrator threads only (`bb.agents.contributeInstructions`;
+  applies from the thread's next session start or resume). Not built: the panel card covers the need.
+
