@@ -33,4 +33,4 @@ Inspect live-block and native-watch counts with `bb live-ui status`. This reads 
 
 Validate fence configuration with `bb live-ui check '<json>'`. This checks syntax; file access is checked at Refresh/Resume. Detailed agent examples live in `skills/live-ui/SKILL.md`, loaded when needed rather than injected as a catalog.
 
-Development: `npm ci --include=dev`, `npm test`, `npm run typecheck`, `bb plugin build`, then install/reload. Tests exercise bounded reads, policy controls and host watcher lifecycle; live validation is also required for a completed delivery. The implementation is original MIT code and uses no GenUI source.
+Development: `npm ci --include=dev`, `npm test`, `npm run typecheck`, `npm run test:production`, `bb plugin build`, then install/reload. Tests exercise bounded reads, policy controls and host watcher lifecycle; live validation is also required for a completed delivery. The implementation is original MIT code and uses no GenUI source.

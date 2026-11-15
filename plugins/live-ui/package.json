@@ -49,6 +49,7 @@
   },
   "scripts": {
     "test": "tsx --test test/*.test.ts",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "test:production": "node test/production.mjs"
   }
 }
