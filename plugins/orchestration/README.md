@@ -186,3 +186,6 @@ from the orchestrator workspace. Ordinary activation captures the click before M
 file preview in an evidence dialog, using explicit thread-storage, workspace or host identity. Ledger file routing is enabled only after the ledger contents match on
 that host. If its host cannot be established, the UI reports that the file location is unavailable.
 The phase remains visible even when the ledger has no goal.
+
+Every local evidence target requires confirmed source-host provenance. A matching workspace or
+thread-storage pathname prefix never overrides a failed ledger identity check.

@@ -23,3 +23,11 @@ test("file identities prefer actual storage and workspace scopes, with no prefix
   assert.deepEqual(evidenceTarget("/state/history.md", "host_test", "thr_test", workspace), { kind: "host", hostId: "host_test", path: "/state/history.md" });
   assert.equal(evidenceTarget("/workspace-other/report.md", null, "thr_test", workspace), null);
 });
+
+
+test("failed source identity cannot be replaced by an overlapping workspace or storage prefix", () => {
+  const remote = { environmentId: "env_remote", rootPath: "/same/workspace", storageRootPath: "/same/storage" };
+  assert.equal(evidenceTarget("/same/workspace/review.md", null, "thr_remote", remote), null);
+  assert.equal(evidenceTarget("/same/storage/review.md", null, "thr_remote", remote), null);
+  assert.deepEqual(evidenceTarget("/same/workspace/review.md", "host_confirmed", "thr_remote", remote), { kind: "workspace", environmentId: "env_remote", path: "review.md" });
+});

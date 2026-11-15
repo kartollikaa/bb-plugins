@@ -16,6 +16,7 @@ export function localEvidencePath(href: string, sourcePath: string): string | nu
 }
 
 export function evidenceTarget(path: string, hostId: string | null, threadId: string, workspace: { environmentId: string; rootPath: string; storageRootPath: string | null } | null): ExperimentalLiveFileTarget | null {
+  if (!hostId) return null;
   if (workspace?.storageRootPath && path.startsWith(`${workspace.storageRootPath}/`))
     return { kind: "thread-storage", threadId, path: path.slice(workspace.storageRootPath.length + 1) };
   if (workspace && path.startsWith(`${workspace.rootPath}/`))
