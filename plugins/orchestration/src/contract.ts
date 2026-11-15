@@ -29,6 +29,8 @@ export const ledgerSummarySchema = z.object({
   path: z.string(),
   goal: z.string().nullable(),
   status: z.string().nullable(),
+  statusRaw: z.string().nullable().optional(),
+  brief: z.string().nullable().optional(),
   subtasks: z.array(subtaskSchema),
   forTheOwner: z.array(z.string()),
   orchestratorSessions: z.number().int(),

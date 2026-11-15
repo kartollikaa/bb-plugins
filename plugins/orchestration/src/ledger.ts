@@ -120,6 +120,8 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
     workflow: workflowEvents(data),
     goal: str(root.goal),
     status: str(root.status),
+    statusRaw: str(root.status_raw),
+    brief: str(root.brief),
     subtasks,
     forTheOwner: arr(root.for_the_owner).flatMap((line) => (typeof line === "string" && line.trim() ? [line] : [])),
     orchestratorSessions: orchestratorHandovers.length + 1,

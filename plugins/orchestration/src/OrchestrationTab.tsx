@@ -4,9 +4,10 @@ import { toast } from "sonner";
 import { contract } from "./contract.ts";
 import { answeredStatus } from "./answered.ts";
 import { WORK_CATEGORIES } from "./categories.ts";
+import { Brief } from "./Brief.tsx";
 import { WorkflowHistory } from "./WorkflowHistory.tsx";
 import { replyKey, replyStatus, type ReplyState } from "./reply.ts";
-import { askIdentity, type Ask, type RecapLine, type Row, type RowKind, type View } from "./view.ts";
+import { askIdentity, type Ask, type Row, type RowKind, type View } from "./view.ts";
 import { replies, useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
@@ -272,35 +273,19 @@ function History({ view }: { view: View }) {
   );
 }
 
-function RecapRow({ label, line }: { label: string; line: RecapLine }) {
-  return (
-    <div className="flex min-w-0 gap-2">
-      <dt className="w-10 shrink-0 text-subtle-foreground">{label}</dt>
-      <dd className="m-0 min-w-0 flex-1 [overflow-wrap:anywhere]">
-        {line.text}
-        {line.age && <span className="ml-1.5 whitespace-nowrap tabular-nums text-subtle-foreground">{line.age === "now" ? "just now" : `${line.age} ago`}</span>}
-      </dd>
-    </div>
-  );
-}
-
 /** Which orchestration this is and where it stands, so the status below reads in context. */
 function Recap({ view, threadId, withTitle }: { view: View; threadId: string; withTitle: boolean }) {
-  const { goal, now, last } = view.recap;
+  const { goal } = view.recap;
   const title = experimental_useSidebarThreads().threads.find((t) => t.id === threadId)?.displayTitle ?? null;
-  if (!(withTitle && title) && !goal && !now && !last) return null;
+  if (!(withTitle && title) && !goal) return null;
   return (
     <header className="flex flex-col gap-2 border-b border-border pb-4">
       {withTitle && title && (
         <h1 className="m-0 min-w-0 text-lg font-semibold leading-[1.3] tracking-[-0.015em] [overflow-wrap:anywhere] [text-wrap:balance]">{title}</h1>
       )}
       {goal && <p className="m-0 text-muted-foreground [overflow-wrap:anywhere] [text-wrap:pretty]">{goal}</p>}
-      {(now || last) && (
-        <dl className="m-0 flex flex-col gap-1 text-xs leading-[1.45]">
-          {now && <RecapRow label="Now" line={now} />}
-          {last && <RecapRow label="Last" line={last} />}
-        </dl>
-      )}
+      <p className="m-0 text-xs font-medium" role="status">{view.phase.label}</p>
+      {view.phase.detail && <p className="m-0 text-xs text-muted-foreground [overflow-wrap:anywhere]">{view.phase.detail}</p>}
     </header>
   );
 }
@@ -412,6 +397,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
         </section>
       )}
 
+      <Brief ledger={state.ledger} view={view} />
       <Team view={view} actions={actions} threadIds={threadIds} />
       {view.state !== "planning" && <History view={view} />}
       </> : <WorkflowHistory key={`${threadId}:${section}`} ledger={state.ledger} view={view} openThread={actions.openThread} mode={section} />}

@@ -37,7 +37,7 @@ test("all moving: nothing needs you, with progress and the freshest report", () 
   );
   assert.equal(v.state, "moving");
   assert.equal(v.heading, "Nothing needs you");
-  assert.equal(v.subline, "1 agent working · 1 of 3 done · latest report 3m ago");
+  assert.equal(v.subline, "2 waiting · 1 of 3 done · latest report 3m ago");
   assert.deepEqual(v.active.map((r) => [r.id, r.kind]), [["S2", "work"], ["S3", "wait"]]);
   assert.equal(v.active[1]!.step, "Starts after S2", "a landed dependency no longer blocks");
   assert.equal(v.active[1]!.age, "");
@@ -53,7 +53,7 @@ test("a question is the one card; asked agents leave the list", () => {
   );
   assert.equal(v.state, "needs");
   assert.equal(v.heading, "One question for you");
-  assert.equal(v.subline, "The rest of the team is moving · 0 of 2 done");
+  assert.equal(v.subline, "Waiting · no agent running · 0 of 2 done");
   assert.equal(v.asks[0]!.text, "Should archived sessions count toward the badge?");
   assert.equal(v.asks[0]!.age, "12m");
   assert.equal(v.asks[0]!.drafts!.primary, "Re S4: ");
@@ -106,7 +106,7 @@ test("an open ask doesn't hide a stuck agent: the subline and the context row na
   assert.equal(v.rowLabel, "One thing waits on you · S5 has gone quiet");
   assert.equal(v.nudge!.draft, "What is S5 doing? It hasn't reported for 52 min.");
   const calm = view([subtask("S6", "working")], { thr_s6: live(2) }, {}, { forTheOwner: ["ask: x"] });
-  assert.equal(calm.subline, "The rest of the team is moving · 0 of 1 done");
+  assert.equal(calm.subline, "Waiting · no agent running · 0 of 1 done");
   assert.equal(calm.rowLabel, "One thing waits on you");
   assert.equal(calm.nudge, null);
 });
@@ -156,8 +156,8 @@ test("everything landed, or a closed ledger: done", () => {
   assert.equal(v.state, "done");
   assert.equal(v.heading, "All 2 subtasks are done");
   const closed = view([subtask("S1", "verified"), subtask("S2", "working")], {}, {}, { status: "closed" });
-  assert.equal(closed.heading, "The orchestration is closed");
-  assert.equal(closed.subline, "The ledger is closed · 1 of 2 done");
+  assert.equal(closed.heading, "Closed, but work is still open");
+  assert.equal(closed.subline, "1 of 2 done · 0 agents running");
   assert.equal(view([subtask("S1", "landed")], {}).heading, "The only subtask is done");
 });
 
@@ -290,7 +290,7 @@ test("a running child thread the ledger doesn't list shows in the team, labelled
   ]);
   assert.equal(v.active[1]!.step, "Running, not in the ledger yet");
   assert.equal(v.threadIds.thr_kid, "thr_kid");
-  assert.equal(v.subline, "3 agents working · 1 of 2 done · latest report 3m ago", "children work but don't count as planned subtasks");
+  assert.equal(v.subline, "2 agents running · 1 of 2 done · latest report 3m ago", "children work but don't count as planned subtasks");
 });
 
 test("a child that names a session-less ledger row becomes that row's thread", () => {
@@ -344,4 +344,53 @@ test("children bind the live, newest session and never duplicate a row that has 
   });
   assert.equal(v.threadIds.S11, "thr_new");
   assert.deepEqual(v.active.map((r) => [r.id, r.label, r.name]), [["S11", "S11", "S11 name"], ["S2", "S2", "S2 name"], ["thr_rev", "", "orch · S2"]]);
+});
+
+
+test("six finished tasks and idle delivered T7 preserve the overall runtime blocker", () => {
+  const tasks = Array.from({ length: 6 }, (_, i) => subtask(`T${i + 1}`, "landed"));
+  tasks.push(subtask("T7", "delivered"));
+  const v = view(tasks, { thr_t7: live(500) }, {}, {
+    status: "blocked", statusRaw: "blocked (runtime activation unavailable; no active worker)",
+    checkpoint: { text: "Old accepted result.\nCurrent runtime gap remains open.", at: null },
+  });
+  assert.equal(v.state, "stuck");
+  assert.equal(v.phase.kind, "blocked");
+  assert.equal(v.heading, "Orchestration blocked");
+  assert.match(v.phase.detail!, /runtime activation unavailable/);
+  assert.equal(v.subline, "6 of 7 done · 0 agents running");
+  assert.equal(v.activeLabel, "0 running");
+  assert.equal(v.active[0]!.step, "Delivered, waiting for the gate");
+  assert.equal(v.done.length, 6);
+});
+
+test("explicit closure, wrapping up, paused and reopened work have distinct phases", () => {
+  const tasks = [subtask("T1", "verified")];
+  assert.equal(view(tasks, {}, {}, { status: "closed" }).phase.kind, "closed");
+  assert.equal(view(tasks, {}).phase.kind, "wrapping");
+  assert.equal(view(tasks, {}, {}, { status: "paused" }).state, "stuck");
+  const reopened = view(tasks, { thr_t1: live(1, { status: "active" }) }, {}, { status: "closed" });
+  assert.equal(reopened.phase.kind, "inconsistent");
+  assert.notEqual(reopened.state, "done");
+  assert.equal(reopened.done.length, 0);
+  assert.equal(reopened.activeLabel, "1 running");
+});
+
+test("running counts use live activity including unlisted children, not task state", () => {
+  const tasks = [subtask("T1", "working"), subtask("T2", "gate")];
+  const idle = view(tasks, { thr_t1: live(1), thr_t2: live(1) });
+  assert.equal(idle.activeLabel, "0 running");
+  assert.equal(idle.phase.kind, "gate");
+  const active = view(tasks, { thr_t1: live(1, { status: "active" }) });
+  assert.equal(active.activeLabel, "1 running");
+  assert.equal(active.phase.kind, "running");
+});
+
+test("a pending owner question does not hide the orchestration blocker", () => {
+  const v = view([subtask("T1", "delivered")], {}, {}, {
+    status: "blocked", forTheOwner: ["ask: Choose the activation route"],
+  });
+  assert.equal(v.state, "needs");
+  assert.equal(v.phase.kind, "blocked");
+  assert.match(v.subline, /Orchestration blocked/);
 });

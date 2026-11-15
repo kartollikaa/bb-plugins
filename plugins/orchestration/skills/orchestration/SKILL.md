@@ -155,3 +155,15 @@ still address the orchestrator: starting an owner reply first opens its composer
 The chat header names the selected conversation. Work and the live team separate Active,
 Idle / waiting, Planned and Done. A running thread or pending input counts as Active;
 a delivered task waiting for its next gate is Idle / waiting, never Planned.
+
+## Overall state and brief
+
+The header shows the orchestration phase independently of owner attention. Explicit blocked,
+paused and closed states take precedence; a closed ledger with open or running work shows a
+conflict. Idle tasks never count as running agents. Finished tasks awaiting ledger closure say so.
+Missing live activity is not evidence of completion.
+
+Now includes Brief: the ledger's Markdown result, or completed and remaining task records for
+older ledgers. The full Current checkpoint is expandable, and outcome notes stay visible. A missing
+brief is never replaced with an invented success claim. New exports may provide `status_raw`
+and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence.

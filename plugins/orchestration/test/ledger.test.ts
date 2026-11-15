@@ -82,3 +82,17 @@ test("reads blocked, the status orchestrate 0.13 added", () => {
   const data = { ...fixture, subtasks: [{ ...fixture.subtasks[0], status: { value: null, raw: "blocked — no registry access" } }] };
   assert.equal(summarizeExport(data, "/x.md").subtasks[0]!.status, "blocked");
 });
+
+
+test("v1 additions preserve a brief and qualified orchestration state; old exports remain valid", () => {
+  const data = { schema: "orchestrate-ledger-export", schema_version: 1,
+    status: "blocked", status_raw: "blocked (supported activation needed)",
+    brief: "Accepted source.\n### Remaining\n- Runtime activation.\n### Evidence\n- [Review](https://example.com/review)",
+  };
+  const summary = summarizeExport(data, "/ledger.md");
+  assert.equal(summary.statusRaw, data.status_raw);
+  assert.equal(summary.brief, data.brief);
+  const old = summarizeExport({ ...data, status_raw: undefined, brief: undefined }, "/old.md");
+  assert.equal(old.statusRaw, null);
+  assert.equal(old.brief, null);
+});

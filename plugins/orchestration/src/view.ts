@@ -3,6 +3,7 @@ import type { Agent, LedgerSummary, Subtask } from "./contract.ts";
 import type { Answer } from "./answered.ts";
 import { parseOwnerItem, type Link } from "./owner.ts";
 import { replyDraft, replyPrefix } from "./reply.ts";
+import { orchestrationPhase, type Phase } from "./phase.ts";
 import { shortAge } from "./age.ts";
 
 export { shortAge };
@@ -65,6 +66,7 @@ export interface RecapLine {
 }
 
 export interface View {
+  phase: Phase;
   state: "planning" | "done" | "needs" | "stuck" | "moving";
   /** The goal, where the orchestrator is now, and its latest decision: the context before the status. */
   recap: { goal: string | null; now: RecapLine | null; last: RecapLine | null };
@@ -310,7 +312,7 @@ export function buildView(input: ViewInput): View {
   const doneIds = new Set(planned.filter((c) => DONE.has(c.subtask.status ?? "")).map((c) => c.subtask.id));
   const rows = classified.map((c) => toRow(c, doneIds, now));
   const total = planned.length;
-  const doneCount = doneIds.size;
+  const doneCount = planned.filter((c) => c.kind === "done").length;
   const progress = `${doneCount} of ${total} done`;
 
   const allAsks = classified.filter((c) => c.kind === "you").map((c) => askOf(c, now));
@@ -359,7 +361,7 @@ export function buildView(input: ViewInput): View {
   const stuck = classified.filter((c) => c.kind === "stuck")
     .sort((a, b) => STUCK_ORDER[a.reason!] - STUCK_ORDER[b.reason!] || (a.lastReport ?? 0) - (b.lastReport ?? 0));
   active.sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || stuck.findIndex((c) => c.subtask.id === a.id) - stuck.findIndex((c) => c.subtask.id === b.id));
-  const working = rows.filter((r) => r.kind === "work");
+  const working = rows.filter((r) => r.running);
   const done = rows.filter((r) => r.kind === "done");
 
   const lastHandover = ledger.lastHandover;
@@ -374,11 +376,15 @@ export function buildView(input: ViewInput): View {
   };
   const recap = { goal: ledger.goal, now: recapLine(ledger.checkpoint, now), last: recapLine(ledger.lastDecision, now) };
   const threadIds = Object.fromEntries(classified.flatMap((c) => (c.subtask.threadId ? [[c.subtask.id, c.subtask.threadId]] : [])));
-  const common = { recap, asks, answered, active, done, threadIds, history, activeLabel: `${active.length} active`, teamLabel: asks.length ? "Rest of the team" : "Team" };
+  const phase = orchestrationPhase(ledger, rows, isBusy(orchestrator));
+  const common = { phase, recap, asks, answered, active, done, threadIds, history, activeLabel: `${working.length} running`, teamLabel: asks.length ? "Rest of the team" : "Team" };
 
   const askHeading = asks.length > 1 ? `${asks.length} things need you`
     : asks[0]?.kind === "decision" ? "One decision for you" : asks[0]?.kind === "owner" ? "One thing waits on you" : "One question for you";
-  if (total === 0) {
+  if (!asks.length && (ledger.status === "blocked" || ledger.status === "paused" || phase.kind === "inconsistent")) {
+    return { ...common, state: "stuck", heading: phase.label, subline: `${progress} · ${working.length} agents running`, rowLabel: phase.label, nudge: null };
+  }
+  if (total === 0 && ledger.status !== "closed") {
     const planning = "The orchestrator is splitting the goal into subtasks.";
     if (asks.length) return { ...common, state: "needs", heading: askHeading, subline: planning, rowLabel: askHeading, nudge: null };
     return { ...common, state: "planning", heading: "Planning the work", subline: planning, rowLabel: "Planning the work", nudge: null };
@@ -402,12 +408,12 @@ export function buildView(input: ViewInput): View {
       const note = stuck.length > 1 ? `${stuckNote}, ${plural(stuck.length - 1, "other", "others")} stuck too` : stuckNote;
       return { ...common, state: "needs", heading, subline: `${capitalize(note)} · ${progress}`, rowLabel: `${heading} · ${note}`, nudge: stuckNudge };
     }
-    const subline = working.length ? `The rest of the team is moving · ${progress}` : progress;
+    const subline = `${phase.label} · ${progress}`;
     return { ...common, state: "needs", heading, subline, rowLabel: heading, nudge: null };
   }
 
   const pending = answered.length ? ` ${plural(answered.length, "answer waits", "answers wait")} on the orchestrator.` : "";
-  if (ledger.status === "closed" || (doneCount === total && active.length === 0)) {
+  if ((ledger.status === "closed" && !rows.some((r) => r.running)) || (total > 0 && doneCount === total && active.length === 0)) {
     const heading = doneCount === total ? (total === 1 ? "The only subtask is done" : `All ${total} subtasks are done`) : "The orchestration is closed";
     return {
       ...common,
@@ -434,8 +440,8 @@ export function buildView(input: ViewInput): View {
 
   const reports = classified.filter((c) => c.kind !== "done" && c.lastReport !== null).map((c) => c.lastReport!);
   const latest = reports.length ? ` · latest report ${shortAge(now - Math.max(...reports)) === "now" ? "just now" : `${shortAge(now - Math.max(...reports))} ago`}` : "";
-  const waiting = rows.filter((r) => r.kind === "wait").length;
-  const lead = working.length ? `${plural(working.length, "agent", "agents")} working` : `${waiting} waiting`;
+  const waiting = rows.filter((r) => r.kind !== "done" && !r.running).length;
+  const lead = working.length ? `${plural(working.length, "agent", "agents")} running` : `${waiting} waiting`;
   return { ...common, state: "moving", heading: "Nothing needs you", subline: `${lead} · ${progress}${latest}`, rowLabel: "Nothing needs you", nudge: null };
 }
 
