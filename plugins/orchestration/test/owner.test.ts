@@ -74,9 +74,12 @@ test("a hand-written `Q:` / `Q (asked …):` / `question:` line is an ask, its d
   if (item.kind !== "ask") return;
   assert.equal(item.title, "accept T9 group 4 boards ThreatDrawIntro, MissionChoiceThreat (thread-storage/thr_qvipv6ji7b/boards) — 4.2 red tests done @03169c0d8 local");
   assert.deepEqual(item.options, []);
-  const q3 = parseOwnerItem("Q3: Merge #12? | options: Yes / No");
-  assert.equal(q3.kind === "ask" && q3.title, "Merge #12?");
-  assert.deepEqual(q3.kind === "ask" && q3.options, ["Yes", "No"]);
+  const q = parseOwnerItem("Q: Merge #12? | options: Yes / No");
+  assert.equal(q.kind === "ask" && q.title, "Merge #12?");
+  assert.deepEqual(q.kind === "ask" && q.options, ["Yes", "No"]);
+  for (const record of ["Q (answered 2026-11-14): accept boards → yes", "Q4: release shipped", "ask (draft): later", "Q&A: none"]) {
+    assert.equal(parseOwnerItem(record).kind, "note", record);
+  }
   assert.equal(parseOwnerItem("Question: Keep both?").kind, "ask");
   assert.equal(parseOwnerItem("Quiet: nothing runs").kind, "note");
   assert.equal(parseOwnerItem("Q: ").kind, "note");

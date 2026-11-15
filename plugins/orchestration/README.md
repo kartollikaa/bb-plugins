@@ -44,8 +44,8 @@ question: does anything need you, and is the team moving?
   error and brings the buttons back.
 - **Answer, Other answer, Land it, Not yet** only start a reply in the orchestrator's composer.
   Nothing is sent until you send it.
-- **A hand-written question still counts.** A «For the owner» line starting `Q:`, `Q3:`,
-  `Q (asked …):` or `question:` is an ask like `ask:`, so it shows as a card that waits on you. Seen
+- **A hand-written question still counts.** A «For the owner» line starting `Q:`,
+  `Q (asked …):` or `question:` is an ask like `ask:` (`Q (answered …):` stays a note), so it shows as a card that waits on you. Seen
   live: an orchestrator wrote `- Q (asked 2026-11-16): accept T9 group 4 boards …` and the view
   showed nothing waiting.
 - **Answers typed in the chat count too.** One message may answer several questions, one

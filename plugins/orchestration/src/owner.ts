@@ -39,8 +39,8 @@ export function linksIn(text: string): Link[] {
 
 const threadsIn = (text: string) => [...new Set(text.match(THREAD) ?? [])];
 
-// Orchestrators editing the ledger by hand drift into `Q (asked 2026-11-16): …`, `Q3: …`, `question: …`.
-const ASK_PREFIX = /^(?:ask|q\d*|question)\s*(?:\([^)]*\))?\s*:/i;
+// Orchestrators editing the ledger by hand drift into `Q (asked 2026-11-16): …` and `question: …`; `Q (answered …)` stays a record.
+const ASK_PREFIX = /^(?:ask:|(?:q|question)\s*(?:\(asked\b[^)]*\))?\s*:)/i;
 
 function parseAsk(text: string): OwnerItem | null {
   const fields: [string, string][] = [["ask", ""]];

@@ -111,14 +111,25 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
   `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
   ` / `). A GitHub link reads `repo#N` on its button. Each option sends `Re «<title>»: <option>` to the orchestrator; Other answer fills the composer with
   `Re «<title>»: `.
-- A hand-written `Q:`, `Q3:`, `Q (asked 2026-11-16):` or `question:` line reads as an `ask:` (the
+- A hand-written `Q:`, `Q (asked 2026-11-16):` or `question:` line reads as an `ask:` (the
   parenthesis is dropped from the title), so a question written that way still reaches the owner;
-  write `ask:` with `options:` anyway, it gets quick replies.
+  `Q (answered …):`, `Q4:` and the like stay notes. Write `ask:` with `options:` anyway, it gets
+  quick replies.
 - Otherwise only `ask:` is an ask. `note:` and every other line («Nothing waiting.», «answered 2026-11-14:
   …») is information: it shows under History as a note and never counts as needs you. An `ask:`
   with no title is a note too. Owner, on the change: «The dialog keep showing even when i answered».
 - A ` | ` segment without one of the keys above stays with the field before it, so a title or a
   `why:` may contain ` | `.
+
+## Asking a ledger question in the chat too
+
+The view knows an ask is answered only from a message that starts `Re «<title>»: `, with `<title>`
+exactly as the view shows it. A Generative UI card in the chat that asks the same question must send
+that: `Button("Accept", Send("Re «<title>»: Accept"))`, a free-text button
+`Send("Re «<title>»: ")`, or a Form labelled `Re «<title>»`. A card that sends anything else
+(«Change the boards: …») leaves the ask waiting in the view. Whatever the answer's shape, once
+you have it, drop the line or replace it with a `note:`; the view reads nothing else. Seen live:
+the owner answered through a card's «Change something» button and the question stayed in the view.
 
 ## Showing a subtask's images in the chat
 
