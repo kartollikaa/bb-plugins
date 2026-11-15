@@ -23,7 +23,8 @@ export default experimental_defineHostEntry({
   experimental_signals: hostSignals,
   handlers: {
     status: () => ({ watchers: watches.size }),
-    read: ({ root, path }) => readFileSource(root, path),
+    read: ({ root, path }, context) =>
+      readFileSource(root, path, context.signal),
     stop: ({ key }) => stop(key),
     watch: async ({ key, root, path, until }, ctx) => {
       if (until <= Date.now() || until > Date.now() + 65000)

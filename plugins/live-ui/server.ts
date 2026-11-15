@@ -138,7 +138,7 @@ export default function plugin(bb: BbPluginApi) {
     await stop(e);
     invalidate(e);
   }
-  async function update(e: Entry, read: boolean) {
+  async function update(e: Entry, read: boolean, signal?: AbortSignal) {
     if (disposed) return e.snapshot;
     try {
       const scope = await resolve(e.binding).catch(async () => {
@@ -161,7 +161,7 @@ export default function plugin(bb: BbPluginApi) {
             path: e.binding.config.source.path,
             until: 0,
           },
-          { hostId: e.hostId },
+          { hostId: e.hostId, signal },
         );
         if (r.revoked) {
           await revoke(e);
@@ -204,11 +204,11 @@ export default function plugin(bb: BbPluginApi) {
     return task;
   }
   bb.rpc.register(rpcContract, {
-    snapshot: async (b) => {
+    snapshot: async (b, context) => {
       const e = await get(b);
-      return serial(e, () => update(e, true));
+      return serial(e, () => update(e, true, context.experimental_signal));
     },
-    control: async ({ binding, client, action }) => {
+    control: async ({ binding, client, action }, context) => {
       const e = await get(binding);
       return serial(e, async () => {
         if (action === "mount") {
@@ -229,6 +229,7 @@ export default function plugin(bb: BbPluginApi) {
         const result = await update(
           e,
           action === "refresh" || action === "resume" || action === "mount",
+          context.experimental_signal,
         );
         if (action !== "heartbeat") invalidate(e);
         return result;

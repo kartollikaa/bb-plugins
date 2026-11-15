@@ -184,4 +184,4 @@ can find it by the error text.
   Importing `defineRpcContract` from the backend SDK in a frontend bundle can pass a dev
   build and fail a production-only install, where the SDK is not a runtime dependency.
 
-- **Canonical paths alone do not identify an opened file.** A parent directory can be swapped during open and restored before a second realpath check. Compare the opened descriptor dev/ino with the authorized path before returning content, and regression-test the swap.
+- **Canonical paths alone do not identify an opened file.** A parent directory can be swapped during open and restored before a second realpath check. Repeated path stat checks can be raced too. Authorize reads through held directory handles and directory-relative no-follow opens; regression-test swaps at both open and metadata checks.

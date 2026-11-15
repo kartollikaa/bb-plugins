@@ -7,3 +7,5 @@ Live starts automatically on the first visible mount of each new block/source. T
 Requires BB 0.49 and SDK 0.6.132 with an enrolled host supporting native file watches. Strict JSON, canonical path validation, no symlinks/traversal, 256 KiB limit and bounded rows. Temporary read errors retain a visibly stale last-good snapshot; access revocation hides cached data. Signals carry only invalidation identifiers.
 
 Unpublished development plugin. No community listing or release tag. See README for syntax and operating limits.
+
+Secure file reads require Python 3 on a POSIX host with directory-relative open and O_NOFOLLOW. A fixed bundled reader opens each directory through held handles, rejecting symlinks even in root ancestors. It accepts only root/path JSON on stdin; block content never supplies commands or executable code. The reader is bounded to five seconds and 256 KiB. Missing Python/platform support fails closed visibly; nothing is installed and no polling fallback is used.
