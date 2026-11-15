@@ -5,6 +5,7 @@ import { contract } from "./contract.ts";
 import { answeredStatus } from "./answered.ts";
 import { WORK_CATEGORIES } from "./categories.ts";
 import { Recap } from "./Recap.tsx";
+import { EvidenceMarkdown } from "./EvidenceMarkdown.tsx";
 import { Brief } from "./Brief.tsx";
 import { WorkflowHistory } from "./WorkflowHistory.tsx";
 import { replyKey, replyStatus, type ReplyState } from "./reply.ts";
@@ -389,7 +390,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
       <Brief ledger={state.ledger} view={view} report={state.report} threadId={threadId} workspace={state.workspace} />
       <Team view={view} actions={actions} threadIds={threadIds} />
       {view.state !== "planning" && <History view={view} />}
-      </> : <WorkflowHistory key={`${threadId}:${section}`} ledger={state.ledger} view={view} openThread={actions.openThread} mode={section} />}
+      </> : <WorkflowHistory key={`${threadId}:${section}`} ledger={state.ledger} view={view} openThread={actions.openThread} mode={section} renderEvidence={(content) => <EvidenceMarkdown content={content} sourcePath={state.ledger.path} hostId={state.workspace?.ledgerHostId ?? null} threadId={threadId} workspace={state.workspace} />} />}
     </div>
   );
 }

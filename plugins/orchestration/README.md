@@ -189,3 +189,9 @@ The phase remains visible even when the ledger has no goal.
 
 Every local evidence target requires confirmed source-host provenance. A matching workspace or
 thread-storage pathname prefix never overrides a failed ledger identity check.
+
+Work includes compact counts for owner input, blocked/failed gates, running tasks and recorded
+evidence. Evidence counts mean records exist, not that checks passed. Expand dependencies to
+inspect their tasks; selecting a dependency resets the filter to All work. Evidence uses the
+same source-host validated Markdown/file preview as Brief. Missing evidence and revision are
+explicit. This view works without GenUI. See [integration decision](docs/genui-integration.md).

@@ -179,3 +179,9 @@ The phase remains visible even when the ledger has no goal.
 
 Every local evidence target requires confirmed source-host provenance. A matching workspace or
 thread-storage pathname prefix never overrides a failed ledger identity check.
+
+Work summary counts are derived from the existing ledger and BB thread state. Evidence recorded
+is a record count, never a passed-check count. Expand a task to inspect dependencies, criteria,
+evidence links and recorded revision. Dependency buttons select that task in All work. Missing
+evidence/revision remain explicit; requirements do not certify results. No GenUI installation
+is required and no new refresh service is introduced.
