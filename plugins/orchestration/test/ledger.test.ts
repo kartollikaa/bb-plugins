@@ -96,3 +96,10 @@ test("v1 additions preserve a brief and qualified orchestration state; old expor
   assert.equal(old.statusRaw, null);
   assert.equal(old.brief, null);
 });
+
+test("the task's gate cell remains visible when its detailed gate was not exported", () => {
+  const summary = summarizeExport({ schema: "orchestrate-ledger-export", schema_version: 1,
+    subtasks: [{ id: "T7", status: { value: "delivered", raw: "delivered" }, gate: "G7 scoped PASS; runtime gaps OPEN" }],
+  }, "/ledger.md");
+  assert.equal(summary.subtasks[0]!.gateLine, "G7 scoped PASS; runtime gaps OPEN");
+});

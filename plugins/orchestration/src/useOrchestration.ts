@@ -57,7 +57,7 @@ export type OrchestrationState =
   | { kind: "loading" }
   | { kind: "none" }
   | { kind: "error"; message: string; retry: () => void }
-  | { kind: "ready"; view: View; ledger: LedgerSummary; threadIds: Record<string, string> };
+  | { kind: "ready"; view: View; ledger: LedgerSummary; report: { text: string; truncated: boolean } | null; threadIds: Record<string, string> };
 
 export function useOrchestration(threadId: string, enabled: boolean): OrchestrationState {
   const query = experimental_useRpcQuery({ contract, method: "snapshot", input: { threadId }, enabled });
@@ -92,7 +92,7 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
     if (data.state === "error") return { kind: "error", message: data.message, retry: () => void query.refetch() };
     const answered = combineAnswers(data.answered, replies.answers(threadId), data.askFirstSeen);
     const view = buildView({ ledger: data.ledger, agents: data.agents, live, orchestratorThreadId: threadId, now: Math.max(now, data.readAt), answered });
-    return { kind: "ready", view, ledger: data.ledger, threadIds: view.threadIds };
+    return { kind: "ready", view, ledger: data.ledger, report: data.report ?? null, threadIds: view.threadIds };
   }, [query.data, query.error, query.refetch, live, threadId, now, repliesVersion]);
 }
 

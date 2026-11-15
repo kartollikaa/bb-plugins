@@ -39,8 +39,9 @@ several name the thread, the newest wins.
 
 ## What it shows
 
-- **Recap**, on top: in the view the orchestrator thread's title, then the ledger's goal, its
-  «Current checkpoint» as Now and its newest «Decision journal» row as Last, each with its age.
+- **Recap**, on top: the orchestrator thread's title, goal and overall phase, with the recorded
+  status qualification when available. The full checkpoint is expandable in Brief; decisions stay
+  in Activity.
 - **Needs you:** subtasks at `question`, `ready` or `card`, a pending approval in any subtask's
   thread or the orchestrator's own, and every `ask:` line under the ledger's «For the owner» (any
   other line there is a note).
@@ -50,7 +51,7 @@ several name the thread, the newest wins.
   too, with the note after the status word as its cause. A subtask at `gate` is waiting
   on the orchestrator and never counts as quiet. While something needs you, the subline and the
   context-card row still name a stuck agent.
-- **Done:** `landed`, `verified`, `dropped`, or the ledger's status `closed`. A done subtask whose
+- **Done:** `landed`, `verified` or `dropped`. A closed ledger with open work shows a conflict. A done subtask whose
   thread is running again shows as working («Running again · …») and keeps the view out of «done».
 - **Running children:** child threads of the orchestrator (bb's `parentThreadId`) the ledger doesn't
   name. One titled `… · <id>` (uppercase id: S11, O8, R2b) fills that ledger row's empty session,
@@ -166,4 +167,6 @@ Missing live activity is not evidence of completion.
 Now includes Brief: the ledger's Markdown result, or completed and remaining task records for
 older ledgers. The full Current checkpoint is expandable, and outcome notes stay visible. A missing
 brief is never replaced with an invented success claim. New exports may provide `status_raw`
-and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence.
+and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence. Latest orchestrator report opens the
+last assistant response in place, preserving its links; long reports explicitly say they were shortened.
+A report is a conversation record, not independent verification of its claims.

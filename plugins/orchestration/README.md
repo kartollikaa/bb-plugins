@@ -28,7 +28,8 @@ question: does anything need you, and is the team moving?
   one value. Full chat stays a per-thread choice.
 - **Orchestration tab.** The same content as a fixed side-panel tab, shown only on a thread that a ledger's first line
   (`Orchestrator: thr_…`) names. On top: a recap (in the view, the orchestrator thread's title
-  first), the goal, the ledger's current checkpoint as Now and its latest journal decision as Last.
+  first), the goal and overall orchestration phase. The full checkpoint is expandable in Brief;
+  dated decisions stay in Activity.
   Then one status sentence, a card per thing that waits on you, the team with one row per subtask,
   and a History fold.
 - **Context-card row.** The same status sentence in the thread's context card. A click opens the view.
@@ -176,4 +177,6 @@ Missing live activity is not evidence of completion.
 Now includes Brief: the ledger's Markdown result, or completed and remaining task records for
 older ledgers. The full Current checkpoint is expandable, and outcome notes stay visible. A missing
 brief is never replaced with an invented success claim. New exports may provide `status_raw`
-and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence.
+and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence. Latest orchestrator report opens the
+last assistant response in place, preserving its links; long reports explicitly say they were shortened.
+A report is a conversation record, not independent verification of its claims.

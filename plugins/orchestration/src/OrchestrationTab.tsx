@@ -397,7 +397,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
         </section>
       )}
 
-      <Brief ledger={state.ledger} view={view} />
+      <Brief ledger={state.ledger} view={view} report={state.report} />
       <Team view={view} actions={actions} threadIds={threadIds} />
       {view.state !== "planning" && <History view={view} />}
       </> : <WorkflowHistory key={`${threadId}:${section}`} ledger={state.ledger} view={view} openThread={actions.openThread} mode={section} />}

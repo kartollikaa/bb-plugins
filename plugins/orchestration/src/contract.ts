@@ -72,6 +72,7 @@ export const snapshotSchema = z.discriminatedUnion("state", [
     answered: z.record(z.string(), z.object({ answer: z.string(), at: z.number() })),
     /** Ask title → since when a reply to it counts, epoch ms. */
     askFirstSeen: z.record(z.string(), z.number()),
+    report: z.object({ text: z.string(), truncated: z.boolean() }).nullable().optional(),
     readAt: z.number(),
   }),
 ]);

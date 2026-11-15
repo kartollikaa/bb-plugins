@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { contract, type Agent, type LedgerSummary, type Snapshot } from "./src/contract.ts";
 import { answeredAsks, askFirstSeen, collectOwnerMessages, observe, sameLines, type Answer, type Observation, type OwnerMessage } from "./src/answered.ts";
+import { reportOf } from "./src/report.ts";
 import { summarizeExport } from "./src/ledger.ts";
 import { exportScriptCandidates, ledgerFor, scanLedgers, type LedgerFile } from "./src/locate.ts";
 import { resolveOwner } from "./src/route.ts";
@@ -167,18 +168,19 @@ export default async function plugin(bb: BbPluginApi) {
       return { state: "error", message: error instanceof Error ? error.message : String(error) };
     }
     const agents: Record<string, Agent> = {};
-    const [answers] = await Promise.all([
+    const [answers, report] = await Promise.all([
       answersFor(threadId, summary).catch((error) => {
         bb.log.warn(`can't read the owner's answers: ${String(error)}`);
         return { answered: {}, askFirstSeen: {} };
       }),
+      bb.sdk.threads.output({ threadId }).then((value) => reportOf(value.output)).catch(() => null),
       ...summary.subtasks.map(async (subtask) => {
         if (!subtask.threadId) return;
         const live = LIVE_STATUSES.has(subtask.status ?? "");
         agents[subtask.threadId] = await readAgent(subtask.threadId, live, FINISHED_STATUSES.has(subtask.status ?? ""));
       }),
     ]);
-    return { state: "ledger", ledger: summary, agents, ...answers, readAt: Date.now() };
+    return { state: "ledger", ledger: summary, agents, report, ...answers, readAt: Date.now() };
   }
 
   const sendReply = replySender(async (threadId, text) => {

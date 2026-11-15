@@ -103,7 +103,7 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
       modelRaw: str(obj(row.model_effort).raw),
       dependsOn: arr(row.depends_on).flatMap((d) => typeof d === "string" && (arr(root.subtasks).some((task) => obj(task).id === d) || /^[A-Z]+\d+[a-z]*$/.test(d)) ? [d] : []),
       dependencyNote: arr(row.depends_on).filter((d) => typeof d === "string" && !arr(root.subtasks).some((task) => obj(task).id === d) && !/^[A-Z]+\d+[a-z]*$/.test(d)).join(" ") || null,
-      gateLine: latestGate ? gateLine(obj(latestGate.summary), failures) : null,
+      gateLine: latestGate ? gateLine(obj(latestGate.summary), failures) : /^G\d+$/i.test(str(row.gate) ?? "") ? null : str(row.gate),
       gateFailures: failures,
       lastFailedKind,
       rotations: roleHandovers.length,

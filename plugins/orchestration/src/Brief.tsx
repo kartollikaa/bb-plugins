@@ -2,7 +2,7 @@ import { Markdown } from "@get-bb/plugin-sdk/app";
 import type { LedgerSummary } from "./contract.ts";
 import type { View } from "./view.ts";
 
-export function Brief({ ledger, view }: { ledger: LedgerSummary; view: View }) {
+export function Brief({ ledger, view, report }: { ledger: LedgerSummary; view: View; report: { text: string; truncated: boolean } | null }) {
   return (
     <section aria-label="Orchestration brief" className="flex flex-col gap-3 border-b border-border pb-5">
       <h2 className="m-0 text-base font-semibold">Brief</h2>
@@ -19,6 +19,11 @@ export function Brief({ ledger, view }: { ledger: LedgerSummary; view: View }) {
         </div>
       </>}
       {view.history.notes.length > 0 && <div className="text-muted-foreground">{view.history.notes.map((note, i) => <p key={i} className="m-0 [overflow-wrap:anywhere]">{note}</p>)}</div>}
+      {report && <details>
+        <summary className="cursor-pointer text-xs font-medium">Latest orchestrator report</summary>
+        <div className="mt-2 [overflow-wrap:anywhere]"><Markdown content={report.text} /></div>
+        {report.truncated && <p className="text-xs text-muted-foreground">Report shortened. Open the orchestrator conversation for the full text.</p>}
+      </details>}
       {ledger.checkpoint?.text && <details>
         <summary className="cursor-pointer text-xs text-muted-foreground">Current checkpoint</summary>
         <div className="mt-2 [overflow-wrap:anywhere]"><Markdown content={ledger.checkpoint.text} /></div>
