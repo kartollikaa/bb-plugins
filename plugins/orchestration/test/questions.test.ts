@@ -26,11 +26,11 @@ test("two or more pickable asks share a card; a lone one, a decision or an ask w
   assert.deepEqual(splitQuestions([a, open]), { questions: [], rest: [a, open] });
 });
 
-test("one card question per title: the newer of two lines with the same title", () => {
+test("one card question per title: the newer of two lines with the same title; the older one is not a card either", () => {
   const old = ask("a", "A", ["Yes", "No"]);
   const b = ask("b", "B", ["One", "Two"]);
   const newer = ask("c", "A", ["Yes", "No", "Later"]);
-  assert.deepEqual(splitQuestions([old, b, newer]), { questions: [b, newer], rest: [old] });
+  assert.deepEqual(splitQuestions([old, b, newer]), { questions: [b, newer], rest: [] });
 });
 
 test("recommended options are preselected only for questions present when the card opened", () => {

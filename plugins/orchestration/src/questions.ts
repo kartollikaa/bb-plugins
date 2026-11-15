@@ -21,8 +21,8 @@ export function splitQuestions(asks: readonly Ask[]): { questions: Ask[]; rest: 
   for (const a of asks) if (a.kind === "owner" && a.replyTitle && a.replies.length > 0) byTitle.set(a.replyTitle, a);
   const pickable = asks.filter((a) => a.replyTitle && byTitle.get(a.replyTitle) === a);
   if (pickable.length < 2) return { questions: [], rest: [...asks] };
-  const keys = new Set(pickable.map((a) => a.key));
-  return { questions: pickable, rest: asks.filter((a) => !keys.has(a.key)) };
+  const titles = new Set(pickable.map((a) => a.replyTitle));
+  return { questions: pickable, rest: asks.filter((a) => !titles.has(a.replyTitle)) };
 }
 
 /** A question's identity across ledger rewrites: its title and options, never its line position. */
