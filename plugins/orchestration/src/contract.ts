@@ -61,6 +61,14 @@ export const agentSchema = z.object({
 });
 export type Agent = z.infer<typeof agentSchema>;
 
+/** A bb interaction waiting in a thread: an agent's question or a request to approve. */
+export const pendingSchema = z.object({
+  kind: z.enum(["question", "approval"]),
+  title: z.string(),
+  text: z.string(),
+});
+export type Pending = z.infer<typeof pendingSchema>;
+
 export const snapshotSchema = z.discriminatedUnion("state", [
   z.object({ state: z.literal("none") }),
   z.object({ state: z.literal("error"), message: z.string() }),
@@ -100,6 +108,10 @@ export const contract = {
   reply: {
     input: z.object({ threadId: z.string().min(1).max(100), text: z.string().min(1).max(2_000) }),
     output: z.object({ delivery: z.enum(["sent", "queued", "already"]) }),
+  },
+  pending: {
+    input: z.object({ threadId: z.string().min(1).max(100), threadIds: z.array(z.string().regex(/^thr_[a-z0-9]+$/i)).max(50) }),
+    output: z.record(z.string(), pendingSchema.nullable()),
   },
   setOrchestrationView: {
     input: z.object({ on: z.boolean() }),

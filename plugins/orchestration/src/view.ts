@@ -1,5 +1,5 @@
 // Turns a ledger snapshot plus bb's live thread state into the tab's one answer: does anything need you, and is the team moving.
-import type { Agent, LedgerSummary, Subtask } from "./contract.ts";
+import type { Agent, LedgerSummary, Pending, Subtask } from "./contract.ts";
 import type { Answer } from "./answered.ts";
 import { parseOwnerItem, type Link } from "./owner.ts";
 import { replyDraft, replyPrefix } from "./reply.ts";
@@ -22,6 +22,8 @@ export interface LiveThread {
   parentThreadId?: string | null;
   title?: string | null;
   hidden?: boolean;
+  /** What the thread's pending interaction asks, once read; null while unknown. */
+  pending?: Pending | null;
 }
 
 export interface Row {
@@ -254,11 +256,16 @@ function askOf(c: Classified, now: number): Ask {
   if (subtask.status === "card") {
     return { ...base, kind: "thread", text: `${subtask.id} waits for you to start its card in this chat.`, drafts: null };
   }
-  if (subtask.status !== "question" && c.live?.hasPendingInteraction) {
-    return { ...base, kind: "thread", text: `${c.child ? who : subtask.id} waits on an approval or a question in its thread.`, drafts: null };
+  if (c.live?.hasPendingInteraction) {
+    return { ...base, kind: "thread", ...pendingContent(c.live.pending, `${c.child ? who : subtask.id} waits on an approval or a question in its thread.`), drafts: null };
   }
   const text = agent?.lastOutput?.trim() || `${subtask.id} asked a question. It is in its thread.`;
   return { ...base, kind: "question", text, drafts: { primary: `Re ${subtask.id}: ` } };
+}
+
+/** The pending interaction's own words; the fallback only until bb has returned them. */
+function pendingContent(pending: Pending | null | undefined, fallback: string): { title: string | null; text: string } {
+  return pending ? { title: pending.title, text: pending.text } : { title: null, text: fallback };
 }
 
 /** `T2: Approve the draft` → T2 and «Approve the draft», when T2 is a subtask of this ledger. */
@@ -345,9 +352,8 @@ export function buildView(input: ViewInput): View {
       subtask: null,
       since: orchestrator.latestAttentionAt || null,
       age: orchestrator.latestAttentionAt ? shortAge(now - orchestrator.latestAttentionAt) : "",
-      title: null,
       replyTitle: null,
-      text: "The orchestrator waits on an approval or a question in this chat.",
+      ...pendingContent(orchestrator.pending, "The orchestrator waits on an approval or a question in this chat."),
       links: [],
       threads: [],
       replies: [],
@@ -468,6 +474,12 @@ export function buildView(input: ViewInput): View {
   const waiting = rows.filter((r) => r.kind !== "done" && !r.running).length;
   const lead = working.length ? `${plural(working.length, "agent", "agents")} running` : `${waiting} waiting`;
   return { ...common, state: "moving", heading: "Nothing needs you", subline: `${lead} · ${progress}${latest}`, rowLabel: "Nothing needs you", nudge: null };
+}
+
+/** Answers go to the orchestrator; only a prompt bb holds in another thread is answered there. */
+export function threadsToOpen(ask: Ask, threadId: string | null): string[] {
+  if (ask.kind !== "thread") return [];
+  return threadId ? [threadId] : ask.threads;
 }
 
 /** What a «sent» marker sticks to: a new question, decision or ledger line under the same key is a new ask. */

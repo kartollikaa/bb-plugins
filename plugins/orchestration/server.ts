@@ -7,6 +7,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { contract, type Agent, type LedgerSummary, type Snapshot } from "./src/contract.ts";
 import { answeredAsks, askFirstSeen, collectOwnerMessages, observe, sameLines, type Answer, type Observation, type OwnerMessage } from "./src/answered.ts";
 import { reportOf } from "./src/report.ts";
+import { describePending } from "./src/pending.ts";
 import { summarizeExport } from "./src/ledger.ts";
 import { exportScriptCandidates, ledgerFor, scanLedgers, type LedgerFile } from "./src/locate.ts";
 import { resolveOwner } from "./src/route.ts";
@@ -209,6 +210,26 @@ export default async function plugin(bb: BbPluginApi) {
     return { delivery };
   }
 
+  async function parentOf(id: string): Promise<string | null> {
+    const result = obj(await bb.sdk.threads.get({ threadId: id }).catch(() => null));
+    return str(obj(result.thread ?? result).parentThreadId);
+  }
+
+  /** Pending interactions of the orchestrator, its ledger's subtasks and its child threads; any other thread reads as null. */
+  async function pending(threadId: string, threadIds: string[]) {
+    const ledger = ledgerFor(await ledgers(), threadId);
+    if (!ledger) return {};
+    const named = new Set((await exportLedger(ledger.path)).subtasks.flatMap((s) => (s.threadId ? [s.threadId] : [])));
+    const entries = await Promise.all([...new Set(threadIds)].map(async (id) => {
+      const ours = id === threadId || named.has(id) || await parentOf(id) === threadId;
+      if (!ours) return [id, null] as const;
+      const list = await bb.sdk.threads.interactions.list({ threadId: id }).catch(() => []);
+      const found = list.map(describePending).find((p) => p !== null) ?? null;
+      return [id, found] as const;
+    }));
+    return Object.fromEntries(entries);
+  }
+
   bb.rpc.register(contract, {
     orchestrators: async () => ({ ids: [...new Set((await ledgers()).map((ledger) => ledger.orchestratorId))] }),
     owner: async ({ threadId }) => {
@@ -225,6 +246,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     snapshot: ({ threadId }) => snapshot(threadId),
     reply: ({ threadId, text }) => reply(threadId, text),
+    pending: ({ threadId, threadIds }) => pending(threadId, threadIds),
     setOrchestrationView: async ({ on }) => ({ on: (await settings.experimental_set({ orchestrationView: on })).orchestrationView }),
   });
 }

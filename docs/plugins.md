@@ -238,7 +238,8 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   owner, the team as one row per subtask plus the orchestrator's running child threads the ledger
   doesn't list yet (bb's `parentThreadId`), and a goal/history fold. A quick-reply option sends
   `Re «title»: option` to the orchestrator (`threads.send`, `queue-if-active`); Answer and Land it
-  only fill its composer.
+  only fill its composer. A pending approval or question card shows the interaction's own words
+  (`threads.interactions.list`); only such a card offers Open thread.
 - **How:** the server scans `~/.claude/projects/*/orchestrate/*.md` first lines, runs orchestrate's
   `orchestration_ledger.py export` (setting `exportScript`, else the plugin cache, newest first) and
   adds per-agent model, effort, context and last output from `threads.*`. The app merges that with

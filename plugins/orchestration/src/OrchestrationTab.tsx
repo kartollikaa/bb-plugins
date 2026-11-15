@@ -9,7 +9,7 @@ import { EvidenceMarkdown } from "./EvidenceMarkdown.tsx";
 import { Brief } from "./Brief.tsx";
 import { WorkflowHistory } from "./WorkflowHistory.tsx";
 import { replyKey, replyStatus, type ReplyState } from "./reply.ts";
-import { askIdentity, type Ask, type Row, type RowKind, type View } from "./view.ts";
+import { askIdentity, threadsToOpen, type Ask, type Row, type RowKind, type View } from "./view.ts";
 import { replies, useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
@@ -101,8 +101,7 @@ function Expandable({ children }: { children: ReactNode }) {
 const linkButton = "block h-[26px] max-w-full truncate whitespace-nowrap leading-[24px] rounded-md border border-border px-2.5 text-xs font-medium text-foreground no-underline hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 /** An ask the owner already answered: no attention colour, it waits on the orchestrator to rewrite the line. */
-function AnsweredCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
-  const threads = threadId ? [threadId] : ask.threads;
+function AnsweredCard({ ask, actions }: { ask: Ask; actions: Actions }) {
   return (
     <div className="flex flex-col gap-1.5 rounded-[10px] border border-border px-3 pb-2.5 pt-3">
       <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -114,7 +113,6 @@ function AnsweredCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; 
         <span role="status" className="text-xs text-muted-foreground">{answeredStatus(ask.answered!, Date.now())}</span>
         {ask.drafts && <Button variant="quiet" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.primary)}>Other answer</Button>}
         {ask.links.map((l) => <UrlLink key={l.href} href={l.href} title={l.title} className={linkButton}>Open {l.label}</UrlLink>)}
-        {threads.map((t) => <Button key={t} variant="quiet" onClick={() => actions.openThread(t)}>{threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
       </div>
     </div>
   );
@@ -126,7 +124,7 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
   const remembered = ask.replies.length ? actions.replyState(replyKeyOf(ask)) : null;
   /** A finished send on a card that still waits belongs to an earlier asking of the same line. */
   const replied = remembered?.kind === "sent" ? null : remembered;
-  const threads = threadId ? [threadId] : ask.threads;
+  const threads = threadsToOpen(ask, threadId);
   const answerable = (ask.kind === "question" || ask.kind === "owner") && ask.drafts;
   return (
     <div className="flex flex-col gap-2 rounded-[10px] border border-[color-mix(in_oklab,var(--attention)_35%,transparent)] bg-[color-mix(in_oklab,var(--attention)_12%,var(--background))] px-3 pb-2.5 pt-3">
@@ -158,7 +156,7 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
           </>
         ) : null}
         {ask.links.map((l) => <UrlLink key={l.href} href={l.href} title={l.title} className={linkButton}>Open {l.label}</UrlLink>)}
-        {threads.map((t) => <Button key={t} variant={answerable || ask.kind === "decision" ? "quiet" : "primary"} onClick={() => actions.openThread(t)}>{threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
+        {threads.map((t) => <Button key={t} variant="primary" onClick={() => actions.openThread(t)}>{threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
       </div>
     </div>
   );
@@ -374,7 +372,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
 
       {view.answered.length > 0 && (
         <section className="flex flex-col gap-2">
-          {view.answered.map((ask) => <AnsweredCard key={ask.key} ask={ask} actions={actions} threadId={askThread(ask)} />)}
+          {view.answered.map((ask) => <AnsweredCard key={ask.key} ask={ask} actions={actions} />)}
         </section>
       )}
 

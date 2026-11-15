@@ -45,7 +45,9 @@ several name the thread, the newest wins.
 - **Needs you:** subtasks at `question`, `ready` or `card`, a pending approval in any subtask's
   thread or the orchestrator's own, and every `ask:` line under the ledger's «For the owner» (any
   other line there is a note). A `ready` card shows the status note, Delivery, Version and gate line;
-  a «For the owner» line naming that subtask or linking only its thread replaces it.
+  a «For the owner» line naming that subtask or linking only its thread replaces it. A pending
+  approval or question card shows the interaction's own question, options or command. Only such a
+  card, held in another thread, has Open thread; every other card answers the orchestrator.
 - **Stuck:** a `working` or `briefed` subtask that hasn't reported for `QUIET_MS` (a report is the
   end of the thread's latest turn), or `FAILURES_STUCK` failed checks, review, done-when or conflicts
   stages across its open gates; both constants are in `src/view.ts`. A `blocked` subtask is stuck

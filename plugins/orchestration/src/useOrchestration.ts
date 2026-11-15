@@ -65,6 +65,9 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
   const sidebar = experimental_useSidebarThreads();
   const now = useNow();
   const repliesVersion = useSyncExternalStore(replies.subscribe, replies.version);
+  const waiting = useMemo(() => sidebar.threads.filter((t) => t.hasPendingInteraction).map((t) => t.id).sort().slice(0, 50), [sidebar.threads]);
+  const pendingQuery = experimental_useRpcQuery({ contract, method: "pending", input: { threadId, threadIds: waiting }, enabled: enabled && waiting.length > 0 });
+  useVisibleInterval(pendingQuery.refetch, SNAPSHOT_REFRESH_MS, enabled && waiting.length > 0);
 
   const live = useMemo(() => {
     const map: Record<string, LiveThread> = {};
@@ -77,10 +80,11 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
         parentThreadId: thread.parentThreadId,
         title: thread.displayTitle,
         hidden: thread.isHidden,
+        pending: thread.hasPendingInteraction ? pendingQuery.data?.[thread.id] ?? null : null,
       };
     }
     return map;
-  }, [sidebar.threads]);
+  }, [sidebar.threads, pendingQuery.data]);
 
   return useMemo<OrchestrationState>(() => {
     const data = query.data;

@@ -77,6 +77,11 @@ same title bar.
 - **A `ready` card** shows the ledger's note after `ready`, and what lands: Delivery, Version and the
   gate line. **Land it** drafts `<id> at <version>: go ahead and land it.` When a «For the owner»
   line names that subtask (`T1: …`) or links only its thread, that line is the card instead.
+- **A pending approval or question** shows what bb holds: the agent's question with its options, or
+  the command, plan, permission or tool it asks to approve (`threads.interactions.list`, read only for
+  the orchestrator, its ledger's subtasks and its child threads).
+- **Open thread** appears only on a card whose prompt bb holds in another thread; every other card is
+  answered to the orchestrator, which records the answer and passes it on.
 - **Stuck:** a `working` or `briefed` subtask that hasn't reported for too long, or one whose
   checks, review, done-when or conflict stages keep failing, or one at `blocked` (orchestrate
   0.13+), which shows its cause. A report is the end of the thread's latest turn. Both limits are the owner's and live in `src/view.ts` (`QUIET_MS`, `FAILURES_STUCK`).
