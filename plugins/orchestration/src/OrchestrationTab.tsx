@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { contract } from "./contract.ts";
 import { answeredStatus } from "./answered.ts";
 import { WORK_CATEGORIES } from "./categories.ts";
+import { Recap } from "./Recap.tsx";
 import { Brief } from "./Brief.tsx";
 import { WorkflowHistory } from "./WorkflowHistory.tsx";
 import { replyKey, replyStatus, type ReplyState } from "./reply.ts";
@@ -273,20 +274,9 @@ function History({ view }: { view: View }) {
   );
 }
 
-/** Which orchestration this is and where it stands, so the status below reads in context. */
-function Recap({ view, threadId, withTitle }: { view: View; threadId: string; withTitle: boolean }) {
-  const { goal } = view.recap;
+function ThreadRecap({ view, threadId, withTitle }: { view: View; threadId: string; withTitle: boolean }) {
   const title = experimental_useSidebarThreads().threads.find((t) => t.id === threadId)?.displayTitle ?? null;
-  return (
-    <header className="flex flex-col gap-2 border-b border-border pb-4">
-      {withTitle && title && (
-        <h1 className="m-0 min-w-0 text-lg font-semibold leading-[1.3] tracking-[-0.015em] [overflow-wrap:anywhere] [text-wrap:balance]">{title}</h1>
-      )}
-      {goal && <p className="m-0 text-muted-foreground [overflow-wrap:anywhere] [text-wrap:pretty]">{goal}</p>}
-      <p className="m-0 text-xs font-medium" role="status">{view.phase.label}</p>
-      {view.phase.detail && <p className="m-0 text-xs text-muted-foreground [overflow-wrap:anywhere]">{view.phase.detail}</p>}
-    </header>
-  );
+  return <Recap view={view} title={title} withTitle={withTitle} />;
 }
 
 export function Message({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
@@ -359,7 +349,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   const askThread = (ask: Ask) => (ask.key in threadIds ? threadIds[ask.key]! : null);
   return (
     <div className={cx("flex flex-col gap-6 text-sm leading-[1.45] text-foreground", variant === "tab" ? "h-full overflow-y-auto px-4 pb-4 pt-5" : "mx-auto w-full max-w-[680px] px-6 pb-6 pt-6")}>
-      <Recap view={view} threadId={threadId} withTitle={variant === "page"} />
+      <ThreadRecap view={view} threadId={threadId} withTitle={variant === "page"} />
 
       <nav aria-label="Orchestration sections" className="flex gap-1 border-b border-border pb-2">
         {(["now", "work", "activity"] as const).map((item) => <button key={item} type="button" aria-pressed={section === item} onClick={() => setSection(item)} className={cx("rounded-md px-3 py-1.5 text-xs capitalize hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary", section === item ? "bg-accent font-medium text-foreground" : "text-muted-foreground")}>{item === "now" ? `Now${view.asks.length ? ` · ${view.asks.length}` : ""}` : item}</button>)}

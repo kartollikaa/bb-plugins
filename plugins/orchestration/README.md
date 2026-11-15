@@ -182,7 +182,7 @@ last assistant response in place, preserving its links; long reports explicitly 
 A report is a conversation record, not independent verification of its claims.
 
 Local evidence links in Brief and checkpoint resolve from the ledger file; report links resolve
-from the orchestrator workspace. Ordinary activation opens the host-owned file preview using
-explicit host identity. Ledger file routing is enabled only after the ledger contents match on
+from the orchestrator workspace. Ordinary activation captures the click before Markdown navigation and opens BB's host-owned
+file preview in an evidence dialog, using explicit thread-storage, workspace or host identity. Ledger file routing is enabled only after the ledger contents match on
 that host. If its host cannot be established, the UI reports that the file location is unavailable.
 The phase remains visible even when the ledger has no goal.

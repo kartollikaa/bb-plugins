@@ -57,7 +57,7 @@ export type OrchestrationState =
   | { kind: "loading" }
   | { kind: "none" }
   | { kind: "error"; message: string; retry: () => void }
-  | { kind: "ready"; view: View; ledger: LedgerSummary; report: { text: string; truncated: boolean } | null; workspace: { environmentId: string; rootPath: string; hostId: string; ledgerHostId: string | null } | null; threadIds: Record<string, string> };
+  | { kind: "ready"; view: View; ledger: LedgerSummary; report: { text: string; truncated: boolean } | null; workspace: { environmentId: string; rootPath: string; hostId: string; ledgerHostId: string | null; storageRootPath: string | null } | null; threadIds: Record<string, string> };
 
 export function useOrchestration(threadId: string, enabled: boolean): OrchestrationState {
   const query = experimental_useRpcQuery({ contract, method: "snapshot", input: { threadId }, enabled });

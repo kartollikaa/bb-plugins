@@ -168,13 +168,14 @@ export default async function plugin(bb: BbPluginApi) {
       return { state: "error", message: error instanceof Error ? error.message : String(error) };
     }
     const agents: Record<string, Agent> = {};
-    const [answers, report, ownerThread] = await Promise.all([
+    const [answers, report, ownerThread, storage] = await Promise.all([
       answersFor(threadId, summary).catch((error) => {
         bb.log.warn(`can't read the owner's answers: ${String(error)}`);
         return { answered: {}, askFirstSeen: {} };
       }),
       bb.sdk.threads.output({ threadId }).then((value) => reportOf(value.output)).catch(() => null),
       bb.sdk.threads.get({ threadId }).catch(() => null),
+      bb.sdk.threads.storageLocation({ threadId }).catch(() => null),
       ...summary.subtasks.map(async (subtask) => {
         if (!subtask.threadId) return;
         const live = LIVE_STATUSES.has(subtask.status ?? "");
@@ -182,7 +183,7 @@ export default async function plugin(bb: BbPluginApi) {
       }),
     ]);
     const environment = ownerThread?.environmentId ? await bb.sdk.environments.get({ environmentId: ownerThread.environmentId }).catch(() => null) : null;
-    const workspace = environment?.id && environment.path ? { environmentId: environment.id, rootPath: environment.path, hostId: environment.hostId, ledgerHostId: null as string | null } : null;
+    const workspace = environment?.id && environment.path ? { environmentId: environment.id, rootPath: environment.path, hostId: environment.hostId, ledgerHostId: null as string | null, storageRootPath: storage?.storageRootPath ?? null } : null;
     if (workspace) {
       const [local, remote] = await Promise.all([
         readFile(summary.path, "utf8").catch(() => null),
