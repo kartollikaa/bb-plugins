@@ -19,7 +19,8 @@ export function orchestrationPhase(ledger: LedgerSummary, rows: Row[], orchestra
   if (rows.some((r) => r.kind === "stuck")) return { kind: "blocked", label: "Work is blocked", detail };
   if (running) return { kind: "running", label: "Work in progress", detail };
   if (rows.length && !unfinished) return { kind: "wrapping", label: "Tasks finished · awaiting closure", detail };
-  if (ledger.subtasks.some((s) => ["delivered", "gate", "ready"].includes(s.status ?? ""))) return { kind: "gate", label: "Waiting for verification or landing", detail };
+  const waitingOnOwner = new Set(rows.filter((r) => r.kind === "you").map((r) => r.id));
+  if (ledger.subtasks.some((s) => ["delivered", "gate", "ready"].includes(s.status ?? "") && !waitingOnOwner.has(s.id))) return { kind: "gate", label: "Waiting for verification or landing", detail };
   if (!rows.length || ledger.subtasks.every((s) => s.status === "planned")) return { kind: "planning", label: "Planning the work", detail };
   if (!state || !["active", "blocked", "paused", "closed"].includes(state)) return { kind: "unknown", label: "Orchestration state unknown", detail };
   return { kind: "waiting", label: "Waiting · no agent running", detail };

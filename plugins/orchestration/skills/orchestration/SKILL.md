@@ -44,7 +44,8 @@ several name the thread, the newest wins.
   in Activity.
 - **Needs you:** subtasks at `question`, `ready` or `card`, a pending approval in any subtask's
   thread or the orchestrator's own, and every `ask:` line under the ledger's «For the owner» (any
-  other line there is a note).
+  other line there is a note). A `ready` card shows the status note, Delivery, Version and gate line;
+  a «For the owner» line naming that subtask or linking only its thread replaces it.
 - **Stuck:** a `working` or `briefed` subtask that hasn't reported for `QUIET_MS` (a report is the
   end of the thread's latest turn), or `FAILURES_STUCK` failed checks, review, done-when or conflicts
   stages across its open gates; both constants are in `src/view.ts`. A `blocked` subtask is stuck
@@ -76,7 +77,7 @@ leaves «needs you», the heading and the context-card dot, and shows as a quiet
 «answer» <age> ago · waiting for the orchestrator» with Other answer. It stays that way until the
 line changes or leaves «For the owner». So on an answer, drop the ask line or replace it with a
 `note:`; for a re-ask, reword the line (e.g. «Merge PR #12 (again)?»): an identical line re-added
-between two reads keeps reading as answered. A done view's subline counts such pending answers. Answer, Other answer, Release and Not yet only put a draft
+between two reads keeps reading as answered. A done view's subline counts such pending answers. Answer, Other answer, Land it and Not yet only put a draft
 into the orchestrator's composer and focus it, wherever the composer currently is (rail, sheet or
 dock); they never send. Keep ledger statuses and «For the owner» current: the tab reads nothing else.
 

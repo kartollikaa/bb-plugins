@@ -74,6 +74,34 @@ test("ready is a decision; several asks sort oldest first", () => {
   assert.equal(view([subtask("S7", "ready")], {}).heading, "One decision for you");
 });
 
+test("a ready card says what lands: the ledger's note, delivery, version and gate", () => {
+  const ready = subtask("S7", "ready", {
+    statusRaw: "ready — review passed; merge after the freeze", delivery: "PR #41", version: "9f3e2a1", gateLine: "checks passed · review passed",
+  });
+  const v = view([ready], { thr_s7: live(5) });
+  const ask = v.asks[0]!;
+  assert.equal(ask.title, "Review passed; merge after the freeze");
+  assert.equal(ask.text, "- **Lands:** PR #41\n- **Version:** `9f3e2a1`\n- **Gate:** checks passed · review passed");
+  assert.equal(ask.drafts!.primary, "S7 at 9f3e2a1: go ahead and land it.");
+  const bare = view([subtask("S7", "ready")], {}).asks[0]!;
+  assert.equal(bare.title, "S7 passed the gate and waits for your word to land");
+  assert.match(bare.text, /names no branch, version or gate/);
+});
+
+test("a «For the owner» line on a ready subtask's thread replaces its landing card", () => {
+  const plan = subtask("T1", "ready", { statusRaw: "ready — plan verified; waits on owner's answers and folder review", threadId: "thr_t1", name: "branch plan (no PR)" });
+  const v = view([plan], { thr_t1: live(8) }, {}, { forTheOwner: ["ask: Answer the 6 plan questions | thread: thr_t1 | options: All as recommended / One by one"] });
+  assert.equal(v.heading, "One thing waits on you");
+  assert.deepEqual(v.asks.map((a) => [a.kind, a.who, a.subtask]), [["owner", "T1 · branch plan (no PR)", "T1"]]);
+  assert.deepEqual(v.asks[0]!.threads, ["thr_t1"]);
+  assert.equal(v.subline, "Waiting · no agent running · 0 of 1 done", "a subtask waiting on the owner is not waiting on a landing");
+  assert.equal(view([subtask("T2", "delivered")], {}).phase.label, "Waiting for verification or landing");
+  const named = view([plan], {}, {}, { forTheOwner: ["ask: T1: Review the plan folder"] });
+  assert.deepEqual(named.asks.map((a) => a.kind), ["owner"]);
+  const other = view([plan, subtask("T2", "working")], {}, {}, { forTheOwner: ["ask: T2: Pick a name"] });
+  assert.deepEqual(other.asks.map((a) => a.kind).sort(), ["decision", "owner"]);
+});
+
 test("a pending approval in a child's thread needs you, without a composer draft", () => {
   const v = view([subtask("S2", "working")], { thr_s2: live(1, { hasPendingInteraction: true }) });
   assert.equal(v.state, "needs");

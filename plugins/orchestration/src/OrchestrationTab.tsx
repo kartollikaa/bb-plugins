@@ -148,7 +148,7 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
           <span className="text-xs text-muted-foreground">Reply started in the chat composer</span>
         ) : ask.kind === "decision" && ask.drafts ? (
           <>
-            <Button variant="primary" onClick={() => actions.fill(id, ask.drafts!.primary)}>Release</Button>
+            <Button variant="primary" onClick={() => actions.fill(id, ask.drafts!.primary)}>Land it</Button>
             <Button variant="quiet" onClick={() => actions.fill(id, ask.drafts!.secondary!)}>Not yet</Button>
           </>
         ) : answerable ? (
@@ -299,7 +299,6 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   composersRef.current = composers;
   const navigate = useBbNavigate();
   const [sent, setSent] = useState<string | null>(null);
-  const [showAllAsks, setShowAllAsks] = useState(false);
   const [section, setSection] = useState<"now" | "work" | "activity">("now");
   const replyMutation = experimental_useRpcMutation({ contract, method: "reply" });
   useSyncExternalStore(replies.subscribe, replies.version);
@@ -346,7 +345,6 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   }
 
   const { view, threadIds } = state;
-  const [first, ...rest] = view.asks;
   const askThread = (ask: Ask) => (ask.key in threadIds ? threadIds[ask.key]! : null);
   return (
     <div className={cx("flex flex-col gap-6 text-sm leading-[1.45] text-foreground", variant === "tab" ? "h-full overflow-y-auto px-4 pb-4 pt-5" : "mx-auto w-full max-w-[680px] px-6 pb-6 pt-6")}>
@@ -368,16 +366,9 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
         )}
       </section>
 
-      {first && (
+      {view.asks.length > 0 && (
         <section className="flex flex-col gap-2">
-          <AskCard ask={first} actions={actions} threadId={askThread(first)} />
-          {rest.length > 0 && (showAllAsks
-            ? rest.map((ask) => <AskCard key={ask.key} ask={ask} actions={actions} threadId={askThread(ask)} />)
-            : (
-              <button type="button" onClick={() => setShowAllAsks(true)} className="self-start px-0.5 py-0.5 text-xs text-muted-foreground hover:text-foreground">
-                {rest.length} more, oldest first
-              </button>
-            ))}
+          {view.asks.map((ask) => <AskCard key={ask.key} ask={ask} actions={actions} threadId={askThread(ask)} />)}
         </section>
       )}
 

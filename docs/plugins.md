@@ -237,7 +237,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   setting (on by default) is written by the title-bar switch and a matching thread-header action. One status sentence, a card per thing that needs the
   owner, the team as one row per subtask plus the orchestrator's running child threads the ledger
   doesn't list yet (bb's `parentThreadId`), and a goal/history fold. A quick-reply option sends
-  `Re «title»: option` to the orchestrator (`threads.send`, `queue-if-active`); Answer and Release
+  `Re «title»: option` to the orchestrator (`threads.send`, `queue-if-active`); Answer and Land it
   only fill its composer.
 - **How:** the server scans `~/.claude/projects/*/orchestrate/*.md` first lines, runs orchestrate's
   `orchestration_ledger.py export` (setting `exportScript`, else the plugin cache, newest first) and

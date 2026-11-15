@@ -178,7 +178,7 @@ function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
   if (c.reason === "blocked") return blockedLine(subtask);
   switch (subtask.status) {
     case "question": return "Waiting on your answer";
-    case "ready": return "Passed the gate, waiting on your word";
+    case "ready": return statusNote(subtask) ?? "Passed the gate, waiting on your word";
     case "card": return "Waiting for you to start its card";
     case "working": return said ?? "Working";
     case "briefed": return "Briefed, no reply yet";
@@ -195,10 +195,18 @@ function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
   return firstLine(subtask.statusRaw, 90) ?? "Status unknown";
 }
 
+/** «ready — plan verified; waits on review» → «Plan verified; waits on review»: what the orchestrator wrote after the status word. */
+function statusNote(subtask: Subtask, max = 90): string | null {
+  const word = subtask.status ?? "";
+  const rest = subtask.statusRaw?.trim().toLowerCase().startsWith(word.toLowerCase()) ? subtask.statusRaw.trim().slice(word.length) : subtask.statusRaw;
+  const note = firstLine(rest?.replace(/^[\s:;,—–-]+/, "") ?? null, max);
+  return note ? capitalize(note) : null;
+}
+
 /** «blocked — no access to the registry» → «Blocked: no access to the registry». */
 function blockedLine(subtask: Subtask): string {
-  const note = firstLine(subtask.statusRaw?.replace(/^\s*blocked\b[\s:;,—–-]*/i, "") ?? null, 90);
-  return note ? `Blocked: ${note}` : "Blocked";
+  const note = statusNote(subtask);
+  return note ? `Blocked: ${note[0]!.toLowerCase()}${note.slice(1)}` : "Blocked";
 }
 
 const STUCK_ORDER = { circles: 0, blocked: 1, quiet: 2 } as const;
@@ -229,11 +237,18 @@ function askOf(c: Classified, now: number): Ask {
   const since = c.lastReport;
   const base = { key: subtask.id, who, subtask: subtask.id, since, age: since === null ? "" : shortAge(now - since), title: null, replyTitle: null, links: [], threads: [], replies: [], answered: null };
   if (subtask.status === "ready") {
+    const facts = [
+      subtask.delivery && `- **Lands:** ${subtask.delivery}`,
+      subtask.version && `- **Version:** \`${subtask.version}\``,
+      subtask.gateLine && `- **Gate:** ${subtask.gateLine}`,
+    ].filter(Boolean);
+    const what = subtask.version ? `${subtask.id} at ${subtask.version}` : subtask.id;
     return {
       ...base,
       kind: "decision",
-      text: `${subtask.id} passed the gate and waits for your word to land.`,
-      drafts: { primary: `${subtask.id}: go ahead and land it.`, secondary: `${subtask.id}: not yet, hold the landing.` },
+      title: statusNote(subtask, 220) ?? `${subtask.id} passed the gate and waits for your word to land`,
+      text: facts.length ? facts.join("\n") : "The ledger names no branch, version or gate for it. Open the thread before landing.",
+      drafts: { primary: `${what}: go ahead and land it.`, secondary: `${subtask.id}: not yet, hold the landing.` },
     };
   }
   if (subtask.status === "card") {
@@ -251,6 +266,12 @@ function subtaskNamed(text: string, byId: Map<string, Subtask>): { subtask: Subt
   const match = /^\s*([^\s:|]+):\s+(\S[\s\S]*)$/.exec(text);
   const subtask = match ? byId.get(match[1]!) : undefined;
   return subtask ? { subtask, rest: match![2]!.trim() } : null;
+}
+
+/** A «For the owner» line without a `T2:` prefix that links one subtask's thread is about that subtask. */
+function subtaskByThread(threads: string[], subtasks: Subtask[], title: string): { subtask: Subtask; rest: string } | null {
+  const hits = subtasks.filter((s) => s.threadId && threads.includes(s.threadId));
+  return hits.length === 1 ? { subtask: hits[0]!, rest: title.trim() } : null;
 }
 
 function recapLine(entry: { text: string; at: string | null } | null, now: number): RecapLine | null {
@@ -343,7 +364,7 @@ export function buildView(input: ViewInput): View {
       notes.push(item.text);
       return;
     }
-    const named = subtaskNamed(item.title, byId);
+    const named = subtaskNamed(item.title, byId) ?? subtaskByThread(item.threads, subtasks, item.title);
     const who = named ? `${named.subtask.id}${named.subtask.name ? ` · ${named.subtask.name}` : ""}` : "For you, from the ledger";
     const threads = named?.subtask.threadId && !item.threads.includes(named.subtask.threadId) ? [...item.threads, named.subtask.threadId] : item.threads;
     allAsks.push({
@@ -353,6 +374,10 @@ export function buildView(input: ViewInput): View {
       answered: input.answered?.[item.title] ?? null,
     });
   });
+  const covered = new Set(allAsks.filter((a) => a.kind === "owner" && a.subtask).map((a) => a.subtask!));
+  for (let i = allAsks.length - 1; i >= 0; i--) {
+    if (allAsks[i]!.kind === "decision" && covered.has(allAsks[i]!.subtask!)) allAsks.splice(i, 1);
+  }
   allAsks.sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));
   const answered = allAsks.filter((a) => a.answered);
   const asks = allAsks.filter((a) => !a.answered);
