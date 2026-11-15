@@ -43,7 +43,7 @@ question: does anything need you, and is the team moving?
 - **Several questions at once.** With the Generative UI plugin installed, the orchestrator posts every
   open question as one form in its chat, recommended answers preselected. Pick or re-click any answer
   and every question's `Re «<title>»: <answer>` line goes into the composer; send them together. A
-  question left empty reads `—` and stays open. A later message in the orchestrator chat makes the
+  question left empty reads `—` and stays open. A later message from you or a subtask's wake makes the
   form read-only; the cards here still answer.
 - **An answered ask stops waiting on you at once.** Once a quick reply is sent, or a
   `Re «<title>»: <answer>` from you shows in the orchestrator chat after that ask line appeared,
