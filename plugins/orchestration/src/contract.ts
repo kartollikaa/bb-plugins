@@ -106,7 +106,7 @@ export const contract = {
     output: snapshotSchema,
   },
   reply: {
-    input: z.object({ threadId: z.string().min(1).max(100), text: z.string().min(1).max(2_000) }),
+    input: z.object({ threadId: z.string().min(1).max(100), text: z.string().min(1).max(8_000) }),
     output: z.object({ delivery: z.enum(["sent", "queued", "already"]) }),
   },
   pending: {

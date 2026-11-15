@@ -9,6 +9,7 @@ import { EvidenceMarkdown } from "./EvidenceMarkdown.tsx";
 import { Brief } from "./Brief.tsx";
 import { WorkflowHistory } from "./WorkflowHistory.tsx";
 import { replyKey, replyStatus, type ReplyState } from "./reply.ts";
+import { answersMessage, optionOf, recommendedOf, splitQuestions } from "./questions.ts";
 import { askIdentity, threadsToOpen, type Ask, type Row, type RowKind, type View } from "./view.ts";
 import { replies, useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 
@@ -69,6 +70,8 @@ interface Actions {
   fill(key: string, text: string): void;
   sent: string | null;
   reply(key: string, label: string, text: string, again?: boolean): void;
+  /** Sends one message that answers several asks; each ask's card tracks its own line. */
+  replyMany(entries: readonly { key: string; label: string }[], text: string): void;
   replyState(key: string): ReplyState | null;
   openThread(threadId: string | null): void;
 }
@@ -101,9 +104,9 @@ function Expandable({ children }: { children: ReactNode }) {
 const linkButton = "block h-[26px] max-w-full truncate whitespace-nowrap leading-[24px] rounded-md border border-border px-2.5 text-xs font-medium text-foreground no-underline hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 /** An ask the owner already answered: no attention colour, it waits on the orchestrator to rewrite the line. */
-function AnsweredCard({ ask, actions }: { ask: Ask; actions: Actions }) {
+function AnsweredCard({ ask, actions, bare = false }: { ask: Ask; actions: Actions; bare?: boolean }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-[10px] border border-border px-3 pb-2.5 pt-3">
+    <div className={cx("flex flex-col gap-1.5", bare ? "px-3 py-2.5" : "rounded-[10px] border border-border px-3 pb-2.5 pt-3")}>
       <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
         <Dot kind="wait" />
         <b className="min-w-0 truncate font-medium text-foreground">{ask.who}</b>
@@ -113,6 +116,83 @@ function AnsweredCard({ ask, actions }: { ask: Ask; actions: Actions }) {
         <span role="status" className="text-xs text-muted-foreground">{answeredStatus(ask.answered!, Date.now())}</span>
         {ask.drafts && <Button variant="quiet" onClick={() => actions.fill(askIdentity(ask), ask.drafts!.primary)}>Other answer</Button>}
         {ask.links.map((l) => <UrlLink key={l.href} href={l.href} title={l.title} className={linkButton}>Open {l.label}</UrlLink>)}
+      </div>
+    </div>
+  );
+}
+
+/** Every open question with options in one card: the recommended option preselected, one message answers them all. */
+function QuestionsCard({ questions, actions }: { questions: Ask[]; actions: Actions }) {
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const chosen: Record<string, string> = {};
+  for (const q of questions) {
+    const pick = picks[q.key] ?? recommendedOf(q);
+    if (pick && q.replies.some((r) => r.label === pick)) chosen[q.key] = pick;
+  }
+  const sending = questions.some((q) => actions.replyState(replyKeyOf(q))?.kind === "sending");
+  const picked = questions.filter((q) => chosen[q.key]);
+  const whos = [...new Set(questions.map((q) => q.who))];
+  const links = [...new Map(questions.flatMap((q) => q.links).map((l) => [l.href, l])).values()];
+  const send = () => {
+    const text = answersMessage(questions, chosen);
+    if (text) actions.replyMany(picked.map((q) => ({ key: replyKeyOf(q), label: chosen[q.key]! })), text);
+  };
+  return (
+    <div className="flex flex-col gap-3 rounded-[10px] border border-[color-mix(in_oklab,var(--attention)_35%,transparent)] bg-[color-mix(in_oklab,var(--attention)_12%,var(--background))] px-3 pb-3 pt-3">
+      <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <Dot kind="you" />
+        <b className="min-w-0 truncate font-medium text-foreground">{whos.length === 1 ? whos[0] : "Questions"}</b>
+        <span className="ml-auto shrink-0 tabular-nums">{questions.length} questions</span>
+      </div>
+      <ol className="m-0 flex list-none flex-col gap-3 p-0">
+        {questions.map((q, i) => (
+          <li key={q.key} className={cx("flex flex-col gap-1.5", i > 0 && "border-t border-[color-mix(in_oklab,var(--attention)_25%,transparent)] pt-3")}>
+            <p id={`q-${q.key}`} className="m-0 text-sm font-semibold leading-[1.4] [overflow-wrap:anywhere]">
+              {whos.length > 1 && <span className="mr-1.5 font-normal text-muted-foreground">{q.who}</span>}
+              {q.title}
+            </p>
+            {q.text && <p className="m-0 text-xs leading-[1.45] text-muted-foreground [overflow-wrap:anywhere]">{q.text}</p>}
+            <div role="radiogroup" aria-labelledby={`q-${q.key}`} className="flex flex-wrap items-center gap-1.5">
+              {q.replies.map((r) => {
+                const on = chosen[q.key] === r.label;
+                const { text, mark } = optionOf(r.label);
+                return (
+                  <button
+                    key={r.label}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    disabled={sending}
+                    onClick={() => setPicks({ ...picks, [q.key]: r.label })}
+                    className={cx(
+                      "min-h-[26px] max-w-full rounded-md border px-2.5 py-[3px] text-left text-xs leading-[1.35] transition-[transform,background-color] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none [overflow-wrap:anywhere]",
+                      "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60",
+                      on ? "border-primary bg-primary font-medium text-primary-foreground" : "border-border bg-background text-foreground hover:bg-accent",
+                    )}
+                  >
+                    {text}
+                    {mark && <span className={cx("ml-1.5", on ? "opacity-80" : "text-muted-foreground")}>· {mark}</span>}
+                  </button>
+                );
+              })}
+              {q.drafts && <Button variant="quiet" onClick={() => actions.fill(askIdentity(q), q.drafts!.primary)}>Other answer</Button>}
+            </div>
+          </li>
+        ))}
+      </ol>
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-[color-mix(in_oklab,var(--attention)_25%,transparent)] pt-3">
+        <button
+          type="button"
+          disabled={sending || picked.length === 0}
+          onClick={send}
+          className="h-[26px] rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 motion-reduce:transition-none"
+        >
+          {sending ? "Sending…" : picked.length === questions.length ? `Send ${picked.length} answers` : `Send ${picked.length} of ${questions.length}`}
+        </button>
+        <span role="status" className="text-xs text-muted-foreground">
+          {picked.length < questions.length ? `${questions.length - picked.length} without a pick stay open` : "One message to the orchestrator"}
+        </span>
+        {links.map((l) => <UrlLink key={l.href} href={l.href} title={l.title} className={linkButton}>Open {l.label}</UrlLink>)}
       </div>
     </div>
   );
@@ -309,6 +389,20 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   const actions: Actions = {
     sent,
     replyState: (key) => replies.get(threadId, key),
+    replyMany(entries, text) {
+      const started = entries.flatMap(({ key, label }) => {
+        const token = replies.get(threadId, key)?.kind === "sent" ? replies.again(threadId, key, label) : replies.begin(threadId, key, label);
+        return token === null ? [] : [{ key, token }];
+      });
+      if (!started.length) return;
+      replyMutation.mutate({ threadId, text }).then(
+        ({ delivery }) => started.forEach(({ key, token }) => replies.done(threadId, key, token, delivery)),
+        (error: unknown) => {
+          started.forEach(({ key, token }) => replies.fail(threadId, key, token));
+          toast.error("Couldn't send the answers", { description: error instanceof Error ? error.message : String(error) });
+        },
+      );
+    },
     reply(key, label, text, again) {
       const token = again ? replies.again(threadId, key, label) : replies.begin(threadId, key, label);
       if (token === null) return;
@@ -343,6 +437,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   }
 
   const { view, threadIds } = state;
+  const { questions, rest } = splitQuestions(view.asks);
   const askThread = (ask: Ask) => (ask.key in threadIds ? threadIds[ask.key]! : null);
   return (
     <div className={cx("flex flex-col gap-6 text-sm leading-[1.45] text-foreground", variant === "tab" ? "h-full overflow-y-auto px-4 pb-4 pt-5" : "mx-auto w-full max-w-[680px] px-6 pb-6 pt-6")}>
@@ -366,13 +461,15 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
 
       {view.asks.length > 0 && (
         <section className="flex flex-col gap-2">
-          {view.asks.map((ask) => <AskCard key={ask.key} ask={ask} actions={actions} threadId={askThread(ask)} />)}
+          {questions.length > 0 && <QuestionsCard questions={questions} actions={actions} />}
+          {rest.map((ask) => <AskCard key={ask.key} ask={ask} actions={actions} threadId={askThread(ask)} />)}
         </section>
       )}
 
-      {view.answered.length > 0 && (
-        <section className="flex flex-col gap-2">
-          {view.answered.map((ask) => <AnsweredCard key={ask.key} ask={ask} actions={actions} />)}
+      {view.answered.length === 1 && <AnsweredCard ask={view.answered[0]!} actions={actions} />}
+      {view.answered.length > 1 && (
+        <section aria-label="Answered" className="flex flex-col divide-y divide-border rounded-[10px] border border-border">
+          {view.answered.map((ask) => <AnsweredCard key={ask.key} ask={ask} actions={actions} bare />)}
         </section>
       )}
 

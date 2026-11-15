@@ -70,6 +70,14 @@ ledger's current asks offer, and only to the thread the ledger names as orchestr
 change: «when I click on the button on the suggestion it just puts the text in the chat. I suggest
 that it should send the message by itself».
 
+Two or more open `ask:` lines with `options:` share one questions card instead of a card each. Each
+question shows its options as a radio row; an option ending «(recommended …)» is preselected and
+shows the mark instead of the suffix. «Send N answers» sends one message, one `Re «<title>»: <option>`
+line per picked question; a question without a pick stays open. The server checks every line against
+the ledger's current quick replies and refuses a message that answers one question twice. Several
+answered asks show as one quiet list. Owner, on the change: «I see a lot of yellow blocks … is it
+possible to just use the giant UI fancy block of questions for me to answer it?»
+
 An answered `ask:` stops needing the owner at once: after a quick reply is sent from the card, or
 once the orchestrator thread has a user message line `Re «<title>»: <non-empty answer>` (one message
 may answer several asks, one line each, as a Generative UI form labelled `Re «<title>»` writes them; a form's `—` for an empty field is no answer) sent after that ask line appeared — dated from the server's

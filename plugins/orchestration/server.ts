@@ -12,6 +12,7 @@ import { summarizeExport } from "./src/ledger.ts";
 import { exportScriptCandidates, ledgerFor, scanLedgers, type LedgerFile } from "./src/locate.ts";
 import { resolveOwner } from "./src/route.ts";
 import { quickReplies, REPLY_MODE, replySender, toDelivery } from "./src/reply.ts";
+import { validReply } from "./src/questions.ts";
 
 const run = promisify(execFile);
 const SCAN_TTL_MS = 10_000;
@@ -204,7 +205,7 @@ export default async function plugin(bb: BbPluginApi) {
     const ledger = ledgerFor(await ledgers(), threadId);
     if (!ledger) throw new Error("This thread is not an orchestrator, so nothing was sent.");
     const summary = await exportLedger(ledger.path);
-    if (!quickReplies(summary.forTheOwner).includes(text)) throw new Error("The ledger no longer offers this answer, so nothing was sent.");
+    if (!validReply(text, quickReplies(summary.forTheOwner))) throw new Error("The ledger no longer offers this answer, so nothing was sent.");
     const delivery = await sendReply(threadId, text);
     await observeOwnerLines(ledger.path, summary.forTheOwner).catch(() => {});
     return { delivery };
