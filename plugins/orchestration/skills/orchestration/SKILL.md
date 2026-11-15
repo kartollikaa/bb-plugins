@@ -71,10 +71,14 @@ change: «when I click on the button on the suggestion it just puts the text in 
 that it should send the message by itself».
 
 Two or more open `ask:` lines with `options:` share one questions card instead of a card each. Each
-question shows its options as a radio row; an option ending «(recommended …)» is preselected and
-shows the mark instead of the suffix. «Send N answers» sends one message, one `Re «<title>»: <option>`
-line per picked question; a question without a pick stays open. The server checks every line against
-the ledger's current quick replies and refuses a message that answers one question twice. Several
+question shows its options as a radio row (arrow keys move the pick); an option ending
+«(recommended …)» is preselected and shows the mark instead of the suffix, but only for questions
+already there when the card opened: one that arrives later reads «new» and starts unpicked. A click on
+the picked option clears it. Picks follow the question's title and options, not its ledger line.
+«Send N answers» sends one message, one `Re «<title>»: <option>` line per picked question; a question
+without a pick stays open. Two lines with one title show the newer one in the card. The server checks
+every line against the ledger's current quick replies and refuses a message that answers one question
+twice. Several
 answered asks show as one quiet list. Owner, on the change: «I see a lot of yellow blocks … is it
 possible to just use the giant UI fancy block of questions for me to answer it?»
 

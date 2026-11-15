@@ -35,7 +35,8 @@ question: does anything need you, and is the team moving?
 - **Context-card row.** The same status sentence in the thread's context card. A click opens the view.
 - **Questions share one card.** Two or more open questions with options show as one card: each
   question with its options, the recommended one preselected, and one «Send N answers» button that
-  sends a single message. A question you leave unpicked stays open.
+  sends a single message. Click a pick again to clear it; a question you leave unpicked stays open. A
+  question that arrives while the card is open is marked «new» and isn't preselected.
 - **Quick replies send.** A click on an ask's option (Merge it, Not now) sends
   `Re «<title>»: <option>` to the orchestrator at once, as you asked: «when I click on the button
   on the suggestion it just puts the text in the chat. I suggest that it should send the message by

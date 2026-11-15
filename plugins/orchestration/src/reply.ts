@@ -18,6 +18,16 @@ export const replyKey = (title: string, options: readonly string[]): string => J
 /** Newer bb reports `deferred` for a send a plugin wait holds; it is accepted, like a queued one. */
 export const toDelivery = (raw: string): Delivery => (raw === "sent" ? "sent" : "queued");
 
+/** Each quick reply the ledger offers, with the title of the ask it answers. */
+export function quickReplyTitles(forTheOwner: readonly string[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const line of forTheOwner) {
+    const item = parseOwnerItem(line);
+    if (item.kind === "ask") for (const option of item.options) map.set(replyDraft(item.title, option), item.title);
+  }
+  return map;
+}
+
 export function quickReplies(forTheOwner: readonly string[]): string[] {
   return forTheOwner.flatMap((line) => {
     const item = parseOwnerItem(line);
