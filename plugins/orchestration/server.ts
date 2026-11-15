@@ -183,7 +183,7 @@ export default async function plugin(bb: BbPluginApi) {
       }),
     ]);
     const environment = ownerThread?.environmentId ? await bb.sdk.environments.get({ environmentId: ownerThread.environmentId }).catch(() => null) : null;
-    const workspace = environment?.id && environment.path ? { environmentId: environment.id, rootPath: environment.path, hostId: environment.hostId, ledgerHostId: null as string | null, storageRootPath: storage?.storageRootPath ?? null } : null;
+    const workspace = environment?.id && environment.path ? { environmentId: environment.id, rootPath: environment.path, hostId: environment.hostId, ledgerHostId: null as string | null, storageRootPath: storage?.hostId === environment.hostId ? storage.storageRootPath : null } : null;
     if (workspace) {
       const [local, remote] = await Promise.all([
         readFile(summary.path, "utf8").catch(() => null),
