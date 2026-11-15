@@ -18,7 +18,7 @@ export function WorkflowHistory({ ledger, view, openThread, mode, renderEvidence
   const activeAgain = (task: Subtask) => finished(task) && (asking(task) || !!rows.get(task.id) && rows.get(task.id)!.kind !== "done");
   const isFinished = (task: Subtask) => finished(task) && !activeAgain(task);
   const done = ledger.subtasks.filter(isFinished).length;
-  const blocked = (task: Subtask) => task.status === "blocked" || task.gateFailures > 0;
+  const blocked = (task: Subtask) => !isFinished(task) && (task.status === "blocked" || task.gateFailures > 0);
   const priority = (task: Subtask) => asking(task) ? 0 : blocked(task) ? 1 : 2;
   const tasks = ledger.subtasks.filter((task) => filter === "all" || (filter === "done" ? isFinished(task) : !isFinished(task)));
   const events = recentEvents((ledger.workflow ?? []).map((event, key) => ({ ...event, key })).filter((event) => !selected || event.task === selected));

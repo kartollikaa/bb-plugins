@@ -16,7 +16,7 @@ test("Work preserves evidence gaps, dependencies and resumed work without certif
   const { WorkflowHistory } = await loadTsx(new URL("../src/WorkflowHistory.tsx", import.meta.url));
   const ledger: LedgerSummary = { path: "/ledger.md", goal: null, status: "active", forTheOwner: [], orchestratorSessions: 1, lastHandover: null, warnings: [], checkpoint: null, lastDecision: null, subtasks: [
     task("Blocked", "blocked", { criteria: ["Must pass review"], dependsOn: ["Finished", "Missing"] }),
-    task("Finished", "verified", { evidence: [{ label: "checks", text: "[Results](./results.md)" }], version: "abc123" }),
+    task("Finished", "verified", { evidence: [{ label: "checks", text: "[Results](./results.md)" }], version: "abc123", gateFailures: 2 }),
     task("Dropped", "dropped"),
     task("Resumed", "verified", { threadId: "thr_resumed" }),
   ] };
@@ -25,6 +25,7 @@ test("Work preserves evidence gaps, dependencies and resumed work without certif
   const slot = render(createElement(WorkflowHistory, { ledger, view, mode: "work", openThread: (id: string) => opened.push(id), renderEvidence: (text: string) => createElement("div", { "data-evidence": true }, text) }));
   try {
     assert.match(slot.container.textContent!, /2 \/ 4 finished/);
+    assert.equal(slot.getByText("Blocked / failed gates").nextElementSibling?.textContent, "1");
     assert.match(slot.container.textContent!, /Active again/);
     fireEvent.click(slot.getByRole("button", { name: /Blocked · Blocked/ }));
     assert.match(slot.container.textContent!, /Requirements, not checked results/);
