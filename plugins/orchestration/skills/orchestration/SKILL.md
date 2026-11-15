@@ -124,9 +124,10 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
 ## Asking a ledger question in the chat too
 
 The view knows an ask is answered only from a message that starts `Re «<title>»: `, with `<title>`
-exactly as the view shows it. A Generative UI card in the chat that asks the same question must send
+exactly as on the `ask:` line, a leading `T2:` included (the card shows it without). A Generative UI card in the chat that asks the same question must send
 that: `Button("Accept", Send("Re «<title>»: Accept"))`, a free-text button
-`Send("Re «<title>»: ")`, or a Form labelled `Re «<title>»`. A card that sends anything else
+`Send("Re «<title>»: ")`, or a Form field labelled `Re «<title>»`. Write the `ask:` line before showing the card: an answer
+sent before the view read the line doesn't count. A card that sends anything else
 («Change the boards: …») leaves the ask waiting in the view. Whatever the answer's shape, once
 you have it, drop the line or replace it with a `note:`; the view reads nothing else. Seen live:
 the owner answered through a card's «Change something» button and the question stayed in the view.
