@@ -219,7 +219,8 @@ export default async function plugin(bb: BbPluginApi) {
   async function pending(threadId: string, threadIds: string[]) {
     const ledger = ledgerFor(await ledgers(), threadId);
     if (!ledger) return {};
-    const named = new Set((await exportLedger(ledger.path)).subtasks.flatMap((s) => (s.threadId ? [s.threadId] : [])));
+    const summary = await exportLedger(ledger.path).catch(() => null);
+    const named = new Set(summary?.subtasks.flatMap((s) => (s.threadId ? [s.threadId] : [])) ?? []);
     const entries = await Promise.all([...new Set(threadIds)].map(async (id) => {
       const ours = id === threadId || named.has(id) || await parentOf(id) === threadId;
       if (!ours) return [id, null] as const;

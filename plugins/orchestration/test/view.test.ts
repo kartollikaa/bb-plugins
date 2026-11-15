@@ -433,3 +433,23 @@ test("a missing goal does not erase phase or its recorded qualification", () => 
   assert.equal(v.phase.detail, "blocked (activation route required)");
   assert.equal(v.heading, "Orchestration blocked");
 });
+
+test("a pending prompt in a ready subtask's thread is its card, so it can be answered there", () => {
+  const v = view([subtask("S7", "ready", { delivery: "PR #41" })], { thr_s7: live(2, { hasPendingInteraction: true, pending: { kind: "approval", title: "Approve a command", text: "git push" } }) });
+  assert.deepEqual(v.asks.map((a) => [a.kind, a.title]), [["thread", "Approve a command"]]);
+});
+
+test("a blocked note keeps its own case", () => {
+  const v = view([subtask("S2", "blocked", { statusRaw: "blocked — API key missing" }), subtask("S3", "blocked", { statusRaw: "blocked: S2 must land first" })], {});
+  assert.deepEqual(v.active.map((r) => r.step), ["Blocked: API key missing", "Blocked: S2 must land first"]);
+});
+
+test("an answered ledger line no longer hides the landing card", () => {
+  const ready = subtask("T2", "ready", { delivery: "PR #41" });
+  const line = "ask: T2: Pick a store name | options: Atlas / Orbit";
+  const open = view([ready], {}, {}, { forTheOwner: [line] });
+  assert.deepEqual(open.asks.map((a) => a.kind), ["owner"]);
+  const answered = buildView({ ledger: ledger([ready], { forTheOwner: [line] }), agents: {}, live: {}, orchestratorThreadId: "thr_orch", now: NOW,
+    answered: { "T2: Pick a store name": { answer: "Atlas", at: NOW - MIN } } });
+  assert.deepEqual(answered.asks.map((a) => a.kind), ["decision"]);
+});

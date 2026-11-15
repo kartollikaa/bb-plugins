@@ -180,7 +180,10 @@ function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
   if (c.reason === "blocked") return blockedLine(subtask);
   switch (subtask.status) {
     case "question": return "Waiting on your answer";
-    case "ready": return statusNote(subtask) ?? "Passed the gate, waiting on your word";
+    case "ready": {
+      const note = statusNote(subtask);
+      return note ? capitalize(note) : "Passed the gate, waiting on your word";
+    }
     case "card": return "Waiting for you to start its card";
     case "working": return said ?? "Working";
     case "briefed": return "Briefed, no reply yet";
@@ -201,14 +204,13 @@ function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
 function statusNote(subtask: Subtask, max = 90): string | null {
   const word = subtask.status ?? "";
   const rest = subtask.statusRaw?.trim().toLowerCase().startsWith(word.toLowerCase()) ? subtask.statusRaw.trim().slice(word.length) : subtask.statusRaw;
-  const note = firstLine(rest?.replace(/^[\s:;,—–-]+/, "") ?? null, max);
-  return note ? capitalize(note) : null;
+  return firstLine(rest?.replace(/^[\s:;,—–-]+/, "") ?? null, max);
 }
 
 /** «blocked — no access to the registry» → «Blocked: no access to the registry». */
 function blockedLine(subtask: Subtask): string {
   const note = statusNote(subtask);
-  return note ? `Blocked: ${note[0]!.toLowerCase()}${note.slice(1)}` : "Blocked";
+  return note ? `Blocked: ${note}` : "Blocked";
 }
 
 const STUCK_ORDER = { circles: 0, blocked: 1, quiet: 2 } as const;
@@ -238,7 +240,11 @@ function askOf(c: Classified, now: number): Ask {
   const who = c.child ? c.child.label || c.child.name : subtask.name ? `${subtask.id} · ${subtask.name}` : subtask.id;
   const since = c.lastReport;
   const base = { key: subtask.id, who, subtask: subtask.id, since, age: since === null ? "" : shortAge(now - since), title: null, replyTitle: null, links: [], threads: [], replies: [], answered: null };
+  if (c.live?.hasPendingInteraction) {
+    return { ...base, kind: "thread", ...pendingContent(c.live.pending, `${c.child ? who : subtask.id} waits on an approval or a question in its thread.`), drafts: null };
+  }
   if (subtask.status === "ready") {
+    const note = statusNote(subtask, 220);
     const facts = [
       subtask.delivery && `- **Lands:** ${subtask.delivery}`,
       subtask.version && `- **Version:** \`${subtask.version}\``,
@@ -248,18 +254,15 @@ function askOf(c: Classified, now: number): Ask {
     return {
       ...base,
       kind: "decision",
-      title: statusNote(subtask, 220) ?? `${subtask.id} passed the gate and waits for your word to land`,
-      text: facts.length ? facts.join("\n") : "The ledger names no branch, version or gate for it. Open the thread before landing.",
+      title: note ? capitalize(note) : `${subtask.id} passed the gate and waits for your word to land`,
+      text: facts.length ? facts.join("\n") : "The ledger names no branch, version or gate for it. Ask the orchestrator what lands before you answer.",
       drafts: { primary: `${what}: go ahead and land it.`, secondary: `${subtask.id}: not yet, hold the landing.` },
     };
   }
   if (subtask.status === "card") {
     return { ...base, kind: "thread", text: `${subtask.id} waits for you to start its card in this chat.`, drafts: null };
   }
-  if (c.live?.hasPendingInteraction) {
-    return { ...base, kind: "thread", ...pendingContent(c.live.pending, `${c.child ? who : subtask.id} waits on an approval or a question in its thread.`), drafts: null };
-  }
-  const text = agent?.lastOutput?.trim() || `${subtask.id} asked a question. It is in its thread.`;
+  const text = agent?.lastOutput?.trim() || `${subtask.id} asked a question; the orchestrator has it. Ask the orchestrator what it needs.`;
   return { ...base, kind: "question", text, drafts: { primary: `Re ${subtask.id}: ` } };
 }
 
@@ -380,7 +383,8 @@ export function buildView(input: ViewInput): View {
       answered: input.answered?.[item.title] ?? null,
     });
   });
-  const covered = new Set(allAsks.filter((a) => a.kind === "owner" && a.subtask).map((a) => a.subtask!));
+  /** An open ledger line about a subtask is what the orchestrator needs from the owner for it. */
+  const covered = new Set(allAsks.filter((a) => a.kind === "owner" && a.subtask && !a.answered).map((a) => a.subtask!));
   for (let i = allAsks.length - 1; i >= 0; i--) {
     if (allAsks[i]!.kind === "decision" && covered.has(allAsks[i]!.subtask!)) allAsks.splice(i, 1);
   }

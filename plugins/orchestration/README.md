@@ -75,7 +75,7 @@ same title bar.
   any subtask's thread or the orchestrator's own, and each `ask:` line under the ledger's «For the
   owner» (any other line there is a note; see the format below).
 - **A `ready` card** shows the ledger's note after `ready`, and what lands: Delivery, Version and the
-  gate line. **Land it** drafts `<id> at <version>: go ahead and land it.` When a «For the owner»
+  gate line. **Land it** drafts `<id> at <version>: go ahead and land it.` When an open «For the owner»
   line names that subtask (`T1: …`) or links only its thread, that line is the card instead.
 - **A pending approval or question** shows what bb holds: the agent's question with its options, or
   the command, plan, permission or tool it asks to approve (`threads.interactions.list`, read only for

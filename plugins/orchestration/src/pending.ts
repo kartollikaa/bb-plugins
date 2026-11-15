@@ -35,7 +35,8 @@ export function describePending(interaction: unknown): Pending | null {
     switch (subject.kind) {
       case "command": {
         const command = str(subject.command);
-        return { kind: "approval", title: "Approve a command", text: withReason(command ? `\`\`\`\n${command}\n\`\`\`${str(subject.cwd) ? `\nin \`${str(subject.cwd)}\`` : ""}` : null) };
+        const shown = command && command.length > LIMIT / 2 ? `${command.slice(0, LIMIT / 2 - 1)}…` : command;
+        return { kind: "approval", title: "Approve a command", text: withReason(shown ? `\`\`\`\n${shown}\n\`\`\`${str(subject.cwd) ? `\nin \`${str(subject.cwd)}\`` : ""}` : null) };
       }
       case "file_change": {
         const scope = str(subject.writeScope);
@@ -66,5 +67,6 @@ export function describePending(interaction: unknown): Pending | null {
     const title = str(payload.title) ?? str(presentation.title);
     return title ? { kind: "approval", title, text: clip(str(presentation.detail) ?? "") } : null;
   }
-  return null;
+  const title = str(payload.title);
+  return title ? { kind: "approval", title, text: "" } : null;
 }
