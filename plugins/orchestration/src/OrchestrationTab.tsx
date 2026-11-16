@@ -5,6 +5,7 @@ import { contract } from "./contract.ts";
 import { answeredStatus } from "./answered.ts";
 import { WORK_CATEGORIES } from "./categories.ts";
 import { Recap } from "./Recap.tsx";
+import { NowBlock } from "./NowBlock.tsx";
 import { EvidenceMarkdown } from "./EvidenceMarkdown.tsx";
 import { Brief } from "./Brief.tsx";
 import { WorkflowHistory } from "./WorkflowHistory.tsx";
@@ -289,6 +290,8 @@ function TeamRow({ row, open, onToggle, actions, threadId }: { row: Row; open: b
       </button>
       <Reveal open={open}>
         <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 pl-[25px] pr-2 pt-0.5 text-xs">
+          <dt className="text-subtle-foreground">Status</dt><dd className="m-0 [overflow-wrap:anywhere]">{row.status}</dd>
+          <dt className="text-subtle-foreground">Last report</dt><dd className="m-0 [overflow-wrap:anywhere]">{row.lastReport}</dd>
           <dt className="text-subtle-foreground">Runs</dt><dd className="m-0 [overflow-wrap:anywhere]">{row.runs}</dd>
           <dt className="text-subtle-foreground">Context</dt><dd className="m-0 [overflow-wrap:anywhere]">{row.context}</dd>
           <dt className="text-subtle-foreground">Gate</dt><dd className="m-0 [overflow-wrap:anywhere]">{row.gate}</dd>
@@ -381,9 +384,9 @@ function History({ view }: { view: View }) {
   );
 }
 
-function ThreadRecap({ view, threadId, withTitle }: { view: View; threadId: string; withTitle: boolean }) {
+function ThreadRecap({ view, threadId, withTitle, block }: { view: View; threadId: string; withTitle: boolean; block: ReactNode }) {
   const title = experimental_useSidebarThreads().threads.find((t) => t.id === threadId)?.displayTitle ?? null;
-  return <Recap view={view} title={title} withTitle={withTitle} />;
+  return <Recap view={view} title={title} withTitle={withTitle}>{block}</Recap>;
 }
 
 export function Message({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
@@ -469,7 +472,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   const askThread = (ask: Ask) => (ask.key in threadIds ? threadIds[ask.key]! : null);
   return (
     <div className={cx("flex flex-col gap-6 text-sm leading-[1.45] text-foreground", variant === "tab" ? "h-full overflow-y-auto px-4 pb-4 pt-5" : "mx-auto w-full max-w-[680px] px-6 pb-6 pt-6")}>
-      <ThreadRecap view={view} threadId={threadId} withTitle={variant === "page"} />
+      <ThreadRecap view={view} threadId={threadId} withTitle={variant === "page"} block={<NowBlock now={view.now} variant={variant} renderEvidence={(content, sourcePath, hostId) => <EvidenceMarkdown content={content} sourcePath={sourcePath} hostId={hostId} threadId={threadId} workspace={state.workspace} />} ledgerPath={state.ledger.path} report={state.report} workspace={state.workspace} threadIds={threadIds} openThread={actions.openThread} />} />
 
       <nav aria-label="Orchestration sections" className="flex gap-1 border-b border-border pb-2">
         {(["now", "work", "activity"] as const).map((item) => <button key={item} type="button" aria-pressed={section === item} onClick={() => setSection(item)} className={cx("rounded-md px-3 py-1.5 text-xs capitalize hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary", section === item ? "bg-accent font-medium text-foreground" : "text-muted-foreground")}>{item === "now" ? `Now${view.asks.length ? ` · ${view.asks.length}` : ""}` : item}</button>)}
@@ -501,7 +504,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
         </section>
       )}
 
-      <Brief ledger={state.ledger} view={view} report={state.report} threadId={threadId} workspace={state.workspace} />
+      <Brief ledger={state.ledger} view={view} threadId={threadId} workspace={state.workspace} />
       <Team view={view} actions={actions} threadIds={threadIds} />
       {view.state !== "planning" && <History view={view} />}
       </> : <WorkflowHistory key={`${threadId}:${section}`} ledger={state.ledger} view={view} openThread={actions.openThread} mode={section} renderEvidence={(content) => <EvidenceMarkdown content={content} sourcePath={state.ledger.path} hostId={state.workspace?.ledgerHostId ?? null} threadId={threadId} workspace={state.workspace} />} />}

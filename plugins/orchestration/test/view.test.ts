@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { Agent, LedgerSummary, Subtask } from "../src/contract.ts";
-import { askIdentity, buildView, childLabel, firstLine, longAge, prettyModel, shortAge, type LiveThread } from "../src/view.ts";
+import type { Agent, LedgerSummary, Subtask, ThreadActivity } from "../src/contract.ts";
+import { STALE_GRACE_MS, askIdentity, buildView, childLabel, firstLine, longAge, prettyModel, shortAge, type LiveThread } from "../src/view.ts";
 
 const NOW = Date.UTC(2026, 10, 14, 12, 0);
 const MIN = 60_000;
@@ -506,4 +506,132 @@ test("a `T2: …` free-text line keeps its label inside the group", () => {
   const lines = [...FREE(5), "S1: pick the colour"];
   const v = view([subtask("S1", "working")], { thr_s1: live(1) }, {}, { forTheOwner: lines });
   assert.equal(v.asks[0]!.group!.at(-1)!.subtask, "S1");
+});
+
+const nowBlock = (extra: Partial<NonNullable<LedgerSummary["now"]>> = {}): NonNullable<LedgerSummary["now"]> =>
+  ({ structured: true, updated: new Date(NOW - 60 * MIN).toISOString(), doing: "I2 — checks running", waitingOn: [], next: "on R1's report", blockedBy: null, backgroundWaits: [], ...extra });
+const act = (extra: Partial<ThreadActivity> = {}): ThreadActivity => ({ turnStartedAt: null, lastTurnStartedAt: null, step: null, stepStartedAt: null, background: [], ...extra });
+function nowOf(opts: { now?: LedgerSummary["now"]; checkpoint?: string; lives?: Record<string, LiveThread>; activity?: Record<string, ThreadActivity | null>; report?: string | null; subtasks?: Subtask[]; ledgerModifiedAt?: number | null; extra?: Partial<LedgerSummary> } = {}) {
+  const checkpoint = opts.checkpoint ? { text: opts.checkpoint, at: null } : null;
+  return buildView({
+    ledger: ledger(opts.subtasks ?? [subtask("S1", "working")], { now: opts.now ?? null, checkpoint, ...opts.extra }),
+    agents: {}, live: opts.lives ?? { thr_orch: live(5) }, orchestratorThreadId: "thr_orch", now: NOW,
+    activity: opts.activity, report: opts.report === undefined ? null : opts.report === null ? null : { text: opts.report }, ledgerModifiedAt: opts.ledgerModifiedAt,
+  });
+}
+
+test("view.now from a structured block carries doing, next, blocked by and the header age", () => {
+  const v = nowOf({ now: nowBlock({ blockedBy: "CI is down" }), report: "D2 working: drafted\nmore", lives: { thr_orch: live(5) }, activity: { thr_orch: act({ lastTurnStartedAt: NOW - 90 * MIN }) } });
+  assert.equal(v.now.source, "block");
+  assert.equal(v.now.doing, "I2 — checks running");
+  assert.equal(v.now.next, "on R1's report");
+  assert.equal(v.now.blockedBy, "CI is down");
+  assert.equal(v.now.updated.label, "updated 1h ago");
+  assert.equal(v.now.orchestrator.state, "idle");
+  assert.deepEqual(v.now.lastTurn, { text: "D2 working: drafted", age: "5m" });
+});
+
+test("view.now is stale only when the last turn started more than STALE_GRACE_MS after the block", () => {
+  const updated = NOW - 60 * MIN;
+  const block = nowBlock({ updated: new Date(updated).toISOString() });
+  const stale = nowOf({ now: block, activity: { thr_orch: act({ lastTurnStartedAt: updated + STALE_GRACE_MS + 1000 }) } });
+  assert.equal(stale.now.updated.stale, true);
+  assert.equal(stale.now.updated.label, "updated 1h ago · the orchestrator has run since");
+  const fresh = nowOf({ now: block, activity: { thr_orch: act({ lastTurnStartedAt: updated + STALE_GRACE_MS - 1000 }) } });
+  assert.equal(fresh.now.updated.stale, false);
+});
+
+test("a block written early in a turn that ran 15 minutes is not stale", () => {
+  const updated = NOW - 20 * MIN;
+  const v = nowOf({ now: nowBlock({ updated: new Date(updated).toISOString() }), lives: { thr_orch: live(2) }, activity: { thr_orch: act({ lastTurnStartedAt: updated - MIN }) } });
+  assert.equal(v.now.updated.stale, false);
+});
+
+test("without activity the stale rule falls back to the turn's end", () => {
+  const updated = NOW - 60 * MIN;
+  const v = nowOf({ now: nowBlock({ updated: new Date(updated).toISOString() }), lives: { thr_orch: live(5) }, activity: { thr_orch: null } });
+  assert.equal(v.now.updated.stale, true);
+});
+
+test("a free-text checkpoint reads as source text with the ledger's age", () => {
+  const v = nowOf({ now: nowBlock({ structured: false, updated: null, doing: null, next: null }), checkpoint: "GO9 done; waiting", ledgerModifiedAt: NOW - 3 * MIN });
+  assert.equal(v.now.source, "text");
+  assert.equal(v.now.text, "GO9 done; waiting");
+  assert.equal(v.now.updated.label, "ledger written 3m ago");
+  assert.equal(v.now.doing, null);
+});
+
+test("an export without the Now block has source none", () => {
+  const v = nowOf({ now: null, checkpoint: "old text" });
+  assert.equal(v.now.source, "none");
+  assert.equal(v.now.doing, null);
+});
+
+test("no sidebar entry for the orchestrator is state unknown", () => {
+  const v = nowOf({ now: nowBlock(), lives: {} });
+  assert.equal(v.now.orchestrator.state, "unknown");
+  assert.equal(v.now.lastTurn, null);
+});
+
+test("a running orchestrator shows its step and age, and does not fail without activity", () => {
+  const running = { thr_orch: live(0, { status: "active" }) };
+  const withStep = nowOf({ now: nowBlock(), lives: running, report: "old", activity: { thr_orch: act({ turnStartedAt: NOW - 4 * MIN, step: "Running npm test", stepStartedAt: NOW - 40_000 }) } });
+  assert.equal(withStep.now.orchestrator.state, "running");
+  assert.equal(withStep.now.orchestrator.activity, "Running npm test · 40s");
+  assert.equal(withStep.now.orchestrator.age, "4m");
+  assert.equal(withStep.now.lastTurn, null);
+  const without = nowOf({ now: nowBlock(), lives: running, activity: { thr_orch: null } });
+  assert.equal(without.now.orchestrator.state, "running");
+  assert.equal(without.now.orchestrator.activity, null);
+});
+
+test("mismatch: idle, no open ask and a report ending Waiting on you", () => {
+  const idle = { thr_orch: live(5) };
+  assert.equal(nowOf({ now: nowBlock(), lives: idle, report: "Done.\nWaiting on you: connect the Pixel" }).now.mismatch, true);
+  assert.equal(nowOf({ now: nowBlock(), lives: { thr_orch: live(0, { status: "active" }) }, report: "Done.\nWaiting on you: connect the Pixel" }).now.mismatch, false);
+  assert.equal(nowOf({ now: nowBlock(), lives: idle, report: "Done.\nNothing waits on you." }).now.mismatch, false);
+});
+
+test("an owner wait line and its matching ask give one You row", () => {
+  const v = nowOf({
+    now: nowBlock({ waitingOn: [{ who: "owner", subtask: null, what: "«Merge the orchestrate plugin PR (I1) …»", since: new Date(NOW - 28 * MIN).toISOString() }] }),
+    extra: { forTheOwner: ["ask: Merge the orchestrate plugin PR (I1) yourself | why: x"] },
+  });
+  assert.equal(v.now.waits.filter((w) => w.label === "You").length, 1);
+  assert.equal(v.now.waits[0]!.age, "28m");
+});
+
+test("a working row shows the report's gist, not its protocol header", () => {
+  const v = view([subtask("T1", "working")], { thr_t1: live(2) }, { thr_t1: agent({ lastOutput: "[orchestrate slug] T1 working: sections 1–3 drafted\nmore" }) });
+  assert.equal(v.active[0]!.step, "sections 1–3 drafted");
+  assert.equal(v.active[0]!.lastReport, "working: sections 1–3 drafted · 2m");
+});
+
+test("a working status note is the step", () => {
+  const v = view([subtask("T1", "working", { statusRaw: "working — drafting sections 1–3" })], { thr_t1: live(2) });
+  assert.equal(v.active[0]!.step, "Drafting sections 1–3");
+  assert.equal(v.active[0]!.status, "working — drafting sections 1–3");
+});
+
+test("a running row shows its live step and age", () => {
+  const v = buildView({
+    ledger: ledger([subtask("T1", "working")]), agents: {}, live: { thr_t1: live(0, { status: "active" }) }, orchestratorThreadId: "thr_orch", now: NOW,
+    activity: { thr_t1: act({ turnStartedAt: NOW - 2 * MIN, step: "Running npm test", stepStartedAt: NOW - 40_000 }) },
+  });
+  assert.equal(v.active[0]!.step, "Running npm test · 40s");
+});
+
+test("a row is named by its delivery (the ledger puts it in the name), never by the slug of its thread title", () => {
+  const named = view([subtask("T3", "working", { name: "PR #41" })], { thr_t3: live(2, { title: "cozy-redesign · T3" }) });
+  assert.equal(named.active[0]!.name, "PR #41");
+  assert.equal(named.active[0]!.label, "T3");
+});
+
+test("a row with no name or delivery falls back to its status note, which the step does not repeat, and then to its id", () => {
+  const note = view([subtask("T4", "working", { name: null, statusRaw: "working — fixing the gate" })], { thr_t4: live(2) });
+  assert.equal(note.active[0]!.name, "fixing the gate");
+  assert.notEqual(note.active[0]!.step.toLowerCase(), "fixing the gate");
+  const bare = view([subtask("T5", "working", { name: null, statusRaw: "working" })], { thr_t5: live(2) });
+  assert.equal(bare.active[0]!.name, "T5");
+  assert.equal(bare.active[0]!.label, "");
 });

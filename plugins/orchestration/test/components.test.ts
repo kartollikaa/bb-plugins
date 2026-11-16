@@ -43,3 +43,31 @@ test("local evidence capture prevents child navigation and selects its exact sto
     dom.window.close();
   }
 });
+
+const nowView = (extra: Record<string, unknown> = {}) => ({
+  source: "block", orchestrator: { state: "idle", age: "3m", activity: null, background: 0 }, lastTurn: { text: "D2 working: drafted", age: "3m" },
+  doing: "I2 — checks running", waits: [{ who: "R1", label: "R1", subtask: "R1", what: "its report", age: "28m", kind: "subtask" }, { who: "owner", label: "You", subtask: null, what: "merge", age: "", kind: "owner" }],
+  mismatch: false, next: "on R1's report", blockedBy: "CI is down", lastDecision: { text: "Split", age: "28m" },
+  updated: { age: "6m", stale: false, from: "block", label: "updated 6m ago" }, text: "- doing: x", ...extra,
+});
+const nowProps = (variant: "tab" | "page", now = nowView()) => ({ now, variant, ledgerPath: "/l.md", renderEvidence: (content: string) => createElement("div", null, content), report: { text: "Full report", truncated: false }, workspace: null, threadIds: { R1: "thr_r1" }, openThread: () => {} });
+
+test("the tab variant of the Right now block shows both folds, Blocked by and a one-line wait summary", async () => {
+  const { NowBlock } = await loadTsx(new URL("../src/NowBlock.tsx", import.meta.url));
+  const html = renderToStaticMarkup(createElement(NowBlock, nowProps("tab")));
+  assert.match(html, /Checkpoint as written/);
+  assert.match(html, /Full last report/);
+  assert.match(html, /Blocked: CI is down/);
+  assert.match(html, /Waits on[\s\S]*R1 and you · 28m/);
+  assert.doesNotMatch(html, /Next|Last decision|Last turn/);
+});
+
+test("the page variant adds next, last turn and last decision, and a muted line for an old ledger", async () => {
+  const { NowBlock } = await loadTsx(new URL("../src/NowBlock.tsx", import.meta.url));
+  const page = renderToStaticMarkup(createElement(NowBlock, nowProps("page")));
+  assert.match(page, /Next/);
+  assert.match(page, /Last decision/);
+  assert.match(page, /Last turn/);
+  const old = renderToStaticMarkup(createElement(NowBlock, nowProps("page", nowView({ source: "none", doing: null, text: null }))));
+  assert.match(old, /This ledger has no Now block yet/);
+});

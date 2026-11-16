@@ -92,6 +92,16 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
   const pendingQuery = experimental_useRpcQuery({ contract, method: "pending", input: { threadId, threadIds: waiting }, enabled: enabled && waiting.length > 0 });
   useVisibleInterval(pendingQuery.refetch, SNAPSHOT_REFRESH_MS, enabled && waiting.length > 0);
 
+  const activityKeys = useMemo(() => {
+    const keys = new Set<string>([threadId]);
+    for (const subtask of ledgerThreads ?? []) {
+      const thread = subtask.threadId ? sidebar.threads.find((t) => t.id === subtask.threadId) : undefined;
+      if (thread && (["starting", "active", "stopping"].includes(thread.status) || (thread.activity?.backgroundCommands ?? 0) + (thread.activity?.backgroundAgents ?? 0) > 0)) keys.add(thread.id);
+    }
+    return [...keys].sort().slice(0, 50);
+  }, [sidebar.threads, ledgerThreads, threadId]);
+  const activityQuery = experimental_useRpcKeyedQuery({ contract, method: "activity", keys: activityKeys, enabled });
+
   const live = useMemo(() => {
     const map: Record<string, LiveThread> = {};
     for (const thread of sidebar.threads) {
@@ -104,6 +114,8 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
         title: thread.displayTitle,
         hidden: thread.isHidden,
         pending: thread.hasPendingInteraction ? pendingQuery.data?.[thread.id] ?? null : null,
+        backgroundCommands: thread.activity?.backgroundCommands ?? 0,
+        backgroundAgents: thread.activity?.backgroundAgents ?? 0,
       };
     }
     return map;
@@ -118,9 +130,9 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
     if (data.state === "none") return { kind: "none" };
     if (data.state === "error") return { kind: "error", message: data.message, retry: () => void query.refetch() };
     const answered = combineAnswers(data.answered, replies.answers(threadId), data.askFirstSeen);
-    const view = buildView({ ledger: data.ledger, agents: data.agents, live, orchestratorThreadId: threadId, now: Math.max(now, data.readAt), answered });
+    const view = buildView({ ledger: data.ledger, agents: data.agents, live, orchestratorThreadId: threadId, now: Math.max(now, data.readAt), answered, activity: activityQuery.data, report: data.report ?? null, ledgerModifiedAt: data.ledgerModifiedAt ?? null });
     return { kind: "ready", view, ledger: data.ledger, report: data.report ?? null, workspace: data.workspace ?? null, threadIds: view.threadIds };
-  }, [query.data, query.error, query.refetch, live, threadId, now, repliesVersion]);
+  }, [query.data, query.error, query.refetch, live, threadId, now, repliesVersion, activityQuery.data]);
 }
 
 export function useOrchestrationOwner(threadId: string): string | null | undefined {
