@@ -249,6 +249,27 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   both stuck thresholds, and the view's route, chat preference and rail geometry). Run `npm run typecheck`.
 - MIT. Not released yet; not in `marketplace.json`.
 
+## team-roles — `plugins/team-roles/`
+
+- **What:** a Team roles nav panel over the installed `team` Claude Code plugin (read-only). The list
+  shows each role's intent, access and model/effort per runtime, above the install (version, key, scope,
+  enabled), `render_roles.py --check` state and the Codex dry-run state. A role page adds tier, agent,
+  blocked tools, features, limits a runtime doesn't enforce, source and generated files (file preview)
+  and the prompt `resolve` prints per runtime. **Propose a change** opens a composer page; submitting
+  spawns a thread in the bb project whose remote is the team marketplace repo, with the owner's words
+  and an agent-only brief. CLI: `bb team-roles list [--json]`.
+- **How:** `lib/locate.ts` finds the install (setting `teamRoot`, else `installed_plugins.json`, else a
+  cache scan). `lib/scripts.ts` is the only way to run Python: `python3 -B -I` with `resolve`, `--check`
+  or the installer's dry run, no shell, 10 s timeout, 2 MiB cap; `assertReadOnlyArgv` refuses anything
+  else. `lib/parse.ts` reads `roles.json` and the scripts' outputs line by line (unknown lines never
+  establish a result). Results are cached until the mtime of `roles.json`, `installed_plugins.json` or the
+  Codex manifest changes, or Refresh.
+- **Agent skill:** `skills/team-roles/`.
+- **Tests:** `npm test` covers `test/*.test.ts` over fixtures from team 0.2.0 (install lookup, the argv
+  guard with broken controls, the three output parsers, repo normalisation, the brief). Run
+  `npm run typecheck`.
+- Design: `plugins/team-roles/docs/design.md`. MIT. Not released; not in `marketplace.json`.
+
 ## Retired repos
 
 Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`. They were deleted on
