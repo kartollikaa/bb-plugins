@@ -76,11 +76,6 @@ export function agentReviewPrompt({ url, number }: { url: string; number: number
 /** The reasoning setting value that keeps the review model's own default. */
 export const REVIEW_REASONING_DEFAULT = "default";
 
-export interface ReviewModelChoice {
-  model: string;
-  reasoningLevel: string;
-}
-
 export interface ProviderModelCatalog {
   providerId: string;
   models: readonly {
@@ -107,15 +102,20 @@ export interface ReviewModelRef {
   model: string;
 }
 
-const PROVIDER_ID = /^[a-z0-9][a-z0-9_-]*$/i;
+/** The provider ids bb accepts, and the longest a stored pair may name, so `provider/model` fits the setting. */
+export const PROVIDER_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+export const PROVIDER_ID_MAX = 64;
 
-/** `provider/model` pins both; a bare id (as saved before the picker existed) names only the model. Null when blank. */
-export function parseReviewModel(value: string): ReviewModelRef | null {
+/**
+ * `provider/model` pins both when `provider` is one bb lists; anything else, including a model id that has a
+ * slash of its own, names only the model, so an id saved before the picker keeps working. Null when blank.
+ */
+export function parseReviewModel(value: string, providerIds: readonly string[]): ReviewModelRef | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
   const slash = trimmed.indexOf("/");
   const providerId = slash > 0 ? trimmed.slice(0, slash) : "";
-  return PROVIDER_ID.test(providerId) && slash < trimmed.length - 1
+  return providerIds.includes(providerId) && slash < trimmed.length - 1
     ? { providerId, model: trimmed.slice(slash + 1) }
     : { providerId: null, model: trimmed };
 }
@@ -141,8 +141,8 @@ export function catalogOffers(catalog: ProviderModelCatalog, model: string): boo
  * The level sent is the chosen one, else the model's default; a model without a default sends none, and bb
  * fills in the project's level.
  */
-export function reviewExecution(choice: ReviewModelChoice, catalogs: readonly ProviderModelCatalog[]): { execution: ReviewExecution; warning: string | null } {
-  const ref = parseReviewModel(choice.model);
+export function reviewExecution(choice: { ref: ReviewModelRef | null; reasoningLevel: string }, catalogs: readonly ProviderModelCatalog[]): { execution: ReviewExecution; warning: string | null } {
+  const { ref } = choice;
   if (!ref) return { execution: {}, warning: null };
   const { providerId, model } = ref;
   for (const catalog of catalogs) {

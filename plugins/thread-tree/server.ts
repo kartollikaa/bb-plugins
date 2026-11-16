@@ -26,24 +26,19 @@ import {
   agentReviewSpawnArgs,
   encodeReviewModel,
   mergeEnvironmentOf,
+  REVIEW_REASONING_DEFAULT,
   projectForRepo,
   PR_STATUS_PLUGIN_ID,
   repoSlugFromPrUrl,
   reviewExecution,
 } from "./src/pullRequestActions";
-import { loadReviewCatalogs, reviewPickerSeed, spawnWithFallback } from "./src/agentReview";
+import { loadReviewCatalogs, reviewPickerState, reviewPickerValueSchema, spawnWithFallback } from "./src/agentReview";
 import { pullRequestStatusRowSchema } from "./src/threadPullRequests";
 
 /** At most one refresh per thread this often; bb already debounces its events to one a second. */
 const SIGNAL_REFRESH_MS = 2_000;
 const signalTag = (threadId: string) => `signals:${threadId}`;
 
-
-const reviewPickerValueSchema = z.object({
-  providerId: z.string().min(1).max(100),
-  model: z.string().min(1).max(200),
-  reasoningLevel: z.string().min(1).max(50),
-}).strict();
 
 const pullRequestUrlSchema = z.string().max(400).regex(/^https:\/\/(?:www\.)?github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*$/i);
 
@@ -53,10 +48,13 @@ export const rpcContract = defineRpcContract({
     input: z.object({ keys: z.array(z.string().min(1).max(200)).min(1).max(200) }),
     output: z.record(z.string(), z.object({ projectId: z.string(), name: z.string() }).nullable()),
   },
-  /** Where the Agent review picker on the settings page opens; null when no provider lists a model. */
-  reviewPickerSeed: {
+  /** Whether the saved Agent review model can run, and where the settings picker opens. */
+  reviewPickerState: {
     input: z.null(),
-    output: reviewPickerValueSchema.nullable(),
+    output: z.object({
+      saved: z.enum(["project-default", "available", "unavailable"]),
+      picker: reviewPickerValueSchema.nullable(),
+    }),
   },
   /** Saves the Agent review model; null goes back to the project's default model and reasoning. */
   setReviewModel: {
@@ -258,10 +256,13 @@ export default async function plugin(bb: BbPluginApi) {
       const projects = await listProjects();
       return Object.fromEntries(keys.map((repo) => [repo, projectForRepo(repo, projects)]));
     },
-    reviewPickerSeed: async () => reviewPickerSeed(bb.sdk, warn, readReviewSettings(await settings.get()).reviewModel),
+    reviewPickerState: async () => {
+      const { reviewModel, reviewReasoningLevel } = readReviewSettings(await settings.get());
+      return reviewPickerState(bb.sdk, warn, { model: reviewModel, reasoningLevel: reviewReasoningLevel });
+    },
     setReviewModel: async ({ selection }) => {
       await settings.experimental_set(selection
-        ? { reviewModel: encodeReviewModel(selection), reviewReasoningLevel: selection.reasoningLevel }
+        ? { reviewModel: encodeReviewModel(selection), reviewReasoningLevel: selection.reasoningLevel || REVIEW_REASONING_DEFAULT }
         : { reviewModel: null, reviewReasoningLevel: null });
       return { ok: true as const };
     },
@@ -270,10 +271,8 @@ export default async function plugin(bb: BbPluginApi) {
       const project = repo ? projectForRepo(repo, await listProjects()) : null;
       if (!project) throw new Error(`No project uses ${repo ?? url}`);
       const { reviewModel, reviewReasoningLevel } = readReviewSettings(await settings.get());
-      const { execution, warning } = reviewExecution(
-        { model: reviewModel, reasoningLevel: reviewReasoningLevel },
-        await loadReviewCatalogs(bb.sdk, warn, { projectId: project.projectId, model: reviewModel }),
-      );
+      const { ref, catalogs } = await loadReviewCatalogs(bb.sdk, warn, { projectId: project.projectId, model: reviewModel });
+      const { execution, warning } = reviewExecution({ ref, reasoningLevel: reviewReasoningLevel }, catalogs);
       if (warning) warn(`agent review of ${url}: ${warning}`);
       const thread = await spawnWithFallback(
         (chosen) => bb.sdk.threads.spawn(agentReviewSpawnArgs({ projectId: project.projectId, url, number, title, execution: chosen })),

@@ -1,96 +1,99 @@
-import { useEffect, useState } from "react";
-import { experimental_ProviderModelPicker as ProviderModelPicker, useRpc, useSettings } from "@get-bb/plugin-sdk/app";
+import { useCallback, useEffect, useState } from "react";
+import { experimental_ProviderModelPicker as ProviderModelPicker, experimental_useProviders, useRpc, useSettings } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import type { rpcContract } from "../server";
+import type { ReviewPickerState, ReviewPickerValue } from "./agentReview";
 import { parseReviewModel, REVIEW_REASONING_DEFAULT } from "./pullRequestActions";
 import { readReviewSettings } from "./settings";
 
-interface PickerValue {
-  providerId: string;
-  model: string;
-  reasoningLevel: string;
-}
-
-/** The saved pair when it names provider, model and level; otherwise the server resolves where the picker opens. */
-function savedPickerValue(reviewModel: string, reviewReasoningLevel: string): PickerValue | null {
-  const ref = parseReviewModel(reviewModel);
-  return ref?.providerId && reviewReasoningLevel !== REVIEW_REASONING_DEFAULT
-    ? { providerId: ref.providerId, model: ref.model, reasoningLevel: reviewReasoningLevel }
-    : null;
-}
+const segment = "rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50";
+const segmentOn = `${segment} bg-popover text-popover-foreground shadow-sm`;
+const segmentOff = `${segment} text-muted-foreground hover:text-popover-foreground`;
 
 export function ReviewSettingsSection() {
   const rpc = useRpc<typeof rpcContract>();
   const { values, isLoading } = useSettings();
+  const { providers } = experimental_useProviders();
+  const ready = !isLoading && values !== undefined;
   const { reviewModel, reviewReasoningLevel } = readReviewSettings(values);
-  const ref = parseReviewModel(reviewModel);
-  const projectDefault = ref === null;
-  const [value, setValue] = useState<PickerValue | null>(null);
+  const projectDefault = !reviewModel.trim();
+  const ref = parseReviewModel(reviewModel, providers.map((provider) => provider.id));
+  const [state, setState] = useState<ReviewPickerState | null>(null);
   const [failed, setFailed] = useState(false);
 
+  const load = useCallback(() => rpc.call("reviewPickerState", null), [rpc]);
+
   useEffect(() => {
-    if (isLoading || projectDefault) return;
-    const saved = savedPickerValue(reviewModel, reviewReasoningLevel);
-    if (saved) {
-      setValue(saved);
-      return;
-    }
+    if (!ready) return;
     let cancelled = false;
-    rpc.call("reviewPickerSeed", null).then(
-      (seed) => {
+    load().then(
+      (next) => {
         if (cancelled) return;
-        setFailed(seed === null);
-        setValue(seed && reviewReasoningLevel !== REVIEW_REASONING_DEFAULT ? { ...seed, reasoningLevel: reviewReasoningLevel } : seed);
+        setState(next);
+        setFailed(false);
       },
       () => !cancelled && setFailed(true),
     );
     return () => {
       cancelled = true;
     };
-  }, [isLoading, projectDefault, reviewModel, reviewReasoningLevel, rpc]);
+  }, [ready, reviewModel, reviewReasoningLevel, load]);
 
-  const save = (selection: PickerValue | null) =>
+  const save = (selection: ReviewPickerValue | null) =>
     rpc.call("setReviewModel", { selection }).catch((error: unknown) => {
       toast.error(`Couldn't save the Agent review model: ${error instanceof Error ? error.message : String(error)}`);
     });
 
-  const choose = async (useProjectDefault: boolean) => {
-    if (useProjectDefault) return save(null);
-    const seed = value ?? (await rpc.call("reviewPickerSeed", null).catch(() => null));
-    if (!seed) {
-      setFailed(true);
+  const chooseModel = async () => {
+    const picker = state?.picker ?? (await load().catch(() => null))?.picker;
+    if (!picker) {
       toast.error("No provider lists a model to choose from");
       return;
     }
-    setValue(seed);
-    return save(seed);
+    await save({ ...picker, reasoningLevel: REVIEW_REASONING_DEFAULT });
   };
 
+  const picker = state?.picker ?? null;
   return (
     <div className="flex flex-col gap-3 text-sm">
-      <label className="flex items-center gap-2">
-        <input type="checkbox" checked={projectDefault} disabled={isLoading} onChange={(event) => void choose(event.target.checked)} />
-        Use the project's default model and reasoning
-      </label>
-      {!projectDefault && value && (
-        <div className="flex flex-col gap-1">
+      <div role="radiogroup" aria-label="Agent review model" className="inline-flex w-fit gap-0.5 rounded-lg border border-border bg-border/40 p-0.5">
+        <button type="button" role="radio" aria-checked={projectDefault} disabled={!ready} className={projectDefault ? segmentOn : segmentOff} onClick={() => !projectDefault && void save(null)}>
+          Project's default
+        </button>
+        <button type="button" role="radio" aria-checked={!projectDefault} disabled={!ready} className={!projectDefault ? segmentOn : segmentOff} onClick={() => projectDefault && void chooseModel()}>
+          Choose a model
+        </button>
+      </div>
+      {projectDefault && <p className="text-xs text-muted-foreground">Reviews run on each project's default model and reasoning.</p>}
+      {!projectDefault && state?.saved === "unavailable" && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          No available provider offers {reviewModel}, so reviews run on the project's default model. Pick a model below to replace it.
+        </p>
+      )}
+      {!projectDefault && picker && (
+        <div className="flex flex-col gap-1.5">
           <ProviderModelPicker
-            value={value}
+            value={picker}
             onChange={({ providerId, model, reasoningLevel }) => {
               const next = { providerId, model, reasoningLevel };
-              setValue(next);
+              setState({ saved: "available", picker: next });
               void save(next);
             }}
           />
-          {ref?.providerId === null && (
-            <p className="text-xs text-muted-foreground">
-              Saved as {ref.model} on any provider that offers it; picking a model pins its provider.
-            </p>
+          {state?.saved === "available" && ref?.providerId === null && (
+            <p className="text-xs text-muted-foreground">Saved as {ref.model} on any provider that offers it; picking a model pins its provider.</p>
           )}
+          {state?.saved === "available" && (reviewReasoningLevel === REVIEW_REASONING_DEFAULT ? (
+            <p className="text-xs text-muted-foreground">Reasoning: the model's own default level.</p>
+          ) : (
+            <button type="button" className="w-fit text-xs text-muted-foreground underline-offset-2 hover:text-popover-foreground hover:underline" onClick={() => void save({ ...picker, reasoningLevel: REVIEW_REASONING_DEFAULT })}>
+              Use the model's own reasoning level
+            </button>
+          ))}
         </div>
       )}
-      {!projectDefault && !value && (
-        <p className="text-xs text-muted-foreground">{failed ? "No provider lists models right now, so the saved model stays as it is." : "Loading models…"}</p>
+      {!projectDefault && !picker && (
+        <p className="text-xs text-muted-foreground">{failed || state ? "No provider lists models right now; the saved setting stays as it is." : "Loading models…"}</p>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isExecutionRefusal, loadReviewCatalogs, reviewPickerSeed, spawnWithFallback, type ReviewCatalogSdk } from "../src/agentReview.ts";
+import { isExecutionRefusal, loadReviewCatalogs, reviewPickerState, reviewPickerValueSchema, spawnWithFallback, type ReviewCatalogSdk } from "../src/agentReview.ts";
 import type { ProviderModelCatalog, ReviewExecution } from "../src/pullRequestActions.ts";
 
 const shared = { model: "shared-model", defaultReasoningEffort: "high", supportedReasoningEfforts: [{ reasoningEffort: "medium" }] };
@@ -45,14 +45,14 @@ const collect = () => {
 
 test("a blank model loads no catalog at all", async () => {
   const { sdk, modelCalls } = fakeSdk({ catalogs: { alpha: [shared] } });
-  assert.deepEqual(await loadReviewCatalogs(sdk, () => {}, { projectId: "p", model: "" }), []);
+  assert.deepEqual(await loadReviewCatalogs(sdk, () => {}, { projectId: "p", model: "" }), { ref: null, catalogs: [] });
   assert.deepEqual(modelCalls, []);
 });
 
 test("a bare model id loads catalogs one at a time and stops at the first provider offering it", async () => {
   const { sdk, modelCalls } = fakeSdk({ catalogs: { alpha: [shared], beta: [shared] } });
   const { lines, log } = collect();
-  const catalogs = await loadReviewCatalogs(sdk, log, { projectId: "p", model: "shared-model" });
+  const { catalogs } = await loadReviewCatalogs(sdk, log, { projectId: "p", model: "shared-model" });
   assert.deepEqual(modelCalls, ["alpha"]);
   assert.deepEqual(catalogs.map((catalog) => catalog.providerId), ["alpha"]);
   assert.deepEqual(lines, []);
@@ -60,14 +60,14 @@ test("a bare model id loads catalogs one at a time and stops at the first provid
 
 test("a model only the second provider offers is found there", async () => {
   const { sdk, modelCalls } = fakeSdk({ catalogs: { alpha: [shared], beta: [betaOnly] } });
-  const catalogs = await loadReviewCatalogs(sdk, () => {}, { projectId: "p", model: "beta-only" });
+  const { catalogs } = await loadReviewCatalogs(sdk, () => {}, { projectId: "p", model: "beta-only" });
   assert.deepEqual(modelCalls, ["alpha", "beta"]);
   assert.deepEqual(catalogs.map((catalog) => catalog.providerId), ["alpha", "beta"]);
 });
 
 test("a pinned pair asks only its provider, and never another that offers the same model", async () => {
   const { sdk, modelCalls } = fakeSdk({ catalogs: { alpha: [shared], beta: [shared] } });
-  const catalogs = await loadReviewCatalogs(sdk, () => {}, { projectId: "p", model: "beta/shared-model" });
+  const { catalogs } = await loadReviewCatalogs(sdk, () => {}, { projectId: "p", model: "beta/shared-model" });
   assert.deepEqual(modelCalls, ["beta"]);
   assert.deepEqual(catalogs.map((catalog) => catalog.providerId), ["beta"]);
 });
@@ -75,14 +75,14 @@ test("a pinned pair asks only its provider, and never another that offers the sa
 test("a pinned provider that isn't available is logged and asked nothing", async () => {
   const { sdk, modelCalls } = fakeSdk({ catalogs: { alpha: [shared] } });
   const { lines, log } = collect();
-  assert.deepEqual(await loadReviewCatalogs(sdk, log, { projectId: "p", model: "off/shared-model" }), []);
+  assert.deepEqual((await loadReviewCatalogs(sdk, log, { projectId: "p", model: "off/shared-model" })).catalogs, []);
   assert.deepEqual(modelCalls, []);
   assert.deepEqual(lines, ["agent review: provider off isn't available"]);
 });
 
 test("for a bare id the project's provider is asked first, and unavailable providers never", async () => {
   const { sdk, modelCalls } = fakeSdk({ projectProviderId: "beta", catalogs: { alpha: [shared], beta: [shared] } });
-  const catalogs = await loadReviewCatalogs(sdk, () => {}, { projectId: "p", model: "shared-model" });
+  const { catalogs } = await loadReviewCatalogs(sdk, () => {}, { projectId: "p", model: "shared-model" });
   assert.deepEqual(modelCalls, ["beta"]);
   assert.equal(catalogs[0]?.providerId, "beta");
 });
@@ -90,7 +90,7 @@ test("for a bare id the project's provider is asked first, and unavailable provi
 test("a catalog with a load error is logged and skipped", async () => {
   const { sdk, modelCalls } = fakeSdk({ catalogs: { alpha: { loadError: "timeout" }, beta: [shared] } });
   const { lines, log } = collect();
-  const catalogs = await loadReviewCatalogs(sdk, log, { projectId: "p", model: "shared-model" });
+  const { catalogs } = await loadReviewCatalogs(sdk, log, { projectId: "p", model: "shared-model" });
   assert.deepEqual(modelCalls, ["alpha", "beta"]);
   assert.deepEqual(catalogs.map((catalog) => catalog.providerId), ["beta"]);
   assert.deepEqual(lines, ["agent review: alpha models unavailable: timeout"]);
@@ -99,7 +99,7 @@ test("a catalog with a load error is logged and skipped", async () => {
 test("a failed catalog request and a failed project-defaults read are both logged with their cause", async () => {
   const { sdk } = fakeSdk({ catalogs: { alpha: new Error("HTTP 504: gateway"), beta: [shared] }, defaultsError: new Error("HTTP 500: db") });
   const { lines, log } = collect();
-  const catalogs = await loadReviewCatalogs(sdk, log, { projectId: "p", model: "shared-model" });
+  const { catalogs } = await loadReviewCatalogs(sdk, log, { projectId: "p", model: "shared-model" });
   assert.deepEqual(catalogs.map((catalog) => catalog.providerId), ["beta"]);
   assert.deepEqual(lines, [
     "agent review: reading the project's default provider failed: HTTP 500: db",
@@ -107,18 +107,60 @@ test("a failed catalog request and a failed project-defaults read are both logge
   ]);
 });
 
+test("a bare id with a slash of its own is looked up whole on every provider", async () => {
+  const slashed = { model: "meta-llama/Llama-3", defaultReasoningEffort: "", supportedReasoningEfforts: [] };
+  const { sdk, modelCalls } = fakeSdk({ catalogs: { alpha: [shared], beta: [slashed] } });
+  const { ref, catalogs } = await loadReviewCatalogs(sdk, () => {}, { projectId: "p", model: "meta-llama/Llama-3" });
+  assert.deepEqual(ref, { providerId: null, model: "meta-llama/Llama-3" });
+  assert.deepEqual(modelCalls, ["alpha", "beta"]);
+  assert.equal(catalogs.at(-1)?.providerId, "beta");
+});
+
+const saved = (model: string, reasoningLevel = "default") => ({ model, reasoningLevel });
+
 test("the settings picker opens on the saved model's provider, or the first provider's default model", async () => {
   const { sdk, projectCalls } = fakeSdk({ catalogs: { alpha: [shared, alphaOnly], beta: [betaOnly] } });
-  assert.deepEqual(await reviewPickerSeed(sdk, () => {}, "beta-only"), { providerId: "beta", model: "beta-only", reasoningLevel: "low" });
-  assert.deepEqual(await reviewPickerSeed(sdk, () => {}, "beta/beta-only"), { providerId: "beta", model: "beta-only", reasoningLevel: "low" });
-  assert.deepEqual(await reviewPickerSeed(sdk, () => {}, ""), { providerId: "alpha", model: "alpha-only", reasoningLevel: "medium" });
-  assert.deepEqual(await reviewPickerSeed(sdk, () => {}, "gone-model"), { providerId: "alpha", model: "alpha-only", reasoningLevel: "medium" });
+  assert.deepEqual(await reviewPickerState(sdk, () => {}, saved("beta-only")), { saved: "available", picker: { providerId: "beta", model: "beta-only", reasoningLevel: "low" } });
+  assert.deepEqual(await reviewPickerState(sdk, () => {}, saved("beta/beta-only", "low")), { saved: "available", picker: { providerId: "beta", model: "beta-only", reasoningLevel: "low" } });
+  assert.deepEqual(await reviewPickerState(sdk, () => {}, saved("")), { saved: "project-default", picker: { providerId: "alpha", model: "alpha-only", reasoningLevel: "medium" } });
   assert.ok(projectCalls.every((projectId) => projectId === undefined), "the picker lists the server machine's catalogs");
 });
 
-test("the picker has nothing to open on when no provider lists a model", async () => {
-  const { sdk } = fakeSdk({ catalogs: { alpha: { loadError: "auth_required" }, beta: [] } });
-  assert.equal(await reviewPickerSeed(sdk, () => {}, ""), null);
+test("a saved model no available provider offers is reported unavailable, with the picker on a real model", async () => {
+  const { sdk } = fakeSdk({ catalogs: { alpha: [shared, alphaOnly], beta: [betaOnly] } });
+  for (const model of ["gone-model", "alpha/beta-only", "off/shared-model"]) {
+    assert.deepEqual(await reviewPickerState(sdk, () => {}, saved(model)), { saved: "unavailable", picker: { providerId: "alpha", model: "alpha-only", reasoningLevel: "medium" } }, model);
+  }
+});
+
+test("the picker's level is the saved one the model lists, else its default, else its first, else empty", async () => {
+  const noDefault = { model: "plain", defaultReasoningEffort: "", supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "high" }] };
+  const none = { model: "bare", defaultReasoningEffort: "", supportedReasoningEfforts: [] };
+  const { sdk } = fakeSdk({ catalogs: { alpha: [noDefault, none] } });
+  const level = async (model: string, reasoningLevel?: string) => (await reviewPickerState(sdk, () => {}, saved(model, reasoningLevel))).picker?.reasoningLevel;
+  assert.equal(await level("alpha/plain", "high"), "high");
+  assert.equal(await level("alpha/plain", "max"), "low");
+  assert.equal(await level("alpha/plain"), "low");
+  assert.equal(await level("alpha/bare"), "");
+  const picker = (await reviewPickerState(sdk, () => {}, saved("alpha/bare"))).picker;
+  assert.equal(reviewPickerValueSchema.safeParse(picker).success, true, "an empty level still fits the RPC schema");
+});
+
+test("the picker has nothing to open on when no provider lists a model, and logs why", async () => {
+  const { sdk } = fakeSdk({ catalogs: { alpha: { loadError: "auth_required" }, beta: new Error("HTTP 504: gateway") } });
+  const { lines, log } = collect();
+  assert.deepEqual(await reviewPickerState(sdk, log, saved("")), { saved: "project-default", picker: null });
+  assert.deepEqual(lines, ["agent review: alpha models unavailable: auth_required", "agent review: listing beta models failed: HTTP 504: gateway"]);
+});
+
+test("the saved pair must name a provider id bb could list and fit the setting", () => {
+  const valid = { providerId: "acp-open_code", model: "vendor/model", reasoningLevel: "" };
+  assert.equal(reviewPickerValueSchema.safeParse(valid).success, true);
+  for (const providerId of ["a/b", "a b", "", "x".repeat(65)]) {
+    assert.equal(reviewPickerValueSchema.safeParse({ ...valid, providerId }).success, false, JSON.stringify(providerId));
+  }
+  assert.equal(reviewPickerValueSchema.safeParse({ ...valid, model: "m".repeat(201) }).success, false);
+  assert.ok(64 + 1 + 200 <= 300, "the longest pair fits reviewModel's 300 characters");
 });
 
 const chosen: ReviewExecution = {

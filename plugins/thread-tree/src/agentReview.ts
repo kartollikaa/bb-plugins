@@ -1,5 +1,16 @@
 // Server side of Agent review: which provider catalogs offer the review model, and the spawn fallback.
-import { catalogOffers, parseReviewModel, reviewProviderOrder, type ProviderModelCatalog, type ReviewExecution } from "./pullRequestActions.ts";
+import { z } from "zod";
+import {
+  catalogOffers,
+  parseReviewModel,
+  PROVIDER_ID_MAX,
+  PROVIDER_ID_PATTERN,
+  REVIEW_REASONING_DEFAULT,
+  reviewProviderOrder,
+  type ProviderModelCatalog,
+  type ReviewExecution,
+  type ReviewModelRef,
+} from "./pullRequestActions.ts";
 
 export const CATALOG_TIMEOUT_MS = 5_000;
 
@@ -21,29 +32,41 @@ export type ReviewLog = (message: string) => void;
 
 export const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+/** What the settings picker saves; with the separator it fits the `reviewModel` setting's 300 characters. */
+export const reviewPickerValueSchema = z.object({
+  providerId: z.string().min(1).max(PROVIDER_ID_MAX).regex(PROVIDER_ID_PATTERN),
+  model: z.string().min(1).max(200),
+  reasoningLevel: z.string().max(50),
+}).strict();
+
+export type ReviewPickerValue = z.infer<typeof reviewPickerValueSchema>;
+
+const listProviders = (sdk: ReviewCatalogSdk, log: ReviewLog) =>
+  sdk.providers.list().catch((error) => {
+    log(`agent review: listing providers failed: ${errorMessage(error)}`);
+    return [];
+  });
+
 /**
- * Stops at the first provider offering the saved model: the pinned provider only, or for a bare model id the
- * project's provider first. A catalog that fails, times out or reports a load error is logged and skipped.
+ * Reads the saved model against the providers bb lists, then loads catalogs until one offers it: the pinned
+ * provider only, or for a bare model id the project's provider first. A catalog that fails, times out or
+ * reports a load error is logged and skipped.
  */
 export async function loadReviewCatalogs(
   sdk: ReviewCatalogSdk,
   log: ReviewLog,
   { projectId, model, timeoutMs = CATALOG_TIMEOUT_MS }: { projectId?: string; model: string; timeoutMs?: number },
-): Promise<ProviderModelCatalog[]> {
-  const ref = parseReviewModel(model);
-  if (!ref) return [];
-  const [providers, projectDefaults] = await Promise.all([
-    sdk.providers.list().catch((error) => {
-      log(`agent review: listing providers failed: ${errorMessage(error)}`);
-      return [];
-    }),
-    projectId && ref.providerId === null
-      ? sdk.projects.defaultExecutionOptions({ projectId }).catch((error) => {
-          log(`agent review: reading the project's default provider failed: ${errorMessage(error)}`);
-          return null;
-        })
-      : null,
-  ]);
+): Promise<{ ref: ReviewModelRef | null; catalogs: ProviderModelCatalog[] }> {
+  if (!model.trim()) return { ref: null, catalogs: [] };
+  const providers = await listProviders(sdk, log);
+  const ref = parseReviewModel(model, providers.map((provider) => provider.id));
+  if (!ref) return { ref, catalogs: [] };
+  const projectDefaults = projectId && ref.providerId === null
+    ? await sdk.projects.defaultExecutionOptions({ projectId }).catch((error) => {
+        log(`agent review: reading the project's default provider failed: ${errorMessage(error)}`);
+        return null;
+      })
+    : null;
   const available = providers.filter((provider) => provider.available).map((provider) => provider.id);
   if (ref.providerId !== null && !available.includes(ref.providerId)) log(`agent review: provider ${ref.providerId} isn't available`);
   const order = ref.providerId !== null
@@ -64,34 +87,57 @@ export async function loadReviewCatalogs(
       log(`agent review: listing ${providerId} models failed: ${errorMessage(error)}`);
     }
   }
-  return catalogs;
+  return { ref, catalogs };
 }
 
-export interface ReviewPickerValue {
-  providerId: string;
-  model: string;
-  reasoningLevel: string;
+type CatalogModel = ProviderModelCatalog["models"][number];
+
+/** The saved level when the model lists it, else the model's default, else its first level; empty when it has none. */
+function pickerLevel(entry: CatalogModel, savedLevel: string): string {
+  const listed = entry.supportedReasoningEfforts.map((effort) => effort.reasoningEffort);
+  if (savedLevel !== REVIEW_REASONING_DEFAULT && (entry.reasoningDiscovery === "unknown" || listed.includes(savedLevel))) return savedLevel;
+  return entry.defaultReasoningEffort || listed[0] || "";
+}
+
+export interface ReviewPickerState {
+  /** `unavailable`: a saved model no available provider offers now, so reviews run on the project's defaults. */
+  saved: "project-default" | "available" | "unavailable";
+  /** Where the picker opens; null when no provider lists a model. */
+  picker: ReviewPickerValue | null;
 }
 
 /**
- * Where the settings picker opens: the saved model on the provider that offers it, else the first available
- * provider's default model. The picker needs a concrete provider and model even while the setting is blank.
+ * The saved model on the provider that offers it, else the first available provider's default model: the picker
+ * needs a concrete provider and model even while the setting is blank or names something gone.
  */
-export async function reviewPickerSeed(sdk: ReviewCatalogSdk, log: ReviewLog, savedModel: string): Promise<ReviewPickerValue | null> {
-  const ref = parseReviewModel(savedModel);
+export async function reviewPickerState(sdk: ReviewCatalogSdk, log: ReviewLog, saved: { model: string; reasoningLevel: string }): Promise<ReviewPickerState> {
+  const { ref, catalogs } = await loadReviewCatalogs(sdk, log, { model: saved.model });
   if (ref) {
-    for (const catalog of await loadReviewCatalogs(sdk, log, { model: savedModel })) {
+    for (const catalog of catalogs) {
       const entry = catalog.models.find((candidate) => candidate.model === ref.model);
-      if (entry) return { providerId: catalog.providerId, model: entry.model, reasoningLevel: entry.defaultReasoningEffort };
+      if (entry) return { saved: "available", picker: { providerId: catalog.providerId, model: entry.model, reasoningLevel: pickerLevel(entry, saved.reasoningLevel) } };
     }
   }
-  const providers = await sdk.providers.list().catch(() => []);
+  const providers = await listProviders(sdk, log);
   for (const provider of providers.filter((candidate) => candidate.available)) {
-    const result = await sdk.providers.models({ providerId: provider.id, signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS) }).catch(() => null);
-    const entry = result && !result.modelLoadError ? (result.models.find((candidate) => candidate.isDefault) ?? result.models[0]) : undefined;
-    if (entry) return { providerId: provider.id, model: entry.model, reasoningLevel: entry.defaultReasoningEffort };
+    try {
+      const result = await sdk.providers.models({ providerId: provider.id, signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS) });
+      if (result.modelLoadError) {
+        log(`agent review: ${provider.id} models unavailable: ${result.modelLoadError.code}`);
+        continue;
+      }
+      const entry = result.models.find((candidate) => candidate.isDefault) ?? result.models[0];
+      if (entry) {
+        return {
+          saved: ref ? "unavailable" : "project-default",
+          picker: { providerId: provider.id, model: entry.model, reasoningLevel: pickerLevel(entry, REVIEW_REASONING_DEFAULT) },
+        };
+      }
+    } catch (error) {
+      log(`agent review: listing ${provider.id} models failed: ${errorMessage(error)}`);
+    }
   }
-  return null;
+  return { saved: ref ? "unavailable" : "project-default", picker: null };
 }
 
 /**

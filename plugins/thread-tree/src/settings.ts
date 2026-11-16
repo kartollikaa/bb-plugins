@@ -93,7 +93,7 @@ export const REVIEW_SETTINGS = {
   reviewModel: {
     type: "string",
     label: "Agent review model",
-    description: "Set it with the Agent review picker below. Stored as provider/model; blank uses the project's default model and reasoning. A bare model id uses any available provider that offers it.",
+    description: "Set it with the Agent review picker below. Stored as provider/model; blank uses the project's default model and reasoning. The prefix counts as a provider only when bb lists it; otherwise the whole value is a bare model id, run on any available provider that offers it.",
     experimental_schema: reviewModel,
     default: "",
   },
