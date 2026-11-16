@@ -2,7 +2,7 @@
 
 Status: complete draft for the owner's confirmation. Section 4 builds on R1's report on live
 activity (`R1-live-activity.md`, bb 0.49.0, plugin SDK 0.6.132). Q1 and Q5 were decided by the
-orchestrator, Q2–Q4, Q6 and Q7 by the owner (see «Decided»).
+orchestrator, Q2–Q4, Q6 and Q7 by the owner (see «Decided»); Q8 waits on the owner.
 
 Two parts build from this document: **I1** in kartollika-ai-hub (`plugins/orchestrate`: the skill,
 the ledger schema, the export) and **I2** in this repo (`plugins/orchestration`: the view). Section 5
@@ -90,11 +90,13 @@ What fails today, by source:
 - **N12** From the top block the owner can open the thread of a subtask it names, read the checkpoint
   as written and the orchestrator's full last report.
 - **N13** I1 and I2 share exact, named contract strings, so each is built and tested alone.
-- **N14** The view never shows «nothing waits on you» while the orchestrator waits on the owner: a
-  «For the owner» line in any shape other than a note counts as an ask, and an orchestrator that
-  asked in the chat without an ask line is flagged.
+- **N14** The view never shows «nothing waits on you» while the orchestrator waits on the owner: on
+  a ledger that is not closed, a «For the owner» line in any shape other than a note counts as an
+  ask, and an orchestrator that asked in the chat without an ask line is flagged. A closed ledger
+  never turns into «needs you» from free-text lines.
 - **N15** On hosts with turn-end hooks, an orchestrator turn that waits on the owner cannot end
-  without an `ask:` line for it; elsewhere the rule text and `check` say so.
+  without an `ask:` line for it: the turn is stopped once with the reason (owner's answer to Q7,
+  «Decided»); elsewhere the rule text and `check` say so.
 - **N16** Live activity costs at most one filtered, cursor-based event read per changed thread, and
   is refreshed by bb's thread events, not a new timer.
 
@@ -138,13 +140,14 @@ V1: the owner asked for the state to be what they see first, wherever they are i
 **A + E1 + V1.** The orchestrator writes five keyed lines at the top of «Current checkpoint» in every
 event update; the export parses them into new keys of `current_checkpoint` without a version bump;
 the view puts a «Right now» block under the goal that joins those lines with bb's live thread state,
-dates every line and flags a block older than the orchestrator's last turn. Old ledgers show their
-free-text checkpoint and the orchestrator's last status line in the same place. Running turns show
-their current step from bb's thread events, read by the plugin's own fold and refreshed by those
-events, not a timer (section 4). A wait on the owner gets two guards: the view treats every
-«For the owner» line that is not a note as a wait and flags a question asked only in the chat, and
-the skill's Stop hook keeps an orchestrator turn from ending on such a wait without an `ask:` line
-(section 6).
+dates every line and flags a block written well before the orchestrator's last turn started. Old
+ledgers show their free-text checkpoint and the orchestrator's last status line in the same place.
+Running turns show their current step from bb's thread events, read by the plugin's own fold and
+refreshed by those events, not a timer (section 4). A wait on the owner gets two guards: on an
+active ledger the view treats every «For the owner» line that is not a note as a wait and flags a
+question asked only in the chat, and the skill's Stop hook stops an orchestrator turn once when it
+would end on such a wait without an `ask:` line (section 6; the hook is the owner's answer to Q7,
+«Decided»).
 
 ## Design
 
@@ -180,7 +183,7 @@ Rules for the skill text:
   results go to Brief or history (`ledger.md` «Overall state and brief» already says so).
 - An owner wait is also an `ask:` line in «For the owner»; the `waiting on: owner` line names it
   with its ask title so both read the same: `waiting on: owner | for: «Merge the orchestrate plugin
-  PR (I1)…» | since: …`.
+  PR (I1)…» | since: …`. A shortened title still matches its ask by section 5's «Owner-wait match».
 - The subtask's own current step stays in its «Subtasks» status cell, after the status word
   (`working — drafting sections 1–3`), which `ledger.md` «Subtask statuses» already allows. The
   skill asks to keep that note current from each report's gist.
@@ -217,9 +220,13 @@ still every line except `background wait:` and `archive after handover:`, so the
 also in `text` and an old view shows them as written. `time` is still the first time in `text`,
 which is now `updated:`.
 
+The complete `current_checkpoint` of section 1's filled example, in a ledger whose «Subtasks» table
+has the ids `R1` and `D1`. The first four keys are what 0.16.0's `checkpoint()` already prints for
+that text (computed with `ledger_export.checkpoint` of 0.16.0); the rest is new:
+
 ```json
 "current_checkpoint": {
-  "text": "- updated: 2026-11-16T14:32+03:00\n- doing: waiting — see «waiting on»; …",
+  "text": "- updated: 2026-11-16T14:32+03:00\n- doing: waiting — see «waiting on»; D2 drafting team-roles design\n- waiting on: R1 | for: its report on bb live activity (R1-live-activity.md) | since: 2026-11-16T14:04+03:00\n- waiting on: D1 | for: now-block.md sections 1–3 draft | since: 2026-11-16T14:04+03:00\n- waiting on: owner | for: «Merge the orchestrate plugin PR (I1) yourself, or let me merge it after it passes checks and an independent review» | since: 2026-11-16T14:04+03:00\n- next: on R1's report: send «unblocked» to D1 for sections 4–5\n- blocked by: none",
   "time": {"at": "2026-11-16T14:32+03:00", "precision": "time", "offset": true},
   "background_waits": [],
   "archive_after_handover": [],
@@ -235,10 +242,17 @@ which is now `updated:`.
       "since": {"at": "2026-11-16T14:04+03:00", "precision": "time", "offset": true}
     },
     {
-      "raw": "owner | for: «Merge the orchestrate plugin PR (I1) …» | since: 2026-11-16T14:04+03:00",
+      "raw": "D1 | for: now-block.md sections 1–3 draft | since: 2026-11-16T14:04+03:00",
+      "who": "D1",
+      "subtask": "D1",
+      "what": "now-block.md sections 1–3 draft",
+      "since": {"at": "2026-11-16T14:04+03:00", "precision": "time", "offset": true}
+    },
+    {
+      "raw": "owner | for: «Merge the orchestrate plugin PR (I1) yourself, or let me merge it after it passes checks and an independent review» | since: 2026-11-16T14:04+03:00",
       "who": "owner",
       "subtask": null,
-      "what": "«Merge the orchestrate plugin PR (I1) …»",
+      "what": "«Merge the orchestrate plugin PR (I1) yourself, or let me merge it after it passes checks and an independent review»",
       "since": {"at": "2026-11-16T14:04+03:00", "precision": "time", "offset": true}
     }
   ],
@@ -246,6 +260,9 @@ which is now `updated:`.
   "blocked_by": null
 }
 ```
+
+`what` keeps the «» as written; matching it to an ask strips them (section 5, «Owner-wait
+match»).
 
 | Key | Type | From |
 |---|---|---|
@@ -338,7 +355,8 @@ Rules:
 - **Doing / Next / Blocked by.** One line each, `firstLine(…, 220)`. `Blocked by` only when not
   null, in the foreground colour with the word «Blocked» (not colour alone).
 - **Waits on.** One row per `waitingOn` entry in ledger order, then one «You» row per open owner ask
-  (section 6) that no `waiting on: owner` line already names, then one per background wait, then
+  (section 6) that no `waiting on: owner` line matches by section 5's «Owner-wait match», then one
+  per background wait, then
   one `Background · <n> commands running` row when section 4's live count exceeds the ledger's
   background waits. `who` shows as the subtask id, «You» for `owner`, «Background» for a background
   wait, else as written.
@@ -348,13 +366,17 @@ Rules:
 - **Last decision.** `view.recap.last`, already computed.
 - **Folds.** «Checkpoint as written» renders `checkpointText` with `EvidenceMarkdown`, as Brief
   does today; «Full last report» renders the report as Brief does today. Both leave Brief
-  (`Brief.tsx:22-30` is removed), so there is one place for them.
+  (`Brief.tsx:22-30` is removed) and sit in the block in both variants, page and tab, so there is
+  one place for them and the narrow tab keeps them (N12).
 - **Age and staleness (N6).** The header shows `updated <age> ago` from `block.updated`. The block is
-  *possibly out of date* when the orchestrator is not running and `latestAttentionAt >
-  updated + STALE_GRACE_MS`, i.e. a turn ended well after the last update, though the skill rewrites
-  the block in every event update. Then the header reads `updated 2h ago · written before the
-  orchestrator's last turn` and the block's text is muted. `STALE_GRACE_MS` is 10 minutes, an owner
-  threshold next to `QUIET_MS` in `src/view.ts` (Q3, decided). A `date`-precision or unparseable
+  *possibly out of date* when the orchestrator is not running and its last turn *started* more than
+  `STALE_GRACE_MS` after `updated`: `lastTurnStartedAt > updated + STALE_GRACE_MS`. A turn that
+  rewrites the block and then runs a long gate is not flagged, since its start precedes its own
+  update. `lastTurnStartedAt` comes from the orchestrator's activity (section 4). When that is
+  `null` (events unreadable), the rule falls back to the turn's end, `latestAttentionAt`, which can
+  flag such a long turn; the label is true in both cases. Then the header reads `updated 2h ago ·
+  the orchestrator has run since` and the block's text is muted. `STALE_GRACE_MS` is 10 minutes, an
+  owner threshold next to `QUIET_MS` in `src/view.ts` (Q3, decided). A `date`-precision or unparseable
   `updated` shows the date and is never marked stale. `updated` missing on a structured block: the age
   comes from `ledgerModifiedAt` with the words `ledger written <age> ago`.
 
@@ -368,8 +390,10 @@ Rules:
 | no checkpoint, or an old exporter | any | orchestrator line, last turn, last decision, and one muted line: `This ledger has no Now block yet. Orchestrators write one from the orchestrate version that ships it.` |
 | none, and no live entry | — | the header keeps only the goal and the phase, as today |
 
-**Tab variant** (the narrow Orchestration tab, `variant="tab"`): the orchestrator line, `Doing`, and
-`Waits on` as one line `Waits on R1, you and 1 background · 28m`. The rest shows on the page.
+**Tab variant** (the narrow Orchestration tab, `variant="tab"`): the orchestrator line, `Doing`,
+`Blocked by` when not null, `Waits on` as one line `Waits on R1, you and 1 background · 28m`, and
+the two folds «Checkpoint as written» and «Full last report». `Next`, the last turn and the last
+decision show on the page.
 
 `view.recap.now` is replaced by `view.now`, a `NowView` that `buildView` computes, so the rules above
 are tested in `test/view.test.ts` without rendering:
@@ -403,8 +427,12 @@ export interface NowView {
     [Open thread]
 ```
 
-- **Name** (what it resolves): the id cell's name, else the delivery, as today
-  (`src/ledger.ts:86`). I1's skill rule fills the name in new ledgers.
+- **Name** (what it resolves; the owner's answer to Q6: always a short name). The first non-empty
+  of: the id cell's name (`src/ledger.ts:86`, which I1's skill rule fills in new ledgers); the
+  subtask thread's title without its ` · <id>` suffix (`childLabel(...).rest`, `src/view.ts:295`);
+  the delivery; the status note. Each is clamped to eight words with «…» (`shortName`, new in
+  `src/view.ts`). With none of them the row shows only its id, never an empty name (today
+  `src/view.ts:227` gives `""`).
 - **Step**, first that applies, after the existing pending, stuck and child cases of `stepOf`, which
   stay as they are:
   1. while its turn runs: the live step with its age (`Running npm test · 40s`), else `Turn
@@ -422,8 +450,8 @@ export interface NowView {
 
 The attention heading, subline, ask and answered cards, the context-card row label, Team grouping,
 History, the Work and Activity tabs, refresh timers, navigation and reply handling. Brief keeps its
-Markdown result and the completed and remaining lists; it loses the two folds that move into the
-block.
+Markdown result and the completed and remaining lists in both variants; it loses the two folds,
+which move into the block in both variants.
 
 ### 4. Live activity
 
@@ -451,6 +479,7 @@ export const ACTIVITY_EVENT_TYPES = ["turn/started", "turn/completed", "item/sta
 
 export interface ThreadActivity {
   turnStartedAt: number | null;    // epoch ms; null when no turn runs
+  lastTurnStartedAt: number | null; // start of the latest top-level turn, kept after it completes
   step: string | null;             // «Running npm test», «Loading skill», «Thinking»
   stepStartedAt: number | null;    // createdAt of that item/started
   background: { description: string; startedAt: number }[];
@@ -461,7 +490,8 @@ I2 copies `foldSignalEvents`, `stepText`, `commandGist` and the paging of `creat
 `plugins/thread-tree/src/threadSignals.ts` (first read: newest-first pages of 100 typed rows;
 then `order: "asc", afterSeq: lastSeq`; 4 reads at a time; at most 400 threads cached), with the
 nested-turn rule (`isTopLevelCompletion`) and their tests, trims them to `ThreadActivity`, and adds
-`stepStartedAt` and the background list, which thread-tree does not return (R1 2b).
+`stepStartedAt`, `lastTurnStartedAt` and the background list, which thread-tree does not return
+(R1 2b; its fold sets `turnStartedAt` to `null` on `turn/completed`, `threadSignals.ts:209`).
 
 Copy, not a call to thread-tree's `threadSignals` RPC: AGENTS.md «Plugins stay independent» bars
 imports, and a runtime call makes live activity disappear without a trace when thread-tree is off
@@ -480,8 +510,10 @@ activity: {
 },
 ```
 
-- The app asks for the orchestrator and every subtask thread whose sidebar `status` is in `BUSY` or
-  whose sidebar background count is above zero. Idle threads are not read.
+- The app always asks for the orchestrator (the staleness rule needs its `lastTurnStartedAt`), and
+  for every subtask thread whose sidebar `status` is in `BUSY` or whose sidebar background count
+  is above zero. Idle subtasks are not read; an idle orchestrator costs one read when its query is
+  first made or invalidated, and its `afterSeq` read returns `[]` when nothing changed.
 - The server subscribes, once, to `experimental_thread.events`, `thread.active`, `thread.idle` and
   `thread.failed` (R1 4); for a thread already in its fold map it schedules one
   `bb.rpc.experimental_invalidate([`activity:<threadId>`])` per `ACTIVITY_REFRESH_MS` = 2 s, as
@@ -522,7 +554,10 @@ ledger, the export or a message.
 | `for:` `since:` | fields of a `waiting on:` line, ` \| `-separated | I1 skill, I1 export |
 | `owner` | `who` of an owner wait | I1 skill; I2 shows «You» |
 | `- ask:` `- note:` | the only two «For the owner» line forms, unchanged | I1 skill, `check`, Stop hook; I2 parses |
-| `Waiting on you: ` / `Nothing waits on you.` (Russian ledgers: `Ждёт тебя: ` / `Ничего не ждёт.`) | the last line of an orchestrator turn's message | I1 skill and Stop hook; I2 mismatch rule |
+| `Waiting on you: ` / `Nothing waits on you.` (Russian ledgers: `Ждёт тебя: ` / `Ничего не ждёт.`) | the last line of an orchestrator turn's message. Detection, the same in both slices: the message's last non-empty line, trimmed, starts with `Waiting on you:` or `Ждёт тебя:` | I1 skill and Stop hook; I2 mismatch rule |
+| Owner-wait match | a `waiting on: owner` line matches an open `ask:` when its `for:` value (else the rest of the line), trimmed, with one pair of surrounding `«»` or `""` and a trailing `…` or `...` removed, is case-insensitively a prefix of the ask's title, or the title a prefix of it. A value empty after stripping matches nothing. Section 1's example matches the ask «Merge the orchestrate plugin PR (I1) yourself, or let me merge it after it passes checks and an independent review» | I1 `check` and Stop hook; I2 «You» rows |
+| Interactive GenUI names: `Form`, `Button`, `Buttons`, `Select` | a ```` ```ui ```` fence counts as a question when its body holds one of these as a whole word | I1 Stop hook; I2 mismatch rule |
+| `closed` | the export's `status` of a finished ledger, as `buildView` already reads it (`src/view.ts:451`) | I1 Stop hook skips it; I2 keeps its free-text lines as notes |
 | `current_checkpoint.structured`, `.updated`, `.doing`, `.waiting_on[].{raw,who,subtask,what,since}`, `.next`, `.blocked_by` | export JSON | I1 writes, I2 reads |
 | `orchestrate-ledger-export`, `schema_version` `1` | export, unchanged | both |
 | `REPORT_HEADER` = `^\[orchestrate [^\]]+\]\s+(\S+)\s+(working\|question\|blocked\|delivered\|updated\|rotate):\s*(.*)$` | first line of a subtask report, from `references/protocol.md` line 90 | I2 parses; I1 changes nothing |
@@ -535,16 +570,18 @@ Areas: `skills/orchestrate/SKILL.md` (§3 init, §6 step 4 and «What reaches th
 §8 finish: write the block; section 6's rule), `skills/orchestrate/references/ledger.md` («Schema»,
 «Subtask statuses» note rule, «Old vocabulary», «Overall state and brief», «For the owner»),
 `skills/orchestrate-handover/SKILL.md` where it reads or writes «Current checkpoint» (lines 58, 72,
-138, 163 in 0.16.0: a takeover rewrites the block), `hooks/hooks.json` (a `Stop` entry),
-`scripts/owner-wait-stop.py` (new), `scripts/ledger_export.py`, `scripts/orchestration_ledger.py`
+138, 146, 163, 202 and 218 in 0.16.0: a takeover rewrites the block), `hooks/hooks.json` (a `Stop`
+entry) and `scripts/owner-wait-stop.py` (new) — the hook the owner chose in Q7 («Decided»; it ships
+with I1, no separate slice), `scripts/ledger_export.py`, `scripts/orchestration_ledger.py`
 (`check` warning and `errors`), `docs/ledger-export.md`, `scripts/test_ledger_export.py`,
 `scripts/test_orchestration_ledger.py`, a test for the hook, `tests/fixtures/ledger-export/`,
 `tests/fixtures/owner-wait/`, and the plugin version the repo's release procedure bumps.
 
 Done when:
 
-1. `export` of `tests/fixtures/ledger-export/current.md`, which carries section 1's filled example,
-   prints `structured: true` and section 2's sample; `bare.md`, `legacy-ru.md`, `real-shaped.md` and
+1. `export` of `tests/fixtures/ledger-export/current.md`, which carries section 1's filled example
+   and the subtask ids `R1` and `D1`, prints a `current_checkpoint` equal to section 2's complete
+   JSON; `bare.md`, `legacy-ru.md`, `real-shaped.md` and
    a free-text-checkpoint fixture export with `structured: false`, `waiting_on: []`, and `text`,
    `time`, `background_waits`, `archive_after_handover` equal to 0.16.0's output. Tests assert both.
 2. A repeated `doing:` gives the first value and the warning; a `waiting on:` without `for:` or
@@ -552,11 +589,14 @@ Done when:
    and exits 0. A test each.
 3. `check` on `tests/fixtures/owner-wait/us26-free-text.md` lists the free-text owner line and, on a
    ledger with `waiting on: owner` and no `ask:`, that wait, under `errors` in its JSON, and exits
-   0; on the fixed ledger `errors` is empty. Tests assert it.
-4. `owner-wait-stop.py`, tested with fixtures: the us26 ledger plus a transcript whose last message
-   ends in a ```` ```ui ```` fence with `Buttons` → prints `{"decision": "block", …}` naming the
-   ledger line; the same input with `stop_hook_active: true` → no output; the fixed ledger → no
-   output; a transcript that never loaded the orchestrate skill → no output, exit 0.
+   0; on the fixed ledger `errors` is empty; section 1's example with its owner ask matches by the
+   Owner-wait match and gives no error. Tests assert it.
+4. `owner-wait-stop.py` (Q7, «Decided»), tested with fixtures: the us26 ledger plus a transcript
+   whose last message holds a ```` ```ui ```` fence with `Buttons` → prints `{"decision": "block", …}`
+   naming the ledger line; the same input with `stop_hook_active: true` → no output; the fixed
+   ledger → no output; the us26 ledger with `Status: closed` → no output; a ledger with 12
+   free-text lines → a reason naming 10 and «and 2 more»; a transcript that never loaded the
+   orchestrate skill → no output, exit 0.
 5. The skill text and `ledger.md` «Schema» show the block in the contract's key order; §6 step 4
    says to rewrite it, `updated:` included, in every event update; «What reaches the owner» carries
    section 6's rule and closing line.
@@ -573,8 +613,9 @@ subscription), `test/`, `docs/genui-integration.md` (the one refresh sentence), 
 Done when:
 
 1. `node --test` cases in `test/view.test.ts` build `view.now` from: a structured block; a block
-   older than the orchestrator's last turn by more than `STALE_GRACE_MS` (stale) and by less (not
-   stale); a free-text checkpoint (`source: "text"`); an export without `structured` (`source:
+   whose `updated` precedes `lastTurnStartedAt` by more than `STALE_GRACE_MS` (stale) and by less
+   (not stale); a block written early in a turn that then ran 15 minutes (not stale); `null`
+   activity, falling back to `latestAttentionAt`; a free-text checkpoint (`source: "text"`); an export without `structured` (`source:
    "none"`); no sidebar entry (`state: "unknown"`); a running orchestrator with an activity
    (`activity` = step and age) and with `null` activity (no step, no error).
 2. `test/ledger.test.ts` reads section 2's sample into `LedgerSummary.now` and an old v1 export into
@@ -583,10 +624,14 @@ Done when:
    check resumes in thr_bjp39sjv29` is an ask with `format: "free text"` and puts the orchestration in
    `needs`; `Waiting: owner merge of kartollikaa/bb-plugins#12` and `Nothing lands until you approve
    the DB migration` become asks (lines 39–40 change); `note: …`, `answered …`, `Q (answered …): …`,
-   `Nothing waiting …` and `Nothing waits on owner input.` stay notes; a view case with notes only, an
-   idle orchestrator and a last report ending `Waiting on you: connect the Pixel` gives
-   `now.mismatch: true`, and the same report while the orchestrator runs, or ending `Nothing waits on
-   you.`, gives `false`.
+   `Nothing waiting …` and `Nothing waits on owner input.` stay notes; `ask:  | why: …` (no title)
+   stays a note (`test/owner.test.ts:44-46`); the us26 line on a `closed` ledger is a note with
+   `freeText: true` and the view's state is not `needs`; an active ledger with six free-text lines
+   gives the result of Q8's answer. A view case with notes only, an idle orchestrator and a last
+   report ending `Waiting on you: connect the Pixel` gives `now.mismatch: true`; the same report
+   while the orchestrator runs, or ending `Nothing waits on you.`, gives `false`; a `waiting on:
+   owner | for: «Merge the orchestrate plugin PR (I1) …»` line and the matching ask give one «You»
+   row, not two.
 3. `test/activity.test.ts`: an open `item/started` gives the step and `stepStartedAt`; its
    `item/completed` clears it; `turn/completed` clears open steps; a nested turn's completion does
    not end the outer turn; a background `progress` without `completed` is listed; a second read asks
@@ -594,7 +639,9 @@ Done when:
    in the fold map invalidates `activity:<id>` once within 2 s; for another thread, nothing.
 4. A `working` row whose last output starts with a `REPORT_HEADER` line shows only the gist; a
    `working — <note>` status cell shows the note; a running subtask with an activity shows its step
-   and age. `npm test`, `npm run typecheck` and `bb plugin build` pass in `plugins/orchestration`.
+   and age; a subtask with no name and no delivery shows its thread title without ` · <id>`, and
+   with nothing at all its id, never `""`; the tab variant renders both folds and `Blocked by`.
+   `npm test`, `npm run typecheck` and `bb plugin build` pass in `plugins/orchestration`.
 5. After landing, in the running bb: the Right now block on this orchestration's view
    (`thr_yc4bw8qaah`) shows a running step while the orchestrator works, and one free-text ledger
    shows its fallback; else an owner check with the exact steps, marked unverified (AGENTS.md «Done
@@ -620,10 +667,22 @@ matches:
 | 2 | starts with `answered` or `Q (answered …):` | note: a record of an answer |
 | 3 | starts with `ask (draft):` | note: not yet asked |
 | 4 | starts with `Nothing waiting`, `Nothing waits`, `Nothing for the owner`, `Quiet:` or `Ничего не ждёт` (case-insensitive) | note: says nothing waits |
-| 5 | matches `ASK_PREFIX` | ask with `format: "ask"`, parsed as today |
-| 6 | anything else | ask with `format: "free text"`; the title is the line as written |
+| 5 | matches `ASK_PREFIX` | ask with `format: "ask"`, parsed as today; with an empty title (`parseAsk` returns `null`) a note, as today (`test/owner.test.ts:44-46`) |
+| 6 | anything else, on a ledger whose `status` is not `closed` | ask with `format: "free text"`; the title is the line as written |
+| 7 | anything else, on a `closed` ledger | note with `freeText: true`: shown with the «written as free text» chip, never «needs you» |
 
-`OwnerItem`'s ask variant gains `format: "ask" | "free text"`. A free-text ask renders as an ask
+`OwnerItem`'s ask variant gains `format: "ask" | "free text"` and its note variant an optional
+`freeText: true`; `parseOwnerItem` takes the ledger status as a second argument. Rule 7 is the
+orchestrator's refinement (message #23): a finished orchestration waits on nobody, and RV-D1's
+survey showed closed ledgers with up to 168 free-text lines. The survey, rerun for this section
+(rules 1–7 applied to each ledger's `for_the_owner` from `orchestration_ledger.py export` of
+0.16.0, 57 ledgers): 37 ledgers have free-text lines, 24 of them `closed`, 12 `active`, one
+`complete`. The largest: `prototype-motion` active 591, `cozy-redesign` closed 168, `qa-agent-wave2`
+active 36, `withdrawal-confirmation-methods` closed 17, `main-v4-us2-showcase` active 13,
+`core-set-v1` active 9. `complete` is not `closed` in the export, so `redesign-follow-ups` (one line)
+follows rule 6. How an active ledger with hundreds of such lines shows is Q8.
+
+A free-text ask renders as an ask
 card with a muted chip «written as free text», counts towards «needs you» and the tab count, gets
 a «You» row in Waits on, and is answered like any ask. This reverses the rule of
 `test/owner.test.ts:36-41` (from the README's «The dialog keep showing even when i answered»):
@@ -636,10 +695,11 @@ happen again».
 - the orchestrator is not running (`BUSY`) and not asking (`hasPendingInteraction`, which already
   shows as a thread ask): an owner's reply would start a turn, so idle means unanswered;
 - no open ask of either format;
-- and one of: the last non-empty line of `lastReport` starts with `Waiting on you:` or `Ждёт
-  тебя:`; `lastReport` holds a ```` ```ui ```` fence whose body names `Form`, `Button`, `Buttons` or
-  `Select` (`docs/genui-integration.md` names `Form`; I2 checks the others against the installed
-  GenUI catalog); the block has a `waiting on: owner` line.
+- and one of: `lastReport` ends with the `Waiting on you:` closing line, detected as the contract
+  table says; `lastReport` holds a ```` ```ui ```` fence with one of the contract's interactive
+  GenUI names (`docs/genui-integration.md` names `Form`; I2 checks the others against the installed
+  GenUI catalog, and a change to the list changes the contract for both slices); the block has a
+  `waiting on: owner` line.
 
 Then the Now tab's attention list opens with a needs-you card «The orchestrator asked you in its
 last message, but its ledger records no ask», with «Full last report» and «Open chat», and Waits on
@@ -659,23 +719,38 @@ Rule text for SKILL.md §6 «What reaches the owner» and `ledger.md` «For the 
 > <ask titles, «; »-separated>` or `Nothing waits on you.`
 
 `check`: its JSON gains `errors` (a list of strings) for free-text owner lines and for a `waiting
-on: owner` line no `ask:` matches; it still exits 0, so every helper mutation keeps its «warnings,
+on: owner` line no `ask:` matches by the contract's Owner-wait match; it still exits 0, so every helper mutation keeps its «warnings,
 exit 0» contract (`orchestration_ledger.py`; exit 1 stays «unreadable»).
 
-**Stop hook.** `hooks/hooks.json` gains `"Stop": [{"hooks": [{"type": "command", "command":
+**Stop hook** (the owner's answer to Q7, «Decided»: stop the turn once). `hooks/hooks.json` gains `"Stop": [{"hooks": [{"type": "command", "command":
 "command -v python3 >/dev/null 2>&1 || exit 0; python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/owner-wait-stop.py\""}]}]`.
 The script:
 
 1. reads the hook input; exits 0 with no output when `stop_hook_active` is true, so it blocks a
    turn at most once;
 2. finds the session's ledger with `scan()` from `compact-reminder.py` (skill invocation and the
-   ledgers this session wrote); none → exit 0, so non-orchestrator sessions pay one transcript scan;
-3. blocks when the ledger has a free-text «For the owner» line, or a `waiting on: owner` line
-   without a matching `ask:`, or the transcript's last assistant message ends with `Waiting on you:`
-   or holds an interactive ```` ```ui ```` fence while the ledger has no open `ask:`. It prints
-   `{"decision": "block", "reason": "<ledger path>: <each offending line or message>; write each wait
-   on the owner as an `ask:` line, then end the turn"}`;
+   ledgers this session wrote); none, or a ledger whose status is `closed` → exit 0, so
+   non-orchestrator sessions pay one transcript scan;
+3. blocks when the ledger has a free-text «For the owner» line, or a `waiting on: owner` line that
+   no `ask:` matches (contract: Owner-wait match), or the transcript's last assistant message ends
+   with the `Waiting on you:` closing line or holds an interactive ```` ```ui ```` fence (both
+   detected as the contract table says) while the ledger has no open `ask:`. It prints
+   `{"decision": "block", "reason": "<ledger path>: <offending lines, at most 10, then «and N
+   more»>; write each wait on the owner as an `ask:` line and every other line as a `note:` line,
+   then end the turn"}`;
 4. any read or parse error → exit 0, no output: the hook never traps a session.
+
+**A resumed active ledger with many free-text lines** (`qa-agent-wave2`, 36; `prototype-motion`,
+591). The hook does not run on ledgers nobody resumes: it needs a session that loaded the skill and
+wrote the ledger. When an orchestrator resumes one, its first turn that ends is stopped once with
+the first ten lines and the count. The rule text tells it what to do with them, which is the
+migration the skill's «Old vocabulary» already applies on the next update: a line that still waits
+on the owner becomes an `ask:`, a current fact a `note:`, and history moves to Brief or history
+(`ledger.md` «Overall state and brief»). If the turn ends without finishing, `stop_hook_active`
+lets it stop; the next turn is stopped once again until the section is clean. The owner sees one
+extra continuation of the orchestrator's turn per unfinished migration, which is what Q7's answer
+chose; nothing else changes for them, so this raises no new question. Until the migration, the view
+shows those lines by rule 6 or Q8's answer.
 
 Rejected: a `PostToolUse` check (runs on every tool call and cannot tell the turn's end); making
 `check` fail (breaks the exit-0 contract the helpers rely on); the view rule alone (it reveals the
@@ -702,6 +777,9 @@ regression case (I1 Done when 3–4, I2 Done when 2).
   with a truly running Agent call.
 - Turn-end enforcement on hosts without Stop hooks; there the rule text, `check` and the view rule
   apply.
+- Enforcing N2 (the block rewritten in every event update): the Stop hook does not check that
+  `updated:` moved in the turn, because a turn without an event need not rewrite it. A skipped
+  update shows only as the view's «the orchestrator has run since» mark (N6).
 - Release of `orchestration` (unpublished, `docs/publication.md`) and the update of the installed
   orchestrate plugin (the owner's, per the ledger's «For the owner»).
 
@@ -733,6 +811,22 @@ option; the owner's words follow each one:
   Decided by the owner on 2026-11-16 (message #21): «Stop the turn once». Rejected: no hook, and
   blocking on every stop.
 
+
+Decided by the orchestrator on RV-D1's review (message #23):
+
+- **Free-text lines on a closed ledger are notes** with the «free text» flag and never make the
+  view «needs you»; on an active ledger they stay waits (section 6 a, rule 7).
+- **Staleness is anchored to the last turn's start**, keeping the owner's 10 minutes (section 3,
+  «Age and staleness»): an implementation choice under Q3's answer.
+
 ## Open questions for the owner
 
-None.
+- **Q8. An active ledger with many free-text «For the owner» lines** (survey in section 6 a:
+  `prototype-motion` 591, `qa-agent-wave2` 36, `main-v4-us2-showcase` 13). A: up to five such
+  lines each get their own ask card; from six on they show as one ask card «N lines in «For the
+  owner» are written as free text — the orchestrator should rewrite them», with the lines folded
+  under it, counting as one in «needs you» (recommended: the wait stays visible, and the owner
+  is not handed hundreds of cards that are mostly old status notes). B: one ask card per line, as
+  rule 6 reads today (`prototype-motion` would show 591 cards until its orchestrator rewrites
+  them). Neither option blocks I1; in I2 it decides one test case (Done when 2) and one branch in
+  `buildView`.
