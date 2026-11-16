@@ -7,8 +7,8 @@ export interface Link {
 }
 
 export type OwnerItem =
-  | { kind: "ask"; title: string; why: string | null; links: Link[]; threads: string[]; options: string[] }
-  | { kind: "note"; text: string };
+  | { kind: "ask"; format: "ask" | "free text"; title: string; why: string | null; links: Link[]; threads: string[]; options: string[] }
+  | { kind: "note"; text: string; freeText?: true };
 
 const URL = /https?:\/\/[^\s<>()|]+[^\s<>()|.,;:!?'"»]/g;
 const GITHUB_REF = /(?<![\w./-])([A-Za-z0-9][\w.-]*)\/([\w.-]+)#(\d+)\b/g;
@@ -58,6 +58,7 @@ function parseAsk(text: string): OwnerItem | null {
   const all = (...keys: string[]) => fields.filter(([k]) => keys.includes(k)).map(([, v]) => v);
   return {
     kind: "ask",
+    format: "ask",
     title,
     why: all("why").join(" ") || null,
     links: linksIn(all("link", "links").join(" ")),
@@ -66,9 +67,19 @@ function parseAsk(text: string): OwnerItem | null {
   };
 }
 
-/** The ledger schema has only `ask:` and `note:`; besides the hand-written `Q:` forms, any other line («answered …», «Nothing waiting») is a note. */
-export function parseOwnerItem(raw: string): OwnerItem {
+/** Lines that are a record or say that nothing waits: never a wait on the owner. */
+const NOT_A_WAIT = /^(?:note:|answered\b|q\s*\(answered\b[^)]*\)\s*:|ask\s*\(draft\)\s*:|nothing\s+(?:waiting|waits|for\s+the\s+owner)|quiet:|ничего\s+не\s+ждёт)/i;
+
+/**
+ * The ledger schema has only `ask:` and `note:`. Besides the hand-written `Q:` forms, a line that is no record and does not say
+ * that nothing waits is a wait on the owner written as free text, unless the ledger is closed.
+ */
+export function parseOwnerItem(raw: string, ledgerStatus: string | null = null): OwnerItem {
   const text = raw.trim();
-  const ask = ASK_PREFIX.test(text) ? parseAsk(text) : null;
-  return ask ?? { kind: "note", text: text.replace(/^note:\s*/i, "") };
+  const note = (): OwnerItem => ({ kind: "note", text: text.replace(/^note:\s*/i, "") });
+  if (NOT_A_WAIT.test(text)) return note();
+  if (ASK_PREFIX.test(text)) return parseAsk(text) ?? note();
+  if (!text) return note();
+  if (ledgerStatus === "closed") return { kind: "note", text, freeText: true };
+  return { kind: "ask", format: "free text", title: text, why: null, links: linksIn(text), threads: threadsIn(text), options: [] };
 }

@@ -58,10 +58,10 @@ export function sameLines(a: Observation | null, b: Observation): boolean {
 }
 
 /** A title on two lines takes the newer line. */
-export function askFirstSeen(lines: readonly string[], firstSeen: Record<string, number>): Record<string, number> {
+export function askFirstSeen(lines: readonly string[], firstSeen: Record<string, number>, ledgerStatus: string | null = null): Record<string, number> {
   const byTitle: Record<string, number> = {};
   for (const line of lines) {
-    const item = parseOwnerItem(line);
+    const item = parseOwnerItem(line, ledgerStatus);
     if (item.kind === "ask") byTitle[item.title] = Math.max(byTitle[item.title] ?? 0, firstSeen[line] ?? 0);
   }
   return byTitle;

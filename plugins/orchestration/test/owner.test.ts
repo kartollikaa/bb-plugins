@@ -6,6 +6,7 @@ test("a structured ask names what is asked, why, its links, its thread and its q
   const item = parseOwnerItem("ask: Merge kartollika-ai-hub#38 | why: S5 passed review and checks | link: https://github.com/kartollikaa/kartollika-ai-hub/pull/38 | thread: thr_abc123 | options: Go as you recommend / Not now");
   assert.deepEqual(item, {
     kind: "ask",
+    format: "ask",
     title: "Merge kartollika-ai-hub#38",
     why: "S5 passed review and checks",
     links: [{ label: "kartollika-ai-hub#38", title: "kartollikaa/kartollika-ai-hub#38", href: "https://github.com/kartollikaa/kartollika-ai-hub/pull/38" }],
@@ -33,12 +34,32 @@ test("a note, and a «Nothing waiting» status line, never need the owner", () =
   assert.equal(parseOwnerItem("Nothing waits on owner input.").kind, "note");
 });
 
-test("only `ask:` makes an ask: an «answered …» record or any other line is a note", () => {
+const US26 = "connect Pixel 9a (5C111JEBF10513) via USB/wireless debugging, app signed in on drma-dy → device check resumes in thr_bjp39sjv29";
+
+test("an «answered …» record and a «Nothing waiting» line are notes; a line that states a wait is an ask", () => {
   const answered = "answered 2026-11-14: Remove orchestration bits from thread-tree? → «keep both (recommended)»";
   assert.deepEqual(parseOwnerItem(answered), { kind: "note", text: answered });
-  assert.equal(parseOwnerItem("Waiting: owner merge of kartollikaa/bb-plugins#12").kind, "note");
-  assert.equal(parseOwnerItem("Nothing lands until you approve the DB migration").kind, "note");
+  assert.equal(parseOwnerItem("Q (answered 2026-11-14): accept boards → yes").kind, "note");
+  assert.equal(parseOwnerItem("Nothing waiting. (#38 merged.)").kind, "note");
+  assert.equal(parseOwnerItem("Nothing waits on owner input.").kind, "note");
+  assert.equal(parseOwnerItem("Waiting: owner merge of kartollikaa/bb-plugins#12").kind, "ask");
+  assert.equal(parseOwnerItem("Nothing lands until you approve the DB migration").kind, "ask");
   assert.equal(parseOwnerItem("ask: Approve the migration").kind, "ask", "positive control: a real ask still parses");
+});
+
+test("the us26 line is an ask in free text, with its thread, on an active ledger", () => {
+  const item = parseOwnerItem(US26, "active");
+  assert.equal(item.kind, "ask");
+  if (item.kind !== "ask") return;
+  assert.equal(item.format, "free text");
+  assert.equal(item.title, US26);
+  assert.deepEqual(item.threads, ["thr_bjp39sjv29"]);
+});
+
+test("on a closed ledger a free-text line is a note flagged as free text", () => {
+  assert.deepEqual(parseOwnerItem(US26, "closed"), { kind: "note", text: US26, freeText: true });
+  assert.equal(parseOwnerItem("note: done", "closed").kind, "note");
+  assert.equal(parseOwnerItem("ask: Merge it", "closed").kind, "ask", "a formatted ask is still an ask");
 });
 
 test("an ask without a title is a note", () => {
@@ -77,10 +98,11 @@ test("a hand-written `Q:` / `Q (asked …):` / `question:` line is an ask, its d
   const q = parseOwnerItem("Q: Merge #12? | options: Yes / No");
   assert.equal(q.kind === "ask" && q.title, "Merge #12?");
   assert.deepEqual(q.kind === "ask" && q.options, ["Yes", "No"]);
-  for (const record of ["Q (answered 2026-11-14): accept boards → yes", "Q4: release shipped", "ask (draft): later", "Q&A: none"]) {
+  for (const record of ["Q (answered 2026-11-14): accept boards → yes", "ask (draft): later"]) {
     assert.equal(parseOwnerItem(record).kind, "note", record);
   }
   assert.equal(parseOwnerItem("Question: Keep both?").kind, "ask");
   assert.equal(parseOwnerItem("Quiet: nothing runs").kind, "note");
+  assert.equal(parseOwnerItem("Ничего не ждёт.").kind, "note");
   assert.equal(parseOwnerItem("Q: ").kind, "note");
 });

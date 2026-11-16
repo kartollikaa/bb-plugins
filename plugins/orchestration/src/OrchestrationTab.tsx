@@ -224,9 +224,24 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
       <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
         <Dot kind="you" />
         <b className="min-w-0 truncate font-medium text-foreground">{ask.who}</b>
+        {ask.freeText && <span className="shrink-0 rounded-full border border-border px-1.5 text-[11px] leading-[16px]">written as free text</span>}
         {ask.age && <span className="ml-auto shrink-0 tabular-nums">{ask.age === "now" ? "just now" : `${ask.age} ago`}</span>}
       </div>
       {ask.title && <p className="m-0 text-sm font-semibold leading-[1.4] [overflow-wrap:anywhere]">{ask.title}</p>}
+      {ask.group && (
+        <details>
+          <summary className="cursor-pointer text-xs font-medium">Show the {ask.group.length} lines</summary>
+          <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
+            {ask.group.map((line) => (
+              <li key={line.key} className="flex flex-col gap-1 border-t border-[color-mix(in_oklab,var(--attention)_25%,transparent)] pt-2 text-sm [overflow-wrap:anywhere]">
+                <span>{line.subtask ? <b className="mr-1.5 font-medium">{line.subtask}</b> : null}{line.title}</span>
+                {line.answered ? <span role="status" className="text-xs text-muted-foreground">{answeredStatus(line.answered, Date.now())}</span>
+                  : line.drafts && <span><Button variant="quiet" onClick={() => actions.fill(askIdentity(line), line.drafts!.primary)}>Answer</Button></span>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {ask.text && (
         <Expandable>
           <Markdown content={ask.text} className={cx("text-sm leading-[1.45]", ask.title && "text-muted-foreground")} />

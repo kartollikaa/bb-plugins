@@ -11,6 +11,8 @@ export { shortAge };
 /** Owner's rule: quiet this long while working, or the third failure of a delivery, means stuck. */
 export const QUIET_MS = 30 * 60_000;
 export const FAILURES_STUCK = 3;
+/** From this many free-text «For the owner» lines on an active ledger they fold into one card. */
+export const FREE_TEXT_GROUP_FROM = 6;
 
 export type RowKind = "you" | "stuck" | "work" | "wait" | "done";
 
@@ -60,6 +62,10 @@ export interface Ask {
   kind: "question" | "decision" | "owner" | "thread";
   drafts: { primary: string; secondary?: string } | null;
   answered: Answer | null;
+  /** The line is a wait on the owner written as free text instead of `ask:`. */
+  freeText?: boolean;
+  /** A grouped card: the free-text lines folded under it, each its own ask with its own answer. */
+  group?: Ask[];
 }
 
 export interface RecapLine {
@@ -86,7 +92,7 @@ export interface View {
   done: Row[];
   /** Row or ask key → the bb thread its Open thread button opens. */
   threadIds: Record<string, string>;
-  history: { sessions: string; handover: string | null; ledger: string; warnings: string[]; notes: string[] };
+  history: { sessions: string; handover: string | null; ledger: string; warnings: string[]; notes: string[]; freeTextNotes: string[] };
 }
 
 export interface ViewInput {
@@ -366,23 +372,36 @@ export function buildView(input: ViewInput): View {
     });
   }
   const notes: string[] = [];
+  const freeTextNotes: string[] = [];
+  const freeAsks: Ask[] = [];
   const byId = new Map(subtasks.map((s) => [s.id, s]));
   ledger.forTheOwner.forEach((line, i) => {
-    const item = parseOwnerItem(line);
+    const item = parseOwnerItem(line, ledger.status);
     if (item.kind === "note") {
-      notes.push(item.text);
+      (item.freeText ? freeTextNotes : notes).push(item.text);
       return;
     }
     const named = subtaskNamed(item.title, byId) ?? subtaskByThread(item.threads, subtasks, item.title);
     const who = named ? `${named.subtask.id}${named.subtask.name ? ` · ${named.subtask.name}` : ""}` : "For you, from the ledger";
     const threads = named?.subtask.threadId && !item.threads.includes(named.subtask.threadId) ? [...item.threads, named.subtask.threadId] : item.threads;
-    allAsks.push({
+    const ask: Ask = {
       key: `owner-${i}`, who, subtask: named?.subtask.id ?? null, since: null, age: "", kind: "owner", links: item.links, threads,
       title: named?.rest ?? item.title, replyTitle: item.title, text: item.why ?? "", drafts: { primary: replyPrefix(item.title) },
       replies: item.options.map((label) => ({ label, draft: replyDraft(item.title, label) })),
       answered: input.answered?.[item.title] ?? null,
-    });
+      ...(item.format === "free text" ? { freeText: true } : {}),
+    };
+    (item.format === "free text" ? freeAsks : allAsks).push(ask);
   });
+  if (freeAsks.length >= FREE_TEXT_GROUP_FROM) {
+    const answers = freeAsks.flatMap((a) => (a.answered ? [a.answered] : []));
+    allAsks.push({
+      key: "owner-free-text", who: "For you, from the ledger", subtask: null, since: null, age: "", kind: "owner", links: [], threads: [],
+      title: `${freeAsks.length} lines in «For the owner» are written as free text — the orchestrator should rewrite them`,
+      replyTitle: null, text: "", drafts: null, replies: [], freeText: true, group: freeAsks,
+      answered: answers.length === freeAsks.length ? answers.reduce((a, b) => (b.at > a.at ? b : a)) : null,
+    });
+  } else allAsks.push(...freeAsks);
   /** An open ledger line about a subtask is what the orchestrator needs from the owner for it. */
   const covered = new Set(allAsks.filter((a) => a.kind === "owner" && a.subtask && !a.answered).map((a) => a.subtask!));
   for (let i = allAsks.length - 1; i >= 0; i--) {
@@ -408,6 +427,7 @@ export function buildView(input: ViewInput): View {
     ledger: ledger.path,
     warnings: ledger.warnings,
     notes,
+    freeTextNotes,
   };
   const recap = { goal: ledger.goal, now: recapLine(ledger.checkpoint, now), last: recapLine(ledger.lastDecision, now) };
   const threadIds = Object.fromEntries(classified.flatMap((c) => (c.subtask.threadId ? [[c.subtask.id, c.subtask.threadId]] : [])));

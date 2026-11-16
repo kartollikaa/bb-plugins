@@ -155,7 +155,7 @@ export default async function plugin(bb: BbPluginApi) {
   );
 
   async function answersFor(threadId: string, ledger: LedgerSummary): Promise<{ answered: Record<string, Answer>; askFirstSeen: Record<string, number> }> {
-    const since = askFirstSeen(ledger.forTheOwner, await observeOwnerLines(ledger.path, ledger.forTheOwner));
+    const since = askFirstSeen(ledger.forTheOwner, await observeOwnerLines(ledger.path, ledger.forTheOwner), ledger.status);
     if (Object.keys(since).length === 0) return { answered: {}, askFirstSeen: since };
     return { answered: answeredAsks(since, await ownerMessages(threadId)), askFirstSeen: since };
   }

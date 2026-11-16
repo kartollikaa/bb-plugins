@@ -18,6 +18,7 @@ export function Brief({ ledger, view, report, threadId, workspace }: { ledger: L
           {view.done.length === ledger.subtasks.length && <p className="m-0 text-muted-foreground">{ledger.status === "closed" ? "No remaining tasks recorded." : "Orchestrator closure remains unrecorded."}</p>}
         </div>
       </>}
+      {view.history.freeTextNotes.length > 0 && <div className="text-muted-foreground">{view.history.freeTextNotes.map((note, i) => <p key={i} className="m-0 [overflow-wrap:anywhere]">{note} <span className="rounded-full border border-border px-1.5 text-[11px]">written as free text</span></p>)}</div>}
       {view.history.notes.length > 0 && <div className="text-muted-foreground">{view.history.notes.map((note, i) => <p key={i} className="m-0 [overflow-wrap:anywhere]">{note}</p>)}</div>}
       {report && <details>
         <summary className="cursor-pointer text-xs font-medium">Latest orchestrator report</summary>

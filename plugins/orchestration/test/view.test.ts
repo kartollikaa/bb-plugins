@@ -255,12 +255,12 @@ test("an answered ledger ask stops needing you at once and waits on the orchestr
   assert.equal(at({ "Another ask": { answer: "x", at: NOW } }).asks.length, 1, "an answer to another title changes nothing");
 });
 
-test("a «For the owner» line that is not `ask:` is a note, never a card", () => {
+test("an answered record is a note, never a card; a line that states a wait is a card", () => {
   const answered = "answered 2026-11-14: Remove orchestration bits from thread-tree? → «keep both (recommended)»";
   const v = view([subtask("S2", "landed")], {}, {}, { forTheOwner: [answered, "Waiting: owner merge of kartollikaa/bb-plugins#12"] });
-  assert.deepEqual(v.asks, []);
-  assert.notEqual(v.heading, "One thing waits on you");
-  assert.deepEqual(v.history.notes, [answered, "Waiting: owner merge of kartollikaa/bb-plugins#12"]);
+  assert.equal(v.asks.length, 1);
+  assert.equal(v.asks[0]!.freeText, true);
+  assert.deepEqual(v.history.notes, [answered]);
   assert.equal(view([], {}, {}, { forTheOwner: [`ask: ${answered}`] }).asks.length, 1, "positive control: the same text as an ask is a card");
 });
 
@@ -467,4 +467,43 @@ test("a hand-written `Q (asked …):` line needs you, and the owner's `Re «titl
   const answered = answeredAsks(since, [{ text: `Re «${ask.title}»: Accept all four`, at: NOW - MIN }]);
   assert.deepEqual(at(answered).asks, []);
   assert.deepEqual(answeredAsks(since, [{ text: `Re «${ask.title}»: Accept all four`, at: NOW - 20 * MIN }]), {}, "an answer from before the ask doesn't close it");
+});
+
+const FREE = (n: number) => Array.from({ length: n }, (_, i) => `Waiting: owner decision ${i + 1}`);
+
+test("the us26 free-text line on an active ledger needs you, on a closed ledger it does not", () => {
+  const line = "connect Pixel 9a (5C111JEBF10513) via USB/wireless debugging, app signed in on drma-dy → device check resumes in thr_bjp39sjv29";
+  const open = view([subtask("S1", "working")], { thr_s1: live(1) }, {}, { forTheOwner: [line] });
+  assert.equal(open.state, "needs");
+  assert.equal(open.asks.length, 1);
+  assert.equal(open.asks[0]!.freeText, true);
+  const closed = view([subtask("S1", "landed")], { thr_s1: live(1) }, {}, { forTheOwner: [line], status: "closed" });
+  assert.notEqual(closed.state, "needs");
+  assert.deepEqual(closed.history.freeTextNotes, [line]);
+});
+
+test("five free-text lines are five cards; six are one grouped card counted once", () => {
+  assert.equal(view([subtask("S1", "working")], { thr_s1: live(1) }, {}, { forTheOwner: FREE(5) }).asks.length, 5);
+  const v = view([subtask("S1", "working")], { thr_s1: live(1) }, {}, { forTheOwner: FREE(6) });
+  assert.equal(v.asks.length, 1);
+  assert.equal(v.asks[0]!.group?.length, 6);
+  assert.equal(v.heading, "One thing waits on you");
+});
+
+test("in a grouped card an answer marks its line; the card leaves needs-you only when all are answered", () => {
+  const lines = FREE(6);
+  const answers = (n: number) => Object.fromEntries(lines.slice(0, n).map((l) => [l, { answer: "ok", at: NOW }]));
+  const run = (n: number) => buildView({ ledger: ledger([subtask("S1", "working")], { forTheOwner: lines }), agents: {}, live: { thr_s1: live(1) }, orchestratorThreadId: "thr_orch", now: NOW, answered: answers(n) });
+  const some = run(5);
+  assert.equal(some.asks.length, 1);
+  assert.equal(some.asks[0]!.group!.filter((g) => g.answered).length, 5);
+  const all = run(6);
+  assert.equal(all.asks.length, 0);
+  assert.equal(all.answered.length, 1);
+});
+
+test("a `T2: …` free-text line keeps its label inside the group", () => {
+  const lines = [...FREE(5), "S1: pick the colour"];
+  const v = view([subtask("S1", "working")], { thr_s1: live(1) }, {}, { forTheOwner: lines });
+  assert.equal(v.asks[0]!.group!.at(-1)!.subtask, "S1");
 });
