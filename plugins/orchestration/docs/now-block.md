@@ -441,7 +441,8 @@ export interface NowView {
   1. while its turn runs: the live step with its age (`Running npm test · 40s`), else `Turn
      running 4m` (section 4);
   2. for `working`, `briefed` and `blocked`: the status note after the status word when the
-     ledger has one (`statusNote`, already in `view.ts`);
+     ledger has one (`statusNote`, already in `view.ts`), unless the row's name already is that
+     note (no name and no delivery), so the note never shows twice; then the next case applies;
   3. for `working`: the report gist, the `<gist>` of a last-output first line matching
      `REPORT_HEADER` (section 5), so the bracketed header no longer shows; otherwise `firstLine` of
      the output as today;
@@ -631,7 +632,9 @@ Done when:
    stays a note (`test/owner.test.ts:44-46`); the us26 line on a `closed` ledger is a note with
    `freeText: true` and the view's state is not `needs`; on an active ledger five free-text lines
    give five ask cards, and six give one grouped ask card with the six lines folded under it,
-   counted once in «needs you» (Q8). A view case with notes only, an idle orchestrator and a last
+   counted once in «needs you» (Q8); in that group a `Re «<line>»: …` reply marks only that line
+   answered, the card leaves «needs you» only when all six are answered, and a `T2: …` free-text
+   line is folded in it with its `T2` label. A view case with notes only, an idle orchestrator and a last
    report ending `Waiting on you: connect the Pixel` gives `now.mismatch: true`; the same report
    while the orchestrator runs, or ending `Nothing waits on you.`, gives `false`; a `waiting on:
    owner | for: «Merge the orchestrate plugin PR (I1) …»` line and the matching ask give one «You»
@@ -645,7 +648,7 @@ Done when:
    `working — <note>` status cell shows the note; a running subtask with an activity shows its step
    and age; a subtask with no name shows its delivery, and one titled `cozy-redesign · T3` with
    delivery `PR #41` shows `PR #41`, not `cozy-redesign`; with no name and no delivery its status
-   note, and with nothing at all its id, never `""`; the tab variant renders both folds and
+   note, which its Step then does not repeat, and with nothing at all its id, never `""`; the tab variant renders both folds and
    `Blocked by`.
    `npm test`, `npm run typecheck` and `bb plugin build` pass in `plugins/orchestration`.
 5. After landing, in the running bb: the Right now block on this orchestration's view
@@ -691,6 +694,25 @@ ask card instead of one each (Q8, «Decided»): «N lines in «For the owner» a
 the orchestrator should rewrite them», with the lines folded under it, counted once in «needs you»
 and as one «You» row in Waits on. Up to five, each is its own card. Formatted `ask:` lines are never
 grouped.
+
+How the grouped card works (implementation choices under Q8's answer):
+
+- **Answered per line.** Each folded line stays its own ask with its own title, the line as
+  written, so `askFirstSeen`, `answeredAsks` and `input.answered[title]` (`src/answered.ts:61-91`)
+  work unchanged. Each folded line has its own reply draft `Re «<line>»: ` and shows its answered
+  status once `input.answered` has its title. The card's heading is display only and is never a
+  reply key: it carries the count N, which changes as the orchestrator rewrites lines, so an
+  answer keyed to it would be lost. Basis: the orchestrator has to act on each line separately,
+  and per-line keys reuse the existing answered matching without a new key scheme.
+- **Marked answered as a whole** when every folded line is answered: it then leaves «needs you»
+  and shows as one grouped answered card. Until then it stays one ask card counted once, with the
+  answered lines marked inside the fold.
+- **Six or more is counted over all free-text asks** of the active ledger, answered or not, so the
+  card does not split back into single cards while the owner answers its lines.
+- **Lines naming a subtask (`T2: …`) are grouped too**, keeping their subtask label (`who`) and
+  thread links inside the fold, as a single card would. Basis: grouping is about the line's format,
+  not its subject; leaving `T2:` lines out would let a ledger like `prototype-motion` still put
+  hundreds of cards on screen.
 
 A free-text ask renders as an ask
 card with a muted chip «written as free text», counts towards «needs you» and the tab count, gets
@@ -820,7 +842,12 @@ option; the owner's words follow each one:
   block the turn once with the reason, never while `stop_hook_active` (section 6 b, «Stop hook»).
   Decided by the owner on 2026-11-16 (message #21): «Stop the turn once». Rejected: no hook, and
   blocking on every stop.
-
+- **Q8. An active ledger with many free-text «For the owner» lines** → A: up to five such lines
+  each get their own ask card; from six on they show as one grouped ask card with the lines folded
+  under it, counted once in «needs you» (section 6 a; I2 Done when 2). Decided by the owner on
+  2026-11-16 (message #29): «Up to 5 cards, from 6 on one folded card counted once». Rejected: one
+  card per line (`prototype-motion` would show 591). How the grouped card is answered and that
+  `T2: …` lines are grouped too are implementation choices under this answer (section 6 a).
 
 Decided by the orchestrator on RV-D1's review (message #23):
 
@@ -828,12 +855,6 @@ Decided by the orchestrator on RV-D1's review (message #23):
   view «needs you»; on an active ledger they stay waits (section 6 a, rule 7).
 - **Staleness is anchored to the last turn's start**, keeping the owner's 10 minutes (section 3,
   «Age and staleness»): an implementation choice under Q3's answer.
-
-- **Q8. An active ledger with many free-text «For the owner» lines** → A: up to five such lines
-  each get their own ask card; from six on they show as one grouped ask card with the lines folded
-  under it, counted once in «needs you» (section 6 a; I2 Done when 2). Decided by the owner on
-  2026-11-16 (message #29): «Up to 5 cards, from 6 on one folded card counted once». Rejected: one
-  card per line (`prototype-motion` would show 591).
 
 ## Open questions for the owner
 
