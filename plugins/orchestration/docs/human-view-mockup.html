@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orchestration view mockup</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1d1d1f; --muted: #6e6e73; --subtle: #8e8e93; --border: #e5e5ea;
+  --card: #fafafa; --accent: #f2f2f7; --attention: #d97706; --ok: #16a34a; --run: #1d1d1f; --link: #2563eb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161618; --fg: #f2f2f2; --muted: #a1a1a6; --subtle: #7c7c80; --border: #2c2c2e;
+    --card: #1c1c1e; --accent: #2c2c2e; --attention: #f59e0b; --ok: #22c55e; --run: #f2f2f2; --link: #60a5fa;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161618; --fg: #f2f2f2; --muted: #a1a1a6; --subtle: #7c7c80; --border: #2c2c2e;
+  --card: #1c1c1e; --accent: #2c2c2e; --attention: #f59e0b; --ok: #22c55e; --run: #f2f2f2; --link: #60a5fa;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+.note { color: var(--muted); font-size: 13px; max-width: 680px; }
+.states { display: flex; gap: 6px; flex-wrap: wrap; margin: 16px 0 24px; }
+.states button { border: 1px solid var(--border); background: var(--bg); color: var(--muted); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 12px; cursor: pointer; }
+.states button[aria-pressed="true"] { background: var(--accent); color: var(--fg); font-weight: 600; }
+.stage { display: grid; grid-template-columns: minmax(0, 680px) 320px; gap: 32px; align-items: start; }
+@media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+.frame { border: 1px solid var(--border); border-radius: 12px; padding: 24px; min-width: 0; }
+.frame.tab { padding: 18px 16px; }
+.cap { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--subtle); margin: 0 0 8px; }
+h1 { font-size: 18px; margin: 0; letter-spacing: -.015em; }
+.goal { color: var(--muted); margin: 6px 0 0; }
+.status { display: flex; gap: 10px; align-items: baseline; margin: 18px 0 0; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.word { font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.dot.run { background: var(--run); animation: pulse 1.6s ease-in-out infinite; }
+.dot.need { background: var(--attention); }
+.dot.idle { border: 1.5px solid var(--subtle); }
+.dot.done { background: var(--ok); }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .dot.run { animation: none; } }
+.sentence { min-width: 0; }
+.sub { color: var(--muted); font-size: 13px; }
+section { margin-top: 20px; }
+h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--subtle); font-weight: 600; margin: 0 0 8px; }
+.row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; padding: 6px 0; align-items: baseline; }
+.row .role { color: var(--muted); }
+.row .right { color: var(--subtle); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row .step { grid-column: 2 / 4; color: var(--muted); font-size: 13px; margin-top: -2px; }
+.row .hint { grid-column: 2 / 4; color: var(--subtle); font-size: 12px; font-style: italic; }
+.mark { font-size: 12px; text-align: center; }
+.mark.ok { color: var(--ok); }
+.mark.part { color: var(--attention); }
+a, .linkish { color: var(--link); text-decoration: none; }
+.next { margin: 0; }
+.recent { display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 4px 12px; font-size: 13px; }
+.recent .t { color: var(--subtle); font-variant-numeric: tabular-nums; }
+details { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 12px; color: var(--muted); font-size: 13px; }
+summary { cursor: pointer; }
+details pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; background: var(--card); padding: 10px; border-radius: 8px; }
+.tabs { display: flex; gap: 4px; margin-top: 20px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.tabs span { padding: 5px 12px; border-radius: 6px; font-size: 12px; color: var(--muted); }
+.tabs span.on { background: var(--accent); color: var(--fg); font-weight: 500; }
+.card { border: 1px solid var(--attention); border-radius: 10px; padding: 12px 14px; background: var(--card); }
+.card .title { font-weight: 600; }
+.card .why { color: var(--muted); margin: 4px 0 10px; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { border: 1px solid var(--border); border-radius: 7px; padding: 5px 10px; font-size: 12px; background: var(--bg); color: var(--fg); }
+.btn.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.asked { color: var(--subtle); font-size: 12px; margin-top: 8px; }
+.fold { color: var(--muted); font-size: 13px; padding: 6px 0; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="cap">Mockup · plugins/orchestration/docs/human-view.md section 4</p>
+  <h1>Orchestration view, readable at a glance</h1>
+  <p class="note">This orchestration (orchestration-observability) drawn by the proposed layout. Static: nothing here reads a ledger. Pick a state; the page variant is on the left, the narrow Orchestration tab on the right.</p>
+  <div class="states" role="group" aria-label="State">
+    <button type="button" aria-pressed="true" data-state="rules">Now · ledger written by the rules (4.1)</button>
+    <button type="button" aria-pressed="false" data-state="asis">Now · ledger as it is (4.2)</button>
+    <button type="button" aria-pressed="false" data-state="needs">16:20 · needs you (4.3)</button>
+  </div>
+
+  <!-- 4.1 -->
+  <div class="stage" data-view="rules">
+    <div class="frame">
+      <h1>orchestration-observability</h1>
+      <p class="goal">Make the Orchestration view show what an orchestration is doing right now, and add a read-only Team roles plugin.</p>
+      <div class="status">
+        <span class="word"><span class="dot run"></span>In progress</span>
+        <div class="sentence">Design · Readable orchestration view: writing the design doc<div class="sub">6 of 7 parts done · nothing needs you</div></div>
+      </div>
+      <section>
+        <h2>Working now</h2>
+        <div class="row"><span class="dot run"></span><span><span class="role">Design ·</span> Readable orchestration view <span class="linkish">↗</span></span><span class="right">12 min</span><span class="step">Writing the design doc</span></div>
+        <div class="row"><span class="dot idle"></span><span><span class="role">Orchestrator ·</span> waiting for «Readable orchestration view»</span><span class="right">idle 12 min</span></div>
+      </section>
+      <section>
+        <h2>Next</h2>
+        <p class="next">When the design is ready, you confirm it; then it is built and reviewed.</p>
+      </section>
+      <section>
+        <h2>Plan · 6 of 7 done</h2>
+        <div class="row"><span class="dot run"></span><span><span class="role">Design ·</span> Readable orchestration view</span><span class="right">In progress · 12 min</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Research ·</span> Live activity in bb</span><span class="right">Done</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Design ·</span> «Right now» block</span><span class="right">Done</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Build ·</span> Ledger «Now» format (orchestrate plugin)</span><span class="right">Done</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Build ·</span> «Right now» block in the view</span><span class="right">Done</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Design ·</span> Team roles plugin</span><span class="right">Done</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Build ·</span> Team roles plugin</span><span class="right">Done · you checked it</span></div>
+      </section>
+      <section>
+        <h2>Recently</h2>
+        <div class="recent">
+          <span class="t">12 min</span><span>You asked for a view that reads at a glance; design started</span>
+          <span class="t">30 min</span><span>«Right now» block in the view landed and was installed</span>
+          <span class="t">1 h</span><span>Review approved the «Right now» block in the view</span>
+          <span class="t">1 h 30</span><span>You merged the orchestrate plugin update</span>
+        </div>
+      </section>
+      <details><summary>Details for debugging</summary>
+        <pre>Checkpoint as written
+- updated: 2026-11-16T15:13+03:00
+- doing: waiting for the readable-view design
+- waiting on: D3 | for: the design doc of a readable Orchestration view | since: 2026-11-16T15:01+03:00
+- next: when the design is ready, you confirm it; then it is built and reviewed
+- blocked by: none
+
+Ids: D3 Readable orchestration view · R1 · D1 · I1 · I2 · D2 · I3 · reviews RV-D1, RV-D2, RV-I1, RV-I2, RV-I3
+Orchestrator session 4 · Ledger ~/.claude/projects/…/orchestrate/orchestration-observability.md</pre>
+        <p>Full last report · Sessions and handovers · Export warnings</p>
+      </details>
+      <div class="tabs"><span class="on">Now</span><span>Work</span><span>Activity</span></div>
+    </div>
+    <div class="frame tab">
+      <p class="cap">Narrow tab</p>
+      <div class="status" style="margin-top:0">
+        <span class="word"><span class="dot run"></span>In progress</span>
+        <div class="sentence">Design · Readable orchestration view: writing the design doc<div class="sub">6 of 7 parts done · nothing needs you</div></div>
+      </div>
+      <section>
+        <div class="row"><span class="dot run"></span><span><span class="role">Design ·</span> Readable orchestration view <span class="linkish">↗</span></span><span class="right">12 min</span></div>
+        <div class="row"><span class="dot idle"></span><span><span class="role">Orchestrator ·</span> idle</span><span class="right">12 min</span></div>
+      </section>
+      <div class="fold">▸ Plan · 6 of 7 done</div>
+      <div class="fold">▸ Details</div>
+    </div>
+  </div>
+
+  <!-- 4.2 -->
+  <div class="stage" data-view="asis" hidden>
+    <div class="frame">
+      <h1>orchestration-observability</h1>
+      <p class="goal">Make the bb Orchestration view show what an orchestration is doing right now, backed by a structured «Now» ledger block, and add a read-only team-roles bb plugin.</p>
+      <div class="status">
+        <span class="word"><span class="dot run"></span>In progress</span>
+        <div class="sentence">Design · Design a human-readable Orchestration view: running<div class="sub">5 of 7 parts done · nothing needs you</div></div>
+      </div>
+      <section>
+        <h2>Working now</h2>
+        <div class="row"><span class="dot run"></span><span><span class="role">Design ·</span> Design a human-readable Orchestration view <span class="linkish">↗</span></span><span class="right">12 min</span></div>
+        <div class="row"><span class="dot idle"></span><span><span class="role">Orchestrator ·</span> idle</span><span class="right">12 min</span><span class="step">Last said: I've started a design subtask, «Design a human-readable Orchestration view», to make the Orchestration view readable at a glance.</span></div>
+      </section>
+      <section>
+        <h2>Plan · 5 of 7 done</h2>
+        <div class="row"><span class="dot run"></span><span><span class="role">Design ·</span> Design a human-readable Orchestration view</span><span class="right">In progress</span></div>
+        <div class="row"><span class="mark part">◐</span><span><span class="role">Build ·</span> Orchestration now block</span><span class="right">Ready for checks</span><span class="hint">Its session has ended; the ledger may be behind</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Research ·</span> Live activity</span><span class="right">Done</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Design ·</span> Orchestration now design</span><span class="right">Done</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Design ·</span> Team roles design</span><span class="right">Done</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Build ·</span> Orchestrate now block</span><span class="right">Done</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Build ·</span> Team roles</span><span class="right">Done</span></div>
+      </section>
+      <section>
+        <h2>Recently</h2>
+        <div class="recent">
+          <span class="t">19:10</span><span>You: «Something's off» — view must be human-readable at first glance; started «Design a human-readable Orchestration view» designer</span>
+          <span class="t">18:50</span><span>Review of «Orchestration now block» round 2 approve, archived; landed; orchestration reinstalled path:~/Projects/bb (was preserved-source) …</span>
+          <span class="t">18:30</span><span>«Orchestration now block» fixes review round 1; «nothing pending» confirmed in 0.17.0 exporter; review round 2 to review of …</span>
+        </div>
+      </section>
+      <details><summary>Details for debugging · ledger times are ahead of this computer's clock</summary>
+        <pre>Checkpoint (free text), ledger written 8 min ago
+D1 landed 8f52057 (verified). I1 (ai-hub PR) and I2 (view) unblocked and working; I3 working on team-roles. I3 done (owner checked the page). I1 merged eeb9ce1, orchestrate 0.17.0 installed. Gate G-I2 landed 0d8700c (RV-I2 r2 approve; ff push 6e1b580..0d8700c; installed from path, running). Owner to look at the Right now block. I2 closed (ack #60, no working files), archived. Owner: view not human-readable → D3 design (thr_wgpp44h7xw, #61) …</pre>
+      </details>
+      <div class="tabs"><span class="on">Now</span><span>Work</span><span>Activity</span></div>
+    </div>
+    <div class="frame tab">
+      <p class="cap">Narrow tab</p>
+      <div class="status" style="margin-top:0">
+        <span class="word"><span class="dot run"></span>In progress</span>
+        <div class="sentence">Design · Design a human-readable Orchestration view: running<div class="sub">5 of 7 parts done · nothing needs you</div></div>
+      </div>
+      <section>
+        <div class="row"><span class="dot run"></span><span><span class="role">Design ·</span> Design a human-readable Orchestration view <span class="linkish">↗</span></span><span class="right">12 min</span></div>
+        <div class="row"><span class="dot idle"></span><span><span class="role">Orchestrator ·</span> idle</span><span class="right">12 min</span></div>
+      </section>
+      <div class="fold">▸ Plan · 5 of 7 done</div>
+      <div class="fold">▸ Details</div>
+    </div>
+  </div>
+
+  <!-- 4.3 -->
+  <div class="stage" data-view="needs" hidden>
+    <div class="frame">
+      <h1>orchestration-observability</h1>
+      <p class="goal">Make the Orchestration view show what an orchestration is doing right now, and add a read-only Team roles plugin.</p>
+      <div class="status">
+        <span class="word"><span class="dot need"></span>Needs you</span>
+        <div class="sentence">1 decision<div class="sub">2 of 6 parts done</div></div>
+      </div>
+      <section>
+        <h2>Needs you</h2>
+        <div class="card">
+          <div class="title">Confirm the «Right now» block design</div>
+          <p class="why">Review approved it after three rounds. It lands once you confirm.</p>
+          <div class="btns"><span class="btn primary">Confirm (recommended)</span><span class="btn">Not yet…</span><span class="btn">Open the design ↗</span></div>
+          <div class="asked">asked 5 min ago</div>
+        </div>
+      </section>
+      <section>
+        <h2>Working now</h2>
+        <div class="row"><span class="dot run"></span><span><span class="role">Build ·</span> «Right now» block in the view <span class="linkish">↗</span></span><span class="right">20 min</span></div>
+        <div class="row"><span class="dot run"></span><span><span class="role">Review ·</span> Team roles plugin <span class="linkish">↗</span></span><span class="right">15 min</span></div>
+        <div class="row"><span class="dot run"></span><span><span class="role">Review ·</span> Ledger «Now» format (orchestrate plugin) <span class="linkish">↗</span></span><span class="right">15 min</span></div>
+        <div class="row"><span class="dot idle"></span><span><span class="role">Orchestrator ·</span> waiting for you and 3 others</span><span class="right">idle 5 min</span></div>
+      </section>
+      <section>
+        <h2>Plan · 2 of 6 done</h2>
+        <div class="row"><span class="mark part">◐</span><span><span class="role">Design ·</span> «Right now» block</span><span class="right">Ready, waits for your OK</span></div>
+        <div class="row"><span class="dot run"></span><span><span class="role">Build ·</span> «Right now» block in the view</span><span class="right">In progress</span></div>
+        <div class="row"><span class="mark part">◐</span><span><span class="role">Build ·</span> Ledger «Now» format (orchestrate plugin)</span><span class="right">Being checked: review</span></div>
+        <div class="row"><span class="mark part">◐</span><span><span class="role">Build ·</span> Team roles plugin</span><span class="right">Being checked: review</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Research ·</span> Live activity in bb</span><span class="right">Done</span></div>
+        <div class="row"><span class="mark ok">✓</span><span><span class="role">Design ·</span> Team roles plugin</span><span class="right">Done</span></div>
+      </section>
+      <div class="tabs"><span class="on">Now · 1</span><span>Work</span><span>Activity</span></div>
+    </div>
+    <div class="frame tab">
+      <p class="cap">Narrow tab</p>
+      <div class="status" style="margin-top:0">
+        <span class="word"><span class="dot need"></span>Needs you</span>
+        <div class="sentence">1 decision<div class="sub">2 of 6 parts done</div></div>
+      </div>
+      <section>
+        <div class="card">
+          <div class="title">Confirm the «Right now» block design</div>
+          <div class="btns" style="margin-top:8px"><span class="btn primary">Confirm</span><span class="btn">Not yet…</span></div>
+        </div>
+      </section>
+      <section>
+        <div class="row"><span class="dot run"></span><span><span class="role">Build ·</span> «Right now» block in the view <span class="linkish">↗</span></span><span class="right">20 min</span></div>
+        <div class="row"><span class="dot run"></span><span><span class="role">Review ·</span> 2 parts</span><span class="right">15 min</span></div>
+      </section>
+      <div class="fold">▸ Plan · 2 of 6 done</div>
+    </div>
+  </div>
+</div>
+<script>
+document.querySelectorAll(".states button").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".states button").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+    document.querySelectorAll("[data-view]").forEach((v) => { v.hidden = v.dataset.view !== button.dataset.state; });
+  });
+});
+</script>
+</body>
+</html>
