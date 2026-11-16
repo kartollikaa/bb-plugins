@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   agentReviewPrompt,
   agentReviewSpawnArgs,
+  catalogOffers,
   reviewExecution,
+  reviewProviderOrder,
   type ProviderModelCatalog,
   mergeEnvironmentOf,
   projectForRepo,
@@ -68,12 +70,12 @@ test("the review prompt names the PR and keeps the agent off GitHub and off the 
 
 const efforts = (...levels: string[]) => levels.map((reasoningEffort) => ({ reasoningEffort }));
 const catalogs: ProviderModelCatalog[] = [
-  { providerId: "codex", models: [{ model: "gpt-5.5", supportedReasoningEfforts: efforts("minimal", "low", "medium", "high") }] },
+  { providerId: "codex", models: [{ model: "gpt-5.5", defaultReasoningEffort: "medium", supportedReasoningEfforts: efforts("minimal", "low", "medium", "high") }] },
   {
     providerId: "claude-code",
     models: [
-      { model: "claude-sonnet-5-5", supportedReasoningEfforts: efforts("low", "medium", "high") },
-      { model: "claude-opus-5-5", supportedReasoningEfforts: efforts("low", "medium", "high", "xhigh", "max") },
+      { model: "claude-sonnet-5-5", defaultReasoningEffort: "medium", supportedReasoningEfforts: efforts("low", "medium", "high") },
+      { model: "claude-opus-5-5", defaultReasoningEffort: "high", supportedReasoningEfforts: efforts("low", "medium", "high", "xhigh", "max") },
     ],
   },
 ];
@@ -105,21 +107,34 @@ test("the chosen model and reasoning level reach the spawn", () => {
   assert.equal(args.reasoningLevel, "high");
 });
 
-test("Model default leaves reasoning to the model, and an unsupported level is dropped with a warning", () => {
+test("Model default and an unsupported level both send the model's own default level explicitly", () => {
   const modelDefault = reviewExecution({ model: "claude-opus-5-5", reasoningLevel: "default" }, catalogs);
   assert.equal(modelDefault.warning, null);
-  assert.equal("reasoningLevel" in modelDefault.execution, false);
-  assert.deepEqual(modelDefault.execution.executionInputSources, { providerId: "explicit", model: "explicit" });
+  assert.equal(modelDefault.execution.reasoningLevel, "high");
+  assert.deepEqual(modelDefault.execution.executionInputSources, { providerId: "explicit", model: "explicit", reasoningLevel: "explicit" });
 
   const unsupported = reviewExecution({ model: "claude-sonnet-5-5", reasoningLevel: "max" }, catalogs);
   assert.equal(unsupported.execution.model, "claude-sonnet-5-5");
-  assert.equal("reasoningLevel" in unsupported.execution, false);
+  assert.equal(unsupported.execution.reasoningLevel, "medium");
   assert.match(unsupported.warning ?? "", /doesn't support reasoning level max/);
 });
 
-test("a model whose provider doesn't list its reasoning levels still gets the chosen level", () => {
-  const unknown: ProviderModelCatalog[] = [{ providerId: "acp", models: [{ model: "m", reasoningDiscovery: "unknown", supportedReasoningEfforts: [] }] }];
+test("a model several providers offer goes to the project's provider", () => {
+  assert.deepEqual(reviewProviderOrder(["claude-code", "codex", "pool"], "pool"), ["pool", "claude-code", "codex"]);
+  assert.deepEqual(reviewProviderOrder(["claude-code", "codex"], "gone"), ["claude-code", "codex"]);
+  assert.deepEqual(reviewProviderOrder(["claude-code", "codex"], null), ["claude-code", "codex"]);
+  const pool: ProviderModelCatalog = { providerId: "pool", models: [{ model: "claude-opus-5-5", defaultReasoningEffort: "high", supportedReasoningEfforts: efforts("medium") }] };
+  assert.equal(catalogOffers(pool, " claude-opus-5-5 "), true);
+  assert.equal(catalogOffers(pool, "gpt-5.5"), false);
+  assert.equal(reviewExecution({ model: "claude-opus-5-5", reasoningLevel: "medium" }, [pool, ...catalogs]).execution.providerId, "pool");
+});
+
+test("a model whose provider doesn't list its reasoning levels gets the chosen level, and none without a default", () => {
+  const unknown: ProviderModelCatalog[] = [{ providerId: "acp", models: [{ model: "m", defaultReasoningEffort: "", reasoningDiscovery: "unknown", supportedReasoningEfforts: [] }] }];
   assert.equal(reviewExecution({ model: "m", reasoningLevel: "high" }, unknown).execution.reasoningLevel, "high");
+  const modelDefault = reviewExecution({ model: "m", reasoningLevel: "default" }, unknown).execution;
+  assert.equal("reasoningLevel" in modelDefault, false);
+  assert.deepEqual(modelDefault.executionInputSources, { providerId: "explicit", model: "explicit" });
 });
 
 test("a blank model or one no available provider offers keeps the project's defaults", () => {

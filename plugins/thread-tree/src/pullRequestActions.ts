@@ -85,6 +85,7 @@ export interface ProviderModelCatalog {
   providerId: string;
   models: readonly {
     model: string;
+    defaultReasoningEffort: string;
     reasoningDiscovery?: "known" | "unknown";
     supportedReasoningEfforts: readonly { reasoningEffort: string }[];
   }[];
@@ -99,10 +100,21 @@ export interface ReviewExecution {
   executionInputSources?: { providerId: ExecutionSource; model: ExecutionSource; reasoningLevel?: ExecutionSource };
 }
 
+/** The project's provider first, so a model several providers offer runs where the project's threads do. */
+export function reviewProviderOrder(providerIds: readonly string[], projectProviderId: string | null): string[] {
+  return projectProviderId && providerIds.includes(projectProviderId)
+    ? [projectProviderId, ...providerIds.filter((id) => id !== projectProviderId)]
+    : [...providerIds];
+}
+
+export function catalogOffers(catalog: ProviderModelCatalog, model: string): boolean {
+  return catalog.models.some((candidate) => candidate.model === model.trim());
+}
+
 /**
  * The provider is the first catalog offering the model, since a model id only runs on its own provider.
- * A blank model, or one no available provider offers, leaves the project's defaults; a reasoning level
- * the model doesn't support leaves the model's default, because bb refuses the spawn otherwise.
+ * A blank model, or one no catalog offers, leaves the project's defaults. The reasoning level is always
+ * sent, because bb fills a missing one from the project's defaults rather than the model's.
  */
 export function reviewExecution(choice: ReviewModelChoice, catalogs: readonly ProviderModelCatalog[]): { execution: ReviewExecution; warning: string | null } {
   const model = choice.model.trim();
@@ -110,16 +122,17 @@ export function reviewExecution(choice: ReviewModelChoice, catalogs: readonly Pr
   for (const catalog of catalogs) {
     const entry = catalog.models.find((candidate) => candidate.model === model);
     if (!entry) continue;
-    const level = choice.reasoningLevel === REVIEW_REASONING_DEFAULT ? null : choice.reasoningLevel;
-    const supported = level !== null && (entry.reasoningDiscovery === "unknown" || entry.supportedReasoningEfforts.some((effort) => effort.reasoningEffort === level));
+    const chosen = choice.reasoningLevel === REVIEW_REASONING_DEFAULT ? null : choice.reasoningLevel;
+    const supported = chosen !== null && (entry.reasoningDiscovery === "unknown" || entry.supportedReasoningEfforts.some((effort) => effort.reasoningEffort === chosen));
+    const level = supported ? chosen : entry.defaultReasoningEffort || null;
     return {
       execution: {
         providerId: catalog.providerId,
         model,
-        ...(supported ? { reasoningLevel: level } : {}),
-        executionInputSources: { providerId: "explicit", model: "explicit", ...(supported ? { reasoningLevel: "explicit" as const } : {}) },
+        ...(level ? { reasoningLevel: level } : {}),
+        executionInputSources: { providerId: "explicit", model: "explicit", ...(level ? { reasoningLevel: "explicit" as const } : {}) },
       },
-      warning: level !== null && !supported ? `${model} doesn't support reasoning level ${level}; the review uses the model's default` : null,
+      warning: chosen !== null && !supported ? `${model} doesn't support reasoning level ${chosen}; the review uses the model's default` : null,
     };
   }
   return { execution: {}, warning: `No available provider offers ${model}; the review uses the project's default model` };
