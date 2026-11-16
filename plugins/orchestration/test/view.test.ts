@@ -664,7 +664,7 @@ test("the chat-ask card shows the question from the ui card with its choices, it
 
 test("chatQuestion reads Form fields, Buttons lists, a Waiting on you line, else the last paragraph", () => {
   const form = chatQuestion('```ui\nForm("Where should the build go?", [\n  TextInput("Host name"),\n  Select("Channel", ["beta", "stable"]),\n  Button("Send")\n])\n```');
-  assert.deepEqual(form, { question: "Where should the build go?", choices: ["Send", "beta", "stable"], fields: ["Host name", "Channel"] });
+  assert.deepEqual(form, { identity: "Where should the build go?", question: "Where should the build go?", choices: ["Send", "beta", "stable"], fields: ["Host name", "Channel"] });
   assert.deepEqual(chatQuestion('Pick one.\n```ui\nCard("Land D3 now?", [Buttons(["Land", "Wait"])])\n```')?.choices, ["Land", "Wait"]);
   assert.equal(chatQuestion("Done with I2.\nWaiting on you: connect the Pixel\n::browser-preview{session=\"x\"}")?.question, "connect the Pixel");
   assert.equal(chatQuestion("First part.\n\nShould I rotate V1 now?\n\n```sh\nls\n```")?.question, "Should I rotate V1 now?");
@@ -716,6 +716,33 @@ test("title matching ignores punctuation/case but does not guess paraphrases", (
   assert.equal(match("Does the old Orchestration view look right?"), true);
   assert.equal(match("Review the layout?"), true);
 });
+
+for (const [label, title] of [
+  ["noncanonical review phrasing", "Review the new Orchestration view?"],
+  ["long title", `Should we approve ${"the proposed layout and keyboard behavior ".repeat(6)}for this release?`],
+] as const) {
+  test(`original question identity matches open and answered asks: ${label}`, () => {
+    const make = (ledgerTitle: string = title, answered = false, laterTurn = false) => buildView({
+      ledger: ledger([], { forTheOwner: [`ask: ${ledgerTitle} | options: Yes / No`] }),
+      agents: {}, live: { thr_orch: live(5) }, orchestratorThreadId: "thr_orch", now: NOW,
+      report: { text: `Waiting on you: ${title}` },
+      answered: answered ? { [ledgerTitle]: { answer: "Yes", at: NOW - 8 * MIN } } : {},
+      activity: { thr_orch: act({ lastTurnStartedAt: NOW - (laterTurn ? 6 : 10) * MIN }) },
+    });
+    const extracted = chatQuestion(`Waiting on you: ${title}`)!;
+    assert.equal(extracted.identity, title);
+    assert.notEqual(extracted.question, title);
+    const open = make();
+    assert.deepEqual(open.asks.map((a) => a.key), ["owner-0"]);
+    assert.equal(open.now.mismatch, false);
+    const answered = make(title, true);
+    assert.deepEqual(answered.asks, []);
+    assert.equal(answered.answered.length, 1);
+    assert.equal(answered.now.mismatch, false);
+    assert.deepEqual(make(title, true, true).asks.map((a) => a.key), ["chat-mismatch"]);
+    assert.deepEqual(make("Allow publication?").asks.map((a) => a.key), ["chat-mismatch", "owner-0"]);
+  });
+}
 
 test("incident closing line has a concise title, separate context, and never searches a previous report", () => {
   const question = chatQuestion(REVIEW_CLOSING)!;

@@ -437,6 +437,8 @@ export function asksInChat(report: string | null | undefined): boolean {
 }
 
 export interface ChatQuestion {
+  /** The extracted question before display rewriting or shortening. */
+  identity: string;
   question: string;
   context?: string;
   /** Button, Buttons and Select options, in order. */
@@ -465,7 +467,7 @@ export function chatQuestion(report: string | null | undefined): ChatQuestion | 
     const form = /\bForm\s*\(/.test(body);
     const fields = form ? [...body.matchAll(/\b(?!Card\b|Form\b|Button\b|Buttons\b|Text\b)([A-Z]\w*)\s*\(\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => unquote(m[2]!)) : [];
     const question = firstQuoted(body, /\b(?:Card|Form)\s*\(\s*"/) ?? firstQuoted(body, /\bSelect\s*\(\s*"/) ?? (form ? fields[0] : null) ?? null;
-    if (question || choices.length) return { question: question ?? "Choose an answer", choices: [...new Set(choices)], fields };
+    if (question || choices.length) return { identity: question ?? "Choose an answer", question: question ?? "Choose an answer", choices: [...new Set(choices)], fields };
   }
   const words = spokenText(report);
   const waiting = words.split("\n").map((line) => line.trim()).filter((line) => WAITING_ON_YOU.test(line)).at(-1);
@@ -481,7 +483,7 @@ function shortQuestion(text: string): ChatQuestion {
   const title = review ? "Does the new Orchestration view look right?" : first;
   const question = title.length > CHAT_PARAGRAPH_MAX ? `${title.slice(0, CHAT_PARAGRAPH_MAX - 1).trimEnd()}…` : title;
   const context = review ? text : text.slice(question.length).trim();
-  return { question, choices: [], fields: [], ...(context ? { context } : {}) };
+  return { identity: text, question, choices: [], fields: [], ...(context ? { context } : {}) };
 }
 
 export function sameChatQuestion(a: string, b: string): boolean {
@@ -556,7 +558,7 @@ function buildNow(input: ViewInput, allAsks: Ask[]): NowView {
   const liveCommands = live?.backgroundCommands ?? 0;
   if (liveCommands > backgroundWaits.length) waits.push({ who: "background", label: "Background", subtask: null, what: `${plural(liveCommands, "command", "commands")} running`, age: "", kind: "background" });
 
-  const reportedQuestion = asksInChat(input.report?.text) ? chatQuestion(input.report?.text)?.question : null;
+  const reportedQuestion = asksInChat(input.report?.text) ? chatQuestion(input.report?.text)?.identity : null;
   const question = reportedQuestion ?? ownerWaits.at(-1)?.what;
   const matching = question ? allAsks.flatMap((a) => a.group ?? [a]).filter((a) => a.kind === "owner" && (reportedQuestion ? sameChatQuestion(a.replyTitle ?? a.title ?? "", question) : ownerWaitMatches(question, a.replyTitle ?? a.title ?? ""))) : [];
   const answered = matching.some((a) => a.answered && (activity?.lastTurnStartedAt ?? 0) <= a.answered.at);
@@ -662,7 +664,7 @@ export function buildView(input: ViewInput): View {
   const done = rows.filter((r) => r.kind === "done");
   const nowView = buildNow(input, allAsks);
   if (nowView.mismatch) {
-    const asked = (asksInChat(input.report?.text) ? chatQuestion(input.report?.text) : null) ?? (ledger.now?.waitingOn ?? []).filter((w) => w.who.toLowerCase() === "owner").map((w) => ({ question: w.what, choices: [], fields: [] })).at(-1) ?? null;
+    const asked = (asksInChat(input.report?.text) ? chatQuestion(input.report?.text) : null) ?? (ledger.now?.waitingOn ?? []).filter((w) => w.who.toLowerCase() === "owner").map((w) => ({ identity: w.what, question: w.what, choices: [], fields: [] })).at(-1) ?? null;
     const card = chatAskCard(asked, (text) => capitalize(names.clean(text)));
     asks.unshift({
       key: "chat-mismatch", who: "Orchestrator", subtask: null, since: orchestrator?.latestAttentionAt || null, age: orchestrator?.latestAttentionAt ? shortAge(now - orchestrator.latestAttentionAt) : "",
