@@ -1,16 +1,20 @@
 // Turns a ledger snapshot plus bb's live thread state into the tab's one answer: does anything need you, and is the team moving.
-import type { Agent, LedgerSummary, Pending, Subtask } from "./contract.ts";
+import type { Agent, LedgerSummary, Pending, Subtask, ThreadActivity } from "./contract.ts";
 import type { Answer } from "./answered.ts";
 import { parseOwnerItem, type Link } from "./owner.ts";
 import { replyDraft, replyPrefix } from "./reply.ts";
 import { orchestrationPhase, type Phase } from "./phase.ts";
-import { shortAge } from "./age.ts";
+import { shortAge, stepAge } from "./age.ts";
 
 export { shortAge };
 
 /** Owner's rule: quiet this long while working, or the third failure of a delivery, means stuck. */
 export const QUIET_MS = 30 * 60_000;
 export const FAILURES_STUCK = 3;
+/** The Now block is possibly out of date when the orchestrator's last turn started this long after its `updated`. */
+export const STALE_GRACE_MS = 10 * 60_000;
+/** The first line of a subtask's report, from the orchestrate protocol. */
+export const REPORT_HEADER = /^\[orchestrate [^\]]+\]\s+(\S+)\s+(working|question|blocked|delivered|updated|rotate):\s*(.*)$/;
 /** From this many free-text «For the owner» lines on an active ledger they fold into one card. */
 export const FREE_TEXT_GROUP_FROM = 6;
 
@@ -26,6 +30,9 @@ export interface LiveThread {
   hidden?: boolean;
   /** What the thread's pending interaction asks, once read; null while unknown. */
   pending?: Pending | null;
+  /** Background commands and provider agents running in the thread, from bb's sidebar. */
+  backgroundCommands?: number;
+  backgroundAgents?: number;
 }
 
 export interface Row {
@@ -38,6 +45,9 @@ export interface Row {
   running: boolean;
   step: string;
   age: string;
+  /** The status cell as written, and the last report's header kind and gist with its age; «—» when there is none. */
+  status: string;
+  lastReport: string;
   runs: string;
   context: string;
   gate: string;
@@ -73,11 +83,38 @@ export interface RecapLine {
   age: string;
 }
 
+export interface NowWait {
+  who: string;
+  label: string;
+  subtask: string | null;
+  what: string;
+  age: string;
+  kind: "subtask" | "owner" | "background" | "other";
+}
+
+export interface NowView {
+  source: "block" | "text" | "none";
+  orchestrator: { state: "running" | "asking" | "idle" | "unknown"; age: string; activity: string | null; background: number };
+  lastTurn: RecapLine | null;
+  doing: string | null;
+  waits: NowWait[];
+  /** The orchestrator asked in its last message, but its ledger records no ask. */
+  mismatch: boolean;
+  next: string | null;
+  blockedBy: string | null;
+  lastDecision: RecapLine | null;
+  /** `label` is the header text: «updated 6m ago», «ledger written 3m ago», the date, and the stale mark. */
+  updated: { age: string; stale: boolean; from: "block" | "ledger" | null; label: string };
+  /** The checkpoint as written. */
+  text: string | null;
+}
+
 export interface View {
   phase: Phase;
   state: "planning" | "done" | "needs" | "stuck" | "moving";
-  /** The goal, where the orchestrator is now, and its latest decision: the context before the status. */
-  recap: { goal: string | null; now: RecapLine | null; last: RecapLine | null };
+  /** The goal, the orchestrator's current state and its latest decision: the context before the status. */
+  recap: { goal: string | null; last: RecapLine | null };
+  now: NowView;
   heading: string;
   subline: string;
   /** The context-card row: the heading, plus the stuck agent when an ask holds the heading. */
@@ -102,6 +139,11 @@ export interface ViewInput {
   orchestratorThreadId: string;
   now: number;
   answered?: Record<string, Answer>;
+  /** What each running thread's turn is doing, by thread id; null or missing when unreadable. */
+  activity?: Record<string, ThreadActivity | null>;
+  /** The orchestrator's last output and the ledger file's modification time. */
+  report?: { text: string } | null;
+  ledgerModifiedAt?: number | null;
 }
 
 const DONE = new Set(["landed", "verified", "dropped"]);
@@ -156,13 +198,15 @@ interface Classified {
   lastReport: number | null;
   agent: Agent | null;
   live: LiveThread | null;
+  activity: ThreadActivity | null;
 }
 
 function classify(subtask: Subtask, input: ViewInput): Classified {
   const live = subtask.threadId ? input.live[subtask.threadId] ?? null : null;
   const agent = subtask.threadId ? input.agents[subtask.threadId] ?? null : null;
   const reported = live?.latestAttentionAt || agent?.lastReportAt || live?.createdAt || null;
-  const base = { subtask, child: null, live, agent, lastReport: reported, reason: null };
+  const activity = subtask.threadId ? input.activity?.[subtask.threadId] ?? null : null;
+  const base = { subtask, child: null, live, agent, activity, lastReport: reported, reason: null };
   const status = subtask.status ?? "";
   if (live?.hasPendingInteraction) return { ...base, kind: "you" };
   if (DONE.has(status)) return { ...base, kind: isBusy(live) ? "work" : "done" };
@@ -176,7 +220,7 @@ function classify(subtask: Subtask, input: ViewInput): Classified {
   return { ...base, kind: "work" };
 }
 
-function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
+function stepOf(c: Classified, doneIds: Set<string>, now: number, nameIsNote: boolean): string {
   const { subtask, agent } = c;
   const said = firstLine(agent?.lastOutput ?? null);
   if (c.child) return c.kind === "you" ? "Waiting on you in its thread" : "Running, not in the ledger yet";
@@ -184,6 +228,9 @@ function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
   if (c.reason === "quiet") return `Quiet for ${longAge(now - c.lastReport!)}${said ? ` · last: ${said}` : ""}`;
   if (c.reason === "circles") return `${capitalize(subtask.lastFailedKind ?? "gate")} failed ${subtask.gateFailures} times`;
   if (c.reason === "blocked") return blockedLine(subtask);
+  if (c.kind !== "you" && isBusy(c.live)) return liveStep(c.activity, now);
+  const note = nameIsNote ? null : statusNote(subtask);
+  if ((subtask.status === "working" || subtask.status === "briefed") && note) return capitalize(note);
   switch (subtask.status) {
     case "question": return "Waiting on your answer";
     case "ready": {
@@ -191,7 +238,7 @@ function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
       return note ? capitalize(note) : "Passed the gate, waiting on your word";
     }
     case "card": return "Waiting for you to start its card";
-    case "working": return said ?? "Working";
+    case "working": return reportGist(agent?.lastOutput ?? null)?.gist ?? said ?? "Working";
     case "briefed": return "Briefed, no reply yet";
     case "delivered": return "Delivered, waiting for the gate";
     case "gate": return subtask.gateLine ?? "In the gate";
@@ -204,6 +251,28 @@ function stepOf(c: Classified, doneIds: Set<string>, now: number): string {
   if (c.kind === "you") return "Waiting on you in its thread";
   if (c.kind === "done") return firstLine(subtask.statusRaw, 90) ?? capitalize(subtask.status ?? "done");
   return firstLine(subtask.statusRaw, 90) ?? "Status unknown";
+}
+
+/** What a running turn is doing: its step with the step's age, else the turn's age; without activity only that it runs. */
+function liveStep(activity: ThreadActivity | null, now: number): string {
+  if (activity?.step && activity.stepStartedAt !== null) return `${activity.step} · ${stepAge(now - activity.stepStartedAt)}`;
+  if (activity?.turnStartedAt != null) return `Turn running ${stepAge(now - activity.turnStartedAt)}`;
+  return "Turn running";
+}
+
+/** The kind and gist of a subtask report whose first line is the protocol header. */
+export function reportGist(output: string | null): { kind: string; gist: string } | null {
+  const first = output?.split("\n").find((line) => line.trim())?.trim();
+  const match = first ? REPORT_HEADER.exec(first) : null;
+  return match ? { kind: match[2]!, gist: match[3]!.trim() } : null;
+}
+
+/** The first eight words of a name, with an ellipsis when cut. */
+export function shortName(text: string | null, words = 8): string | null {
+  const line = firstLine(text, 200);
+  if (!line) return null;
+  const parts = line.split(/\s+/);
+  return parts.length > words ? `${parts.slice(0, words).join(" ")}…` : line;
 }
 
 /** «ready — plan verified; waits on review» → «Plan verified; waits on review»: what the orchestrator wrote after the status word. */
@@ -221,20 +290,42 @@ function blockedLine(subtask: Subtask): string {
 
 const STUCK_ORDER = { circles: 0, blocked: 1, quiet: 2 } as const;
 
+/** What the row is called: the id cell's name or delivery, else the status note; the id alone when there is nothing. */
+function nameOf(c: Classified): { name: string; label: string; isNote: boolean } {
+  const { subtask } = c;
+  if (c.child) return { name: c.child.name, label: c.child.label, isNote: false };
+  const named = shortName(subtask.name);
+  if (named) return { name: named, label: subtask.id, isNote: false };
+  const note = shortName(statusNote(subtask));
+  if (note) return { name: note, label: subtask.id, isNote: true };
+  return { name: subtask.id, label: "", isNote: false };
+}
+
+function lastReportLine(c: Classified, now: number): string {
+  const text = c.agent?.lastOutput ?? null;
+  const parsed = reportGist(text);
+  const said = parsed ? `${parsed.kind}${parsed.gist ? `: ${parsed.gist}` : ""}` : firstLine(text, 120);
+  if (!said) return "—";
+  return c.lastReport === null ? said : `${said} · ${shortAge(now - c.lastReport)}`;
+}
+
 function toRow(c: Classified, doneIds: Set<string>, now: number): Row {
   const { subtask, agent } = c;
   const model = prettyModel(agent?.model ?? null);
   const runs = model ? [model, agent?.effort].filter(Boolean).join(" · ") : subtask.modelRaw ?? "—";
   const percent = agent?.contextUsed != null && agent.contextWindow ? `${Math.round((agent.contextUsed / agent.contextWindow) * 100)}%` : null;
   const context = [percent, rotations(subtask.rotations)].filter(Boolean).join(" · ") || "—";
+  const named = nameOf(c);
   return {
     id: subtask.id,
-    label: c.child ? c.child.label : subtask.id,
-    name: c.child ? c.child.name : subtask.name ?? "",
+    label: named.label,
+    name: named.name,
     kind: c.kind,
     running: isBusy(c.live),
-    step: stepOf(c, doneIds, now),
+    step: stepOf(c, doneIds, now, named.isNote),
     age: c.kind === "wait" || c.lastReport === null ? "" : shortAge(now - c.lastReport),
+    status: c.child ? "—" : subtask.statusRaw ?? subtask.status ?? "—",
+    lastReport: lastReportLine(c, now),
     runs,
     context,
     gate: subtask.gateLine ?? "Not at a gate yet",
@@ -336,9 +427,104 @@ function withChildren(input: ViewInput): { subtasks: Subtask[]; children: Classi
       lastReport: live.latestAttentionAt || live.createdAt || null,
       agent: null,
       live,
+      activity: input.activity?.[threadId] ?? null,
     });
   }
   return { subtasks, children };
+}
+
+const stripQuotes = (text: string) => text.trim().replace(/^(?:«([\s\S]*)»|"([\s\S]*)")$/, (_, a, b) => a ?? b).replace(/(?:…|\.\.\.)$/, "").trim().toLowerCase();
+
+/** The contract's Owner-wait match: a `waiting on: owner` value is a prefix of an ask's title, or the title of it. */
+export function ownerWaitMatches(value: string, title: string): boolean {
+  const left = stripQuotes(value);
+  const right = title.trim().toLowerCase();
+  return left !== "" && (right.startsWith(left) || left.startsWith(right));
+}
+
+const WAITING_ON_YOU = /^\s*(?:Waiting on you|Ждёт тебя):/i;
+const INTERACTIVE_UI = /```ui\b[\s\S]*?\b(?:Form|Button|Buttons|Select)\b[\s\S]*?```/;
+
+/** The orchestrator's last message ends on the closing line that says it waits on the owner, or holds an interactive form. */
+export function asksInChat(report: string | null | undefined): boolean {
+  if (!report) return false;
+  const last = report.split("\n").map((line) => line.trim()).filter(Boolean).at(-1) ?? "";
+  return WAITING_ON_YOU.test(last) || INTERACTIVE_UI.test(report);
+}
+
+const ageSince = (iso: string | null, now: number): string => {
+  const at = iso ? Date.parse(iso) : NaN;
+  return Number.isFinite(at) && at <= now ? shortAge(now - at) : "";
+};
+
+function updatedOf(input: ViewInput, source: NowView["source"], block: LedgerSummary["now"], running: boolean, lastTurnStartedAt: number | null): NowView["updated"] {
+  const { now } = input;
+  const ledgerAge = input.ledgerModifiedAt != null ? shortAge(now - input.ledgerModifiedAt) : null;
+  const fromLedger = (): NowView["updated"] => ({ age: ledgerAge ?? "", stale: false, from: ledgerAge === null ? null : "ledger", label: ledgerAge === null ? "" : `ledger written ${ledgerAge === "now" ? "just now" : `${ledgerAge} ago`}` });
+  if (source !== "block" || !block?.updated) return fromLedger();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(block.updated)) return { age: block.updated, stale: false, from: "block", label: `updated ${block.updated}` };
+  const at = Date.parse(block.updated);
+  if (!Number.isFinite(at)) return { age: block.updated, stale: false, from: "block", label: `updated ${block.updated}` };
+  const age = shortAge(Math.max(0, now - at));
+  const stale = !running && lastTurnStartedAt !== null && lastTurnStartedAt > at + STALE_GRACE_MS;
+  return { age, stale, from: "block", label: `updated ${age === "now" ? "just now" : `${age} ago`}${stale ? " · the orchestrator has run since" : ""}` };
+}
+
+function buildNow(input: ViewInput, openAsks: Ask[]): NowView {
+  const { ledger, now } = input;
+  const live = input.live[input.orchestratorThreadId] ?? null;
+  const activity = input.activity?.[input.orchestratorThreadId] ?? null;
+  const block = ledger.now ?? null;
+  const source: NowView["source"] = block?.structured ? "block" : block && ledger.checkpoint ? "text" : "none";
+  const running = isBusy(live);
+  const state: NowView["orchestrator"]["state"] = !live ? "unknown" : live.hasPendingInteraction ? "asking" : running ? "running" : "idle";
+  const background = (live?.backgroundCommands ?? 0) + (live?.backgroundAgents ?? 0);
+  const orchestrator = {
+    state,
+    background: live?.backgroundCommands ?? 0,
+    age: state === "running" ? (activity?.turnStartedAt != null ? shortAge(now - activity.turnStartedAt) : "") : live?.latestAttentionAt ? shortAge(now - live.latestAttentionAt) : "",
+    activity: state === "running" && activity?.step && activity.stepStartedAt !== null ? `${activity.step} · ${stepAge(now - activity.stepStartedAt)}` : null,
+  };
+  const lastTurn = running || !input.report ? null : (() => {
+    const text = firstLine(input.report.text, 140);
+    return text ? { text, age: live?.latestAttentionAt ? shortAge(now - live.latestAttentionAt) : "" } : null;
+  })();
+
+  const waits: NowWait[] = [];
+  const ownerWaits = (block?.waitingOn ?? []).filter((w) => w.who.toLowerCase() === "owner");
+  for (const wait of block?.waitingOn ?? []) {
+    const owner = wait.who.toLowerCase() === "owner";
+    waits.push({ who: wait.who, label: owner ? "You" : wait.subtask ?? wait.who, subtask: owner ? null : wait.subtask, what: wait.what, age: ageSince(wait.since, now), kind: owner ? "owner" : wait.subtask ? "subtask" : "other" });
+  }
+  const ownerAsks = openAsks.filter((a) => a.kind === "owner");
+  for (const ask of ownerAsks) {
+    if (ownerWaits.some((w) => ownerWaitMatches(w.what, ask.replyTitle ?? ask.title ?? ""))) continue;
+    waits.push({ who: "owner", label: "You", subtask: null, what: ask.title ?? ask.text, age: "", kind: "owner" });
+  }
+  const backgroundWaits = block?.backgroundWaits ?? [];
+  for (const wait of backgroundWaits) waits.push({ who: "background", label: "Background", subtask: null, what: wait, age: "", kind: "background" });
+  const liveCommands = live?.backgroundCommands ?? 0;
+  if (liveCommands > backgroundWaits.length) waits.push({ who: "background", label: "Background", subtask: null, what: `${plural(liveCommands, "command", "commands")} running`, age: "", kind: "background" });
+
+  const mismatch = ledger.status !== "closed" && state === "idle" && openAsks.length === 0
+    && (asksInChat(input.report?.text) || ownerWaits.length > 0);
+  if (mismatch) waits.push({ who: "owner", label: "You", subtask: null, what: "asked in the chat", age: "", kind: "owner" });
+
+  const lastTurnStartedAt = activity?.lastTurnStartedAt ?? live?.latestAttentionAt ?? null;
+  const line = (text: string | null) => (text ? firstLine(text, 220) : null);
+  return {
+    source,
+    orchestrator,
+    lastTurn,
+    doing: source === "block" ? line(block!.doing) : null,
+    waits,
+    mismatch,
+    next: source === "block" ? line(block!.next) : null,
+    blockedBy: source === "block" ? line(block!.blockedBy) : null,
+    lastDecision: recapLine(ledger.lastDecision, now),
+    updated: updatedOf(input, source, block, running, lastTurnStartedAt),
+    text: ledger.checkpoint?.text ?? null,
+  };
 }
 
 export function buildView(input: ViewInput): View {
@@ -417,6 +603,13 @@ export function buildView(input: ViewInput): View {
   active.sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || stuck.findIndex((c) => c.subtask.id === a.id) - stuck.findIndex((c) => c.subtask.id === b.id));
   const working = rows.filter((r) => r.running);
   const done = rows.filter((r) => r.kind === "done");
+  const nowView = buildNow(input, asks);
+  if (nowView.mismatch) {
+    asks.unshift({
+      key: "chat-mismatch", who: "Orchestrator", subtask: null, since: orchestrator?.latestAttentionAt || null, age: orchestrator?.latestAttentionAt ? shortAge(now - orchestrator.latestAttentionAt) : "",
+      title: "The orchestrator asked you in its last message, but its ledger records no ask", replyTitle: null, text: "Open the chat to answer it; the full last report is in the Right now block.", links: [], threads: [], replies: [], kind: "thread", drafts: null, answered: null,
+    });
+  }
 
   const lastHandover = ledger.lastHandover;
   const history = {
@@ -429,10 +622,11 @@ export function buildView(input: ViewInput): View {
     notes,
     freeTextNotes,
   };
-  const recap = { goal: ledger.goal, now: recapLine(ledger.checkpoint, now), last: recapLine(ledger.lastDecision, now) };
-  const threadIds = Object.fromEntries(classified.flatMap((c) => (c.subtask.threadId ? [[c.subtask.id, c.subtask.threadId]] : [])));
+  const recap = { goal: ledger.goal, last: recapLine(ledger.lastDecision, now) };
+  const threadIds: Record<string, string> = Object.fromEntries(classified.flatMap((c) => (c.subtask.threadId ? [[c.subtask.id, c.subtask.threadId]] : [])));
+  if (nowView.mismatch) threadIds["chat-mismatch"] = input.orchestratorThreadId;
   const phase = orchestrationPhase(ledger, rows, isBusy(orchestrator));
-  const common = { phase, recap, asks, answered, active, done, threadIds, history, activeLabel: `${working.length} running`, teamLabel: asks.length ? "Rest of the team" : "Team" };
+  const common = { phase, recap, now: nowView, asks, answered, active, done, threadIds, history, activeLabel: `${working.length} running`, teamLabel: asks.length ? "Rest of the team" : "Team" };
 
   const askHeading = asks.length > 1 ? `${asks.length} things need you`
     : asks[0]?.kind === "decision" ? "One decision for you" : asks[0]?.kind === "owner" ? "One thing waits on you" : "One question for you";

@@ -292,13 +292,13 @@ test("an owner line that names a subtask first is that subtask's ask, with its t
   assert.equal(other!.title, "X9: Not a subtask");
 });
 
-test("the recap carries the goal, the checkpoint and the latest decision with their ages", () => {
+test("the recap carries the goal and the latest decision with its age", () => {
   const v = view([subtask("T1", "working")], {}, {}, {
     checkpoint: { text: "G1 waits on review of 9f1c2ab.\nmore", at: new Date(NOW - 40 * MIN).toISOString() },
     lastDecision: { text: "Review by R1", at: null },
   });
-  assert.deepEqual(v.recap, { goal: "Goal", now: { text: "G1 waits on review of 9f1c2ab.", age: "40m" }, last: { text: "Review by R1", age: "" } });
-  assert.deepEqual(view([], {}).recap, { goal: "Goal", now: null, last: null });
+  assert.deepEqual(v.recap, { goal: "Goal", last: { text: "Review by R1", age: "" } });
+  assert.deepEqual(view([], {}).recap, { goal: "Goal", last: null });
 });
 
 test("a running child thread the ledger doesn't list shows in the team, labelled by its title's id", () => {
@@ -323,7 +323,7 @@ test("a running child thread the ledger doesn't list shows in the team, labelled
 
 test("a child that names a session-less ledger row becomes that row's thread", () => {
   const v = view([subtask("S11", "briefed", { threadId: null })], { thr_kid: live(2, { parentThreadId: "thr_orch", title: "orch · S11", status: "active" }) });
-  assert.deepEqual(v.active.map((r) => [r.id, r.running, r.step]), [["S11", true, "Briefed, no reply yet"]]);
+  assert.deepEqual(v.active.map((r) => [r.id, r.running, r.step]), [["S11", true, "Turn running"]]);
   assert.equal(v.threadIds.S11, "thr_kid");
 });
 
