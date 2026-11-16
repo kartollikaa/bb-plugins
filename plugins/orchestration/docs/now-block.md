@@ -2,7 +2,7 @@
 
 Status: complete draft for the owner's confirmation. Section 4 builds on R1's report on live
 activity (`R1-live-activity.md`, bb 0.49.0, plugin SDK 0.6.132). Q1 and Q5 were decided by the
-orchestrator, Q2–Q4 and Q6 by the owner (see «Decided»); Q7 waits on the owner.
+orchestrator, Q2–Q4, Q6 and Q7 by the owner (see «Decided»).
 
 Two parts build from this document: **I1** in kartollika-ai-hub (`plugins/orchestrate`: the skill,
 the ledger schema, the export) and **I2** in this repo (`plugins/orchestration`: the view). Section 5
@@ -728,11 +728,11 @@ option; the owner's words follow each one:
 - **Q6. Name of what a subtask resolves** → A: the skill asks for two to eight words after the id
   in the «Subtasks» id cell, and every row shows it (section 1, «Rules for the skill text»).
   «Always a short name».
+- **Q7. The Stop hook on an orchestrator turn that waits on the owner without an `ask:` line** → A:
+  block the turn once with the reason, never while `stop_hook_active` (section 6 b, «Stop hook»).
+  Decided by the owner on 2026-11-16 (message #21): «Stop the turn once». Rejected: no hook, and
+  blocking on every stop.
 
 ## Open questions for the owner
 
-- **Q7. The Stop hook on an orchestrator turn that waits on the owner without an `ask:` line.** A:
-  block the turn once with the reason, so the orchestrator writes the line before it stops
-  (recommended: the miss happened twice in a day with the rule text alone). B: no hook; `check`
-  errors and the view's mismatch card only. C: block on every stop until fixed (risks a loop when the
-  orchestrator cannot write the ledger).
+None.
