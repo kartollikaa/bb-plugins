@@ -1,7 +1,8 @@
 # Design: `team-roles` — the `team` plugin's agent roles in bb
 
-Status: proposal, 2026-11-16. Scope approved by Dmitrii for v1: read-only view, generated-files
-staleness, Codex install status, a «Propose a change» thread; no in-place edits; not published.
+Status: confirmed by Dmitrii, 2026-11-16, with D1–D4 decided (see «Decided»). Scope approved for
+v1: read-only view, generated-files staleness, Codex install status, a «Propose a change» thread; no
+in-place edits; not published.
 
 ## Problem
 
@@ -281,7 +282,7 @@ which is never passed; it is tolerated too.
 | plan lines, every one `unchanged` (exit 0) | `installed` | «Codex agents: 6 installed, current» |
 | plan lines, every one `install` (exit 0) | `not-installed` | «Codex agents not installed» + apply command |
 | plan lines, otherwise (exit 0): some `install`/`update`/`remove`/`forget`/`keep` | `pending` | counts per action + apply command; `keep` files with «edited after install, no role produces them; they stay as your own files» |
-| no plan lines; stderr has `error: generated files are not current…` | `blocked` | «blocked: generated files are stale» + the problem lines |
+| no plan lines; stderr has `error: generated files are not current…` | `blocked` | «blocked: generated files are not current (see ②)» + the problem lines |
 | no plan lines; stderr has another `error: …` | `unknown` | that message |
 | no plan lines and no `error:` line (an empty plan: the root has no `codex/agents/team-*.toml` and the destination no manifest) | `unknown` | «the installer planned nothing» — never `installed` |
 | exit other than 0/1, timeout, spawn failure, or an exit that contradicts the plan (`conflict` with exit 0, exit 1 without `conflict` or `error:`) | `unknown` | the reason |
@@ -563,8 +564,10 @@ result. The tests carry fixtures copied from 0.2.0's real output.
 ## Implementation slice I3
 
 **Areas:** `plugins/team-roles/**` (new); `.bb/plugins.json`, `README.md` (plugin table),
-`docs/plugins.md` (new section), `docs/publication.md` (row: no public tag, not submitted). Not
-`marketplace.json` or `icons/` — see Q1. Commits: one for the plugin, one for the repo-wide indexes
+`docs/plugins.md` (new section), `docs/publication.md` (row: no public tag, not submitted), and
+`AGENTS.md`: next to the rule that a new plugin goes into `marketplace.json` with an icon, add that an
+unpublished plugin stays out of `marketplace.json` until Dmitrii approves its publication (D1). Not
+`marketplace.json` or `icons/` (D1). Commits: one for the plugin, one for the repo-wide indexes
 and docs (repo `AGENTS.md`, «One commit touches one plugin»).
 
 **Done when:**
@@ -597,9 +600,24 @@ and docs (repo `AGENTS.md`, «One commit touches one plugin»).
    The install already contains `scripts/__pycache__/render_roles.cpython-312.pyc` before team-roles
    ever runs, so this record proves that nothing *changes*, not that no cache exists.
 
-## Open questions for the owner
+## Decided
 
-1. **`marketplace.json` for an unpublished plugin.** Repo `AGENTS.md` says a new plugin goes into
+Dmitrii confirmed this design and answered the four owner questions on 2026-11-16 (orchestration
+thread `thr_kpk3hf9pr5`), each with the recommended option. His answers, verbatim («D2» in them is
+the orchestration subtask's id, not decision D2 below):
+
+- «Re «D2: Confirm the team-roles page design»: Confirm (recommended)»
+- «Re «D2: Should team-roles get a marketplace.json entry»: Leave it out until you approve
+  publication (recommended)»
+- «Re «D2: Keep the teamRoot setting for previewing roles from a source checkout»: Keep it
+  (recommended)»
+- «Re «D2: How «Propose a change» starts its thread»: Composer page where you write the request
+  (recommended)»
+- «Re «D2: Rail label of the page»: «Team roles» (recommended)»
+
+1. **D1. No `marketplace.json` entry until publication is approved** (option (a) below). I3 adds
+   no catalog entry and no icon, and records the precedent in `AGENTS.md`. The question as it was
+   put: repo `AGENTS.md` says a new plugin goes into
    `plugins/`, `.bb/plugins.json` *and* `marketplace.json` with an icon in `icons/`. The repo's
    unpublished plugins don't follow one rule:
    - `kaiten`, `orchestration` and `task-stop` have no `marketplace.json` entry. `kaiten` still has
@@ -607,27 +625,29 @@ and docs (repo `AGENTS.md`, «One commit touches one plugin»).
    - `live-ui` has a self-hosted entry, `{ git, subdir: "plugins/live-ui", ref: "main" }`, with
      `icons/live-ui.svg`. `docs/plugins.md` («live-ui») calls it an unpublished development plugin,
      and `docs/publication.md` says the entry tracks `main`, is not a store release, and that first
-     publication needs your decision.
+     publication needs Dmitrii's decision.
    - `docs/publication.md` has table rows for `kaiten` and `orchestration` but none for `task-stop`
      or `live-ui` (live-ui has a paragraph instead).
 
-   Any entry in the self-hosted catalog makes the plugin installable from it. Options:
-   (a) leave it out of `marketplace.json`, like kaiten, orchestration and task-stop, until you
-   approve publication; (b) a self-hosted entry on `ref: main` with an icon, like live-ui;
-   (c) a tag-range entry now, which is a release. **Recommendation: (a)**: the page is for your
-   own machine, and (b) or (c) puts an unreviewed plugin into a catalog others can install from.
-   Record the precedent in `AGENTS.md` in the same change. With (b), I3's areas add
-   `marketplace.json` and `icons/team-roles.svg`; (c) is a release and is outside I3.
-2. **The `teamRoot` setting.** Options: (a) keep it, so a role change can be previewed from a source
-   checkout before release; (b) drop it, the page only ever reads the installed plugin.
-   **Recommendation: (a)**: it costs one setting and makes the staleness check useful while editing
-   roles.
-3. **Propose flow.** Options: (a) composer page where you write the request, brief added agent-only
-   (this design); (b) one click starts the thread with the brief only, and the agent asks what to
-   change. **Recommendation: (a)**: the thread starts with the request, so its first turn is work,
-   not a question.
-4. **Rail label.** «Team roles» (this design) or «Team». **Recommendation: «Team roles»**: «Team» alone
-   reads like people or a bb workspace.
+   Any entry in the self-hosted catalog makes the plugin installable from it. Options were:
+   (a) leave it out of `marketplace.json`, like kaiten, orchestration and task-stop, until Dmitrii
+   approves publication; (b) a self-hosted entry on `ref: main` with an icon, like live-ui;
+   (c) a tag-range entry now, which is a release. Reason for (a): the page is for Dmitrii's own
+   machine, and (b) or (c) puts an unreviewed plugin into a catalog others can install from.
+2. **D2. Keep the `teamRoot` setting** (option (a)). Options were: (a) keep it, so a role change can
+   be previewed from a source checkout before release; (b) drop it, the page only ever reads the
+   installed plugin. Reason: it costs one setting and makes the staleness check useful while
+   editing roles.
+3. **D3. «Propose a change» opens a composer page** (option (a)). Options were: (a) composer page
+   where the owner writes the request, brief added agent-only; (b) one click starts the thread with
+   the brief only, and the agent asks what to change. Reason: the thread starts with the request,
+   so its first turn is work, not a question.
+4. **D4. Rail label «Team roles».** The alternative was «Team». Reason: «Team» alone reads like
+   people or a bb workspace.
+
+## Open questions for the owner
+
+None.
 
 ## Sources read
 
@@ -654,7 +674,7 @@ and docs (repo `AGENTS.md`, «One commit touches one plugin»).
 - The before/after record in I3 «Done when» 5, run twice in a row: identical output.
 - Claude Code state: `~/.claude/plugins/installed_plugins.json`, `known_marketplaces.json`,
   `~/.claude/settings.json` (`enabledPlugins`).
-- This repo, for Q1: `icons/`, `git log --diff-filter=A -- icons/kaiten.svg`, the `live-ui` entry in
+- This repo, for D1: `icons/`, `git log --diff-filter=A -- icons/kaiten.svg`, the `live-ui` entry in
   `marketplace.json`.
 - Hub repo `origin/main`: `README.md` («Разработка», its «Перед коммитом» list), `.claude-plugin/marketplace.json`, the file
   list of `plugins/team`.
