@@ -185,8 +185,9 @@ function scriptArgv(root: string, call: ScriptCall): string[]
 - There is no other way to build an argv: no call kind can produce `render_roles.py` without
   `resolve`/`--check` (which *writes* every output — read in `render_roles.py`, `main`) or the
   installer with `--apply`/`--force`. A test asserts this over every call kind.
-- `-B` stops Python writing `__pycache__` into the install (the installer imports `render_roles`);
-  `-I` ignores `PYTHON*` variables and keeps the current directory off `sys.path`. Both checked: all
+- `-B` stops Python writing `__pycache__` into the install (the installer imports `render_roles`).
+  The 0.2.0 install already holds `scripts/__pycache__/render_roles.cpython-312.pyc` (same mtime as
+  the install's folders); `-B` keeps it from being rewritten or joined by others. `-I` ignores `PYTHON*` variables and keeps the current directory off `sys.path`. Both checked: all
   three calls run correctly with `-B -I` on 0.2.0 (the installer adds its own folder to `sys.path`).
 - `execFile("python3", argv, { cwd: os.tmpdir(), timeout: 10_000, killSignal: "SIGKILL",
   maxBuffer: 2 MiB, env: process.env })` — no shell. `CODEX_HOME` passes through, because the
@@ -375,7 +376,7 @@ display label for the two known ones (`claude-code` → «Claude Code», `codex`
 |---|---|---|
 | ① | intent, tier, effort, access, shell, web | `roles.json` → `roles.<name>` |
 | ② | agent, model, effort, disallowed tools, features, unenforced per runtime | `roles.json` → `roles.<name>.runtimes.<rt>`; a field where `resolve` disagrees is marked «differs from source» with the `resolve` value (only possible while ② of the list says stale) |
-| ③ | source and generated files, clickable | `roles.<name>.source`; `agents/<name>.md`; `codex/agents/<runtimes.codex.agent>.toml`; opened read-only with `useBbNavigate().experimental_openFilePreview({ target: { kind: "host", hostId, path } })`, `hostId` from the snapshot (docs/gotchas.md, «File preview»); when it returns `false`, the path is copied instead |
+| ③ | source and generated files, clickable | `roles.<name>.source`; `agents/<name>.md`; `codex/agents/<runtimes.codex.agent>.toml`; opened read-only with `useBbNavigate().experimental_openFilePreview({ target: { kind: "host", hostId, path }, location: null })` (`location` is required: `ExperimentalFileOpenOptions`, `bb-plugin-sdk-app.d.ts:23709`), `hostId` from the snapshot (docs/gotchas.md, «File preview»); when it returns `false`, the path is copied instead |
 | ④ | the prompt per runtime | `render_roles.py resolve <name> --runtime <rt>` → `prompt`; rendered with `Markdown`, Raw shows it as preformatted text; Copy uses `experimental_copyToClipboard({ text })` |
 
 The prompt is fetched for the selected runtime only, when the detail opens.
@@ -457,9 +458,8 @@ Before you change it:
   every role reads first — not in the role. Say so if that is what this is.
 - Never edit the installed copy under ~/.claude/plugins/cache; it is replaced on update.
 
-After the change: regenerate with render_roles.py and run the checks the README lists for team
-(test_render_roles.py, test_install_codex_agents.py, check_neutral_roles.py, render_roles.py
---check). The installed copy only changes after a version bump and an update, and Codex agents
+After the change: regenerate with render_roles.py and run every check in the repository README's
+pre-commit list («Разработка», «Перед коммитом»). The installed copy only changes after a version bump and an update, and Codex agents
 after install_codex_agents.py --apply — leave both to the owner and list them in your report.
 ```
 
@@ -542,7 +542,8 @@ plugin depends on the team plugin's file layout and its scripts' interfaces as o
 (`roles.json` `version: 1`; `resolve` JSON keys `role, runtime, agent, model, effort,
 disallowed_tools, features, unenforced, prompt`; `--check` line prefixes; the installer's plan line
 format). A change there shows up as `invalid`/`unknown` states, not as wrong data, because every
-parser is strict. The tests carry fixtures copied from 0.2.0's real output.
+parser recognises only the lines it names and reports `unknown` when none of them establish a
+result. The tests carry fixtures copied from 0.2.0's real output.
 
 ## What it does not cover
 
@@ -584,18 +585,39 @@ and docs (repo `AGENTS.md`, «One commit touches one plugin»).
 4. Propose a change on `reviewer`, submitted with a short request, opens a new thread in the
    `kartollika-ai-hub` project whose first message shows only the owner's words and whose agent-only
    part is the brief with reviewer's current values.
-5. A before/after record of the team install folder and `~/.codex/agents` (file list with checksums)
-   around steps 2–4 is identical: nothing was written.
+5. Nothing was written: the record below, run once before step 2 and once after step 4, prints the
+   same two checksums both times.
+   ```
+   I=$(python3 -c 'import json,os; d=json.load(open(os.path.expanduser("~/.claude/plugins/installed_plugins.json"))); print([e for k,v in d["plugins"].items() if k.startswith("team@") for e in v if e["scope"]=="user"][0]["installPath"])')
+   ( cd "$I" && find . -path ./.in_use -prune -o -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 ) | shasum -a 256
+   ( cd "${CODEX_HOME:-$HOME/.codex}/agents" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 ) | shasum -a 256
+   ```
+   `<installPath>/.in_use/` is left out because Claude Code itself adds and removes a per-process
+   marker there whenever a session starts or ends, so it changes without team-roles doing anything.
+   The install already contains `scripts/__pycache__/render_roles.cpython-312.pyc` before team-roles
+   ever runs, so this record proves that nothing *changes*, not that no cache exists.
 
 ## Open questions for the owner
 
 1. **`marketplace.json` for an unpublished plugin.** Repo `AGENTS.md` says a new plugin goes into
-   `plugins/`, `.bb/plugins.json` *and* `marketplace.json` with an icon; the unpublished `kaiten`,
-   `orchestration` and `task-stop` are in neither `marketplace.json` nor `icons/`
-   (`docs/plugins.md`, `docs/publication.md`), and adding to the self-hosted catalog makes the plugin
-   installable from it. Options: (a) leave it out like kaiten until you approve publication;
-   (b) add it now. **Recommendation: (a)**, and record the precedent in `AGENTS.md` in the same
-   change.
+   `plugins/`, `.bb/plugins.json` *and* `marketplace.json` with an icon in `icons/`. The repo's
+   unpublished plugins don't follow one rule:
+   - `kaiten`, `orchestration` and `task-stop` have no `marketplace.json` entry. `kaiten` still has
+     `icons/kaiten.svg` (added in `6630c73`); the other two have no icon.
+   - `live-ui` has a self-hosted entry, `{ git, subdir: "plugins/live-ui", ref: "main" }`, with
+     `icons/live-ui.svg`. `docs/plugins.md` («live-ui») calls it an unpublished development plugin,
+     and `docs/publication.md` says the entry tracks `main`, is not a store release, and that first
+     publication needs your decision.
+   - `docs/publication.md` has table rows for `kaiten` and `orchestration` but none for `task-stop`
+     or `live-ui` (live-ui has a paragraph instead).
+
+   Any entry in the self-hosted catalog makes the plugin installable from it. Options:
+   (a) leave it out of `marketplace.json`, like kaiten, orchestration and task-stop, until you
+   approve publication; (b) a self-hosted entry on `ref: main` with an icon, like live-ui;
+   (c) a tag-range entry now, which is a release. **Recommendation: (a)**: the page is for your
+   own machine, and (b) or (c) puts an unreviewed plugin into a catalog others can install from.
+   Record the precedent in `AGENTS.md` in the same change. With (b), I3's areas add
+   `marketplace.json` and `icons/team-roles.svg`; (c) is a release and is outside I3.
 2. **The `teamRoot` setting.** Options: (a) keep it, so a role change can be previewed from a source
    checkout before release; (b) drop it, the page only ever reads the installed plugin.
    **Recommendation: (a)**: it costs one setting and makes the staleness check useful while editing
@@ -620,9 +642,21 @@ and docs (repo `AGENTS.md`, «One commit touches one plugin»).
   `render_roles.py resolve reviewer --runtime claude-code` and `--runtime codex`, `resolve nope`
   (exit 1, `error: unknown role`), `--check` (exit 0), `install_codex_agents.py` (dry run: six
   `unchanged`, exit 0), each with `python3 -B -I`.
+- A temporary copy of the 0.2.0 install under `/tmp`, run with `python3 -B -I`, for the outputs
+  quoted in «Snapshot model»: `--check` on a fresh copy (exit 0, both streams empty); on a stale copy
+  (`roles/reviewer.md` edited, a stray `codex/agents/team-ghost.toml` added: exit 1, three problem
+  lines and the advice line on stderr); on a role with an unknown tier (exit 1, `error: …` on
+  stderr). The installer's dry run against the real Codex agents folder (exit 0), an empty `--dest`
+  (exit 0, six `install` lines, folder not created), a `--dest` with conflict, keep and forget cases
+  (exit 1, plan lines on stdout, two summary lines on stderr, folder checksums unchanged), and on the
+  stale copy (exit 1, stdout empty, problem lines and `error: generated files are not current…` on
+  stderr).
+- The before/after record in I3 «Done when» 5, run twice in a row: identical output.
 - Claude Code state: `~/.claude/plugins/installed_plugins.json`, `known_marketplaces.json`,
   `~/.claude/settings.json` (`enabledPlugins`).
-- Hub repo `origin/main`: `README.md` («Разработка»), `.claude-plugin/marketplace.json`, the file
+- This repo, for Q1: `icons/`, `git log --diff-filter=A -- icons/kaiten.svg`, the `live-ui` entry in
+  `marketplace.json`.
+- Hub repo `origin/main`: `README.md` («Разработка», its «Перед коммитом» list), `.claude-plugin/marketplace.json`, the file
   list of `plugins/team`.
 
 ## SDK surfaces used
