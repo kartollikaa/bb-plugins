@@ -48,8 +48,8 @@ several name the thread, the newest wins.
   checkpoint or a «no Now block yet» line. A last message that asks the owner while the ledger records no ask
   gets a needs-you card. «Checkpoint as written» and «Full last report» are folds in this block.
 - **Needs you:** subtasks at `question`, `ready` or `card`, a pending approval in any subtask's
-  thread or the orchestrator's own, and every `ask:` line under the ledger's «For the owner» (any
-  other line there is a note). A `ready` card shows the status note, Delivery, Version and gate line;
+  thread or the orchestrator's own, and every `ask:` line under the ledger's «For the owner» (on an
+  active ledger any line that is not a note is a wait). A `ready` card shows the status note, Delivery, Version and gate line;
   an open «For the owner» line naming that subtask or linking only its thread replaces it. A pending
   approval or question card shows the interaction's own question, options or command. Only such a
   card, held in another thread, has Open thread; every other card answers the orchestrator.

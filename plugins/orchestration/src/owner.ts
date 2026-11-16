@@ -68,6 +68,7 @@ function parseAsk(text: string): OwnerItem | null {
 }
 
 /** Lines that are a record or say that nothing waits: never a wait on the owner. */
+const NOTHING_LINE = new Set(["nothing", "«nothing»", "nothing pending", "ничего", "none", "—"]);
 const NOT_A_WAIT = /^(?:note:|answered\b|q\s*\(answered\b[^)]*\)\s*:|ask\s*\(draft\)\s*:|nothing\s+(?:waiting|waits|for\s+the\s+owner)|quiet:|ничего\s+не\s+ждёт)/i;
 
 /**
@@ -77,7 +78,7 @@ const NOT_A_WAIT = /^(?:note:|answered\b|q\s*\(answered\b[^)]*\)\s*:|ask\s*\(dra
 export function parseOwnerItem(raw: string, ledgerStatus: string | null = null): OwnerItem {
   const text = raw.trim();
   const note = (): OwnerItem => ({ kind: "note", text: text.replace(/^note:\s*/i, "") });
-  if (NOT_A_WAIT.test(text)) return note();
+  if (NOT_A_WAIT.test(text) || NOTHING_LINE.has(text.toLowerCase().replace(/\.+$/, ""))) return note();
   if (ASK_PREFIX.test(text)) return parseAsk(text) ?? note();
   if (!text) return note();
   if (ledgerStatus === "closed") return { kind: "note", text, freeText: true };

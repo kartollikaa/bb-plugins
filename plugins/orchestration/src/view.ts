@@ -238,7 +238,7 @@ function stepOf(c: Classified, doneIds: Set<string>, now: number, nameIsNote: bo
       return note ? capitalize(note) : "Passed the gate, waiting on your word";
     }
     case "card": return "Waiting for you to start its card";
-    case "working": return reportGist(agent?.lastOutput ?? null)?.gist ?? said ?? "Working";
+    case "working": return reportGist(agent?.lastOutput ?? null)?.gist || said || "Working";
     case "briefed": return "Briefed, no reply yet";
     case "delivered": return "Delivered, waiting for the gate";
     case "gate": return subtask.gateLine ?? "In the gate";
@@ -478,7 +478,6 @@ function buildNow(input: ViewInput, openAsks: Ask[]): NowView {
   const source: NowView["source"] = block?.structured ? "block" : block && ledger.checkpoint ? "text" : "none";
   const running = isBusy(live);
   const state: NowView["orchestrator"]["state"] = !live ? "unknown" : live.hasPendingInteraction ? "asking" : running ? "running" : "idle";
-  const background = (live?.backgroundCommands ?? 0) + (live?.backgroundAgents ?? 0);
   const orchestrator = {
     state,
     background: live?.backgroundCommands ?? 0,
@@ -506,7 +505,7 @@ function buildNow(input: ViewInput, openAsks: Ask[]): NowView {
   const liveCommands = live?.backgroundCommands ?? 0;
   if (liveCommands > backgroundWaits.length) waits.push({ who: "background", label: "Background", subtask: null, what: `${plural(liveCommands, "command", "commands")} running`, age: "", kind: "background" });
 
-  const mismatch = ledger.status !== "closed" && state === "idle" && openAsks.length === 0
+  const mismatch = ledger.status !== "closed" && state === "idle" && openAsks.filter((a) => a.kind === "owner").length === 0
     && (asksInChat(input.report?.text) || ownerWaits.length > 0);
   if (mismatch) waits.push({ who: "owner", label: "You", subtask: null, what: "asked in the chat", age: "", kind: "owner" });
 

@@ -78,7 +78,7 @@ function FreeText({ text, title, evidence }: { text: string; title: string; evid
     <div>
       <p className="m-0 text-xs text-muted-foreground">{title}</p>
       <div className={cx("mt-1 [overflow-wrap:anywhere]", !all && "line-clamp-3")}>{evidence}</div>
-      {!all && text.split("\n").length > 3 && <button type="button" onClick={() => setAll(true)} className="mt-1 text-xs text-muted-foreground hover:underline focus-visible:outline-2 focus-visible:outline-primary">Show all</button>}
+      {!all && <button type="button" onClick={() => setAll(true)} className="mt-1 text-xs text-muted-foreground hover:underline focus-visible:outline-2 focus-visible:outline-primary">Show all</button>}
     </div>
   );
 }
@@ -90,7 +90,7 @@ export function NowBlock({ now, variant, ledgerPath, report, workspace, threadId
   const page = variant === "page";
   const folds = (
     <div className="flex flex-wrap gap-x-4 gap-y-1">
-      {now.source === "block" && now.text && <details className="min-w-0">
+      {now.source !== "text" && now.text && <details className="min-w-0">
         <summary className="cursor-pointer text-xs text-muted-foreground">Checkpoint as written</summary>
         <div className="mt-2 [overflow-wrap:anywhere]">{evidence(now.text, ledgerPath, workspace?.ledgerHostId ?? null)}</div>
       </details>}

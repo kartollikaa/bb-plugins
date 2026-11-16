@@ -106,3 +106,9 @@ test("a hand-written `Q:` / `Q (asked …):` / `question:` line is an ask, its d
   assert.equal(parseOwnerItem("Ничего не ждёт.").kind, "note");
   assert.equal(parseOwnerItem("Q: ").kind, "note");
 });
+
+test("whole-line «nothing» phrases are notes, as in the exporter", async () => {
+  
+  for (const line of ["Nothing", "Nothing pending.", "nothing", "«nothing»", "Ничего", "None", "—", "none."]) assert.equal(parseOwnerItem(line).kind, "note", line);
+  assert.equal(parseOwnerItem("Nothing lands until you approve the DB migration").kind, "ask");
+});

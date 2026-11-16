@@ -635,3 +635,8 @@ test("a row with no name or delivery falls back to its status note, which the st
   assert.equal(bare.active[0]!.name, "T5");
   assert.equal(bare.active[0]!.label, "");
 });
+
+test("a pending thread question does not hide a mismatch: only owner asks count", () => {
+  const v = nowOf({ now: nowBlock(), lives: { thr_orch: live(5), thr_s1: live(2, { hasPendingInteraction: true }) }, report: "Done.\nWaiting on you: connect the Pixel" });
+  assert.equal(v.now.mismatch, true);
+});

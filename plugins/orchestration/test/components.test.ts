@@ -71,3 +71,12 @@ test("the page variant adds next, last turn and last decision, and a muted line 
   const old = renderToStaticMarkup(createElement(NowBlock, nowProps("page", nowView({ source: "none", doing: null, text: null }))));
   assert.match(old, /This ledger has no Now block yet/);
 });
+
+test("a clamped free-text checkpoint offers Show all even when it is one long line; an old exporter's text gets the fold", async () => {
+  const { NowBlock } = await loadTsx(new URL("../src/NowBlock.tsx", import.meta.url));
+  const text = renderToStaticMarkup(createElement(NowBlock, nowProps("page", nowView({ source: "text", doing: null, text: "x ".repeat(400) }))));
+  assert.match(text, /Show all/);
+  assert.doesNotMatch(text, /Checkpoint as written/);
+  const none = renderToStaticMarkup(createElement(NowBlock, nowProps("page", nowView({ source: "none", doing: null, text: "old text" }))));
+  assert.match(none, /Checkpoint as written/);
+});

@@ -83,7 +83,7 @@ same title bar.
 
 - **Needs you:** a subtask at `question` or `ready`, one waiting for its card, a pending approval in
   any subtask's thread or the orchestrator's own, and each `ask:` line under the ledger's «For the
-  owner» (any other line there is a note; see the format below).
+  owner» (on an active ledger any line that is not a note is a wait; see the format below).
 - **A `ready` card** shows the ledger's note after `ready`, and what lands: Delivery, Version and the
   gate line. **Land it** drafts `<id> at <version>: go ahead and land it.` When an open «For the owner»
   line names that subtask (`T1: …`) or links only its thread, that line is the card instead.
