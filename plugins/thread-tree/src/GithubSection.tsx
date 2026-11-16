@@ -16,7 +16,9 @@ import {
   prOpenTarget,
 } from "./githubFolder";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
-import { ROW_HOVER_SOLID_BG, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
+import { ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
+import { ROW_ACTION_BUTTON, rowHeightPx } from "./rowActions";
+import { HIDDEN_UNDER_STRIP, RowHoverActions, useRowKeyboardFocus, type RowActionsView } from "./RowHoverActions";
 import { formatAge } from "./time";
 import { Collapse } from "./Collapse";
 import { pullRequestLook, pullRequestSummary } from "./sectionSummaries";
@@ -93,7 +95,11 @@ export function GithubSection({
   threadOfPullRequest,
   pullRequestActions,
   onOpenThread,
+  rowView,
+  isCompactViewport,
 }: {
+  rowView: RowActionsView;
+  isCompactViewport: boolean;
   folder: GithubFolder;
   threadOfPullRequest: ReadonlyMap<string, string>;
   pullRequestActions: PullRequestActionHandlers;
@@ -152,6 +158,8 @@ export function GithubSection({
                 />
               )}
               isSnoozed={view.snoozed.includes(item)}
+              rowView={rowView}
+              isCompactViewport={isCompactViewport}
               now={now}
               onHover={() => prefetch(item.pr.url)}
               onOpen={() => openGithubFolderPrPage(item.pr.url)}
@@ -200,7 +208,11 @@ function PullRequestRow({
   onOpenThread,
   action,
   onToggleSnoozed,
+  rowView,
+  isCompactViewport,
 }: {
+  rowView: RowActionsView;
+  isCompactViewport: boolean;
   item: GithubFolderItem;
   onOpenThread?: (split: boolean) => void;
   action: (className: string) => React.ReactNode;
@@ -213,6 +225,7 @@ function PullRequestRow({
 }) {
   const { pr, attention } = item;
   const look = pullRequestLook(item);
+  const keyboardFocus = useRowKeyboardFocus();
   const tooltip = [
     `${pr.repo}#${pr.number} · ${pr.title}`,
     attention.map((reason) => ATTENTION_LABEL[reason]).join(", ") || look.label,
@@ -226,13 +239,15 @@ function PullRequestRow({
     <div
       role="listitem"
       title={tooltip}
+      {...keyboardFocus}
+      style={{ height: rowHeightPx(isCompactViewport) }}
       onClick={(event) => (event.metaKey || event.ctrlKey ? onOpenOnGithub() : onOpen())}
       onPointerEnter={onHover}
       onAuxClick={(event) => {
         if (event.button === 1) onOpenOnGithub();
       }}
       className={cn(
-        "group/row relative flex h-8 cursor-default items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90",
+        "group/row relative flex cursor-default items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90",
         ROW_TINT,
         isSnoozed && "text-sidebar-foreground/50",
       )}
@@ -240,14 +255,22 @@ function PullRequestRow({
       <span data-pr-reason={look.reason ?? "none"} className={cn("flex size-4 shrink-0 items-center justify-center", look.className)}>
         <Icon name={look.icon} fallback="GitPullRequest" aria-label={look.label} className="size-3.5" />
       </span>
-      <span className="min-w-0 flex-1 truncate">{pr.title}</span>
-      <span data-pr-repo="" className="max-w-[30%] shrink-0 truncate text-2xs text-sidebar-foreground/45 group-hover/row:invisible">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          if (event.metaKey || event.ctrlKey) onOpenOnGithub();
+          else onOpen();
+        }}
+        className="min-w-0 flex-1 truncate text-left outline-none focus-visible:underline"
+      >
+        {pr.title}
+      </button>
+      <span data-pr-repo="" className={cn("max-w-[30%] shrink-0 truncate text-2xs text-sidebar-foreground/45", !rowView.inline && HIDDEN_UNDER_STRIP)}>
         {pr.repo.split("/")[1] ?? pr.repo}
       </span>
-      <span
-        onAuxClick={(event) => event.stopPropagation()}
-        className={cn("absolute inset-y-0 right-1 hidden items-center gap-0.5 pl-2 group-hover/row:flex", ROW_HOVER_SOLID_BG)}
-      >
+      <span className="contents" onAuxClick={(event) => event.stopPropagation()}>
+      <RowHoverActions view={rowView} isActive={false}>
         {onOpenThread ? (
           <button
             type="button"
@@ -257,7 +280,7 @@ function PullRequestRow({
               event.stopPropagation();
               onOpenThread(event.metaKey || event.ctrlKey);
             }}
-            className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            className={ROW_ACTION_BUTTON}
           >
             <Icon name="MessageSquare" fallback="ArrowUpRight" aria-hidden className="size-3.5" />
           </button>
@@ -271,7 +294,7 @@ function PullRequestRow({
             event.stopPropagation();
             onOpenOnGithub();
           }}
-          className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          className={ROW_ACTION_BUTTON}
         >
           <Icon name="ArrowUpRight" aria-hidden className="size-3.5" />
         </button>
@@ -283,16 +306,17 @@ function PullRequestRow({
             event.stopPropagation();
             onToggleSnoozed(!isSnoozed);
           }}
-          className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          className={ROW_ACTION_BUTTON}
         >
           <Icon name={isSnoozed ? "Eye" : "EyeOff"} aria-hidden className="size-3.5" />
         </button>
+      </RowHoverActions>
       </span>
     </div>
   );
 }
 
-const STRIP_BUTTON = "flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground disabled:opacity-60";
+const STRIP_BUTTON = `${ROW_ACTION_BUTTON} disabled:opacity-60`;
 
 const SOURCE_ITEMS: readonly { source: keyof GithubSettings["sources"]; label: string }[] = [
   { source: "review", label: "Review requests" },

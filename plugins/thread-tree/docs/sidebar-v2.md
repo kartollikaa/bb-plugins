@@ -129,8 +129,8 @@ Left to right, fixed 32px height:
 
 - Archive and ⋯ overlay the right end of the row over a fade of the row's background; nothing
   underneath moves. They appear at once on hover and on keyboard focus, with a fade-in of 80ms at
-  most. ⋯ is always outermost. The Automations section already uses this overlay; thread rows join
-  it. The first pick was a 120ms hover delay; the owner dropped it after trying it: "There is an
+  most. ⋯ is always outermost. Thread rows, Needs you, Pull requests and Automations rows all
+  share this overlay, with 24px buttons. The first pick was a 120ms hover delay; the owner dropped it after trying it: "There is an
   uncomfortable delay between I hover the chat and they appear." Every hover control in the
   sidebar (thread rows, Automations, section headers) shows without a wait.
 - Stop lives on the spinner: hovering a running thread's glyph turns it into a Stop button. It is

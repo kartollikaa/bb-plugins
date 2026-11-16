@@ -28,6 +28,9 @@ failed and running automations and the soonest next run ("1 failed · next in
 12m"). An expanded PR row draws its most urgent reason as a tinted icon, then the
 title and repo; the number and reasons are in the tooltip. Hover offers "Open its
 thread" when one of your threads links the PR, Open on GitHub, and Snooze.
+Pull request and automation rows show their buttons the way thread rows do:
+over a fade at the row's right end, at once on hover or keyboard focus, as 24px
+targets; on touch screens and compact viewports they sit in the row instead.
 An unclaimed PR whose repo is the remote of a bb project also offers Agent
 review (a robot icon): it starts a thread in that project (the most recently
 updated one when several share the remote) that reviews the PR with `gh`,

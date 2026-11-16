@@ -10,7 +10,9 @@ import { cn } from "@/lib/utils";
 import type { rpcContract } from "../server";
 import { automationDot, sortAutomations, type AutomationAction, type AutomationSummary } from "./automations";
 import { GroupHeader, type HeaderMenuItem } from "./GroupHeader";
-import { ROW_HOVER_SOLID_BG, ROW_TINT } from "./rowStyles";
+import { ROW_TINT } from "./rowStyles";
+import { ROW_ACTION_BUTTON, rowHeightPx } from "./rowActions";
+import { HIDDEN_UNDER_STRIP, RowHoverActions, useRowKeyboardFocus, type RowActionsView } from "./RowHoverActions";
 import { StatusDot } from "./StatusDot";
 import { formatUntil } from "./time";
 import { Collapse } from "./Collapse";
@@ -59,7 +61,11 @@ export function AutomationsSection({
   activeThreadId,
   now,
   onNavigate,
+  rowView,
+  isCompactViewport,
 }: {
+  rowView: RowActionsView;
+  isCompactViewport: boolean;
   automations: Automations;
   isCollapsed: boolean;
   onToggle: () => void;
@@ -114,6 +120,8 @@ export function AutomationsSection({
               automation={automation}
               isActive={automation.lastRunThreadId !== null && automation.lastRunThreadId === activeThreadId}
               now={now}
+              rowView={rowView}
+              isCompactViewport={isCompactViewport}
               onOpen={() => {
                 if (automation.lastRunThreadId) {
                   openThread(navigate, automation.lastRunThreadId);
@@ -146,7 +154,11 @@ function AutomationRow({
   now,
   onOpen,
   onAction,
+  rowView,
+  isCompactViewport,
 }: {
+  rowView: RowActionsView;
+  isCompactViewport: boolean;
   automation: AutomationSummary;
   isActive: boolean;
   now: number;
@@ -162,14 +174,17 @@ function AutomationRow({
         : automation.nextRunAt
           ? formatUntil(automation.nextRunAt, now)
           : "";
+  const keyboardFocus = useRowKeyboardFocus();
   const tooltip = [automation.name, automation.projectName, automation.lastError].filter(Boolean).join(" · ");
   return (
     <div
       role="listitem"
       title={tooltip}
       onClick={onOpen}
+      {...keyboardFocus}
+      style={{ height: rowHeightPx(isCompactViewport) }}
       className={cn(
-        "group/row relative flex h-8 cursor-default items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90",
+        "group/row relative flex cursor-default items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90",
         isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : ROW_TINT,
         !automation.enabled && "text-sidebar-foreground/55",
       )}
@@ -177,21 +192,25 @@ function AutomationRow({
       <span className="flex size-4 shrink-0 items-center justify-center">
         <StatusDot state={dot} className="size-2" />
       </span>
-      <span className="min-w-0 flex-1 truncate">{automation.name}</span>
-      <span className="shrink-0 text-2xs tabular-nums text-sidebar-foreground/45 group-hover/row:invisible">{when}</span>
-      <span
-        className={cn(
-          "absolute inset-y-0 right-1 hidden items-center gap-0.5 pl-2 group-hover/row:flex",
-          isActive ? "bg-sidebar-accent" : ROW_HOVER_SOLID_BG,
-        )}
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen();
+        }}
+        className="min-w-0 flex-1 truncate text-left outline-none focus-visible:underline"
       >
+        {automation.name}
+      </button>
+      <span className={cn("shrink-0 text-2xs tabular-nums text-sidebar-foreground/45", !rowView.inline && HIDDEN_UNDER_STRIP)}>{when}</span>
+      <RowHoverActions view={rowView} isActive={isActive}>
           <RowButton label="Run now" icon="Play" onClick={() => onAction("run")} />
           <RowButton
             label={automation.enabled ? "Pause" : "Resume"}
             icon={automation.enabled ? "Pause" : "Repeat"}
             onClick={() => onAction(automation.enabled ? "pause" : "resume")}
           />
-      </span>
+      </RowHoverActions>
     </div>
   );
 }
@@ -206,7 +225,7 @@ function RowButton({ label, icon, onClick }: { label: string; icon: string; onCl
         event.stopPropagation();
         onClick();
       }}
-      className="flex size-5 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+      className={ROW_ACTION_BUTTON}
     >
       <Icon name={icon} aria-hidden className="size-3.5" />
     </button>

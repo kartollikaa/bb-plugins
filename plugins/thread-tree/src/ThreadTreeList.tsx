@@ -107,7 +107,7 @@ import { useDragReorder, useFlipOrder } from "./useReorder";
 import { ReduceMotionContext, useStill } from "./motion";
 import { Collapse } from "./Collapse";
 import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT, TOUCH_DIMMED } from "./rowStyles";
-import { canStop, END_SLOT_MIN_PX, NO_HOVER_QUERY, ROW_ACTION_BUTTON, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
+import { actionsInline, canStop, END_SLOT_MIN_PX, NO_HOVER_QUERY, ROW_ACTION_BUTTON, hoverActionsClass, ROW_END_PAD_PX, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX, stopsFromGlyph } from "./rowActions";
 import { useArchiveUndo } from "./useArchiveUndo";
 import { foldedRootOf, OLDER_RULE, olderRootIds, sameIds } from "./olderThreads";
 import { folderProjectOf, inactiveProjectIds, inactiveRule } from "./inactiveProjects";
@@ -327,6 +327,7 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
   const sharedBranches = useMemo(() => sharedBranchThreads(threads, familyRootOf(threads)), [threads]);
   const orchestrationList = useMemo(() => orchestrations(activeForest), [activeForest]);
   const canHover = !useMediaQuery(NO_HOVER_QUERY);
+  const sectionRowView = { inline: actionsInline({ isCompactViewport, canHover }), reduceMotion: view.reduceMotion };
   const searchPool = showArchived ? listed.threads : threads;
   const flatList = useMemo(() => {
     if (statusFilter) return filterThreads(threads, statusFilter);
@@ -627,6 +628,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                 }}
                 isCollapsed={foldSections || isSectionCollapsed(collapsedGroups.values, "github")}
                 onToggle={() => collapsedGroups.toggle(sectionToggleKey("github"))}
+                rowView={sectionRowView}
+                isCompactViewport={isCompactViewport}
                 showSnoozed={flags.has("github-snoozed")}
                 onToggleSnoozed={() => flags.toggle("github-snoozed")}
                 menu={menu}
@@ -636,6 +639,8 @@ export function ThreadTreeList({ activeThreadId, isCompactViewport, onNavigate }
                 automations={automations}
                 isCollapsed={foldSections || isSectionCollapsed(collapsedGroups.values, "automations")}
                 onToggle={() => collapsedGroups.toggle(sectionToggleKey("automations"))}
+                rowView={sectionRowView}
+                isCompactViewport={isCompactViewport}
                 showPaused={flags.has("automations-paused")}
                 onTogglePaused={() => flags.toggle("automations-paused")}
                 menu={menu}
@@ -1325,7 +1330,7 @@ function PullRequestIcon({ pullRequest, list }: { pullRequest: RowPullRequest; l
       }}
       className={cn("flex size-[18px] shrink-0 items-center justify-center rounded-[5px] outline-none hover:brightness-125 focus-visible:ring-1 focus-visible:ring-sidebar-ring", look.className, look.chipClassName)}
     >
-      <Icon name={look.icon} aria-hidden className="size-3" />
+      <Icon name={look.icon} aria-hidden className="size-3.5" />
     </button>
   );
   if (!several) return button;
@@ -1377,7 +1382,7 @@ function PullRequestIcon({ pullRequest, list }: { pullRequest: RowPullRequest; l
                     className="flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left outline-none hover:bg-accent focus-visible:bg-accent"
                   >
                     <span className={cn("mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-[5px]", itemLook ? [itemLook.className, itemLook.chipClassName] : "text-muted-foreground")}>
-                      <Icon name={itemLook?.icon ?? (item.pr.state === "merged" ? "GitMerge" : "GitPullRequest")} aria-hidden className="size-3" />
+                      <Icon name={itemLook?.icon ?? (item.pr.state === "merged" ? "GitMerge" : "GitPullRequest")} aria-hidden className="size-3.5" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">

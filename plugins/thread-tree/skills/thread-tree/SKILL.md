@@ -40,7 +40,11 @@ offers Open its thread. A PR GitHub calls ready to merge, when it is the open
 current-branch PR of a thread's environment, offers Merge instead: a toast asks
 to confirm, then bb's GitHub PR Status merges it with a merge commit. The
 server refuses when that environment's PR is no longer this one.
-Paused automations stay behind "N paused".
+Paused automations stay behind "N paused". Automation rows offer Run now and Pause
+or Resume on hover.
+Pull request and automation rows show their buttons the way thread rows do:
+over a fade at the row's right end, at once on hover or keyboard focus, as 24px
+targets; on touch screens and compact viewports they sit in the row instead.
 
 Needs you sits above the sections in an amber card and hides when nothing
 waits. Its header shows the count and the next-item key; the card lists the first

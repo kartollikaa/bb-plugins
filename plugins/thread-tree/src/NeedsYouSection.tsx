@@ -47,11 +47,9 @@ import { StatusDot } from "./StatusDot";
 import { ResendButton, RetryButton, StopButton } from "./RetryButton";
 import type { ThreadSignals } from "./threadSignals";
 import { formatAge } from "./time";
-import { actionsInline, ROW_ACTION_BUTTON, hoverActionsClass, rowHeightPx, STRIP_END_PAD_PX, STRIP_GAP_PX } from "./rowActions";
-import { ROW_FADE_ACTIVE, ROW_FADE_GRADIENT, ROW_FADE_HOVER, ROW_FADE_SOLID, ROW_TINT } from "./rowStyles";
-
-/** The strip repeats the pill beside Snooze, so the row's own copy steps aside under it. */
-const HIDDEN_UNDER_STRIP = "group-hover/row:invisible group-data-[keyboard-focus]/row:invisible";
+import { actionsInline, ROW_ACTION_BUTTON, rowHeightPx } from "./rowActions";
+import { ROW_TINT } from "./rowStyles";
+import { HIDDEN_UNDER_STRIP, RowHoverActions, useRowKeyboardFocus } from "./RowHoverActions";
 
 const THREAD_GLYPH: Record<ThreadItemKind, PluginSidebarThreadIndicator> = {
   input: "waiting-for-input",
@@ -298,7 +296,7 @@ function NeedsYouRow({
   pullRequestAction: React.ReactNode;
 }) {
   const sdk = useSdk();
-  const [keyboardFocus, setKeyboardFocus] = useState(false);
+  const keyboardFocus = useRowKeyboardFocus();
   const reason = item.kind !== "pr" && item.kind !== "automation" && item.orchestration ? `${item.reason} · under ${item.orchestration}` : item.reason;
   const wait = item.kind === "input" && item.since !== null ? formatAge(item.since, now) : null;
   const markRead = item.kind === "unread"
@@ -322,16 +320,12 @@ function NeedsYouRow({
       role="listitem"
       data-needs-you-item={item.kind}
       title={`${item.title}\n${reason}`}
-      data-keyboard-focus={keyboardFocus || undefined}
+      {...keyboardFocus}
       className={cn(
         "group/row relative flex items-center gap-2 rounded-md pl-1.5 pr-2 text-sm text-sidebar-foreground/90",
         isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : ROW_TINT,
       )}
       style={{ height: rowHeightPx(isCompactViewport, 2) }}
-      onFocus={(event) => setKeyboardFocus(event.target.matches(":focus-visible"))}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocus(false);
-      }}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest("button")) return;
         onOpen(event.metaKey || event.ctrlKey);
@@ -353,23 +347,12 @@ function NeedsYouRow({
         </span>
         <span data-row-subtitle="" className="truncate text-2xs text-sidebar-foreground/50">{reason}</span>
       </span>
+      {/* The strip repeats the pill beside Snooze, so the row's own copy steps aside under it. */}
       {failure && !inlineActions ? <span className={cn("flex shrink-0", HIDDEN_UNDER_STRIP)}>{failure}</span> : null}
       {provider}
-      {inlineActions ? (
-        <span data-inline-actions="" className="relative z-[1] flex shrink-0 items-center" style={{ gap: STRIP_GAP_PX }}>
-          {actionButtons}
-        </span>
-      ) : (
-        <span
-          data-hover-actions=""
-          className={cn("absolute inset-y-0 right-0 flex items-center rounded-r-md", isActive ? ROW_FADE_ACTIVE : ROW_FADE_HOVER, hoverActionsClass(reduceMotion))}
-        >
-          <span aria-hidden className={cn("h-full w-6", ROW_FADE_GRADIENT)} />
-          <span className={cn("flex h-full items-center", ROW_FADE_SOLID)} style={{ gap: STRIP_GAP_PX, paddingRight: STRIP_END_PAD_PX }}>
-            {actionButtons}
-          </span>
-        </span>
-      )}
+      <RowHoverActions view={{ inline: inlineActions, reduceMotion }} isActive={isActive}>
+        {actionButtons}
+      </RowHoverActions>
     </div>
   );
 }
