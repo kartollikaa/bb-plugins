@@ -2,7 +2,7 @@
 
 Status: complete draft for the owner's confirmation. Section 4 builds on R1's report on live
 activity (`R1-live-activity.md`, bb 0.49.0, plugin SDK 0.6.132). Q1 and Q5 were decided by the
-orchestrator, Q2–Q4, Q6 and Q7 by the owner (see «Decided»); Q8 waits on the owner.
+orchestrator, Q2–Q4 and Q6–Q8 by the owner (see «Decided»).
 
 Two parts build from this document: **I1** in kartollika-ai-hub (`plugins/orchestrate`: the skill,
 the ledger schema, the export) and **I2** in this repo (`plugins/orchestration`: the view). Section 5
@@ -626,8 +626,9 @@ Done when:
    the DB migration` become asks (lines 39–40 change); `note: …`, `answered …`, `Q (answered …): …`,
    `Nothing waiting …` and `Nothing waits on owner input.` stay notes; `ask:  | why: …` (no title)
    stays a note (`test/owner.test.ts:44-46`); the us26 line on a `closed` ledger is a note with
-   `freeText: true` and the view's state is not `needs`; an active ledger with six free-text lines
-   gives the result of Q8's answer. A view case with notes only, an idle orchestrator and a last
+   `freeText: true` and the view's state is not `needs`; on an active ledger five free-text lines
+   give five ask cards, and six give one grouped ask card with the six lines folded under it,
+   counted once in «needs you» (Q8). A view case with notes only, an idle orchestrator and a last
    report ending `Waiting on you: connect the Pixel` gives `now.mismatch: true`; the same report
    while the orchestrator runs, or ending `Nothing waits on you.`, gives `false`; a `waiting on:
    owner | for: «Merge the orchestrate plugin PR (I1) …»` line and the matching ask give one «You»
@@ -680,7 +681,11 @@ survey showed closed ledgers with up to 168 free-text lines. The survey, rerun f
 `complete`. The largest: `prototype-motion` active 591, `cozy-redesign` closed 168, `qa-agent-wave2`
 active 36, `withdrawal-confirmation-methods` closed 17, `main-v4-us2-showcase` active 13,
 `core-set-v1` active 9. `complete` is not `closed` in the export, so `redesign-follow-ups` (one line)
-follows rule 6. How an active ledger with hundreds of such lines shows is Q8.
+follows rule 6. On an active ledger with six or more free-text lines, they show as one grouped
+ask card instead of one each (Q8, «Decided»): «N lines in «For the owner» are written as free text —
+the orchestrator should rewrite them», with the lines folded under it, counted once in «needs you»
+and as one «You» row in Waits on. Up to five, each is its own card. Formatted `ask:` lines are never
+grouped.
 
 A free-text ask renders as an ask
 card with a muted chip «written as free text», counts towards «needs you» and the tab count, gets
@@ -750,7 +755,7 @@ on the owner becomes an `ask:`, a current fact a `note:`, and history moves to B
 lets it stop; the next turn is stopped once again until the section is clean. The owner sees one
 extra continuation of the orchestrator's turn per unfinished migration, which is what Q7's answer
 chose; nothing else changes for them, so this raises no new question. Until the migration, the view
-shows those lines by rule 6 or Q8's answer.
+shows those lines by rule 6, grouped from six on (Q8).
 
 Rejected: a `PostToolUse` check (runs on every tool call and cannot tell the turn's end); making
 `check` fail (breaks the exit-0 contract the helpers rely on); the view rule alone (it reveals the
@@ -819,14 +824,12 @@ Decided by the orchestrator on RV-D1's review (message #23):
 - **Staleness is anchored to the last turn's start**, keeping the owner's 10 minutes (section 3,
   «Age and staleness»): an implementation choice under Q3's answer.
 
+- **Q8. An active ledger with many free-text «For the owner» lines** → A: up to five such lines
+  each get their own ask card; from six on they show as one grouped ask card with the lines folded
+  under it, counted once in «needs you» (section 6 a; I2 Done when 2). Decided by the owner on
+  2026-11-16 (message #29): «Up to 5 cards, from 6 on one folded card counted once». Rejected: one
+  card per line (`prototype-motion` would show 591).
+
 ## Open questions for the owner
 
-- **Q8. An active ledger with many free-text «For the owner» lines** (survey in section 6 a:
-  `prototype-motion` 591, `qa-agent-wave2` 36, `main-v4-us2-showcase` 13). A: up to five such
-  lines each get their own ask card; from six on they show as one ask card «N lines in «For the
-  owner» are written as free text — the orchestrator should rewrite them», with the lines folded
-  under it, counting as one in «needs you» (recommended: the wait stays visible, and the owner
-  is not handed hundreds of cards that are mostly old status notes). B: one ask card per line, as
-  rule 6 reads today (`prototype-motion` would show 591 cards until its orchestrator rewrites
-  them). Neither option blocks I1; in I2 it decides one test case (Done when 2) and one branch in
-  `buildView`.
+None.
