@@ -17,6 +17,7 @@
     { "name": "kaiten", "source": "./plugins/kaiten" },
     { "name": "orchestration", "source": "./plugins/orchestration" },
     { "name": "live-ui", "source": "./plugins/live-ui" },
-    { "name": "team-roles", "source": "./plugins/team-roles" }
+    { "name": "team-roles", "source": "./plugins/team-roles" },
+    { "name": "team-stats", "source": "./plugins/team-stats" }
   ]
 }

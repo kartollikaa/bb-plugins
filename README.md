@@ -19,6 +19,7 @@ Plugins for [bb](https://getbb.app), each in its own folder with its own README.
 | [orchestration](plugins/orchestration) | An Orchestration tab on an orchestrator's thread: what needs you and whether the team is moving, from the orchestrate ledger and bb's live thread state. |
 | [live-ui](plugins/live-ui) | Bounded live JSON Metric, Table, Chart and Pipeline views; unpublished development source |
 | [team-roles](plugins/team-roles) | The team plugin's agent roles in a Team roles page: model, effort and prompt per runtime, generated-file and Codex status, and a thread to propose a change. Read-only; unpublished. |
+| [team-stats](plugins/team-stats) | Per-member agent tokens, timing, tool calls, cost estimates and source run history. Unpublished. |
 
 Marketplace listings, release tags and submission/update PRs for every plugin:
 [Publication status](docs/publication.md).

@@ -286,3 +286,11 @@ Before the monorepo, each plugin had its own repo, `kartollikaa/bb-plugin-<id>`.
 - File sources in authoritative thread workspace/storage roots, native host watcher, explicit Live/Pause/Refresh and bounded visibility/consent leases. No producer execution or polling fallback.
 - Syntax, limits and lifecycle: [README](../plugins/live-ui/README.md). Agent discovery: own `skills/live-ui/SKILL.md`; CLI `bb live-ui check '<json>'`.
 - Tests: `npm test`, `npm run typecheck`, `bb plugin build`. Self-hosted catalog tracks `main` for development; no public release or marketplace submission.
+
+## team-stats — `plugins/team-stats/`
+
+- **What:** Team statistics nav page groups delegated agents and workflow calls by member, provider and model. Tokens, timing averages/median/p95, run outcomes, tool calls, coverage, optional blended-rate cost estimates, and source-thread drill-down.
+- **How:** SDK event reads only, with manual scope refresh, project/thread and archived-only selection, client-side search/window/sort. Missing telemetry remains unknown. Bounded to 100 threads, 2,000 events per thread and 5,000 runs; failed reads/caps are visible. No persistent event copies or external services.
+- **Agent skill:** `skills/team-stats/`. CLI: `bb team-stats list [--project <id>] [--thread <id>] [--archived] [--json]`; at most 100 CLI rows.
+- **Checks:** `npm test`, `npm run typecheck`, `bb plugin build`. Lifecycle/usage fold tests include background launch, failed agents, workflow replays and missing samples.
+- MIT. Unpublished; absent from `marketplace.json`.
