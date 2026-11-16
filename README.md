@@ -18,6 +18,7 @@ Plugins for [bb](https://getbb.app), each in its own folder with its own README.
 | [kaiten](plugins/kaiten) | The Kaiten sprint board as a bb page; a click on a card starts a thread that works it. |
 | [orchestration](plugins/orchestration) | An Orchestration tab on an orchestrator's thread: what needs you and whether the team is moving, from the orchestrate ledger and bb's live thread state. |
 | [live-ui](plugins/live-ui) | Bounded live JSON Metric, Table, Chart and Pipeline views; unpublished development source |
+| [team-roles](plugins/team-roles) | The team plugin's agent roles in a Team roles page: model, effort and prompt per runtime, generated-file and Codex status, and a thread to propose a change. Read-only; unpublished. |
 
 Marketplace listings, release tags and submission/update PRs for every plugin:
 [Publication status](docs/publication.md).

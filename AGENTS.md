@@ -31,6 +31,8 @@ test-all.sh        every plugin's tests
 
 A new or renamed plugin goes into all three: `plugins/`, `.bb/plugins.json` and
 `marketplace.json` with an icon in `icons/`, plus the table in `README.md` and `docs/plugins.md`.
+An unpublished plugin stays out of `marketplace.json` (and `icons/`) until Dmitrii approves its
+publication; `kaiten`, `orchestration`, `task-stop` and `team-roles` are such plugins.
 
 ## Rules
 
