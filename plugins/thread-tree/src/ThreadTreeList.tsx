@@ -1,6 +1,6 @@
-import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import * as HoverCard from "@radix-ui/react-hover-card";
+import * as Popover from "@radix-ui/react-popover";
 import { toast } from "sonner";
 import {
   ThreadTitle,
@@ -1277,27 +1277,51 @@ function ThreadRowView({
   );
 }
 
+const PR_CARD_OPEN_MS = 150;
+const PR_CARD_CLOSE_MS = 150;
+
 /** Shown only when a PR needs action; the most urgent one's reason is its tint. Several PRs list in a card. */
 function PullRequestIcon({ pullRequest, list }: { pullRequest: RowPullRequest; list: readonly ListedPullRequest[] }) {
   const navigate = useBbNavigate();
   const portalProps = usePortalScopeProps();
   const [open, setOpen] = useState(false);
+  const openedByHover = useRef(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(hoverTimer.current), []);
   const look = PR_REASON_LOOK[pullRequest.reason];
   const several = list.length > 1;
   const label = several ? pullRequestListLabel(list) : prTooltip(pullRequest);
+  const hoverTo = (next: boolean) => (event: ReactPointerEvent) => {
+    if (event.pointerType === "touch") return;
+    clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => {
+      setOpen((current) => {
+        if (next && !current) openedByHover.current = true;
+        return next ? true : openedByHover.current ? false : current;
+      });
+    }, next ? PR_CARD_OPEN_MS : PR_CARD_CLOSE_MS);
+  };
+  const hoverProps = several ? { onPointerEnter: hoverTo(true), onPointerLeave: hoverTo(false) } : {};
   const button = (
     <button
       type="button"
       data-pr-reason={pullRequest.reason}
       data-pr-count={list.length}
       aria-label={label}
-      aria-haspopup={several ? "dialog" : undefined}
-      aria-expanded={several ? open : undefined}
-      title={several ? undefined : label}
+      // An empty title keeps the row's own tooltip from covering the card.
+      title={several ? "" : label}
+      {...hoverProps}
       onClick={(event) => {
         event.stopPropagation();
-        if (several) setOpen((value) => !value);
-        else navigate.openUrl(pullRequest.pr.url);
+        if (!several) {
+          navigate.openUrl(pullRequest.pr.url);
+          return;
+        }
+        // Radix skips its own toggle, so a click after a hover keeps the card open.
+        event.preventDefault();
+        clearTimeout(hoverTimer.current);
+        openedByHover.current = false;
+        setOpen(true);
       }}
       className={cn("flex size-[18px] shrink-0 items-center justify-center rounded-[5px] outline-none hover:brightness-125 focus-visible:ring-1 focus-visible:ring-sidebar-ring", look.className, look.chipClassName)}
     >
@@ -1305,19 +1329,36 @@ function PullRequestIcon({ pullRequest, list }: { pullRequest: RowPullRequest; l
     </button>
   );
   if (!several) return button;
+  const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
   return (
-    <HoverCard.Root open={open} onOpenChange={setOpen} openDelay={150} closeDelay={120}>
-      <HoverCard.Trigger asChild>{button}</HoverCard.Trigger>
-      <HoverCard.Portal>
-        <HoverCard.Content
+    <Popover.Root
+      open={open}
+      onOpenChange={(next) => {
+        clearTimeout(hoverTimer.current);
+        if (!next) openedByHover.current = false;
+        setOpen(next);
+      }}
+    >
+      <Popover.Trigger asChild>{button}</Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
           {...portalProps}
+          {...hoverProps}
           data-pr-list=""
           side="right"
           align="start"
           sideOffset={8}
           collisionPadding={8}
-          onClick={(event) => event.stopPropagation()}
-          className="z-50 flex max-h-[var(--radix-hover-card-content-available-height)] w-80 max-w-[var(--radix-hover-card-content-available-width)] flex-col rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-md"
+          onOpenAutoFocus={(event) => {
+            if (openedByHover.current) event.preventDefault();
+          }}
+          onCloseAutoFocus={(event) => {
+            if (openedByHover.current) event.preventDefault();
+          }}
+          onClick={stop}
+          onPointerDown={stop}
+          onContextMenu={stop}
+          className="z-50 flex max-h-[var(--radix-popover-content-available-height)] w-80 max-w-[var(--radix-popover-content-available-width)] flex-col rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-md outline-none"
         >
           <div className="shrink-0 px-1.5 pb-1.5 text-xs font-medium text-muted-foreground">{label}</div>
           <ul className="min-h-0 max-h-80 overflow-y-auto">
@@ -1349,9 +1390,9 @@ function PullRequestIcon({ pullRequest, list }: { pullRequest: RowPullRequest; l
               );
             })}
           </ul>
-        </HoverCard.Content>
-      </HoverCard.Portal>
-    </HoverCard.Root>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
