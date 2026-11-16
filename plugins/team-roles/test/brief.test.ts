@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { findSourceProject, marketplaceRepo, normaliseRepo, proposalBrief } from "../lib/brief.ts";
 import { parseRolesJson } from "../lib/parse.ts";
-import type { InstallInfo } from "../lib/schema.ts";
+import type { GeneratedStatus, InstallInfo } from "../lib/schema.ts";
 
 const roles = parseRolesJson(readFileSync(new URL("./fixtures/roles.json", import.meta.url), "utf8")).roles;
 const install: InstallInfo = { root: "/r", version: "0.2.0", key: "team@kartollika-ai-hub", scope: "user", commit: "4451618a1eab872d5f5125148cb430c164e82e43", enabled: true, source: "installed_plugins", others: [] };
-const current = { state: "current", problems: [], error: null, other: [] } as const;
+const current: GeneratedStatus = { state: "current", problems: [], error: null, other: [] };
 
 test("every spelling of the repo normalises to one key", () => {
   const key = "github.com/kartollikaa/kartollika-ai-hub";
@@ -70,4 +70,14 @@ test("brief without an install or roles still renders", () => {
   const brief = proposalBrief({ role: null, install: null, roles: [], generated: current });
   assert.match(brief, /team plugin not found/);
   assert.match(brief, /roles\.json could not be read/);
+});
+
+test("the brief names the role's Codex agent file, not a guessed team-<role>", () => {
+  const reviewer = roles.find((r) => r.name === "reviewer");
+  const codex = reviewer?.runtimes["codex"];
+  assert.ok(reviewer && codex);
+  const renamed = { ...reviewer, runtimes: { ...reviewer.runtimes, codex: { ...codex, agent: "custom-agent" } } };
+  const brief = proposalBrief({ role: renamed, install, roles, generated: current });
+  assert.ok(brief.includes("codex/agents/custom-agent.toml"));
+  assert.ok(!brief.includes("team-reviewer.toml"));
 });

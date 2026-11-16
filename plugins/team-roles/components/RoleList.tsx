@@ -9,6 +9,7 @@ import {
   accessParts,
   codexText,
   generatedText,
+  INSTALL_COMMAND,
   installLine,
   modelEffort,
   proposeSubPath,
@@ -17,7 +18,6 @@ import {
   runtimeLabel,
 } from "@/lib/view";
 
-const INSTALL_COMMAND = "claude plugin install team@kartollika-ai-hub";
 
 function StatusLine({ label, ok, text, children }: { label: string; ok: boolean | null; text: string; children?: React.ReactNode }) {
   return (

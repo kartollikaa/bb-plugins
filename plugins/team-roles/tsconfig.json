@@ -12,5 +12,5 @@
     "skipLibCheck": false,
     "allowImportingTsExtensions": true
   },
-  "include": ["server.ts", "app.tsx", "components", "lib"]
+  "include": ["server.ts", "app.tsx", "components", "lib", "test"]
 }

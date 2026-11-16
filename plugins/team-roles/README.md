@@ -23,7 +23,7 @@ shown as a command for you to run. Editing a role means changing the plugin's so
 the install is never edited.
 
 Where the plugin is found: `installed_plugins.json` of Claude Code (user scope, `$CLAUDE_CONFIG_DIR`
-respected), else the newest folder under `plugins/cache`. The **Team plugin folder** setting
+respected), else the newest folder under `plugins/cache` when there is no `team@` entry at all. A `team@` entry without a usable user-scope install is a named error. The **Team plugin folder** setting
 (`teamRoot`) reads another folder instead, such as a source checkout of `plugins/team`.
 
 Needs `python3` on the bb server's `PATH`. Not published; it is not in the marketplace catalog.

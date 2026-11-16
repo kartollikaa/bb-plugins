@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createStampedCache } from "../lib/cache.ts";
 import { buildSnapshot, type SnapshotDeps } from "../lib/snapshot.ts";
-import { formatList, parseSubPath, generatedFiles, tildePath } from "../lib/view.ts";
+import { formatList, parseSubPath, generatedFiles, roleDetailState, tildePath } from "../lib/view.ts";
 import type { RunResult } from "../lib/schema.ts";
 
 const roles = readFileSync(new URL("./fixtures/roles.json", import.meta.url), "utf8");
@@ -94,4 +94,17 @@ test("a role's generated files follow its runtimes", async () => {
   const reviewer = snapshot.roles.find((r) => r.name === "reviewer");
   assert.ok(reviewer);
   assert.deepEqual(generatedFiles(reviewer), ["agents/reviewer.md", "codex/agents/team-reviewer.toml"]);
+});
+
+test("role detail picks the state: loading, not installed, roles error, unknown role, ok", async () => {
+  const good = await buildSnapshot(deps());
+  const row = good.roles[0];
+  assert.deepEqual(roleDetailState(undefined, undefined, true), { kind: "loading" });
+  assert.deepEqual(roleDetailState(good, undefined, true), { kind: "loading" });
+  assert.equal(roleDetailState(good, row, false).kind, "ok");
+  assert.deepEqual(roleDetailState(good, undefined, false), { kind: "not-found", version: good.install?.version ?? "?" });
+  const none = { ...good, install: null, installError: "team plugin not found", roles: [] };
+  assert.deepEqual(roleDetailState(none, undefined, false), { kind: "not-installed", installError: "team plugin not found" });
+  const broken = { ...good, rolesError: "roles.json: unsupported version 2", roles: [] };
+  assert.deepEqual(roleDetailState(broken, undefined, false), { kind: "roles-error", message: "roles.json: unsupported version 2" });
 });

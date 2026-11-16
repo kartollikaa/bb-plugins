@@ -63,7 +63,7 @@ export function proposalBrief(input: {
     "- plugins/team/adapters/runtimes.json — models, efforts and tool limits per runtime; the only file",
     "  that names a provider, model or runtime tool.",
     `- Generated, never edited by hand: plugins/team/agents/${sourceName}.md,`,
-    `  plugins/team/codex/agents/team-${sourceName}.toml, plugins/team/roles.json.`,
+    `  plugins/team/codex/agents/${role?.runtimes["codex"]?.agent ?? `team-${sourceName}`}.toml, plugins/team/roles.json.`,
   ];
   const now = role === null
     ? roles.map((each) => `- ${each.name}: ${Object.entries(each.runtimes).map(([runtime, row]) => `${runtime} ${row.model}/${row.effort}`).join(", ")}`)
