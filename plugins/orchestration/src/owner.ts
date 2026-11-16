@@ -69,7 +69,7 @@ function parseAsk(text: string): OwnerItem | null {
 
 /** Lines that are a record or say that nothing waits: never a wait on the owner. */
 const NOTHING_LINE = new Set(["nothing", "«nothing»", "nothing pending", "ничего", "none", "—"]);
-const NOT_A_WAIT = /^(?:note:|answered\b|q\s*\(answered\b[^)]*\)\s*:|ask\s*\(draft\)\s*:|nothing\s+(?:waiting|waits|for\s+the\s+owner)|quiet:|ничего\s+не\s+ждёт)/i;
+const NOT_A_WAIT = /^(?:note:|answered\b|q\s*\(answered\b[^)]*\)\s*:|ask\s*\(draft\)\s*:|nothing\s*(?:waiting|waits|for\s*the\s*owner)|quiet:|ничего\s+не\s+ждёт)/i;
 
 /**
  * The ledger schema has only `ask:` and `note:`. Besides the hand-written `Q:` forms, a line that is no record and does not say

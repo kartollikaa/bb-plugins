@@ -152,7 +152,9 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
 - On an active ledger every other line that is not a note is a wait on the owner: a line that states a wait in
   free text shows as an ask card with a «written as free text» chip (from six such lines one grouped card,
   answered line by line, counted once). `note:`, `answered …`, `Q (answered …):`, `ask (draft):` and «Nothing waiting …»
-  lines are information: they show under Details and never count as needs you. On a `closed` ledger free-text lines
+  lines are information, including compact forms such as `Nothingwaitsonowner`: they show under Details and
+  never count as needs you. Missing spaces are tolerated only in these no-wait prefixes; the original text
+  is preserved. Write operational instructions as `note:` so they cannot become owner questions. On a `closed` ledger free-text lines
   are notes. An `ask:` with no title is a note too. An idle orchestrator whose last message ends with `Waiting on you:`
   or holds an interactive form while no ask is recorded gets a needs-you card.
 - A ` | ` segment without one of the keys above stays with the field before it, so a title or a

@@ -470,6 +470,18 @@ test("a hand-written `Q (asked …):` line needs you, and the owner's `Re «titl
 
 const FREE = (n: number) => Array.from({ length: n }, (_, i) => `Waiting: owner decision ${i + 1}`);
 
+test("a compact operational note stays in history without an owner card or answer tracking", async () => {
+  const { askFirstSeen } = await import("../src/answered.ts");
+  const line = "Nothingwaitsonowner. Quietrelays: progressinledger, notifyonlydecision/blocker/verifiedoutcome. No routinepolling/duplicatepings. Durableworkersautoparent verified; sourceapproval/dispatch/gatelabel isnotcompletion. Pendingtasksremainwaiting/working untilactualevidence+landing. Correctbefore/aftercampaignreceiptregularUUIDJSONbytes/SHAformat, noreset/clear/wipe; emulatorauthorized, preserveunrelatedprocesses.";
+  const v = view([subtask("S1", "working")], { thr_s1: live(1) }, {}, { forTheOwner: [line] });
+  assert.deepEqual(v.asks, []);
+  assert.notEqual(v.sections.status.word, "Needs you");
+  assert.deepEqual(v.history.notes, [line]);
+  assert.deepEqual(askFirstSeen([line], { [line]: NOW }), {});
+  const mixed = view([subtask("S1", "working")], { thr_s1: live(1) }, {}, { forTheOwner: [line, "ask: Approve migration"] });
+  assert.deepEqual(mixed.asks.map((a) => a.title), ["Approve migration"]);
+});
+
 test("the us26 free-text line on an active ledger needs you, on a closed ledger it does not", () => {
   const line = "connect Pixel 9a (5C111JEBF10513) via USB/wireless debugging, app signed in on drma-dy → device check resumes in thr_bjp39sjv29";
   const open = view([subtask("S1", "working")], { thr_s1: live(1) }, {}, { forTheOwner: [line] });

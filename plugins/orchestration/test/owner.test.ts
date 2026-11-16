@@ -34,6 +34,18 @@ test("a note, and a «Nothing waiting» status line, never need the owner", () =
   assert.equal(parseOwnerItem("Nothing waits on owner input.").kind, "note");
 });
 
+test("a no-owner-wait status remains a note when its spaces are omitted", () => {
+  for (const line of [
+    "Nothingwaitsonowner. Quietrelays: progressinledger, notifyonlydecision/blocker/verifiedoutcome.",
+    "Nothing waits onowner. Quiet relays: progress in ledger.",
+    "Nothingwaiting. Progress stays in the ledger.",
+    "Nothingfortheowner. Checks continue.",
+  ]) assert.deepEqual(parseOwnerItem(line, "active"), { kind: "note", text: line });
+  for (const line of ["Nothing lands until you approve the migration", "Waiting: owner decision", "ask: Approve migration"]) {
+    assert.equal(parseOwnerItem(line, "active").kind, "ask", line);
+  }
+});
+
 const US26 = "connect Pixel 9a (5C111JEBF10513) via USB/wireless debugging, app signed in on drma-dy → device check resumes in thr_bjp39sjv29";
 
 test("an «answered …» record and a «Nothing waiting» line are notes; a line that states a wait is an ask", () => {
