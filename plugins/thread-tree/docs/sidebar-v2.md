@@ -107,7 +107,9 @@ Left to right, fixed 32px height:
   siblings misalign), a hollow ring (noise across dozens of rows).
 - **PR:** a tinted 14px icon only when a PR needs action (checks failing, conflicts, changes
   requested, ready to merge); the number and title are in its tooltip, click opens GitHub.
-  Nothing otherwise. A failed thread shows Retry and no PR icon. Owner: the PR line "feels like
+  A thread with several PRs tints the icon for the most urgent one, and hovering or clicking it
+  opens a card listing them all, actionable first; each opens on GitHub. Owner, after v2 shipped:
+  hovering the icon of a thread with several PRs showed nothing. Nothing otherwise. A failed thread shows Retry and no PR icon. Owner: the PR line "feels like
   too much information … I see the pull request, but I don't use it." Rejected: today's
   scrolling second line, a one-word pill (costs about 40% of the title at 300px), and a PR icon
   revealed on hover (invisible on touch and to keyboard users, and it competes with the hover

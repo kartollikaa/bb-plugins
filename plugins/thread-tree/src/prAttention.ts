@@ -53,3 +53,38 @@ export function rowPullRequest(prs: readonly ThreadPullRequest[], folder: Folder
 export function prTooltip({ pr, reason }: RowPullRequest): string {
   return `PR #${pr.number}: ${pr.title} · ${PR_REASON_LOOK[reason].label}`;
 }
+
+export interface ListedPullRequest {
+  pr: ThreadPullRequest;
+  reason: PrReason | null;
+}
+
+const STATE_ORDER: readonly ThreadPullRequest["state"][] = ["open", "draft", "unknown", "merged", "closed"];
+const STATE_LABEL: Record<ThreadPullRequest["state"], string> = {
+  open: "Open",
+  draft: "Draft",
+  unknown: "Status unknown",
+  merged: "Merged",
+  closed: "Closed",
+};
+
+/** Every PR of the row, one per URL: those needing action by urgency, then the rest by state. */
+export function rowPullRequestList(prs: readonly ThreadPullRequest[], folder: FolderAttention): ListedPullRequest[] {
+  const byUrl = new Map<string, ListedPullRequest>();
+  for (const pr of prs) {
+    const key = pr.url.toLowerCase();
+    if (!byUrl.has(key)) byUrl.set(key, { pr, reason: prActionReason(pr, folder) });
+  }
+  const rank = ({ pr, reason }: ListedPullRequest) =>
+    reason ? PR_REASONS.indexOf(reason) : PR_REASONS.length + STATE_ORDER.indexOf(pr.state);
+  return [...byUrl.values()].sort((a, b) => rank(a) - rank(b) || b.pr.number - a.pr.number);
+}
+
+export function listedPullRequestStatus({ pr, reason }: ListedPullRequest): string {
+  return reason ? PR_REASON_LOOK[reason].label : STATE_LABEL[pr.state];
+}
+
+export function pullRequestListLabel(list: readonly ListedPullRequest[]): string {
+  const needAction = list.filter((item) => item.reason).length;
+  return `${list.length} pull requests · ${needAction} need${needAction === 1 ? "s" : ""} action`;
+}

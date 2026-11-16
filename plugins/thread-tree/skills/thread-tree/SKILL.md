@@ -105,7 +105,10 @@ glyph, so a tap never stops a thread; a long press opens the row's menu.
 
 The PR icon appears only when one of the thread's pull requests needs action:
 checks failing (red), conflicts (orange), changes requested (amber) or ready to
-merge (green). Hover it for the number, title and reason; click it to open
+merge (green), tinted for the most urgent one. With one PR, hover it for the
+number, title and reason and click it to open GitHub. With several, hovering or
+clicking it opens a card listing every PR of the thread, those needing action
+first, each with its number, title and reason or state; click one to open it on
 GitHub. A quiet, merged or closed PR shows nothing, and a failed thread shows
 Retry instead. The built-in GitHub PR Status plugin supplies the branch PR's
 checks and conflicts; with Thread Links installed, PRs linked in the session

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { providerTintColor } from "../src/providerTint.ts";
-import { folderAttentionByUrl, prActionReason, prTooltip, rowPullRequest } from "../src/prAttention.ts";
+import { folderAttentionByUrl, listedPullRequestStatus, prActionReason, prTooltip, pullRequestListLabel, rowPullRequest, rowPullRequestList } from "../src/prAttention.ts";
 import { familyRootOf, sharedBranchThreads, sharedBranchTooltip, type BranchThread } from "../src/sharedBranch.ts";
 import { createRefreshScheduler } from "../src/refreshScheduler.ts";
 import type { ThreadPullRequest } from "../src/threadPullRequests.ts";
@@ -64,6 +64,21 @@ test("a row shows its most urgent PR, and none on a failed thread", () => {
   assert.equal(rowPullRequest(prs, none, true), null);
   assert.equal(rowPullRequest([pr()], none, false), null);
   assert.equal(prTooltip({ pr: pr({ checks: { state: "failing" } }), reason: "failing" }), "PR #7: Fix it · Checks failing");
+});
+
+test("a row's PR list puts PRs needing action first by urgency, then the rest by state, one per URL", () => {
+  const list = rowPullRequestList([
+    pr({ url: "https://github.com/o/r/pull/1", number: 1, state: "merged" }),
+    pr({ url: "https://github.com/o/r/pull/2", number: 2 }),
+    pr({ url: "https://github.com/o/r/pull/3", number: 3, attention: "conflicts" }),
+    pr({ url: "https://github.com/o/r/pull/4", number: 4, checks: { state: "failing" } }),
+    pr({ url: "https://github.com/o/r/pull/5", number: 5, state: "closed" }),
+    pr({ url: "https://github.com/O/R/pull/4", number: 4 }),
+  ], none);
+  assert.deepEqual(list.map((item) => item.pr.number), [4, 3, 2, 1, 5]);
+  assert.deepEqual(list.map(listedPullRequestStatus), ["Checks failing", "Has conflicts", "Open", "Merged", "Closed"]);
+  assert.equal(pullRequestListLabel(list), "5 pull requests · 2 need action");
+  assert.equal(pullRequestListLabel(list.slice(1, 3)), "2 pull requests · 1 needs action");
 });
 
 const bt = (id: string, env: Partial<NonNullable<BranchThread["environment"]>> | null, extra: Partial<BranchThread> = {}): BranchThread => ({

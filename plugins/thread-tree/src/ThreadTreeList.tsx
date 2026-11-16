@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import * as HoverCard from "@radix-ui/react-hover-card";
 import { toast } from "sonner";
 import {
   ThreadTitle,
@@ -35,7 +36,18 @@ import { useThreadPullRequests } from "./useThreadPullRequests";
 import { useDiffStats } from "./useDiffStats";
 import { PullRequestActionPill, usePullRequestActions } from "./usePullRequestActions";
 import { excludeDescendantPullRequests, type ThreadPullRequest } from "./threadPullRequests";
-import { folderAttentionByUrl, PR_REASON_LOOK, prTooltip, rowPullRequest, type FolderAttention, type RowPullRequest } from "./prAttention";
+import {
+  folderAttentionByUrl,
+  listedPullRequestStatus,
+  PR_REASON_LOOK,
+  prTooltip,
+  pullRequestListLabel,
+  rowPullRequest,
+  rowPullRequestList,
+  type FolderAttention,
+  type ListedPullRequest,
+  type RowPullRequest,
+} from "./prAttention";
 import { providerTintColor } from "./providerTint";
 import { familyRootOf, sharedBranchThreads, sharedBranchTooltip } from "./sharedBranch";
 import { pullRequestThreads } from "./pullRequestKeys";
@@ -1099,7 +1111,9 @@ function ThreadRowView({
   const dot = <RowStatusGlyph glyph={glyph} />;
   const providerName = provider?.displayName ?? thread.providerId;
   const failed = thread.status === "error" && !thread.isArchived;
-  const pullRequest = rowPullRequest(excludeDescendantPullRequests(pullRequestsOf(thread), descendants.flatMap(pullRequestsOf)), folderAttention, failed);
+  const ownPullRequests = excludeDescendantPullRequests(pullRequestsOf(thread), descendants.flatMap(pullRequestsOf));
+  const pullRequest = rowPullRequest(ownPullRequests, folderAttention, failed);
+  const pullRequestList = pullRequest ? rowPullRequestList(ownPullRequests, folderAttention) : [];
   const branch = thread.environment?.branchName ?? null;
   const tooltip = [
     context ? `${thread.displayTitle} · ${context}` : thread.displayTitle,
@@ -1190,7 +1204,7 @@ function ThreadRowView({
           {/* Above the overlay's fade, so hover and focus never hide or block them. */}
           <span className="relative z-[1] flex shrink-0 items-center gap-2 empty:hidden">
             {failed ? <RetryButton threadId={thread.id} /> : null}
-            {pullRequest ? <PullRequestIcon pullRequest={pullRequest} /> : null}
+            {pullRequest ? <PullRequestIcon pullRequest={pullRequest} list={pullRequestList} /> : null}
             {sharesBranchWith ? (
               <span
                 data-shared-branch=""
@@ -1263,25 +1277,81 @@ function ThreadRowView({
   );
 }
 
-/** Shown only when the PR needs action; the reason is its tint and tooltip. */
-function PullRequestIcon({ pullRequest }: { pullRequest: RowPullRequest }) {
+/** Shown only when a PR needs action; the most urgent one's reason is its tint. Several PRs list in a card. */
+function PullRequestIcon({ pullRequest, list }: { pullRequest: RowPullRequest; list: readonly ListedPullRequest[] }) {
   const navigate = useBbNavigate();
+  const portalProps = usePortalScopeProps();
+  const [open, setOpen] = useState(false);
   const look = PR_REASON_LOOK[pullRequest.reason];
-  const label = prTooltip(pullRequest);
-  return (
+  const several = list.length > 1;
+  const label = several ? pullRequestListLabel(list) : prTooltip(pullRequest);
+  const button = (
     <button
       type="button"
       data-pr-reason={pullRequest.reason}
+      data-pr-count={list.length}
       aria-label={label}
-      title={label}
+      aria-haspopup={several ? "dialog" : undefined}
+      aria-expanded={several ? open : undefined}
+      title={several ? undefined : label}
       onClick={(event) => {
         event.stopPropagation();
-        navigate.openUrl(pullRequest.pr.url);
+        if (several) setOpen((value) => !value);
+        else navigate.openUrl(pullRequest.pr.url);
       }}
       className={cn("flex size-[18px] shrink-0 items-center justify-center rounded-[5px] outline-none hover:brightness-125 focus-visible:ring-1 focus-visible:ring-sidebar-ring", look.className, look.chipClassName)}
     >
       <Icon name={look.icon} aria-hidden className="size-3" />
     </button>
+  );
+  if (!several) return button;
+  return (
+    <HoverCard.Root open={open} onOpenChange={setOpen} openDelay={150} closeDelay={120}>
+      <HoverCard.Trigger asChild>{button}</HoverCard.Trigger>
+      <HoverCard.Portal>
+        <HoverCard.Content
+          {...portalProps}
+          data-pr-list=""
+          side="right"
+          align="start"
+          sideOffset={8}
+          collisionPadding={8}
+          onClick={(event) => event.stopPropagation()}
+          className="z-50 flex max-h-[var(--radix-hover-card-content-available-height)] w-80 max-w-[var(--radix-hover-card-content-available-width)] flex-col rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-md"
+        >
+          <div className="shrink-0 px-1.5 pb-1.5 text-xs font-medium text-muted-foreground">{label}</div>
+          <ul className="min-h-0 max-h-80 overflow-y-auto">
+            {list.map((item) => {
+              const itemLook = item.reason ? PR_REASON_LOOK[item.reason] : null;
+              return (
+                <li key={item.pr.url}>
+                  <button
+                    type="button"
+                    data-pr-item={item.pr.number}
+                    title={item.pr.url}
+                    onClick={() => {
+                      setOpen(false);
+                      navigate.openUrl(item.pr.url);
+                    }}
+                    className="flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left outline-none hover:bg-accent focus-visible:bg-accent"
+                  >
+                    <span className={cn("mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-[5px]", itemLook ? [itemLook.className, itemLook.chipClassName] : "text-muted-foreground")}>
+                      <Icon name={itemLook?.icon ?? (item.pr.state === "merged" ? "GitMerge" : "GitPullRequest")} aria-hidden className="size-3" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm">
+                        <span className="tabular-nums text-muted-foreground">#{item.pr.number}</span> {item.pr.title}
+                      </span>
+                      <span className={cn("block truncate text-xs", itemLook ? itemLook.className : "text-muted-foreground")}>{listedPullRequestStatus(item)}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </HoverCard.Content>
+      </HoverCard.Portal>
+    </HoverCard.Root>
   );
 }
 
