@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Markdown, experimental_copyToClipboard, experimental_useRpcQuery as useRpcQuery, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
-import { CHIP, Notice } from "@/components/shared";
+import { CHIP, CopyText, Notice } from "@/components/shared";
 import { cn } from "@/lib/utils";
 import { rpcContract } from "@/lib/contract";
 import type { RoleRow } from "@/lib/schema";
-import { accessParts, proposeSubPath, runtimeKeys, runtimeLabel } from "@/lib/view";
+import { accessParts, INSTALL_COMMAND, proposeSubPath, roleDetailState, runtimeKeys, runtimeLabel } from "@/lib/view";
 
 function Prompt({ name, runtimes }: { name: string; runtimes: string[] }) {
   const [runtime, setRuntime] = useState(runtimes[0] ?? "");
@@ -72,8 +72,8 @@ export function RoleDetail({ name }: { name: string }) {
   const snapshot = useRpcQuery({ contract: rpcContract, method: "snapshot", input: null });
   const role = useRpcQuery({ contract: rpcContract, method: "role", input: { name } });
   const back = () => navigate.toPluginPanel("roles", { subPath: "" });
-  const version = snapshot.data?.install?.version ?? "(not installed)";
-  const row = role.data;
+  const state = roleDetailState(snapshot.data, role.data, role.isLoading);
+  const row = state.kind === "ok" ? state.role : undefined;
 
   return (
     <div className="h-full min-h-0 flex-1 overflow-y-auto">
@@ -87,16 +87,23 @@ export function RoleDetail({ name }: { name: string }) {
             Propose a change
           </Button>
         </div>
-        {role.isLoading ? (
+        {state.kind === "loading" ? (
           <Notice>Loading…</Notice>
-        ) : row === undefined ? (
+        ) : state.kind === "not-installed" ? (
           <Notice>
-            No role <code>{name}</code> in team {version}.{" "}
+            <p className="mb-2">The team plugin isn't installed for Claude Code{state.installError === null ? "" : ` (${state.installError})`}.</p>
+            <CopyText text={INSTALL_COMMAND} />
+          </Notice>
+        ) : state.kind === "roles-error" ? (
+          <Notice tone="error">{state.message}</Notice>
+        ) : state.kind === "not-found" ? (
+          <Notice>
+            No role <code>{name}</code> in team {state.version}.{" "}
             <button type="button" className="cursor-pointer underline" onClick={back}>
               Back to the list
             </button>
           </Notice>
-        ) : (
+        ) : row === undefined ? null : (
           <>
             <p className="text-sm">{row.intent}</p>
             <div className="flex flex-wrap gap-1.5">

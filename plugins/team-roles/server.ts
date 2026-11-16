@@ -202,7 +202,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (command !== "list") {
         return { exitCode: command === undefined || command === "help" || command === "--help" ? 0 : 1, stdout: usage };
       }
-      const current = await snapshot(true);
+      const current = await snapshot(false);
       const ok = current.install !== null && current.rolesError === null;
       const output = json ? JSON.stringify(current) : formatList(current, homedir());
       return ok ? { exitCode: 0, stdout: output } : { exitCode: 1, stdout: json ? output : undefined, stderr: current.installError ?? current.rolesError ?? "team plugin not found" };

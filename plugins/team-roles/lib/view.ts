@@ -1,5 +1,7 @@
 import type { CodexStatus, GeneratedStatus, InstallInfo, RoleRow, Snapshot } from "./schema.ts";
 
+export const INSTALL_COMMAND = "claude plugin install team@kartollika-ai-hub";
+
 export type Route =
   | { kind: "list" }
   | { kind: "role"; name: string }
@@ -110,4 +112,20 @@ export function formatList(snapshot: Snapshot, home: string | null): string {
   const widths = header.map((_, column) => Math.max(...[header, ...rows].map((row) => (row[column] ?? "").length)));
   const format = (row: string[]) => row.map((cell, column) => cell.padEnd(widths[column] ?? 0)).join("  ").trimEnd();
   return [...lines, "", format(header), ...rows.map(format)].join("\n");
+}
+
+export type RoleDetailState<R extends RoleRow = RoleRow> =
+  | { kind: "loading" }
+  | { kind: "not-installed"; installError: string | null }
+  | { kind: "roles-error"; message: string }
+  | { kind: "not-found"; version: string }
+  | { kind: "ok"; role: R };
+
+export function roleDetailState<R extends RoleRow>(snapshot: Snapshot | undefined, role: R | undefined, roleLoading: boolean): RoleDetailState<R> {
+  if (snapshot === undefined) return { kind: "loading" };
+  if (snapshot.install === null) return { kind: "not-installed", installError: snapshot.installError };
+  if (snapshot.rolesError !== null) return { kind: "roles-error", message: snapshot.rolesError };
+  if (role !== undefined) return { kind: "ok", role };
+  if (roleLoading) return { kind: "loading" };
+  return { kind: "not-found", version: snapshot.install.version ?? "?" };
 }
