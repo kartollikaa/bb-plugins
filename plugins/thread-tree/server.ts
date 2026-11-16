@@ -24,19 +24,26 @@ import { archiveScopes, dirtyEnvironmentIds, MAX_THREADS_PER_CALL } from "./src/
 import { createSignalReader, threadSignalsSchema, type SignalListArgs } from "./src/threadSignals";
 import {
   agentReviewSpawnArgs,
+  encodeReviewModel,
   mergeEnvironmentOf,
   projectForRepo,
   PR_STATUS_PLUGIN_ID,
   repoSlugFromPrUrl,
   reviewExecution,
 } from "./src/pullRequestActions";
-import { loadReviewCatalogs, spawnWithFallback } from "./src/agentReview";
+import { loadReviewCatalogs, reviewPickerSeed, spawnWithFallback } from "./src/agentReview";
 import { pullRequestStatusRowSchema } from "./src/threadPullRequests";
 
 /** At most one refresh per thread this often; bb already debounces its events to one a second. */
 const SIGNAL_REFRESH_MS = 2_000;
 const signalTag = (threadId: string) => `signals:${threadId}`;
 
+
+const reviewPickerValueSchema = z.object({
+  providerId: z.string().min(1).max(100),
+  model: z.string().min(1).max(200),
+  reasoningLevel: z.string().min(1).max(50),
+}).strict();
 
 const pullRequestUrlSchema = z.string().max(400).regex(/^https:\/\/(?:www\.)?github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*$/i);
 
@@ -45,6 +52,16 @@ export const rpcContract = defineRpcContract({
   reviewProjects: {
     input: z.object({ keys: z.array(z.string().min(1).max(200)).min(1).max(200) }),
     output: z.record(z.string(), z.object({ projectId: z.string(), name: z.string() }).nullable()),
+  },
+  /** Where the Agent review picker on the settings page opens; null when no provider lists a model. */
+  reviewPickerSeed: {
+    input: z.null(),
+    output: reviewPickerValueSchema.nullable(),
+  },
+  /** Saves the Agent review model; null goes back to the project's default model and reasoning. */
+  setReviewModel: {
+    input: z.object({ selection: reviewPickerValueSchema.nullable() }).strict(),
+    output: z.object({ ok: z.literal(true) }),
   },
   agentReview: {
     input: z.object({ url: pullRequestUrlSchema, number: z.number().int().positive(), title: z.string().max(400) }).strict(),
@@ -241,6 +258,13 @@ export default async function plugin(bb: BbPluginApi) {
       const projects = await listProjects();
       return Object.fromEntries(keys.map((repo) => [repo, projectForRepo(repo, projects)]));
     },
+    reviewPickerSeed: async () => reviewPickerSeed(bb.sdk, warn, readReviewSettings(await settings.get()).reviewModel),
+    setReviewModel: async ({ selection }) => {
+      await settings.experimental_set(selection
+        ? { reviewModel: encodeReviewModel(selection), reviewReasoningLevel: selection.reasoningLevel }
+        : { reviewModel: null, reviewReasoningLevel: null });
+      return { ok: true as const };
+    },
     agentReview: async ({ url, number, title }) => {
       const repo = repoSlugFromPrUrl(url);
       const project = repo ? projectForRepo(repo, await listProjects()) : null;
@@ -248,7 +272,7 @@ export default async function plugin(bb: BbPluginApi) {
       const { reviewModel, reviewReasoningLevel } = readReviewSettings(await settings.get());
       const { execution, warning } = reviewExecution(
         { model: reviewModel, reasoningLevel: reviewReasoningLevel },
-        reviewModel.trim() ? await loadReviewCatalogs(bb.sdk, warn, { projectId: project.projectId, model: reviewModel }) : [],
+        await loadReviewCatalogs(bb.sdk, warn, { projectId: project.projectId, model: reviewModel }),
       );
       if (warning) warn(`agent review of ${url}: ${warning}`);
       const thread = await spawnWithFallback(

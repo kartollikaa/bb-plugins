@@ -85,6 +85,7 @@ export interface ProviderModelCatalog {
   providerId: string;
   models: readonly {
     model: string;
+    isDefault?: boolean;
     defaultReasoningEffort: string;
     reasoningDiscovery?: "known" | "unknown";
     supportedReasoningEfforts: readonly { reasoningEffort: string }[];
@@ -100,6 +101,29 @@ export interface ReviewExecution {
   executionInputSources?: { providerId: ExecutionSource; model: ExecutionSource; reasoningLevel?: ExecutionSource };
 }
 
+export interface ReviewModelRef {
+  /** Null for a bare model id: any available provider that offers it. */
+  providerId: string | null;
+  model: string;
+}
+
+const PROVIDER_ID = /^[a-z0-9][a-z0-9_-]*$/i;
+
+/** `provider/model` pins both; a bare id (as saved before the picker existed) names only the model. Null when blank. */
+export function parseReviewModel(value: string): ReviewModelRef | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const slash = trimmed.indexOf("/");
+  const providerId = slash > 0 ? trimmed.slice(0, slash) : "";
+  return PROVIDER_ID.test(providerId) && slash < trimmed.length - 1
+    ? { providerId, model: trimmed.slice(slash + 1) }
+    : { providerId: null, model: trimmed };
+}
+
+export function encodeReviewModel({ providerId, model }: { providerId: string; model: string }): string {
+  return `${providerId}/${model}`;
+}
+
 /** The project's provider first, so a model several providers offer runs where the project's threads do. */
 export function reviewProviderOrder(providerIds: readonly string[], projectProviderId: string | null): string[] {
   return projectProviderId && providerIds.includes(projectProviderId)
@@ -108,18 +132,21 @@ export function reviewProviderOrder(providerIds: readonly string[], projectProvi
 }
 
 export function catalogOffers(catalog: ProviderModelCatalog, model: string): boolean {
-  return catalog.models.some((candidate) => candidate.model === model.trim());
+  return catalog.models.some((candidate) => candidate.model === model);
 }
 
 /**
- * The provider is the first catalog offering the model, since a model id only runs on its own provider.
- * A blank model, or one no catalog offers, leaves the project's defaults. The level sent is the chosen one,
- * else the model's default; a model without a default sends none, and bb fills in the project's level.
+ * The provider is the pinned one, or for a bare model id the first catalog offering it, since a model id only
+ * runs on its own provider. A blank model, or one its provider doesn't offer, leaves the project's defaults.
+ * The level sent is the chosen one, else the model's default; a model without a default sends none, and bb
+ * fills in the project's level.
  */
 export function reviewExecution(choice: ReviewModelChoice, catalogs: readonly ProviderModelCatalog[]): { execution: ReviewExecution; warning: string | null } {
-  const model = choice.model.trim();
-  if (!model) return { execution: {}, warning: null };
+  const ref = parseReviewModel(choice.model);
+  if (!ref) return { execution: {}, warning: null };
+  const { providerId, model } = ref;
   for (const catalog of catalogs) {
+    if (providerId !== null && catalog.providerId !== providerId) continue;
     const entry = catalog.models.find((candidate) => candidate.model === model);
     if (!entry) continue;
     const chosen = choice.reasoningLevel === REVIEW_REASONING_DEFAULT ? null : choice.reasoningLevel;
@@ -135,7 +162,8 @@ export function reviewExecution(choice: ReviewModelChoice, catalogs: readonly Pr
       warning: chosen !== null && !supported ? `${model} doesn't support reasoning level ${chosen}; the review uses ${level ? "the model's default" : "the project's level"}` : null,
     };
   }
-  return { execution: {}, warning: `No available provider offers ${model}; the review uses the project's default model` };
+  const where = providerId === null ? "No available provider offers" : `Provider ${providerId} isn't available or doesn't offer`;
+  return { execution: {}, warning: `${where} ${model}; the review uses the project's default model` };
 }
 
 export function agentReviewSpawnArgs({ projectId, url, number, title, execution }: {

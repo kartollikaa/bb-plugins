@@ -4,6 +4,8 @@ import {
   agentReviewPrompt,
   agentReviewSpawnArgs,
   catalogOffers,
+  encodeReviewModel,
+  parseReviewModel,
   reviewExecution,
   reviewProviderOrder,
   type ProviderModelCatalog,
@@ -70,88 +72,127 @@ test("the review prompt names the PR and keeps the agent off GitHub and off the 
 
 const efforts = (...levels: string[]) => levels.map((reasoningEffort) => ({ reasoningEffort }));
 const catalogs: ProviderModelCatalog[] = [
-  { providerId: "codex", models: [{ model: "gpt-5.5", defaultReasoningEffort: "medium", supportedReasoningEfforts: efforts("minimal", "low", "medium", "high") }] },
   {
-    providerId: "claude-code",
+    providerId: "alpha",
     models: [
-      { model: "claude-sonnet-5-5", defaultReasoningEffort: "medium", supportedReasoningEfforts: efforts("low", "medium", "high") },
-      { model: "claude-opus-5-5", defaultReasoningEffort: "high", supportedReasoningEfforts: efforts("low", "medium", "high", "xhigh", "max") },
+      { model: "shared-model", defaultReasoningEffort: "medium", supportedReasoningEfforts: efforts("low", "medium") },
+      { model: "alpha-only", defaultReasoningEffort: "low", supportedReasoningEfforts: efforts("minimal", "low", "medium", "high") },
+    ],
+  },
+  {
+    providerId: "beta",
+    models: [
+      { model: "shared-model", defaultReasoningEffort: "high", supportedReasoningEfforts: efforts("medium", "high", "max") },
+      { model: "beta-only", defaultReasoningEffort: "high", supportedReasoningEfforts: efforts("low", "high", "max") },
     ],
   },
 ];
 const review = { projectId: "proj_1", url: "https://github.com/a/b/pull/7", number: 7, title: "Fix it" };
 
-test("by default the review spawns on Opus 5.5 at medium reasoning, on the provider that offers it", () => {
-  const { reviewModel, reviewReasoningLevel } = readReviewSettings(undefined);
-  assert.deepEqual({ reviewModel, reviewReasoningLevel }, { reviewModel: "claude-opus-5-5", reviewReasoningLevel: "medium" });
-  const { execution, warning } = reviewExecution({ model: reviewModel, reasoningLevel: reviewReasoningLevel }, catalogs);
+test("by default the review passes no model or reasoning, so bb uses the project's defaults", () => {
+  const settings = readReviewSettings(undefined);
+  assert.deepEqual(settings, { reviewModel: "", reviewReasoningLevel: "default" });
+  const { execution, warning } = reviewExecution({ model: settings.reviewModel, reasoningLevel: settings.reviewReasoningLevel }, catalogs);
   assert.equal(warning, null);
   assert.deepEqual(agentReviewSpawnArgs({ ...review, execution }), {
     projectId: "proj_1",
     environment: { type: "project-default" },
     title: "Review #7 Fix it",
     prompt: agentReviewPrompt({ url: review.url, number: 7 }),
-    providerId: "claude-code",
-    model: "claude-opus-5-5",
-    reasoningLevel: "medium",
+  });
+});
+
+test("the setting names provider and model together, and a bare id names only the model", () => {
+  assert.equal(encodeReviewModel({ providerId: "beta", model: "shared-model" }), "beta/shared-model");
+  assert.deepEqual(parseReviewModel("beta/shared-model"), { providerId: "beta", model: "shared-model" });
+  assert.deepEqual(parseReviewModel(" shared-model "), { providerId: null, model: "shared-model" });
+  assert.deepEqual(parseReviewModel("beta/vendor/model"), { providerId: "beta", model: "vendor/model" });
+  assert.deepEqual(parseReviewModel("/model"), { providerId: null, model: "/model" });
+  assert.deepEqual(parseReviewModel("beta/"), { providerId: null, model: "beta/" });
+  assert.equal(parseReviewModel("  "), null);
+});
+
+test("a pinned pair spawns on that provider even when another lists the same model first", () => {
+  const { execution, warning } = reviewExecution({ model: "beta/shared-model", reasoningLevel: "max" }, catalogs);
+  assert.equal(warning, null);
+  assert.deepEqual(agentReviewSpawnArgs({ ...review, execution }), {
+    projectId: "proj_1",
+    environment: { type: "project-default" },
+    title: "Review #7 Fix it",
+    prompt: agentReviewPrompt({ url: review.url, number: 7 }),
+    providerId: "beta",
+    model: "shared-model",
+    reasoningLevel: "max",
     executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit" },
   });
 });
 
-test("the chosen model and reasoning level reach the spawn", () => {
-  const { reviewModel, reviewReasoningLevel } = readReviewSettings({ reviewModel: " gpt-5.5 ", reviewReasoningLevel: "high" });
-  const { execution } = reviewExecution({ model: reviewModel, reasoningLevel: reviewReasoningLevel }, catalogs);
-  const args = agentReviewSpawnArgs({ ...review, execution });
-  assert.equal(args.providerId, "codex");
-  assert.equal(args.model, "gpt-5.5");
-  assert.equal(args.reasoningLevel, "high");
+test("a model only the second provider offers spawns there, pinned or bare", () => {
+  for (const model of ["beta/beta-only", "beta-only"]) {
+    const { execution, warning } = reviewExecution({ model, reasoningLevel: "low" }, catalogs);
+    assert.equal(warning, null, model);
+    assert.equal(execution.providerId, "beta", model);
+    assert.equal(execution.model, "beta-only", model);
+    assert.equal(execution.reasoningLevel, "low", model);
+  }
+});
+
+test("a bare model id, as saved before the picker, runs on the first provider offering it", () => {
+  const { execution } = reviewExecution({ model: "shared-model", reasoningLevel: "medium" }, catalogs);
+  assert.equal(execution.providerId, "alpha");
+  assert.equal(execution.reasoningLevel, "medium");
+});
+
+test("a pinned provider that doesn't offer the model falls back to the project's defaults with a warning", () => {
+  const wrongProvider = reviewExecution({ model: "alpha/beta-only", reasoningLevel: "low" }, catalogs);
+  assert.deepEqual(wrongProvider.execution, {});
+  assert.match(wrongProvider.warning ?? "", /Provider alpha isn't available or doesn't offer beta-only/);
+  const missingProvider = reviewExecution({ model: "gamma/shared-model", reasoningLevel: "low" }, catalogs);
+  assert.deepEqual(missingProvider.execution, {});
+  assert.match(missingProvider.warning ?? "", /Provider gamma isn't available/);
 });
 
 test("Model default and an unsupported level both send the model's own default level explicitly", () => {
-  const modelDefault = reviewExecution({ model: "claude-opus-5-5", reasoningLevel: "default" }, catalogs);
+  const modelDefault = reviewExecution({ model: "beta/shared-model", reasoningLevel: "default" }, catalogs);
   assert.equal(modelDefault.warning, null);
   assert.equal(modelDefault.execution.reasoningLevel, "high");
   assert.deepEqual(modelDefault.execution.executionInputSources, { providerId: "explicit", model: "explicit", reasoningLevel: "explicit" });
 
-  const unsupported = reviewExecution({ model: "claude-sonnet-5-5", reasoningLevel: "max" }, catalogs);
-  assert.equal(unsupported.execution.model, "claude-sonnet-5-5");
+  const unsupported = reviewExecution({ model: "alpha/shared-model", reasoningLevel: "max" }, catalogs);
   assert.equal(unsupported.execution.reasoningLevel, "medium");
-  assert.match(unsupported.warning ?? "", /doesn't support reasoning level max/);
+  assert.match(unsupported.warning ?? "", /doesn't support reasoning level max; the review uses the model's default/);
 });
 
-test("a model several providers offer goes to the project's provider", () => {
-  assert.deepEqual(reviewProviderOrder(["claude-code", "codex", "pool"], "pool"), ["pool", "claude-code", "codex"]);
-  assert.deepEqual(reviewProviderOrder(["claude-code", "codex"], "gone"), ["claude-code", "codex"]);
-  assert.deepEqual(reviewProviderOrder(["claude-code", "codex"], null), ["claude-code", "codex"]);
-  const pool: ProviderModelCatalog = { providerId: "pool", models: [{ model: "claude-opus-5-5", defaultReasoningEffort: "high", supportedReasoningEfforts: efforts("medium") }] };
-  assert.equal(catalogOffers(pool, " claude-opus-5-5 "), true);
-  assert.equal(catalogOffers(pool, "gpt-5.5"), false);
-  assert.equal(reviewExecution({ model: "claude-opus-5-5", reasoningLevel: "medium" }, [pool, ...catalogs]).execution.providerId, "pool");
+test("a model several providers offer goes to the project's provider when only its id is saved", () => {
+  assert.deepEqual(reviewProviderOrder(["alpha", "beta", "pool"], "pool"), ["pool", "alpha", "beta"]);
+  assert.deepEqual(reviewProviderOrder(["alpha", "beta"], "gone"), ["alpha", "beta"]);
+  assert.deepEqual(reviewProviderOrder(["alpha", "beta"], null), ["alpha", "beta"]);
+  assert.equal(catalogOffers(catalogs[1]!, "beta-only"), true);
+  assert.equal(catalogOffers(catalogs[0]!, "beta-only"), false);
 });
 
 test("a model whose provider doesn't list its reasoning levels gets the chosen level, and none without a default", () => {
   const unknown: ProviderModelCatalog[] = [{ providerId: "acp", models: [{ model: "m", defaultReasoningEffort: "", reasoningDiscovery: "unknown", supportedReasoningEfforts: [] }] }];
-  assert.equal(reviewExecution({ model: "m", reasoningLevel: "high" }, unknown).execution.reasoningLevel, "high");
-  const modelDefault = reviewExecution({ model: "m", reasoningLevel: "default" }, unknown).execution;
+  assert.equal(reviewExecution({ model: "acp/m", reasoningLevel: "high" }, unknown).execution.reasoningLevel, "high");
+  const modelDefault = reviewExecution({ model: "acp/m", reasoningLevel: "default" }, unknown).execution;
   assert.equal("reasoningLevel" in modelDefault, false);
   assert.deepEqual(modelDefault.executionInputSources, { providerId: "explicit", model: "explicit" });
-  const unknownCatalog: ProviderModelCatalog[] = [{ providerId: "acp", models: [{ model: "m", defaultReasoningEffort: "", supportedReasoningEfforts: efforts("low") }] }];
-  const unsupported = reviewExecution({ model: "m", reasoningLevel: "max" }, unknownCatalog);
+  const noDefault: ProviderModelCatalog[] = [{ providerId: "acp", models: [{ model: "m", defaultReasoningEffort: "", supportedReasoningEfforts: efforts("low") }] }];
+  const unsupported = reviewExecution({ model: "m", reasoningLevel: "max" }, noDefault);
   assert.equal("reasoningLevel" in unsupported.execution, false);
   assert.match(unsupported.warning ?? "", /the review uses the project's level$/);
 });
 
 test("a blank model or one no available provider offers keeps the project's defaults", () => {
-  const blank = reviewExecution({ model: "  ", reasoningLevel: "medium" }, catalogs);
-  assert.deepEqual(blank, { execution: {}, warning: null });
-  const missing = reviewExecution({ model: "claude-opus-9", reasoningLevel: "medium" }, catalogs);
+  assert.deepEqual(reviewExecution({ model: "  ", reasoningLevel: "medium" }, catalogs), { execution: {}, warning: null });
+  const missing = reviewExecution({ model: "unknown-model", reasoningLevel: "medium" }, catalogs);
   assert.deepEqual(missing.execution, {});
-  assert.match(missing.warning ?? "", /No available provider offers claude-opus-9/);
-  const args = agentReviewSpawnArgs({ ...review, execution: missing.execution });
-  assert.deepEqual(Object.keys(args).sort(), ["environment", "projectId", "prompt", "title"]);
+  assert.match(missing.warning ?? "", /No available provider offers unknown-model/);
+  assert.deepEqual(Object.keys(agentReviewSpawnArgs({ ...review, execution: missing.execution })).sort(), ["environment", "projectId", "prompt", "title"]);
 });
 
-test("off-type stored review settings fall back to their defaults", () => {
-  assert.deepEqual(readReviewSettings({ reviewModel: 5, reviewReasoningLevel: "turbo" }), { reviewModel: "claude-opus-5-5", reviewReasoningLevel: "medium" });
-  assert.deepEqual(readReviewSettings({ reviewModel: "", reviewReasoningLevel: "default" }), { reviewModel: "", reviewReasoningLevel: "default" });
+test("off-type stored review settings fall back to their defaults; any provider's level is kept", () => {
+  assert.deepEqual(readReviewSettings({ reviewModel: 5, reviewReasoningLevel: "" }), { reviewModel: "", reviewReasoningLevel: "default" });
+  assert.deepEqual(readReviewSettings({ reviewModel: "beta/shared-model", reviewReasoningLevel: "ultra" }), { reviewModel: "beta/shared-model", reviewReasoningLevel: "ultra" });
+  assert.deepEqual(readReviewSettings({ reviewModel: "legacy-model-id", reviewReasoningLevel: "medium" }), { reviewModel: "legacy-model-id", reviewReasoningLevel: "medium" });
 });

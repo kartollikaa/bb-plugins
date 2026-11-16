@@ -35,15 +35,20 @@ An unclaimed PR whose repo is the remote of a bb project also offers Agent
 review (a robot icon): it starts a thread in that project (the most recently
 updated one when several share the remote) that reviews the PR with `gh`,
 without checking out its branch or posting to GitHub, and opens it; the row then
-offers Open its thread. The review runs on the `reviewModel` setting (default `claude-opus-5-5`) at
-`reviewReasoningLevel` (default `medium`), on the available provider that offers that model, the project's own provider
-first. A blank model, one no available provider offers, or one bb refuses at
-spawn (provider disabled or unknown, reasoning level or options it can't run)
-uses the project's default model and reasoning. Model default, or a level the
-model doesn't support, sends the model's default level; a model without one
-gets the project's level. Each fallback still starts the review and logs a
-warning to `bb plugin logs thread-tree`; any other spawn failure is reported
-as an error, without a second try. A PR GitHub calls ready to merge, when it is the open
+offers Open its thread. By default the review passes no model, so it runs on the
+project's default model and reasoning. The Agent review section on the plugin's
+settings page offers bb's own provider and model picker, fed by every available
+provider's live catalog, with the reasoning levels the chosen model supports; a
+checkbox goes back to the project's default. The choice is stored as
+`reviewModel` = `provider/model` and `reviewReasoningLevel`. A bare model id
+(saved before the picker existed, or set by hand) runs on any available
+provider that offers it, the project's own provider first. A model its provider
+no longer offers, or one bb refuses at spawn (provider disabled or unknown,
+reasoning level or options it can't run), uses the project's default model and
+reasoning. A level the model doesn't support, or `default`, sends the model's
+default level; a model without one gets the project's level. Each fallback
+still starts the review and logs a warning to `bb plugin logs thread-tree`; any
+other spawn failure is reported as an error, without a second try. A PR GitHub calls ready to merge, when it is the open
 current-branch PR of a thread's environment, offers Merge instead: a toast asks
 to confirm, then bb's GitHub PR Status merges it with a merge commit. The
 server refuses when that environment's PR is no longer this one.

@@ -81,25 +81,28 @@ export const SETTINGS = {
   },
 } as const;
 
-const reviewModel = z.string().max(200);
-const REVIEW_REASONING_LEVELS = ["default", "minimal", "low", "medium", "high", "xhigh", "max"];
+const reviewModel = z.string().max(300);
+const reviewReasoningLevel = z.string().min(1).max(50);
 
-/** Read by the server only, so they stay out of the sidebar's view settings. */
+/**
+ * Read by the server only, so they stay out of the sidebar's view settings. The Agent review section on the
+ * plugin's settings page fills them from bb's provider and model picker; a select descriptor can't, because
+ * its options are fixed when the plugin loads.
+ */
 export const REVIEW_SETTINGS = {
   reviewModel: {
     type: "string",
-    label: "Model for PR review",
-    description: "The model an agent review of a pull request runs on, such as claude-opus-5-5. Blank, or a model no available provider offers, uses the project's default model.",
+    label: "Agent review model",
+    description: "Set it with the Agent review picker below. Stored as provider/model; blank uses the project's default model and reasoning. A bare model id uses any available provider that offers it.",
     experimental_schema: reviewModel,
-    default: "claude-opus-5-5",
+    default: "",
   },
   reviewReasoningLevel: {
-    type: "select",
-    label: "Reasoning level for PR review",
-    description: "Model default, or a level the model doesn't support, uses the model's own default, or the project's level when the model has none.",
-    options: REVIEW_REASONING_LEVELS as string[],
-    experimental_optionLabels: { default: "Model default", minimal: "Minimal", low: "Low", medium: "Medium", high: "High", xhigh: "Extra high", max: "Max" },
-    default: "medium",
+    type: "string",
+    label: "Agent review reasoning level",
+    description: "Set it with the Agent review picker below. \"default\", or a level the model doesn't support, uses the model's own default, or the project's level when the model has none.",
+    experimental_schema: reviewReasoningLevel,
+    default: "default",
   },
 } as const;
 
@@ -108,10 +111,10 @@ export type ReviewSettings = { reviewModel: string; reviewReasoningLevel: string
 /** Stored values are trusted less than their schema: anything off-type falls back to the default. */
 export function readReviewSettings(values: Record<string, unknown> | undefined): ReviewSettings {
   const model = reviewModel.safeParse(values?.reviewModel);
-  const level = values?.reviewReasoningLevel;
+  const level = reviewReasoningLevel.safeParse(values?.reviewReasoningLevel);
   return {
     reviewModel: model.success ? model.data : REVIEW_SETTINGS.reviewModel.default,
-    reviewReasoningLevel: typeof level === "string" && REVIEW_REASONING_LEVELS.includes(level) ? level : REVIEW_SETTINGS.reviewReasoningLevel.default,
+    reviewReasoningLevel: level.success ? level.data : REVIEW_SETTINGS.reviewReasoningLevel.default,
   };
 }
 
