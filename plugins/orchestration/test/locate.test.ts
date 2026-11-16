@@ -14,7 +14,7 @@ function tree(files: Record<string, string>): string {
   return root;
 }
 
-test("finds ledgers by their first line, newest wins", async () => {
+test("finds ledgers by their first line; duplicate identities require repair", async () => {
   const root = tree({
     "projects/-a/orchestrate/one.md": "Orchestrator: thr_aaa\nBackend: x\n",
     "projects/-a/orchestrate/old.md": "Orchestrator: thr_aaa\n",
@@ -26,7 +26,8 @@ test("finds ledgers by their first line, newest wins", async () => {
   utimesSync(join(root, "projects/-a/orchestrate/old.md"), new Date(2020, 0, 1), new Date(2020, 0, 1));
   const ledgers = await scanLedgers(join(root, "projects"));
   assert.deepEqual(ledgers.map((l) => l.orchestratorId).sort(), ["thr_aaa", "thr_aaa", "thr_bbb"]);
-  assert.match(ledgerFor(ledgers, "thr_aaa")!.path, /one\.md$/);
+  assert.throws(() => ledgerFor(ledgers, "thr_aaa"), /Multiple ledgers/);
+  assert.match(ledgerFor(ledgers, "thr_bbb")!.path, /two\.md$/);
   assert.equal(ledgerFor(ledgers, "thr_ccc"), null, "subdirectories are scratch, not ledgers");
   assert.equal(ledgerFor(ledgers, "thr_zzz"), null);
   assert.deepEqual(await scanLedgers(join(root, "missing")), []);

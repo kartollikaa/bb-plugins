@@ -447,7 +447,7 @@ function statusLine(args: {
   if (ledger.status === "paused") return make("paused", "Paused", capitalize(names.clean(ledger.statusRaw?.replace(/^paused\b[\s:;,—–-]*/i, "")) || "The orchestration is paused"));
   const head = stuck[0];
   if (head) return make("stuck", "Stuck", stuckSentence(head, names.title(head.subtask.id), rowOf.get(head.subtask.id)!, names.clean));
-  const anyRunning = working.some((w) => w.state === "running");
+  const anyRunning = orchestratorRunning || working.some((w) => w.state === "running");
   if (ledger.status === "closed" && (anyRunning || done < total)) {
     return make("paused", "Closed", `The ledger is closed, but ${total - done} of ${total} parts are still open`);
   }

@@ -788,3 +788,49 @@ test("a live tool step is shown as-is, not cleaned like ledger text", () => {
   });
   assert.match(range.sections.working[0]!.detail!, /git log a1b2c3d\.\.b4c5d6e/);
 });
+
+
+test("active descendants of a completed coordinator reopen overall progress without rewriting its delivery", () => {
+  const tasks = [subtask("T1", "verified", { threadId: "thr_coord" })];
+  const threads = {
+    thr_coord: live(10, { parentThreadId: "thr_orch" }),
+    thr_middle: live(5, { parentThreadId: "thr_coord" }),
+    thr_worker: live(0, { status: "active", parentThreadId: "thr_middle", title: "Winner badges" }),
+    thr_other: live(0, { status: "active", parentThreadId: "thr_unrelated" }),
+    thr_cyclea: live(0, { status: "active", parentThreadId: "thr_cycleb" }),
+    thr_cycleb: live(0, { status: "active", parentThreadId: "thr_cyclea" }),
+  };
+  const v = view(tasks, threads);
+  assert.equal(v.state, "moving");
+  assert.equal(v.sections.status.word, "In progress");
+  assert.equal(v.sections.status.progress, "1 of 2 parts done");
+  assert.deepEqual(v.active.map((r) => r.id), ["thr_worker"]);
+  assert.deepEqual(v.done.map((r) => r.id), ["T1"]);
+  assert.equal(v.phase.kind, "running");
+  assert.equal(view(tasks, { ...threads, thr_worker: live(0, { parentThreadId: "thr_middle" }) }).state, "done");
+  assert.equal(view(tasks, threads, {}, { status: "closed" }).phase.kind, "inconsistent");
+});
+
+test("a ledger-linked nested coordinator anchors live descendants even outside the root's BB parent tree", () => {
+  const v = view([subtask("T1", "verified", { threadId: "thr_nested" })], {
+    thr_nested: live(2, { parentThreadId: "thr_otherroot" }),
+    thr_child: live(0, { status: "active", parentThreadId: "thr_nested" }),
+  });
+  assert.equal(v.sections.status.word, "In progress");
+  assert.equal(v.active[0]?.id, "thr_child");
+});
+
+test("pending input in a descendant needs attention; idle descendants alone are not unfinished work", () => {
+  const v = view([subtask("T1", "verified")], {
+    thr_t1: live(5),
+    thr_child: live(0, { parentThreadId: "thr_t1", hasPendingInteraction: true }),
+  });
+  assert.equal(v.state, "needs");
+  assert.equal(v.asks[0]?.key, "thr_child");
+});
+
+test("all recorded tasks finished while the orchestrator is active is not overall Done", () => {
+  const v = view([subtask("T1", "verified")], { thr_orch: live(0, { status: "active" }) });
+  assert.equal(v.sections.status.word, "In progress");
+  assert.equal(v.phase.kind, "running");
+});

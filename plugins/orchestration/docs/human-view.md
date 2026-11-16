@@ -788,3 +788,22 @@ the same route. Only ledger choices use the validated reply endpoint. UI-extract
 context. The extractor reads only the latest report: a review closing line becomes “Does the new
 Orchestration view look right?”, while status and follow-ups remain context. Earlier answered UI
 cards are never searched or resurrected.
+
+
+## Source integrity and live descendants
+
+A completed coordinator can still have active child work. The view follows explicit BB
+parent links from the orchestrator and ledger-linked sessions, including nested coordinators,
+and shows running or pending descendants even when their coordinator's delivery is finished.
+Idle descendants alone do not establish unfinished work or completion. The ledger's recorded
+statuses remain unchanged. A running orchestrator also keeps the overall status in progress.
+
+Only one ledger may name an orchestrator in the scanned project directories. Multiple matches
+show a source error instead of selecting by modification time. Keep history outside the scanned
+`orchestrate/` directory or remove its Orchestrator header. Filenames do not establish authority.
+The view also rejects exports that omit identifiable task rows under Subtasks, including a table
+split by a blank line. Repair the source table; the view does not reconstruct statuses from prose.
+This coverage guard checks task identifiers, not the truth or completeness of the owner's plan.
+Live descendants are limited to the BB threads available to the view; missing activity is not
+proof of completion. Exporter validation and keeping the ledger current remain orchestrate's
+responsibility.

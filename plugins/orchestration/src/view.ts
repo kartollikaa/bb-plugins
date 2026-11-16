@@ -7,6 +7,7 @@ import { orchestrationPhase, type Phase } from "./phase.ts";
 import { shortAge, stepAge } from "./age.ts";
 import { REPORT_HEADER, firstLine, reportGist, shortName, spokenText, statusNote } from "./text.ts";
 import { buildSections, naming, type Naming, type Sections } from "./sections.ts";
+import { relatedThreadIds } from "./membership.ts";
 import { capitalize } from "./human.ts";
 
 export { shortAge, REPORT_HEADER, firstLine, reportGist, shortName };
@@ -390,8 +391,9 @@ function withChildren(input: ViewInput): { subtasks: Subtask[]; children: Classi
   const named = new Set(subtasks.flatMap((s) => (s.threadId ? [s.threadId] : [])));
   const taken = new Set(subtasks.flatMap((s) => (s.threadId ? [s.id] : [])));
   const children: Classified[] = [];
+  const related = relatedThreadIds(input.orchestratorThreadId, subtasks, new Map(Object.entries(input.live).map(([id, t]) => [id, t.parentThreadId])));
   const own = Object.entries(input.live)
-    .filter(([id, t]) => t.parentThreadId === input.orchestratorThreadId && !t.hidden && !named.has(id))
+    .filter(([id, t]) => id !== input.orchestratorThreadId && related.has(id) && !t.hidden && !named.has(id))
     .sort(([, a], [, b]) => liveFirst(b) - liveFirst(a) || b.createdAt - a.createdAt);
   for (const [threadId, live] of own) {
     const parsed = childLabel(live.title);

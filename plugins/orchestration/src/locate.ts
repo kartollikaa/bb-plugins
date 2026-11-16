@@ -50,11 +50,9 @@ export async function scanLedgers(projectsDir: string): Promise<LedgerFile[]> {
 }
 
 export function ledgerFor(ledgers: readonly LedgerFile[], threadId: string): LedgerFile | null {
-  let best: LedgerFile | null = null;
-  for (const ledger of ledgers) {
-    if (ledger.orchestratorId === threadId && (!best || ledger.mtimeMs > best.mtimeMs)) best = ledger;
-  }
-  return best;
+  const matches = ledgers.filter((ledger) => ledger.orchestratorId === threadId);
+  if (matches.length > 1) throw new Error("Multiple ledgers name this orchestrator. Keep one canonical ledger; move snapshots outside the orchestrate directory or remove their Orchestrator header.");
+  return matches[0] ?? null;
 }
 
 const SCRIPT = join("scripts", "orchestration_ledger.py");

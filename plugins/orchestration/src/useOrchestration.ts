@@ -7,6 +7,7 @@ import { changeWatcher, turnSignal } from "./refresh.ts";
 import { createReplyTracker } from "./reply.ts";
 import { localStore } from "./storage.ts";
 import { orchestratorLookupKeys } from "./switch.ts";
+import { relatedThreadIds } from "./membership.ts";
 import { buildView, type LiveThread, type View } from "./view.ts";
 import { knownOwner, navigationOwners } from "./navigation.ts";
 
@@ -86,8 +87,8 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
   const repliesVersion = useSyncExternalStore(replies.subscribe, replies.version);
   const ledgerThreads = query.data?.state === "ledger" ? query.data.ledger.subtasks : null;
   const waiting = useMemo(() => {
-    const ours = new Set([threadId, ...(ledgerThreads ?? []).flatMap((s) => (s.threadId ? [s.threadId] : []))]);
-    return sidebar.threads.filter((t) => t.hasPendingInteraction && (ours.has(t.id) || t.parentThreadId === threadId)).map((t) => t.id).sort().slice(0, 50);
+    const ours = relatedThreadIds(threadId, ledgerThreads ?? [], new Map(sidebar.threads.map((t) => [t.id, t.parentThreadId])));
+    return sidebar.threads.filter((t) => t.hasPendingInteraction && ours.has(t.id)).map((t) => t.id).sort().slice(0, 50);
   }, [sidebar.threads, ledgerThreads, threadId]);
   const pendingQuery = experimental_useRpcQuery({ contract, method: "pending", input: { threadId, threadIds: waiting }, enabled: enabled && waiting.length > 0 });
   useVisibleInterval(pendingQuery.refetch, SNAPSHOT_REFRESH_MS, enabled && waiting.length > 0);

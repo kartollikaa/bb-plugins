@@ -258,3 +258,22 @@ offered answers. The view compares question titles ignoring case and punctuation
 can remain as separate questions. A matching answered ask stays quiet until a later turn re-asks.
 Maintenance diagnostics remain folded under Details. Only the latest report supplies a chat
 question; follow-up status prose is context, not the question title.
+
+
+## Source integrity and live descendants
+
+A completed coordinator can still have active child work. The view follows explicit BB
+parent links from the orchestrator and ledger-linked sessions, including nested coordinators,
+and shows running or pending descendants even when their coordinator's delivery is finished.
+Idle descendants alone do not establish unfinished work or completion. The ledger's recorded
+statuses remain unchanged. A running orchestrator also keeps the overall status in progress.
+
+Only one ledger may name an orchestrator in the scanned project directories. Multiple matches
+show a source error instead of selecting by modification time. Keep history outside the scanned
+`orchestrate/` directory or remove its Orchestrator header. Filenames do not establish authority.
+The view also rejects exports that omit identifiable task rows under Subtasks, including a table
+split by a blank line. Repair the source table; the view does not reconstruct statuses from prose.
+This coverage guard checks task identifiers, not the truth or completeness of the owner's plan.
+Live descendants are limited to the BB threads available to the view; missing activity is not
+proof of completion. Exporter validation and keeping the ledger current remain orchestrate's
+responsibility.

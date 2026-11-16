@@ -8,6 +8,7 @@ import { contract, type Agent, type LedgerSummary, type Snapshot } from "./src/c
 import { answeredAsks, askFirstSeen, collectOwnerMessages, observe, sameLines, type Answer, type Observation, type OwnerMessage } from "./src/answered.ts";
 import { reportOf } from "./src/report.ts";
 import { describePending } from "./src/pending.ts";
+import { assertSubtaskCoverage, LedgerIntegrityError } from "./src/integrity.ts";
 import { summarizeExport } from "./src/ledger.ts";
 import { exportScriptCandidates, ledgerFor, scanLedgers, type LedgerFile } from "./src/locate.ts";
 import { resolveOwner } from "./src/route.ts";
@@ -90,11 +91,13 @@ export default async function plugin(bb: BbPluginApi) {
       try {
         const { stdout } = await run("python3", [script, "export", path], { timeout: 15_000, maxBuffer: 8 * 1024 * 1024 });
         const summary = summarizeExport(JSON.parse(stdout), path);
+        assertSubtaskCoverage(await readFile(path, "utf8"), summary);
         workingScript = { configured, path: script };
         exports.set(path, { mtimeMs, summary });
         failures.delete(path);
         return summary;
       } catch (error) {
+        if (error instanceof LedgerIntegrityError) return fail(error);
         lastError = error instanceof Error ? error.message : String(error);
       }
     }
@@ -185,7 +188,10 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   async function snapshot(threadId: string): Promise<Snapshot> {
-    const ledger = ledgerFor(await ledgers(), threadId);
+    let ledger: LedgerFile | null;
+    try { ledger = ledgerFor(await ledgers(), threadId); } catch (error) {
+      return { state: "error", message: error instanceof Error ? error.message : String(error) };
+    }
     if (!ledger) return { state: "none" };
     let summary: LedgerSummary;
     try {
@@ -249,7 +255,13 @@ export default async function plugin(bb: BbPluginApi) {
     const summary = await exportLedger(ledger.path).catch(() => null);
     const named = new Set(summary?.subtasks.flatMap((s) => (s.threadId ? [s.threadId] : [])) ?? []);
     const entries = await Promise.all([...new Set(threadIds)].map(async (id) => {
-      const ours = id === threadId || named.has(id) || await parentOf(id) === threadId;
+      let ancestor: string | null = id;
+      const seen = new Set<string>();
+      while (ancestor && ancestor !== threadId && !named.has(ancestor) && !seen.has(ancestor) && seen.size < 100) {
+        seen.add(ancestor);
+        ancestor = await parentOf(ancestor);
+      }
+      const ours = ancestor === threadId || (ancestor !== null && named.has(ancestor));
       if (!ours) return [id, null] as const;
       const list = await bb.sdk.threads.interactions.list({ threadId: id }).catch(() => []);
       const found = list.map(describePending).find((p) => p !== null) ?? null;
@@ -271,7 +283,7 @@ export default async function plugin(bb: BbPluginApi) {
     orchestrators: async () => ({ ids: [...new Set((await ledgers()).map((ledger) => ledger.orchestratorId))] }),
     owner: async ({ threadId }) => {
       const all = await ledgers();
-      const owner = await resolveOwner(threadId, (id) => ledgerFor(all, id) !== null, async (id) => {
+      const owner = await resolveOwner(threadId, (id) => all.some((ledger) => ledger.orchestratorId === id), async (id) => {
         const result = obj(await bb.sdk.threads.get({ threadId: id }));
         return str(obj(result.thread ?? result).parentThreadId);
       });
@@ -279,7 +291,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     isOrchestrator: async ({ keys }) => {
       const all = await ledgers();
-      return Object.fromEntries(keys.map((key) => [key, ledgerFor(all, key) !== null]));
+      return Object.fromEntries(keys.map((key) => [key, all.some((ledger) => ledger.orchestratorId === key)]));
     },
     snapshot: ({ threadId }) => snapshot(threadId),
     reply: ({ threadId, text }) => reply(threadId, text),
