@@ -26,6 +26,8 @@ can find it by the error text.
   against the catalog at spawn, but refuses a standard reasoning level the provider lacks. Look the
   model up with `providers.list()` and `providers.models({ projectId, providerId })` first, and pass
   `executionInputSources` for the fields you set: with partial sources bb drops unmarked ones.
+  Send the reasoning level too: a missing one comes from the project's defaults (or bb's own
+  default on another provider), not from the model's `defaultReasoningEffort`.
 - **CLI subcommand names** must match `[a-z0-9-]+`. Otherwise install fails with
   `cli command commands[0] must be { name: [a-z0-9-]+ ... }`.
 - **Message directives** (`app.slots.messageDirective({ id, component })`): the component gets
