@@ -40,8 +40,13 @@ several name the thread, the newest wins.
 ## What it shows
 
 - **Recap**, on top: the orchestrator thread's title, goal and overall phase, with the recorded
-  status qualification when available. The full checkpoint is expandable in Brief; decisions stay
-  in Activity.
+  status qualification when available; decisions stay in Activity.
+- **Right now**, under the goal in every tab: the orchestrator's live state and current step, its last turn,
+  `doing`, what it waits on and since when, `next`, `blocked by` and its last decision, from the ledger's
+  Now block (keyed lines at the head of «Current checkpoint») and bb's thread events. The header gives the block's age and,
+  when the orchestrator has run well after it was written, says so and mutes it. Old ledgers show their free-text
+  checkpoint or a «no Now block yet» line. A last message that asks the owner while the ledger records no ask
+  gets a needs-you card. «Checkpoint as written» and «Full last report» are folds in this block.
 - **Needs you:** subtasks at `question`, `ready` or `card`, a pending approval in any subtask's
   thread or the orchestrator's own, and every `ask:` line under the ledger's «For the owner» (any
   other line there is a note). A `ready` card shows the status note, Delivery, Version and gate line;
@@ -113,11 +118,14 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
   `Re «<title>»: `.
 - A hand-written `Q:`, `Q (asked 2026-11-16):` or `question:` line reads as an `ask:` (the
   parenthesis is dropped from the title), so a question written that way still reaches the owner;
-  `Q (answered …):`, `Q4:` and the like stay notes. Write `ask:` with `options:` anyway, it gets
+  `Q (answered …):` stays a note. Write `ask:` with `options:` anyway, it gets
   quick replies.
-- Otherwise only `ask:` is an ask. `note:` and every other line («Nothing waiting.», «answered 2026-11-14:
-  …») is information: it shows under History as a note and never counts as needs you. An `ask:`
-  with no title is a note too. Owner, on the change: «The dialog keep showing even when i answered».
+- On an active ledger every other line that is not a note is a wait on the owner: a line that states a wait in
+  free text shows as an ask card with a «written as free text» chip (from six such lines one grouped card,
+  answered line by line, counted once). `note:`, `answered …`, `Q (answered …):`, `ask (draft):` and «Nothing waiting …»
+  lines are information: they show under History and never count as needs you. On a `closed` ledger free-text lines
+  are notes. An `ask:` with no title is a note too. An idle orchestrator whose last message ends with `Waiting on you:`
+  or holds an interactive form while no ask is recorded gets a needs-you card.
 - A ` | ` segment without one of the keys above stays with the field before it, so a title or a
   `why:` may contain ` | `.
 
@@ -202,9 +210,9 @@ conflict. Idle tasks never count as running agents. Finished tasks awaiting ledg
 Missing live activity is not evidence of completion.
 
 Now includes Brief: the ledger's Markdown result, or completed and remaining task records for
-older ledgers. The full Current checkpoint is expandable, and outcome notes stay visible. A missing
+older ledgers. Outcome notes stay visible. A missing
 brief is never replaced with an invented success claim. New exports may provide `status_raw`
-and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence. Latest orchestrator report opens the
+and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence. Full last report (in the Right now block) opens the
 last assistant response in place, preserving its links; long reports explicitly say they were shortened.
 A report is a conversation record, not independent verification of its claims.
 

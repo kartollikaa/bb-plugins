@@ -28,6 +28,8 @@ replaced by a current live revision. Unknown dates are not synthesized.
 Refresh is unchanged: visible snapshot reads every 20 seconds, refresh when
 visibility returns, BB sidebar state for live activity. There is no added file
 watcher, polling service or promise that linked external evidence is current.
+Live steps (what a running turn does now) follow bb's thread events, one filtered read per changed
+thread, not a timer.
 Navigation, native ThreadChat, composer and reply validation are unchanged.
 The new presentation adds no animation and uses ordinary keyboard buttons.
 

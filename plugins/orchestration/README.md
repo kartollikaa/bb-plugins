@@ -28,8 +28,7 @@ question: does anything need you, and is the team moving?
   one value. Full chat stays a per-thread choice.
 - **Orchestration tab.** The same content as a fixed side-panel tab, shown only on a thread that a ledger's first line
   (`Orchestrator: thr_…`) names. On top: a recap (in the view, the orchestrator thread's title
-  first), the goal and overall orchestration phase. The full checkpoint is expandable in Brief;
-  dated decisions stay in Activity.
+  first), the goal, a **Right now** block (the page shows all of it, the tab a compact form): the orchestrator's live state (running with its current step and age, asking, idle since, or not in bb's thread list), its last turn, what it is doing, what it waits on and since when (a subtask's wait opens its thread), its next step, what blocks it and its last decision, with the age of the ledger's Now block. A block the orchestrator has run past is marked «the orchestrator has run since» and muted. Old ledgers fall back to their free-text checkpoint (three lines, «Show all», the ledger's age) or a note that they have no Now block yet. «Checkpoint as written» and «Full last report» are folds in the block. Each team row shows its current step from the live turn, else the status note, else the report's gist, and its expanded detail adds Status and Last report. The overall orchestration phase follows the block. Dated decisions stay in Activity.
   Then one status sentence, a card per thing that waits on you, the team with one row per subtask,
   and a History fold.
 - **Context-card row.** The same status sentence in the thread's context card. A click opens the view.
@@ -125,9 +124,13 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
   `owner/repo#N`, space-separated), `thread:` (bb thread ids), `options:` (quick replies separated by
   ` / `). A GitHub link reads `repo#N` on its button. Each option sends `Re «<title>»: <option>` to the orchestrator; Other answer fills the composer with
   `Re «<title>»: `.
-- Only `ask:` is an ask. `note:` and every other line («Nothing waiting.», «answered 2026-11-14:
-  …») is information: it shows under History as a note and never counts as needs you. An `ask:`
-  with no title is a note too. Owner, on the change: «The dialog keep showing even when i answered».
+- On an active ledger every line that is not `note:` is a wait on you: `ask:` lines parse as above, and a line that
+  states a wait in free text shows as an ask card with a «written as free text» chip (from six such lines, one
+  grouped card, answered line by line, counted once). `note:`, `answered …`, `Q (answered …):`, `ask (draft):` and
+  «Nothing waiting …» lines are information: they show under History and never count as needs you. On a `closed`
+  ledger free-text lines are notes. An `ask:` with no title is a note too. An orchestrator that is idle and ended
+  its last message with `Waiting on you:` or an interactive form while no ask is recorded gets a needs-you card.
+  Owner, on the original change: «The dialog keep showing even when i answered».
 - A ` | ` segment without one of the keys above stays with the field before it, so a title or a
   `why:` may contain ` | `.
 
@@ -196,9 +199,9 @@ conflict. Idle tasks never count as running agents. Finished tasks awaiting ledg
 Missing live activity is not evidence of completion.
 
 Now includes Brief: the ledger's Markdown result, or completed and remaining task records for
-older ledgers. The full Current checkpoint is expandable, and outcome notes stay visible. A missing
+older ledgers. Outcome notes stay visible. A missing
 brief is never replaced with an invented success claim. New exports may provide `status_raw`
-and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence. Latest orchestrator report opens the
+and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence. Full last report (in the Right now block) opens the
 last assistant response in place, preserving its links; long reports explicitly say they were shortened.
 A report is a conversation record, not independent verification of its claims.
 
