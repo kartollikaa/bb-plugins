@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { assertSubtaskCoverage } from "../src/integrity.ts";
 import { summarizeExport } from "../src/ledger.ts";
 
-const exported = (ids: string[]) => summarizeExport({ schema: "orchestrate-ledger-export", version: 1, subtasks: ids.map((id) => ({ id, status: { value: "verified" } })) }, "/ledger.md");
+const exported = (ids: string[]) => summarizeExport({ schema: "orchestrate-ledger-export", schema_version: 1, subtasks: ids.map((id) => ({ id, status: { value: "verified" } })) }, "/ledger.md");
 const markdown = `## Subtasks
 | id | Session | Status |
 |---|---|---|
@@ -22,4 +22,13 @@ test("split Subtasks table cannot silently lose rows from a successful v1 export
 test("coverage accepts localized/annotated headings and ignores examples and prose", () => {
   assert.throws(() => assertSubtaskCoverage(markdown.replace("Subtasks", "Подзадачи (current)"), exported(["T1"])), /rows missing/);
   assert.doesNotThrow(() => assertSubtaskCoverage("## Subtasks\n```md\n| T9 example | planned |\n```\n## Brief\nActive T9 in prose", exported([])));
+});
+
+
+test("fenced examples close only with their own marker and sufficient length", () => {
+  for (const [open, inside, close] of [["````md", "```", "````"], ["```md", "~~~", "```"], ["~~~~md", "~~~", "~~~~"]]) {
+    const source = ["## Subtasks", open, inside, "| T9 example | planned |", close, "| T1 actual | verified |"].join("\n");
+    assert.doesNotThrow(() => assertSubtaskCoverage(source, exported(["T1"])));
+    assert.throws(() => assertSubtaskCoverage(source, exported([])), /rows missing/);
+  }
 });

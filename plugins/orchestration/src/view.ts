@@ -396,7 +396,7 @@ function withChildren(input: ViewInput): { subtasks: Subtask[]; children: Classi
     .filter(([id, t]) => id !== input.orchestratorThreadId && related.has(id) && !t.hidden && !named.has(id))
     .sort(([, a], [, b]) => liveFirst(b) - liveFirst(a) || b.createdAt - a.createdAt);
   for (const [threadId, live] of own) {
-    const parsed = childLabel(live.title);
+    const parsed = live.parentThreadId === input.orchestratorThreadId ? childLabel(live.title) : null;
     const label = parsed && !taken.has(parsed.label) ? parsed.label : null;
     if (label) taken.add(label);
     const row = label ? subtasks.findIndex((s) => s.id === label) : -1;

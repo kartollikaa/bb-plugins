@@ -834,3 +834,15 @@ test("all recorded tasks finished while the orchestrator is active is not overal
   assert.equal(v.sections.status.word, "In progress");
   assert.equal(v.phase.kind, "running");
 });
+
+
+test("nested task labels cannot bind or rename the root coordinator's task namespace", () => {
+  const v = view([subtask("T1", "planned", { threadId: null }), subtask("T2", "verified", { threadId: "thr_coord" })], {
+    thr_coord: live(5),
+    thr_nested: live(0, { status: "active", parentThreadId: "thr_coord", title: "Nested work · T1" }),
+  });
+  assert.equal(v.threadIds.T1, undefined);
+  assert.equal(v.threadIds.thr_nested, "thr_nested");
+  assert.equal(v.active.find((r) => r.id === "T1")?.kind, "wait");
+  assert.equal(v.active.find((r) => r.id === "thr_nested")?.name, "Nested work · T1");
+});

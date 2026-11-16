@@ -16,10 +16,18 @@ Two independent View weaknesses made that incomplete plan harder to spot:
 
 The status line also allowed Done while the orchestrator itself was running.
 
+The delivery also acquired a second coordinator when a completed implementer continued
+coordinating later work in the same queue. This indirect actor flow made the root ledger
+incomplete. It differs from an explicitly delegated independent nested orchestration:
+View can show observed descendants in either case, but cannot decide coordination authority.
+The owner/coordinator must repair actor ownership and ledger rows. Reparenting existing workers
+can repair that flow without restarting workers or validation gates.
+
 ## View protections
 
 Explicit BB parent links and ledger-linked sessions anchor descendant reconciliation.
 Active or pending descendants become live rows without rewriting recorded delivery states.
+Nested task labels cannot bind session-less root task rows: each coordinator has its own namespace.
 No statuses are inferred from narrative, thread silence, or archiving. Unrelated trees and
 cycles do not acquire membership. Ambiguous ledger identities and task identifiers omitted
 from a successful export produce source errors rather than misleading totals.
