@@ -75,6 +75,21 @@ function nowBlock(checkpoint: Json): LedgerSummary["now"] {
   };
 }
 
+/** The newest row by its time; a journal may list new rows on top or at the bottom. Undated rows count as oldest, ties keep the last in file order. */
+function newest<T extends { at: string | null }>(rows: T[]): T | undefined {
+  let best: T | undefined;
+  let bestAt = -Infinity;
+  for (const row of rows) {
+    const at = row.at ? Date.parse(row.at) : NaN;
+    const key = Number.isFinite(at) ? at : -Infinity;
+    if (!best || key >= bestAt) {
+      best = row;
+      bestAt = key;
+    }
+  }
+  return best;
+}
+
 export function summarizeExport(data: unknown, path: string): LedgerSummary {
   const root = obj(data);
   const warnings = arr(root.warnings).flatMap((w) => (typeof w === "string" ? [w] : []));
@@ -103,7 +118,8 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
     const status = obj(row.status);
     return [{
       id,
-      name: str(row.name) ?? str(row.delivery),
+      name: str(row.name),
+      role: str(obj(row.role).name),
       delivery: str(row.delivery),
       version: str(row.version),
       areas: str(row.areas),
@@ -132,7 +148,11 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
 
   const checkpoint = obj(root.current_checkpoint);
   const checkpointText = str(checkpoint.text);
-  const lastJournal = arr(root.decision_journal).map(obj).filter((row) => str(row.decision)).at(-1);
+  const journal = arr(root.decision_journal).map(obj).flatMap((row) => {
+    const text = str(row.decision);
+    return text ? [{ text, at: str(obj(obj(row.when).time).at), by: str(row.decided_by) }] : [];
+  });
+  const lastJournal = newest(journal);
   const orchestratorHandovers = handovers.filter((h) => h.role === "orchestrator");
   const last = orchestratorHandovers.at(-1);
   return {
@@ -149,6 +169,8 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
     warnings,
     checkpoint: checkpointText ? { text: checkpointText, at: str(obj(checkpoint.time).at) } : null,
     now: nowBlock(checkpoint),
-    lastDecision: lastJournal ? { text: str(lastJournal.decision)!, at: str(obj(obj(lastJournal.when).time).at) } : null,
+    lastDecision: lastJournal ? { text: lastJournal.text, at: lastJournal.at } : null,
+    journal,
+    landingQueue: arr(root.landing_queue).flatMap((line) => (typeof line === "string" && line.trim() ? [line.trim()] : [])),
   };
 }

@@ -5,16 +5,17 @@ import { parseOwnerItem, type Link } from "./owner.ts";
 import { replyDraft, replyPrefix } from "./reply.ts";
 import { orchestrationPhase, type Phase } from "./phase.ts";
 import { shortAge, stepAge } from "./age.ts";
+import { REPORT_HEADER, firstLine, reportGist, shortName, spokenText, statusNote } from "./text.ts";
+import { buildSections, naming, type Naming, type Sections } from "./sections.ts";
+import { capitalize } from "./human.ts";
 
-export { shortAge };
+export { shortAge, REPORT_HEADER, firstLine, reportGist, shortName };
 
 /** Owner's rule: quiet this long while working, or the third failure of a delivery, means stuck. */
 export const QUIET_MS = 30 * 60_000;
 export const FAILURES_STUCK = 3;
 /** The Now block is possibly out of date when the orchestrator's last turn started this long after its `updated`. */
 export const STALE_GRACE_MS = 10 * 60_000;
-/** The first line of a subtask's report, from the orchestrate protocol. */
-export const REPORT_HEADER = /^\[orchestrate [^\]]+\]\s+(\S+)\s+(working|question|blocked|delivered|updated|rotate):\s*(.*)$/;
 /** From this many free-text «For the owner» lines on an active ledger they fold into one card. */
 export const FREE_TEXT_GROUP_FROM = 6;
 
@@ -44,6 +45,8 @@ export interface Row {
   /** bb has a turn running in the row's thread. */
   running: boolean;
   step: string;
+  /** The step is bb's live tool step, shown as-is. */
+  stepLive: boolean;
   age: string;
   /** The status cell as written, and the last report's header kind and gist with its age; «—» when there is none. */
   status: string;
@@ -90,6 +93,7 @@ export interface NowWait {
   what: string;
   age: string;
   kind: "subtask" | "owner" | "background" | "other";
+  since?: string | null;
 }
 
 export interface NowView {
@@ -112,19 +116,17 @@ export interface NowView {
 export interface View {
   phase: Phase;
   state: "planning" | "done" | "needs" | "stuck" | "moving";
-  /** The goal, the orchestrator's current state and its latest decision: the context before the status. */
-  recap: { goal: string | null; last: RecapLine | null };
+  recap: { goal: string | null };
   now: NowView;
-  heading: string;
-  subline: string;
-  /** The context-card row: the heading, plus the stuck agent when an ask holds the heading. */
+  /** Status line, Working now, Next, Plan, Recently and Details: what the Now section shows. */
+  sections: Sections;
+  /** The context-card row: the status line's word and sentence. */
   rowLabel: string;
   asks: Ask[];
   /** Ledger asks the owner answered; they wait on the orchestrator, not on the owner. */
   answered: Ask[];
-  nudge: { label: string; draft: string } | null;
-  teamLabel: string;
-  activeLabel: string;
+  /** The stuck part the owner can ask the orchestrator about. */
+  nudge: { label: string; draft: string; text: string } | null;
   active: Row[];
   done: Row[];
   /** Row or ask key → the bb thread its Open thread button opens. */
@@ -144,6 +146,8 @@ export interface ViewInput {
   /** The orchestrator's last output and the ledger file's modification time. */
   report?: { text: string } | null;
   ledgerModifiedAt?: number | null;
+  /** Child thread id → its brief, the first message the orchestrator sent it. */
+  briefs?: Record<string, string>;
 }
 
 const DONE = new Set(["landed", "verified", "dropped"]);
@@ -170,26 +174,12 @@ export function prettyModel(model: string | null): string | null {
   return `${match[1]![0]!.toUpperCase()}${match[1]!.slice(1)} ${match[2]}.${match[3]}`;
 }
 
-export function firstLine(text: string | null, max = 140): string | null {
-  if (!text) return null;
-  for (const raw of text.split("\n")) {
-    const line = raw
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replace(/^\s*(#+|[-*>]|\d+\.)\s*/, "")
-      .replace(/[*`]/g, "")
-      .replace(/(^|\s)_+(?=\S)|(?<=\S)_+(?=\s|$)/g, "$1")
-      .trim();
-    if (line) return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
-  }
-  return null;
-}
 
 const listing = (ids: string[]) => (ids.length <= 1 ? ids.join("") : `${ids.slice(0, -1).join(", ")} and ${ids.at(-1)}`);
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const rotations = (n: number) => (n === 0 ? null : n === 1 ? "rotated once" : n === 2 ? "rotated twice" : `rotated ${n} times`);
-const capitalize = (text: string) => text[0]!.toUpperCase() + text.slice(1);
 
-interface Classified {
+export interface Classified {
   subtask: Subtask;
   /** A child thread of the orchestrator that no ledger row names: shown while it runs or asks. */
   child: { label: string; name: string } | null;
@@ -201,29 +191,41 @@ interface Classified {
   activity: ThreadActivity | null;
 }
 
+/** Since when a thread has said nothing: an idle thread since its last report; a running turn is never quiet. */
+export function quietSince(live: LiveThread | null, reported: number | null): number | null {
+  return isBusy(live) ? null : reported;
+}
+
 function classify(subtask: Subtask, input: ViewInput): Classified {
   const live = subtask.threadId ? input.live[subtask.threadId] ?? null : null;
   const agent = subtask.threadId ? input.agents[subtask.threadId] ?? null : null;
   const reported = live?.latestAttentionAt || agent?.lastReportAt || live?.createdAt || null;
   const activity = subtask.threadId ? input.activity?.[subtask.threadId] ?? null : null;
   const base = { subtask, child: null, live, agent, activity, lastReport: reported, reason: null };
+  const silentSince = quietSince(live, reported);
   const status = subtask.status ?? "";
   if (live?.hasPendingInteraction) return { ...base, kind: "you" };
   if (DONE.has(status)) return { ...base, kind: isBusy(live) ? "work" : "done" };
   if (ASKING.has(status)) return { ...base, kind: "you" };
   if (subtask.gateFailures >= FAILURES_STUCK) return { ...base, kind: "stuck", reason: "circles" };
   if (status === "blocked") return { ...base, kind: "stuck", reason: "blocked" };
-  if (QUIET_WATCHED.has(status) && reported !== null && input.now - reported >= QUIET_MS) {
-    return { ...base, kind: "stuck", reason: "quiet" };
+  if (QUIET_WATCHED.has(status) && silentSince !== null && input.now - silentSince >= QUIET_MS && agent?.archivedAt == null) {
+    return { ...base, lastReport: silentSince, kind: "stuck", reason: "quiet" };
   }
   if (WAITING.has(status)) return { ...base, kind: "wait" };
   return { ...base, kind: "work" };
 }
 
+function stepIsLive(c: Classified): boolean {
+  if (c.child) return c.kind !== "you" && !!c.activity;
+  if (c.kind === "work" && DONE.has(c.subtask.status ?? "")) return false;
+  return !c.reason && c.kind !== "you" && isBusy(c.live);
+}
+
 function stepOf(c: Classified, doneIds: Set<string>, now: number, nameIsNote: boolean): string {
   const { subtask, agent } = c;
   const said = firstLine(agent?.lastOutput ?? null);
-  if (c.child) return c.kind === "you" ? "Waiting on you in its thread" : "Running, not in the ledger yet";
+  if (c.child) return c.kind === "you" ? "Waiting on you in its thread" : c.activity ? liveStep(c.activity, now) : "Running, not in the ledger yet";
   if (c.kind === "work" && DONE.has(subtask.status ?? "")) return `Running again · ${firstLine(subtask.statusRaw, 90) ?? subtask.status}`;
   if (c.reason === "quiet") return `Quiet for ${longAge(now - c.lastReport!)}${said ? ` · last: ${said}` : ""}`;
   if (c.reason === "circles") return `${capitalize(subtask.lastFailedKind ?? "gate")} failed ${subtask.gateFailures} times`;
@@ -260,27 +262,8 @@ function liveStep(activity: ThreadActivity | null, now: number): string {
   return "Turn running";
 }
 
-/** The kind and gist of a subtask report whose first line is the protocol header. */
-export function reportGist(output: string | null): { kind: string; gist: string } | null {
-  const first = output?.split("\n").find((line) => line.trim())?.trim();
-  const match = first ? REPORT_HEADER.exec(first) : null;
-  return match ? { kind: match[2]!, gist: match[3]!.trim() } : null;
-}
 
-/** The first eight words of a name, with an ellipsis when cut. */
-export function shortName(text: string | null, words = 8): string | null {
-  const line = firstLine(text, 200);
-  if (!line) return null;
-  const parts = line.split(/\s+/);
-  return parts.length > words ? `${parts.slice(0, words).join(" ")}…` : line;
-}
 
-/** «ready — plan verified; waits on review» → «Plan verified; waits on review»: what the orchestrator wrote after the status word. */
-function statusNote(subtask: Subtask, max = 90): string | null {
-  const word = subtask.status ?? "";
-  const rest = subtask.statusRaw?.trim().toLowerCase().startsWith(word.toLowerCase()) ? subtask.statusRaw.trim().slice(word.length) : subtask.statusRaw;
-  return firstLine(rest?.replace(/^[\s:;,—–-]+/, "") ?? null, max);
-}
 
 /** «blocked — no access to the registry» → «Blocked: no access to the registry». */
 function blockedLine(subtask: Subtask): string {
@@ -323,6 +306,7 @@ function toRow(c: Classified, doneIds: Set<string>, now: number): Row {
     kind: c.kind,
     running: isBusy(c.live),
     step: stepOf(c, doneIds, now, named.isNote),
+    stepLive: stepIsLive(c),
     age: c.kind === "wait" || c.lastReport === null ? "" : shortAge(now - c.lastReport),
     status: c.child ? "—" : subtask.statusRaw ?? subtask.status ?? "—",
     lastReport: lastReportLine(c, now),
@@ -332,13 +316,13 @@ function toRow(c: Classified, doneIds: Set<string>, now: number): Row {
   };
 }
 
-function askOf(c: Classified, now: number): Ask {
+function askOf(c: Classified, now: number, names: Naming): Ask {
   const { subtask, agent } = c;
-  const who = c.child ? c.child.label || c.child.name : subtask.name ? `${subtask.id} · ${subtask.name}` : subtask.id;
+  const who = names.title(subtask.id);
   const since = c.lastReport;
   const base = { key: subtask.id, who, subtask: subtask.id, since, age: since === null ? "" : shortAge(now - since), title: null, replyTitle: null, links: [], threads: [], replies: [], answered: null };
   if (c.live?.hasPendingInteraction) {
-    return { ...base, kind: "thread", ...pendingContent(c.live.pending, `${c.child ? who : subtask.id} waits on an approval or a question in its thread.`), drafts: null };
+    return { ...base, kind: "thread", ...pendingContent(c.live.pending, `${who} waits on an approval or a question in its thread.`), drafts: null };
   }
   if (subtask.status === "ready") {
     const note = statusNote(subtask, 220);
@@ -351,15 +335,15 @@ function askOf(c: Classified, now: number): Ask {
     return {
       ...base,
       kind: "decision",
-      title: note ? capitalize(note) : `${subtask.id} passed the gate and waits for your word to land`,
+      title: note ? capitalize(names.clean(note) || note) : `${who} passed its checks and waits for your word to land`,
       text: facts.length ? facts.join("\n") : "The ledger names no branch, version or gate for it. Ask the orchestrator what lands before you answer.",
       drafts: { primary: `${what}: go ahead and land it.`, secondary: `${subtask.id}: not yet, hold the landing.` },
     };
   }
   if (subtask.status === "card") {
-    return { ...base, kind: "thread", text: `${subtask.id} waits for you to start its card in this chat.`, drafts: null };
+    return { ...base, kind: "thread", text: `${who} waits for you to start its card in this chat.`, drafts: null };
   }
-  const text = agent?.lastOutput?.trim() || `${subtask.id} asked a question; the orchestrator has it. Ask the orchestrator what it needs.`;
+  const text = agent?.lastOutput?.trim() || `${who} asked a question; the orchestrator has it. Ask the orchestrator what it needs.`;
   return { ...base, kind: "question", text, drafts: { primary: `Re ${subtask.id}: ` } };
 }
 
@@ -388,14 +372,14 @@ function recapLine(entry: { text: string; at: string | null } | null, now: numbe
   return { text, age: Number.isFinite(at) && at <= now ? shortAge(now - at) : "" };
 }
 
-/** «thread-tree-sidebar-v2 · S11» → S11: the id an orchestrator puts after its children's titles. */
+/** «thread-tree-sidebar-v2 · S11», «… · D3 #1», «… · RV-I2» → the id an orchestrator puts after its children's titles. */
 export function childLabel(title: string | null | undefined): { label: string; rest: string } | null {
-  const match = / · ([A-Z]{1,4}\d+[a-z]?)$/.exec(title?.trim() ?? "");
+  const match = / · ((?:RV-)?[A-Z]{1,4}\d+[a-z]?)(?: #\d+)?$/.exec(title?.trim() ?? "");
   return match ? { label: match[1]!, rest: title!.trim().slice(0, match.index) } : null;
 }
 
-const childSubtask = (id: string, threadId: string): Subtask => ({
-  id, name: null, threadId, status: null, statusRaw: null, modelRaw: null, dependsOn: [], gateLine: null, gateFailures: 0, lastFailedKind: null, rotations: 0,
+const childSubtask = (id: string, threadId: string, role: string | null): Subtask => ({
+  id, name: null, role, threadId, status: null, statusRaw: null, modelRaw: null, dependsOn: [], gateLine: null, gateFailures: 0, lastFailedKind: null, rotations: 0,
 });
 
 const liveFirst = (t: LiveThread) => (isBusy(t) || t.hasPendingInteraction ? 1 : 0);
@@ -420,7 +404,7 @@ function withChildren(input: ViewInput): { subtasks: Subtask[]; children: Classi
     }
     if (!isBusy(live) && !live.hasPendingInteraction) continue;
     children.push({
-      subtask: childSubtask(threadId, threadId),
+      subtask: childSubtask(threadId, threadId, label?.startsWith("RV-") ? "reviewer" : null),
       child: { label: label ?? "", name: label ? parsed!.rest : live.title ?? threadId },
       kind: live.hasPendingInteraction ? "you" : "work",
       reason: null,
@@ -450,6 +434,56 @@ export function asksInChat(report: string | null | undefined): boolean {
   if (!report) return false;
   const last = report.split("\n").map((line) => line.trim()).filter(Boolean).at(-1) ?? "";
   return WAITING_ON_YOU.test(last) || INTERACTIVE_UI.test(report);
+}
+
+export interface ChatQuestion {
+  question: string;
+  /** Button, Buttons and Select options, in order. */
+  choices: string[];
+  /** A form's field labels. */
+  fields: string[];
+}
+
+const QUOTED = /"((?:[^"\\]|\\.)*)"/g;
+const unquote = (text: string) => text.replace(/\\(.)/g, "$1").trim();
+const quoted = (text: string) => [...text.matchAll(QUOTED)].map((m) => unquote(m[1]!)).filter(Boolean);
+const firstQuoted = (body: string, call: RegExp) => {
+  const at = body.search(call);
+  return at === -1 ? null : quoted(body.slice(at))[0] ?? null;
+};
+const CHAT_PARAGRAPH_MAX = 300;
+
+/** What the orchestrator's last message asks: its interactive ```ui card (title, choices, form fields), else its last «Waiting on you:» line, else its last paragraph. */
+export function chatQuestion(report: string | null | undefined): ChatQuestion | null {
+  if (!report) return null;
+  const body = [...report.matchAll(/```ui\b[^\n]*\n([\s\S]*?)```/g)].map((m) => m[1]!).filter((b) => INTERACTIVE_UI.test(`\`\`\`ui\n${b}\`\`\``)).at(-1);
+  if (body) {
+    const choices: string[] = [];
+    for (const m of body.matchAll(/\bButton\s*\(\s*"((?:[^"\\]|\\.)*)"/g)) choices.push(unquote(m[1]!));
+    for (const m of body.matchAll(/\b(?:Buttons\s*\(|Select\s*\(\s*"(?:[^"\\]|\\.)*"\s*,)\s*\[([^\]]*)\]/g)) choices.push(...quoted(m[1]!));
+    const form = /\bForm\s*\(/.test(body);
+    const fields = form ? [...body.matchAll(/\b(?!Card\b|Form\b|Button\b|Buttons\b|Text\b)([A-Z]\w*)\s*\(\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => unquote(m[2]!)) : [];
+    const question = firstQuoted(body, /\b(?:Card|Form)\s*\(\s*"/) ?? firstQuoted(body, /\bSelect\s*\(\s*"/) ?? (form ? fields[0] : null) ?? null;
+    if (question || choices.length) return { question: question ?? "Choose an answer", choices: [...new Set(choices)], fields };
+  }
+  const words = spokenText(report);
+  const waiting = words.split("\n").map((line) => line.trim()).filter((line) => WAITING_ON_YOU.test(line)).at(-1);
+  if (waiting) return { question: waiting.replace(WAITING_ON_YOU, "").trim(), choices: [], fields: [] };
+  const paragraph = words.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean).at(-1);
+  if (!paragraph) return null;
+  return { question: paragraph.length > CHAT_PARAGRAPH_MAX ? `${paragraph.slice(0, CHAT_PARAGRAPH_MAX - 1).trimEnd()}…` : paragraph, choices: [], fields: [] };
+}
+
+/** The chat-ask card's wording: the question in plain words, then its choices or fields. */
+export function chatAskCard(asked: ChatQuestion | null, clean: (text: string) => string): { title: string; text: string } {
+  if (!asked) return { title: "The orchestrator asked you something in the chat that isn't in its ledger", text: "Open the chat to answer it; its full last report is under Details." };
+  const question = clean(asked.question) || asked.question;
+  const lines = [
+    asked.choices.length ? `Choices: ${asked.choices.map((c) => `«${c}»`).join(" / ")}` : null,
+    asked.fields.length ? `It asks for: ${asked.fields.join(", ")}` : null,
+    "Answer it in the chat; the ledger doesn't record this question.",
+  ].filter(Boolean);
+  return { title: `Asked in the chat: ${question}`, text: lines.join("\n\n") };
 }
 
 const ageSince = (iso: string | null, now: number): string => {
@@ -493,7 +527,7 @@ function buildNow(input: ViewInput, openAsks: Ask[]): NowView {
   const ownerWaits = (block?.waitingOn ?? []).filter((w) => w.who.toLowerCase() === "owner");
   for (const wait of block?.waitingOn ?? []) {
     const owner = wait.who.toLowerCase() === "owner";
-    waits.push({ who: wait.who, label: owner ? "You" : wait.subtask ?? wait.who, subtask: owner ? null : wait.subtask, what: wait.what, age: ageSince(wait.since, now), kind: owner ? "owner" : wait.subtask ? "subtask" : "other" });
+    waits.push({ who: wait.who, label: owner ? "You" : wait.subtask ?? wait.who, subtask: owner ? null : wait.subtask, what: wait.what, age: ageSince(wait.since, now), kind: owner ? "owner" : wait.subtask ? "subtask" : "other", since: wait.since });
   }
   const ownerAsks = openAsks.filter((a) => a.kind === "owner");
   for (const ask of ownerAsks) {
@@ -533,11 +567,9 @@ export function buildView(input: ViewInput): View {
   const classified = [...planned, ...children];
   const doneIds = new Set(planned.filter((c) => DONE.has(c.subtask.status ?? "")).map((c) => c.subtask.id));
   const rows = classified.map((c) => toRow(c, doneIds, now));
-  const total = planned.length;
-  const doneCount = planned.filter((c) => c.kind === "done").length;
-  const progress = `${doneCount} of ${total} done`;
+  const names = naming(classified, input);
 
-  const allAsks = classified.filter((c) => c.kind === "you").map((c) => askOf(c, now));
+  const allAsks = classified.filter((c) => c.kind === "you").map((c) => askOf(c, now, names));
   const orchestrator = input.live[input.orchestratorThreadId];
   if (orchestrator?.hasPendingInteraction) {
     allAsks.push({
@@ -567,11 +599,12 @@ export function buildView(input: ViewInput): View {
       return;
     }
     const named = subtaskNamed(item.title, byId) ?? subtaskByThread(item.threads, subtasks, item.title);
-    const who = named ? `${named.subtask.id}${named.subtask.name ? ` · ${named.subtask.name}` : ""}` : "For you, from the ledger";
+    const who = named ? names.title(named.subtask.id) : "From the ledger";
     const threads = named?.subtask.threadId && !item.threads.includes(named.subtask.threadId) ? [...item.threads, named.subtask.threadId] : item.threads;
+    const title = named?.rest ?? item.title;
     const ask: Ask = {
       key: `owner-${i}`, who, subtask: named?.subtask.id ?? null, since: null, age: "", kind: "owner", links: item.links, threads,
-      title: named?.rest ?? item.title, replyTitle: item.title, text: item.why ?? "", drafts: { primary: replyPrefix(item.title) },
+      title: capitalize(names.clean(title) || title), replyTitle: item.title, text: capitalize(names.clean(item.why ?? "")), drafts: { primary: replyPrefix(item.title) },
       replies: item.options.map((label) => ({ label, draft: replyDraft(item.title, label) })),
       answered: input.answered?.[item.title] ?? null,
       ...(item.format === "free text" ? { freeText: true } : {}),
@@ -581,7 +614,7 @@ export function buildView(input: ViewInput): View {
   if (freeAsks.length >= FREE_TEXT_GROUP_FROM) {
     const answers = freeAsks.flatMap((a) => (a.answered ? [a.answered] : []));
     allAsks.push({
-      key: "owner-free-text", who: "For you, from the ledger", subtask: null, since: null, age: "", kind: "owner", links: [], threads: [],
+      key: "owner-free-text", who: "From the ledger", subtask: null, since: null, age: "", kind: "owner", links: [], threads: [],
       title: `${freeAsks.length} lines in «For the owner» are written as free text — the orchestrator should rewrite them`,
       replyTitle: null, text: "", drafts: null, replies: [], freeText: true, group: freeAsks,
       answered: answers.length === freeAsks.length ? answers.reduce((a, b) => (b.at > a.at ? b : a)) : null,
@@ -600,13 +633,14 @@ export function buildView(input: ViewInput): View {
   const stuck = classified.filter((c) => c.kind === "stuck")
     .sort((a, b) => STUCK_ORDER[a.reason!] - STUCK_ORDER[b.reason!] || (a.lastReport ?? 0) - (b.lastReport ?? 0));
   active.sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || stuck.findIndex((c) => c.subtask.id === a.id) - stuck.findIndex((c) => c.subtask.id === b.id));
-  const working = rows.filter((r) => r.running);
   const done = rows.filter((r) => r.kind === "done");
   const nowView = buildNow(input, asks);
   if (nowView.mismatch) {
+    const asked = chatQuestion(input.report?.text) ?? (ledger.now?.waitingOn ?? []).filter((w) => w.who.toLowerCase() === "owner").map((w) => ({ question: w.what, choices: [], fields: [] })).at(-1) ?? null;
+    const card = chatAskCard(asked, (text) => capitalize(names.clean(text)));
     asks.unshift({
       key: "chat-mismatch", who: "Orchestrator", subtask: null, since: orchestrator?.latestAttentionAt || null, age: orchestrator?.latestAttentionAt ? shortAge(now - orchestrator.latestAttentionAt) : "",
-      title: "The orchestrator asked you in its last message, but its ledger records no ask", replyTitle: null, text: "Open the chat to answer it; the full last report is in the Right now block.", links: [], threads: [], replies: [], kind: "thread", drafts: null, answered: null,
+      title: card.title, replyTitle: null, text: card.text, links: [], threads: [], replies: [], kind: "thread", drafts: null, answered: null,
     });
   }
 
@@ -614,83 +648,58 @@ export function buildView(input: ViewInput): View {
   const history = {
     sessions: ledger.orchestratorSessions === 1
       ? "This is the first orchestrator session."
-      : `This is orchestrator session ${ledger.orchestratorSessions}. The team above includes subtasks from all ${ledger.orchestratorSessions}.`,
+      : `This is orchestrator session ${ledger.orchestratorSessions}. The plan includes subtasks from all ${ledger.orchestratorSessions}.`,
     handover: lastHandover?.why ?? null,
     ledger: ledger.path,
     warnings: ledger.warnings,
     notes,
     freeTextNotes,
   };
-  const recap = { goal: ledger.goal, last: recapLine(ledger.lastDecision, now) };
   const threadIds: Record<string, string> = Object.fromEntries(classified.flatMap((c) => (c.subtask.threadId ? [[c.subtask.id, c.subtask.threadId]] : [])));
   if (nowView.mismatch) threadIds["chat-mismatch"] = input.orchestratorThreadId;
   const phase = orchestrationPhase(ledger, rows, isBusy(orchestrator));
-  const common = { phase, recap, now: nowView, asks, answered, active, done, threadIds, history, activeLabel: `${working.length} running`, teamLabel: asks.length ? "Rest of the team" : "Team" };
-
-  const askHeading = asks.length > 1 ? `${asks.length} things need you`
-    : asks[0]?.kind === "decision" ? "One decision for you" : asks[0]?.kind === "owner" ? "One thing waits on you" : "One question for you";
-  if (!asks.length && (ledger.status === "blocked" || ledger.status === "paused" || phase.kind === "inconsistent")) {
-    return { ...common, state: "stuck", heading: phase.label, subline: `${progress} · ${working.length} agents running`, rowLabel: phase.label, nudge: null };
-  }
-  if (total === 0 && ledger.status !== "closed") {
-    const planning = "The orchestrator is splitting the goal into subtasks.";
-    if (asks.length) return { ...common, state: "needs", heading: askHeading, subline: planning, rowLabel: askHeading, nudge: null };
-    return { ...common, state: "planning", heading: "Planning the work", subline: planning, rowLabel: "Planning the work", nudge: null };
-  }
+  const sections = buildSections({ input, classified, rows, asks, now: nowView, stuck, names });
+  const { status } = sections;
 
   const head = stuck[0];
-  const stuckId = head?.subtask.id;
-  const failedKind = head?.subtask.lastFailedKind ?? "the gate";
-  const quiet = head?.reason === "quiet" ? longAge(now - head.lastReport!) : "";
-  const stuckNote = head ? `${stuckId} ${head.reason === "circles" ? "is going in circles" : head.reason === "blocked" ? "is blocked" : "has gone quiet"}` : null;
-  const askAbout = `Ask the orchestrator about ${stuckId}`;
-  const stuckNudge = !head ? null
-    : head.reason === "circles" ? { label: askAbout, draft: `${stuckId} has failed ${failedKind} ${head.subtask.gateFailures} times. What's the plan?` }
-    : head.reason === "blocked" ? { label: askAbout, draft: `What is ${stuckId} blocked on, and what would unblock it?` }
-    : { label: askAbout, draft: `What is ${stuckId} doing? It hasn't reported for ${quiet}.` };
-  const more = stuck.length > 1 ? ` ${plural(stuck.length - 1, "other agent looks", "other agents look")} stuck too.` : "";
+  const nudge = head ? nudgeFor(head, names, now) : null;
+  return {
+    phase,
+    state: STATE_OF[status.state],
+    recap: { goal: ledger.goal },
+    now: nowView,
+    sections,
+    rowLabel: `${status.word} · ${status.sentence}`,
+    asks,
+    answered,
+    nudge,
+    active,
+    done,
+    threadIds,
+    history,
+  };
+}
 
-  if (asks.length) {
-    const heading = askHeading;
-    if (stuckNote) {
-      const note = stuck.length > 1 ? `${stuckNote}, ${plural(stuck.length - 1, "other", "others")} stuck too` : stuckNote;
-      return { ...common, state: "needs", heading, subline: `${capitalize(note)} · ${progress}`, rowLabel: `${heading} · ${note}`, nudge: stuckNudge };
-    }
-    const subline = `${phase.label} · ${progress}`;
-    return { ...common, state: "needs", heading, subline, rowLabel: heading, nudge: null };
+const STATE_OF: Record<Sections["status"]["state"], View["state"]> = {
+  needs: "needs", blocked: "stuck", paused: "stuck", stuck: "stuck", done: "done", planning: "planning", running: "moving", waiting: "moving",
+};
+
+/** The stuck part's nudge: the label and text name it, the draft keeps its id for the orchestrator. */
+function nudgeFor(head: Classified, names: Naming, now: number): View["nudge"] {
+  const id = head.subtask.id;
+  const name = names.name(id) ?? id;
+  const title = names.title(id);
+  const label = `Ask the orchestrator about «${name}»`;
+  if (head.reason === "circles") {
+    const failed = head.subtask.lastFailedKind ?? "the gate";
+    return { label, text: `${title} is going in circles: ${failed} failed ${head.subtask.gateFailures} times`, draft: `${id} («${name}») has failed ${failed} ${head.subtask.gateFailures} times. What's the plan?` };
   }
-
-  const pending = answered.length ? ` ${plural(answered.length, "answer waits", "answers wait")} on the orchestrator.` : "";
-  if ((ledger.status === "closed" && !rows.some((r) => r.running)) || (total > 0 && doneCount === total && active.length === 0)) {
-    const heading = doneCount === total ? (total === 1 ? "The only subtask is done" : `All ${total} subtasks are done`) : "The orchestration is closed";
-    return {
-      ...common,
-      state: "done",
-      heading,
-      subline: (ledger.status === "closed" ? (doneCount === total ? "The ledger is closed." : `The ledger is closed · ${progress}`) : "The orchestrator is wrapping up.") + pending,
-      rowLabel: heading,
-      nudge: null,
-    };
+  if (head.reason === "blocked") {
+    const note = names.clean(statusNote(head.subtask));
+    return { label, text: `${title} is blocked${note ? `: ${note}` : ""}`, draft: `What is ${id} («${name}») blocked on, and what would unblock it?` };
   }
-
-  if (head) {
-    const heading = `Nothing needs you, but ${stuckNote}`;
-    if (head.reason === "circles") {
-      return { ...common, state: "stuck", heading, subline: `${capitalize(failedKind)} failed ${head.subtask.gateFailures} times.${more}`, rowLabel: heading, nudge: stuckNudge };
-    }
-    if (head.reason === "blocked") {
-      return { ...common, state: "stuck", heading, subline: `${blockedLine(head.subtask)}.${more}`, rowLabel: heading, nudge: stuckNudge };
-    }
-    const others = classified.filter((c) => c.kind === "work" && c.lastReport !== null).map((c) => now - c.lastReport!);
-    const othersLine = others.length ? ` Everyone else reported in the last ${longAge(Math.max(...others))}.` : "";
-    return { ...common, state: "stuck", heading, subline: `No report from ${stuckId} for ${quiet}.${stuck.length > 1 ? more : othersLine}`, rowLabel: heading, nudge: stuckNudge };
-  }
-
-  const reports = classified.filter((c) => c.kind !== "done" && c.lastReport !== null).map((c) => c.lastReport!);
-  const latest = reports.length ? ` · latest report ${shortAge(now - Math.max(...reports)) === "now" ? "just now" : `${shortAge(now - Math.max(...reports))} ago`}` : "";
-  const waiting = rows.filter((r) => r.kind !== "done" && !r.running).length;
-  const lead = working.length ? `${plural(working.length, "agent", "agents")} running` : `${waiting} waiting`;
-  return { ...common, state: "moving", heading: "Nothing needs you", subline: `${lead} · ${progress}${latest}`, rowLabel: "Nothing needs you", nudge: null };
+  const quiet = longAge(now - head.lastReport!);
+  return { label, text: `${title} has been quiet for ${quiet}`, draft: `What is ${id} («${name}») doing? It hasn't reported for ${quiet}.` };
 }
 
 /** Answers go to the orchestrator; only a prompt bb holds in another thread is answered there. */

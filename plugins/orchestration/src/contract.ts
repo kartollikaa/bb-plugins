@@ -3,6 +3,8 @@ import { z } from "zod";
 export const subtaskSchema = z.object({
   id: z.string(),
   name: z.string().nullable(),
+  /** The role column's role name (`researcher`, `reviewer`, …). */
+  role: z.string().nullable().optional(),
   delivery: z.string().nullable().optional(),
   version: z.string().nullable().optional(),
   areas: z.string().nullable().optional(),
@@ -39,6 +41,10 @@ export const ledgerSummarySchema = z.object({
   /** «Current checkpoint» and the newest «Decision journal» row: what the recap says is happening now. */
   checkpoint: z.object({ text: z.string(), at: z.string().nullable() }).nullable(),
   lastDecision: z.object({ text: z.string(), at: z.string().nullable() }).nullable(),
+  /** «Landing queue» lines in order, `<id> — <what>; …`: the Plan's step order. */
+  landingQueue: z.array(z.string()).optional(),
+  /** Decision journal rows in file order. */
+  journal: z.array(z.object({ text: z.string(), at: z.string().nullable(), by: z.string().nullable() })).optional(),
   /** The Now block of «Current checkpoint»; null when the export predates it (no `structured` key). */
   now: z.object({
     structured: z.boolean(),
@@ -79,6 +85,8 @@ export const agentSchema = z.object({
   lastOutput: z.string().nullable(),
   /** When the agent last finished a turn (bb's latestAttentionAt), epoch ms. */
   lastReportAt: z.number().nullable(),
+  /** When bb archived the agent's thread, epoch ms. */
+  archivedAt: z.number().nullable().optional(),
 });
 export type Agent = z.infer<typeof agentSchema>;
 
@@ -103,6 +111,8 @@ export const snapshotSchema = z.discriminatedUnion("state", [
     askFirstSeen: z.record(z.string(), z.number()),
     workspace: z.object({ environmentId: z.string(), rootPath: z.string(), hostId: z.string(), ledgerHostId: z.string().nullable(), storageRootPath: z.string().nullable() }).nullable().optional(),
     report: z.object({ text: z.string(), truncated: z.boolean() }).nullable().optional(),
+    /** Child thread id → the first message its orchestrator sent it, for a child the ledger doesn't name yet. */
+    briefs: z.record(z.string(), z.string()).optional(),
     /** The ledger file's modification time, epoch ms. */
     ledgerModifiedAt: z.number().nullable().optional(),
     readAt: z.number(),

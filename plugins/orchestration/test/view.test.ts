@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Agent, LedgerSummary, Subtask, ThreadActivity } from "../src/contract.ts";
-import { STALE_GRACE_MS, askIdentity, buildView, childLabel, firstLine, longAge, prettyModel, shortAge, type LiveThread } from "../src/view.ts";
+import { STALE_GRACE_MS, askIdentity, buildView, chatQuestion, childLabel, firstLine, longAge, prettyModel, shortAge, type LiveThread } from "../src/view.ts";
 
 const NOW = Date.UTC(2026, 10, 14, 12, 0);
 const MIN = 60_000;
@@ -27,7 +27,8 @@ const view = (subtasks: Subtask[], lives: Record<string, LiveThread>, agents: Re
 test("no subtasks: planning", () => {
   const v = view([], {});
   assert.equal(v.state, "planning");
-  assert.equal(v.heading, "Planning the work");
+  assert.equal(v.sections.status.word, "Planning");
+  assert.equal(v.sections.status.sentence, "The orchestrator is splitting the goal into parts");
 });
 
 test("all moving: nothing needs you, with progress and the freshest report", () => {
@@ -36,13 +37,14 @@ test("all moving: nothing needs you, with progress and the freshest report", () 
     { thr_s2: live(3), thr_s1: live(100) },
   );
   assert.equal(v.state, "moving");
-  assert.equal(v.heading, "Nothing needs you");
-  assert.equal(v.subline, "2 waiting · 1 of 3 done · latest report 3m ago");
+  assert.equal(v.sections.status.word, "Waiting");
+  assert.equal(v.sections.status.sentence, "Waiting for «S2 name»");
+  assert.equal(v.sections.status.progress, "1 of 3 parts done");
+  assert.equal(v.rowLabel, "Waiting · Waiting for «S2 name»");
   assert.deepEqual(v.active.map((r) => [r.id, r.kind]), [["S2", "work"], ["S3", "wait"]]);
   assert.equal(v.active[1]!.step, "Starts after S2", "a landed dependency no longer blocks");
   assert.equal(v.active[1]!.age, "");
   assert.equal(v.done.length, 1);
-  assert.equal(v.teamLabel, "Team");
 });
 
 test("a question is the one card; asked agents leave the list", () => {
@@ -52,13 +54,13 @@ test("a question is the one card; asked agents leave the list", () => {
     { thr_s4: agent({ lastOutput: "Should archived sessions count toward the badge?" }) },
   );
   assert.equal(v.state, "needs");
-  assert.equal(v.heading, "One question for you");
-  assert.equal(v.subline, "Waiting · no agent running · 0 of 2 done");
+  assert.equal(v.sections.status.word, "Needs you");
+  assert.equal(v.sections.status.sentence, "1 question");
+  assert.equal(v.sections.status.nothingNeedsYou, false);
   assert.equal(v.asks[0]!.text, "Should archived sessions count toward the badge?");
   assert.equal(v.asks[0]!.age, "12m");
   assert.equal(v.asks[0]!.drafts!.primary, "Re S4: ");
   assert.deepEqual(v.active.map((r) => r.id), ["S5"]);
-  assert.equal(v.teamLabel, "Rest of the team");
 });
 
 test("ready is a decision; several asks sort oldest first", () => {
@@ -66,12 +68,12 @@ test("ready is a decision; several asks sort oldest first", () => {
     [subtask("S4", "question"), subtask("S7", "ready")],
     { thr_s4: live(5), thr_s7: live(185) },
   );
-  assert.equal(v.heading, "2 things need you");
+  assert.equal(v.sections.status.sentence, "1 decision and 1 question");
   assert.equal(v.asks[0]!.key, "S7");
   assert.equal(v.asks[0]!.kind, "decision");
   assert.equal(v.asks[0]!.age, "3h 5m");
   assert.equal(v.asks[0]!.drafts!.secondary, "S7: not yet, hold the landing.");
-  assert.equal(view([subtask("S7", "ready")], {}).heading, "One decision for you");
+  assert.equal(view([subtask("S7", "ready")], {}).sections.status.sentence, "1 decision");
 });
 
 test("a ready card says what lands: the ledger's note, delivery, version and gate", () => {
@@ -84,17 +86,16 @@ test("a ready card says what lands: the ledger's note, delivery, version and gat
   assert.equal(ask.text, "- **Lands:** PR #41\n- **Version:** `9f3e2a1`\n- **Gate:** checks passed · review passed");
   assert.equal(ask.drafts!.primary, "S7 at 9f3e2a1: go ahead and land it.");
   const bare = view([subtask("S7", "ready")], {}).asks[0]!;
-  assert.equal(bare.title, "S7 passed the gate and waits for your word to land");
+  assert.equal(bare.title, "S7 name passed its checks and waits for your word to land");
   assert.match(bare.text, /names no branch, version or gate/);
 });
 
 test("a «For the owner» line on a ready subtask's thread replaces its landing card", () => {
   const plan = subtask("T1", "ready", { statusRaw: "ready — plan verified; waits on owner's answers and folder review", threadId: "thr_t1", name: "branch plan (no PR)" });
   const v = view([plan], { thr_t1: live(8) }, {}, { forTheOwner: ["ask: Answer the 6 plan questions | thread: thr_t1 | options: All as recommended / One by one"] });
-  assert.equal(v.heading, "One thing waits on you");
-  assert.deepEqual(v.asks.map((a) => [a.kind, a.who, a.subtask]), [["owner", "T1 · branch plan (no PR)", "T1"]]);
+  assert.equal(v.sections.status.sentence, "1 decision");
+  assert.deepEqual(v.asks.map((a) => [a.kind, a.who, a.subtask]), [["owner", "branch plan (no PR)", "T1"]]);
   assert.deepEqual(v.asks[0]!.threads, ["thr_t1"]);
-  assert.equal(v.subline, "Waiting · no agent running · 0 of 1 done", "a subtask waiting on the owner is not waiting on a landing");
   assert.equal(view([subtask("T2", "delivered")], {}).phase.label, "Waiting for verification or landing");
   const named = view([plan], {}, {}, { forTheOwner: ["ask: T1: Review the plan folder"] });
   assert.deepEqual(named.asks.map((a) => a.kind), ["owner"]);
@@ -117,11 +118,11 @@ test("the orchestrator's own pending question needs you too", () => {
 test("each «For the owner» ask needs you, after the timed asks", () => {
   const v = view([subtask("S7", "ready"), subtask("S2", "working")], { thr_s7: live(5), thr_s2: live(1) }, {},
     { forTheOwner: ["ask: Merge hub#38"] });
-  assert.equal(v.heading, "2 things need you");
+  assert.equal(v.sections.status.sentence, "1 decision and 1 question");
   assert.deepEqual(v.asks.map((a) => a.key), ["S7", "owner-0"]);
   assert.equal(v.asks[1]!.drafts!.primary, "Re «Merge hub#38»: ");
   const only = view([subtask("S2", "working")], { thr_s2: live(1) }, {}, { forTheOwner: ["ask: Confirm the window"] });
-  assert.equal(only.heading, "One thing waits on you");
+  assert.equal(only.sections.status.word, "Needs you");
   assert.equal(only.state, "needs");
 });
 
@@ -129,13 +130,13 @@ test("an open ask doesn't hide a stuck agent: the subline and the context row na
   const v = view([subtask("S5", "working"), subtask("S6", "working"), subtask("S1", "landed")], { thr_s5: live(52), thr_s6: live(2) }, {},
     { forTheOwner: ["ask: Merge hub#38"] });
   assert.equal(v.state, "needs");
-  assert.equal(v.heading, "One thing waits on you");
-  assert.equal(v.subline, "S5 has gone quiet · 1 of 3 done");
-  assert.equal(v.rowLabel, "One thing waits on you · S5 has gone quiet");
-  assert.equal(v.nudge!.draft, "What is S5 doing? It hasn't reported for 52 min.");
+  assert.equal(v.sections.status.word, "Needs you");
+  assert.equal(v.rowLabel, "Needs you · 1 question");
+  assert.equal(v.nudge!.label, "Ask the orchestrator about «S5 name»");
+  assert.equal(v.nudge!.text, "S5 name has been quiet for 52 min");
+  assert.equal(v.nudge!.draft, "What is S5 («S5 name») doing? It hasn't reported for 52 min.");
   const calm = view([subtask("S6", "working")], { thr_s6: live(2) }, {}, { forTheOwner: ["ask: x"] });
-  assert.equal(calm.subline, "Waiting · no agent running · 0 of 1 done");
-  assert.equal(calm.rowLabel, "One thing waits on you");
+  assert.equal(calm.rowLabel, "Needs you · 1 question");
   assert.equal(calm.nudge, null);
 });
 
@@ -155,12 +156,12 @@ test("quiet for 30 min while working is stuck; 29 min is not", () => {
   const quiet = view([subtask("S5", "working"), subtask("S6", "working")], { thr_s5: live(52), thr_s6: live(4) },
     { thr_s5: agent({ lastOutput: "## Writing tests for the fold threshold\nmore" }) });
   assert.equal(quiet.state, "stuck");
-  assert.equal(quiet.heading, "Nothing needs you, but S5 has gone quiet");
-  assert.equal(quiet.subline, "No report from S5 for 52 min. Everyone else reported in the last 4 min.");
+  assert.equal(quiet.sections.status.word, "Stuck");
+  assert.equal(quiet.sections.status.sentence, "S5 name has been quiet for 52 min");
   assert.equal(quiet.active[0]!.id, "S5");
   assert.equal(quiet.active[0]!.step, "Quiet for 52 min · last: Writing tests for the fold threshold");
-  assert.equal(quiet.nudge!.draft, "What is S5 doing? It hasn't reported for 52 min.");
-  assert.equal(quiet.rowLabel, quiet.heading);
+  assert.equal(quiet.nudge!.draft, "What is S5 («S5 name») doing? It hasn't reported for 52 min.");
+  assert.equal(quiet.rowLabel, "Stuck · S5 name has been quiet for 52 min");
   assert.equal(view([subtask("S5", "working")], { thr_s5: live(29) }).state, "moving");
   const edge = buildView({ ledger: ledger([subtask("S5", "working")]), agents: {}, orchestratorThreadId: "x", now: NOW,
     live: { thr_s5: { ...live(0), latestAttentionAt: NOW - 30 * MIN } } });
@@ -173,8 +174,8 @@ test("a quiet subtask in the gate is waiting on the orchestrator, not stuck", ()
 
 test("a third failure is going in circles; a second is not", () => {
   const v = view([subtask("S6", "gate", { gateFailures: 3, lastFailedKind: "review" })], { thr_s6: live(1) });
-  assert.equal(v.heading, "Nothing needs you, but S6 is going in circles");
-  assert.equal(v.subline, "Review failed 3 times.");
+  assert.equal(v.sections.status.word, "Stuck");
+  assert.equal(v.sections.status.sentence, "S6 name is going in circles: review failed 3 times");
   assert.equal(v.active[0]!.step, "Review failed 3 times");
   assert.equal(view([subtask("S6", "gate", { gateFailures: 2 })], { thr_s6: live(1) }).state, "moving");
 });
@@ -182,11 +183,12 @@ test("a third failure is going in circles; a second is not", () => {
 test("everything landed, or a closed ledger: done", () => {
   const v = view([subtask("S1", "verified"), subtask("S2", "dropped")], {});
   assert.equal(v.state, "done");
-  assert.equal(v.heading, "All 2 subtasks are done");
+  assert.equal(v.sections.status.word, "Done");
+  assert.equal(v.sections.status.sentence, "All 2 parts done");
   const closed = view([subtask("S1", "verified"), subtask("S2", "working")], {}, {}, { status: "closed" });
-  assert.equal(closed.heading, "Closed, but work is still open");
-  assert.equal(closed.subline, "1 of 2 done · 0 agents running");
-  assert.equal(view([subtask("S1", "landed")], {}).heading, "The only subtask is done");
+  assert.equal(closed.sections.status.word, "Closed");
+  assert.equal(closed.sections.status.sentence, "The ledger is closed, but 1 of 2 parts are still open");
+  assert.equal(view([subtask("S1", "landed")], {}).sections.status.sentence, "The only part is done");
 });
 
 test("row detail: model, effort, context and rotations", () => {
@@ -217,7 +219,7 @@ test("a structured «For the owner» ask says what is asked, and its options bec
     forTheOwner: ["ask: Merge kartollika-ai-hub#38 | why: S5 passed review | link: kartollikaa/kartollika-ai-hub#38 | thread: thr_s5x | options: Go as you recommend / Not now"],
   });
   const ask = v.asks[0]!;
-  assert.equal(v.heading, "One thing waits on you");
+  assert.equal(v.sections.status.sentence, "1 decision");
   assert.equal(ask.title, "Merge kartollika-ai-hub#38");
   assert.equal(ask.text, "S5 passed review");
   assert.equal(ask.drafts!.primary, "Re «Merge kartollika-ai-hub#38»: ");
@@ -234,7 +236,7 @@ test("notes from «For the owner» stay out of what needs you and show in the hi
     forTheOwner: ["Nothing waiting. Store PR get-bb/marketplace#958 waits on a maintainer.", "note: T4 accepted the pager slide"],
   });
   assert.equal(v.asks.length, 0);
-  assert.equal(v.heading, "Nothing needs you");
+  assert.equal(v.sections.status.nothingNeedsYou, true);
   assert.deepEqual(v.history.notes, ["Nothing waiting. Store PR get-bb/marketplace#958 waits on a maintainer.", "T4 accepted the pager slide"]);
 });
 
@@ -244,13 +246,11 @@ test("an answered ledger ask stops needing you at once and waits on the orchestr
   const at = (answered: Record<string, { answer: string; at: number }>) =>
     buildView({ ledger: ledger([subtask("S2", "landed")], { forTheOwner: [line] }), agents: {}, live: {}, orchestratorThreadId: "thr_orch", now: NOW, answered });
   const open = at({});
-  assert.equal(open.heading, "One thing waits on you", "positive control: unanswered, it needs you");
+  assert.equal(open.sections.status.word, "Needs you", "positive control: unanswered, it needs you");
   assert.equal(open.asks.length, 1);
   const done = at({ [title]: { answer: "keep both", at: NOW - MIN } });
   assert.deepEqual(done.asks, []);
   assert.equal(done.state, "done");
-  assert.match(done.subline, /1 answer waits on the orchestrator\.$/);
-  assert.doesNotMatch(open.subline, /waits on the orchestrator/);
   assert.deepEqual(done.answered.map((a) => [a.title, a.answered]), [[title, { answer: "keep both", at: NOW - MIN }]]);
   assert.equal(at({ "Another ask": { answer: "x", at: NOW } }).asks.length, 1, "an answer to another title changes nothing");
 });
@@ -267,28 +267,28 @@ test("an answered record is a note, never a card; a line that states a wait is a
 test("a blocked subtask is stuck with its cause, and the nudge asks what unblocks it", () => {
   const v = view([subtask("T2", "blocked", { statusRaw: "blocked — no access to the registry" }), subtask("T3", "working")], { thr_t2: live(5), thr_t3: live(2) });
   assert.equal(v.state, "stuck");
-  assert.equal(v.heading, "Nothing needs you, but T2 is blocked");
-  assert.equal(v.subline, "Blocked: no access to the registry.");
+  assert.equal(v.sections.status.word, "Stuck");
+  assert.equal(v.sections.status.sentence, "T2 name is blocked: no access to the registry");
   assert.equal(v.active[0]!.step, "Blocked: no access to the registry");
-  assert.equal(v.nudge!.draft, "What is T2 blocked on, and what would unblock it?");
+  assert.equal(v.nudge!.draft, "What is T2 («T2 name») blocked on, and what would unblock it?");
   assert.equal(view([subtask("T2", "blocked")], {}).active[0]!.step, "Blocked");
 });
 
 test("a subtask going in circles outranks a blocked one", () => {
   const v = view([subtask("T2", "blocked"), subtask("T3", "gate", { gateFailures: 3, lastFailedKind: "review" })], {});
-  assert.equal(v.heading, "Nothing needs you, but T3 is going in circles");
+  assert.equal(v.sections.status.sentence, "T3 name is going in circles: review failed 3 times");
 });
 
 test("an owner line that names a subtask first is that subtask's ask, with its thread", () => {
   const v = view([subtask("T2", "delivered")], {}, {}, { forTheOwner: ["ask: T2: Approve the draft | options: Approve / Rework", "ask: X9: Not a subtask"] });
   const [named, other] = v.asks;
-  assert.equal(named!.who, "T2 · T2 name");
+  assert.equal(named!.who, "T2 name");
   assert.equal(named!.subtask, "T2");
   assert.equal(named!.title, "Approve the draft");
   assert.equal(named!.replyTitle, "T2: Approve the draft");
   assert.equal(named!.replies[0]!.draft, "Re «T2: Approve the draft»: Approve");
   assert.deepEqual(named!.threads, ["thr_t2"]);
-  assert.equal(other!.who, "For you, from the ledger");
+  assert.equal(other!.who, "From the ledger");
   assert.equal(other!.title, "X9: Not a subtask");
 });
 
@@ -297,8 +297,9 @@ test("the recap carries the goal and the latest decision with its age", () => {
     checkpoint: { text: "G1 waits on review of 9f1c2ab.\nmore", at: new Date(NOW - 40 * MIN).toISOString() },
     lastDecision: { text: "Review by R1", at: null },
   });
-  assert.deepEqual(v.recap, { goal: "Goal", last: { text: "Review by R1", age: "" } });
-  assert.deepEqual(view([], {}).recap, { goal: "Goal", last: null });
+  assert.deepEqual(v.recap, { goal: "Goal" });
+  assert.deepEqual(v.now.lastDecision, { text: "Review by R1", age: "" });
+  assert.equal(view([], {}).now.lastDecision, null);
 });
 
 test("a running child thread the ledger doesn't list shows in the team, labelled by its title's id", () => {
@@ -318,7 +319,8 @@ test("a running child thread the ledger doesn't list shows in the team, labelled
   ]);
   assert.equal(v.active[1]!.step, "Running, not in the ledger yet");
   assert.equal(v.threadIds.thr_kid, "thr_kid");
-  assert.equal(v.subline, "2 agents running · 1 of 2 done · latest report 3m ago", "children work but don't count as planned subtasks");
+  assert.equal(v.sections.status.sentence, "orch and 1 more are running");
+  assert.equal(v.sections.status.progress, "1 of 4 parts done", "a running child the ledger doesn't name yet is a part");
 });
 
 test("a child that names a session-less ledger row becomes that row's thread", () => {
@@ -332,7 +334,7 @@ test("a child waiting on approval is an ask; a landed subtask running again is a
     thr_s1: live(1, { status: "active" }),
     thr_kid: live(4, { parentThreadId: "thr_orch", title: "orch · R2", hasPendingInteraction: true }),
   });
-  assert.deepEqual(v.asks.map((a) => [a.key, a.who, a.kind, a.text]), [["thr_kid", "R2", "thread", "R2 waits on an approval or a question in its thread."]]);
+  assert.deepEqual(v.asks.map((a) => [a.key, a.who, a.kind, a.text]), [["thr_kid", "orch", "thread", "orch waits on an approval or a question in its thread."]]);
   assert.equal(v.threadIds.thr_kid, "thr_kid");
   assert.deepEqual(v.active.map((r) => [r.id, r.kind, r.step]), [["S1", "work", "Running again · landed abc; follow-up working"]]);
   assert.equal(v.state, "needs");
@@ -352,15 +354,13 @@ test("child labels: an id after the last « · », else none", () => {
 test("a landed subtask running again that stops on an approval needs you", () => {
   const v = view([subtask("S1", "landed")], { thr_s1: live(1, { status: "active", hasPendingInteraction: true }) });
   assert.equal(v.state, "needs");
-  assert.deepEqual(v.asks.map((a) => [a.key, a.kind, a.text]), [["S1", "thread", "S1 waits on an approval or a question in its thread."]]);
+  assert.deepEqual(v.asks.map((a) => [a.key, a.kind, a.text]), [["S1", "thread", "S1 name waits on an approval or a question in its thread."]]);
 });
 
 test("a child asking while the ledger has no subtasks yet needs you", () => {
   const v = view([], { thr_kid: live(1, { parentThreadId: "thr_orch", title: "orch · S1", hasPendingInteraction: true }) });
   assert.equal(v.state, "needs");
-  assert.equal(v.heading, "One question for you");
-  assert.equal(v.rowLabel, "One question for you");
-  assert.equal(v.subline, "The orchestrator is splitting the goal into subtasks.");
+  assert.equal(v.rowLabel, "Needs you · 1 request in a thread");
 });
 
 test("children bind the live, newest session and never duplicate a row that has a thread", () => {
@@ -384,10 +384,10 @@ test("six finished tasks and idle delivered T7 preserve the overall runtime bloc
   });
   assert.equal(v.state, "stuck");
   assert.equal(v.phase.kind, "blocked");
-  assert.equal(v.heading, "Orchestration blocked");
+  assert.equal(v.sections.status.word, "Blocked");
   assert.match(v.phase.detail!, /runtime activation unavailable/);
-  assert.equal(v.subline, "6 of 7 done · 0 agents running");
-  assert.equal(v.activeLabel, "0 running");
+  assert.equal(v.sections.status.sentence, "Runtime activation unavailable; no active worker");
+  assert.equal(v.sections.status.progress, "6 of 7 parts done");
   assert.equal(v.active[0]!.step, "Delivered, waiting for the gate");
   assert.equal(v.done.length, 6);
 });
@@ -401,16 +401,13 @@ test("explicit closure, wrapping up, paused and reopened work have distinct phas
   assert.equal(reopened.phase.kind, "inconsistent");
   assert.notEqual(reopened.state, "done");
   assert.equal(reopened.done.length, 0);
-  assert.equal(reopened.activeLabel, "1 running");
 });
 
 test("running counts use live activity including unlisted children, not task state", () => {
   const tasks = [subtask("T1", "working"), subtask("T2", "gate")];
   const idle = view(tasks, { thr_t1: live(1), thr_t2: live(1) });
-  assert.equal(idle.activeLabel, "0 running");
   assert.equal(idle.phase.kind, "gate");
   const active = view(tasks, { thr_t1: live(1, { status: "active" }) });
-  assert.equal(active.activeLabel, "1 running");
   assert.equal(active.phase.kind, "running");
 });
 
@@ -420,7 +417,7 @@ test("a pending owner question does not hide the orchestration blocker", () => {
   });
   assert.equal(v.state, "needs");
   assert.equal(v.phase.kind, "blocked");
-  assert.match(v.subline, /Orchestration blocked/);
+  assert.equal(v.sections.status.sentence, "1 question · blocked: the ledger says the orchestration is blocked");
 });
 
 
@@ -431,7 +428,8 @@ test("a missing goal does not erase phase or its recorded qualification", () => 
   assert.equal(v.recap.goal, null);
   assert.equal(v.phase.label, "Orchestration blocked");
   assert.equal(v.phase.detail, "blocked (activation route required)");
-  assert.equal(v.heading, "Orchestration blocked");
+  assert.equal(v.sections.status.word, "Blocked");
+  assert.equal(v.sections.status.sentence, "Activation route required");
 });
 
 test("a pending prompt in a ready subtask's thread is its card, so it can be answered there", () => {
@@ -460,13 +458,14 @@ test("a hand-written `Q (asked …):` line needs you, and the owner's `Re «titl
   const at = (answered: Record<string, { answer: string; at: number }>) =>
     buildView({ ledger: ledger([subtask("T9", "working")], { forTheOwner: [line] }), agents: {}, live: { thr_t9: live(1) }, orchestratorThreadId: "thr_orch", now: NOW, answered });
   const open = at({});
-  assert.equal(open.heading, "One thing waits on you");
+  assert.equal(open.sections.status.word, "Needs you");
   const ask = open.asks[0]!;
-  assert.equal(ask.title, "accept T9 group 4 boards ThreatDrawIntro (thread-storage/thr_qvipv6ji7b/boards) — 4.2 red tests done @03169c0d8 local");
+  assert.equal(ask.title, "Accept «T9 name» group 4 boards ThreatDrawIntro (thread-storage/thr_qvipv6ji7b/boards) — 4.2 red tests done local", "cleaned for reading; a path keeps its thread id");
+  assert.equal(ask.replyTitle, "accept T9 group 4 boards ThreatDrawIntro (thread-storage/thr_qvipv6ji7b/boards) — 4.2 red tests done @03169c0d8 local");
   const since = askFirstSeen([line], { [line]: NOW - 10 * MIN });
-  const answered = answeredAsks(since, [{ text: `Re «${ask.title}»: Accept all four`, at: NOW - MIN }]);
+  const answered = answeredAsks(since, [{ text: `Re «${ask.replyTitle}»: Accept all four`, at: NOW - MIN }]);
   assert.deepEqual(at(answered).asks, []);
-  assert.deepEqual(answeredAsks(since, [{ text: `Re «${ask.title}»: Accept all four`, at: NOW - 20 * MIN }]), {}, "an answer from before the ask doesn't close it");
+  assert.deepEqual(answeredAsks(since, [{ text: `Re «${ask.replyTitle}»: Accept all four`, at: NOW - 20 * MIN }]), {}, "an answer from before the ask doesn't close it");
 });
 
 const FREE = (n: number) => Array.from({ length: n }, (_, i) => `Waiting: owner decision ${i + 1}`);
@@ -487,7 +486,7 @@ test("five free-text lines are five cards; six are one grouped card counted once
   const v = view([subtask("S1", "working")], { thr_s1: live(1) }, {}, { forTheOwner: FREE(6) });
   assert.equal(v.asks.length, 1);
   assert.equal(v.asks[0]!.group?.length, 6);
-  assert.equal(v.heading, "One thing waits on you");
+  assert.equal(v.sections.status.word, "Needs you");
 });
 
 test("in a grouped card an answer marks its line; the card leaves needs-you only when all are answered", () => {
@@ -639,4 +638,64 @@ test("a row with no name or delivery falls back to its status note, which the st
 test("a pending thread question does not hide a mismatch: only owner asks count", () => {
   const v = nowOf({ now: nowBlock(), lives: { thr_orch: live(5), thr_s1: live(2, { hasPendingInteraction: true }) }, report: "Done.\nWaiting on you: connect the Pixel" });
   assert.equal(v.now.mismatch, true);
+});
+
+const LEDGER_CARD = [
+  "I'd like to record your instructions in the task ledger.",
+  "",
+  "```ui",
+  'Card("Allow recording these instructions in the task ledger?", [',
+  '  Button("Allow ledger update"),',
+  '  Button("Leave ledger unchanged")',
+  "])",
+  "```",
+].join("\n");
+
+test("the chat-ask card shows the question from the ui card with its choices, its age and an Open chat target", () => {
+  const v = nowOf({ now: nowBlock(), lives: { thr_orch: live(7) }, report: LEDGER_CARD });
+  assert.equal(v.now.mismatch, true);
+  const ask = v.asks.find((a) => a.key === "chat-mismatch")!;
+  assert.equal(ask.title, "Asked in the chat: Allow recording these instructions in the task ledger?");
+  assert.match(ask.text, /Choices: «Allow ledger update» \/ «Leave ledger unchanged»/);
+  assert.equal(ask.age, "7m");
+  assert.equal(v.threadIds["chat-mismatch"], "thr_orch");
+  assert.doesNotMatch(`${ask.title} ${ask.text}`, /```|Button\(|Card\(/);
+});
+
+test("chatQuestion reads Form fields, Buttons lists, a Waiting on you line, else the last paragraph", () => {
+  const form = chatQuestion('```ui\nForm("Where should the build go?", [\n  TextInput("Host name"),\n  Select("Channel", ["beta", "stable"]),\n  Button("Send")\n])\n```');
+  assert.deepEqual(form, { question: "Where should the build go?", choices: ["Send", "beta", "stable"], fields: ["Host name", "Channel"] });
+  assert.deepEqual(chatQuestion('Pick one.\n```ui\nCard("Land D3 now?", [Buttons(["Land", "Wait"])])\n```')?.choices, ["Land", "Wait"]);
+  assert.equal(chatQuestion("Done with I2.\nWaiting on you: connect the Pixel\n::browser-preview{session=\"x\"}")?.question, "connect the Pixel");
+  assert.equal(chatQuestion("First part.\n\nShould I rotate V1 now?\n\n```sh\nls\n```")?.question, "Should I rotate V1 now?");
+  assert.equal(chatQuestion(null), null);
+});
+
+test("quiet comes from the thread's live state: a running turn with recent activity is never quiet", () => {
+  const reportedLongAgo = (status: string, activity: Partial<ThreadActivity> | null) => buildView({
+    ledger: ledger([subtask("S5", "working")]), agents: {}, orchestratorThreadId: "x", now: NOW,
+    live: { thr_s5: live(45, { status }) }, activity: { thr_s5: activity === null ? null : act(activity) },
+  });
+  const busy = reportedLongAgo("active", { turnStartedAt: NOW - 50 * MIN, step: "Running npm test", stepStartedAt: NOW - 2 * MIN });
+  assert.notEqual(busy.state, "stuck", "last report 45 min ago, but the turn is running and stepped 2 min ago");
+  assert.equal(busy.nudge, null);
+  assert.notEqual(reportedLongAgo("active", null).state, "stuck", "a running turn without activity data is not quiet");
+  const longStep = reportedLongAgo("active", { turnStartedAt: NOW - 50 * MIN, step: "Running npm test", stepStartedAt: NOW - 40 * MIN });
+  assert.notEqual(longStep.state, "stuck", "one long step 40 min in is still a running turn, never quiet");
+  assert.notEqual(reportedLongAgo("active", { turnStartedAt: NOW - 35 * MIN }).state, "stuck", "thinking between tools 35 min into a turn is not quiet");
+  assert.equal(reportedLongAgo("idle", null).state, "stuck", "positive control: an idle thread with no report for 45 min");
+});
+
+test("a live tool step is shown as-is, not cleaned like ledger text", () => {
+  const v = buildView({
+    ledger: ledger([subtask("S5", "working")]), agents: {}, orchestratorThreadId: "x", now: NOW,
+    live: { thr_s5: live(1, { status: "active" }) }, activity: { thr_s5: act({ turnStartedAt: NOW - 3 * MIN, step: "Running rm -f $D/r3-*", stepStartedAt: NOW - 15_000 }) },
+  });
+  assert.match(v.sections.working[0]!.detail!, /^Running rm -f \$D\/r3-\* · 15s$/);
+  assert.match(v.sections.status.sentence, /rm -f \$D\/r3-\*/);
+  assert.doesNotMatch(v.sections.status.sentence, /round 3/);  const range = buildView({
+    ledger: ledger([subtask("S5", "working")]), agents: {}, orchestratorThreadId: "x", now: NOW,
+    live: { thr_s5: live(1, { status: "active" }) }, activity: { thr_s5: act({ turnStartedAt: NOW - 3 * MIN, step: "Running git log a1b2c3d..b4c5d6e", stepStartedAt: NOW - 15_000 }) },
+  });
+  assert.match(range.sections.working[0]!.detail!, /git log a1b2c3d\.\.b4c5d6e/);
 });

@@ -38,11 +38,11 @@ test("a card for a pending interaction shows what it asks, not a stock sentence"
   const v = buildView({ ledger, agents: {}, orchestratorThreadId: "thr_orch", now: NOW,
     live: { thr_s2: live({ pending: question }), thr_orch: live({ pending: { kind: "approval", title: "Approve a command", text: "git push" } }) } });
   assert.deepEqual(v.asks.map((a) => [a.who, a.kind, a.title, a.text]), [
-    ["S2 · S2 name", "thread", "Which save format?", "- v2\n- v3"],
+    ["S2 name", "thread", "Which save format?", "- v2\n- v3"],
     ["Orchestrator", "thread", "Approve a command", "git push"],
   ]);
   const unread = buildView({ ledger, agents: {}, orchestratorThreadId: "thr_orch", now: NOW, live: { thr_s2: live() } });
-  assert.equal(unread.asks[0]!.text, "S2 waits on an approval or a question in its thread.");
+  assert.equal(unread.asks[0]!.text, "S2 name waits on an approval or a question in its thread.");
 });
 
 test("only a prompt held in another thread offers Open thread; the rest answer the orchestrator", () => {

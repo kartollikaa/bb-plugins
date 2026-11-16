@@ -130,7 +130,7 @@ export function useOrchestration(threadId: string, enabled: boolean): Orchestrat
     if (data.state === "none") return { kind: "none" };
     if (data.state === "error") return { kind: "error", message: data.message, retry: () => void query.refetch() };
     const answered = combineAnswers(data.answered, replies.answers(threadId), data.askFirstSeen);
-    const view = buildView({ ledger: data.ledger, agents: data.agents, live, orchestratorThreadId: threadId, now: Math.max(now, data.readAt), answered, activity: activityQuery.data, report: data.report ?? null, ledgerModifiedAt: data.ledgerModifiedAt ?? null });
+    const view = buildView({ ledger: data.ledger, agents: data.agents, live, orchestratorThreadId: threadId, now: Math.max(now, data.readAt), answered, activity: activityQuery.data, report: data.report ?? null, ledgerModifiedAt: data.ledgerModifiedAt ?? null, briefs: data.briefs ?? {} });
     return { kind: "ready", view, ledger: data.ledger, report: data.report ?? null, workspace: data.workspace ?? null, threadIds: view.threadIds };
   }, [query.data, query.error, query.refetch, live, threadId, now, repliesVersion, activityQuery.data]);
 }

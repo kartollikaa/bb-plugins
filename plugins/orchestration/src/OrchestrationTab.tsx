@@ -3,15 +3,12 @@ import { experimental_useRpcMutation, experimental_useSidebarThreads, Markdown, 
 import { toast } from "sonner";
 import { contract } from "./contract.ts";
 import { answeredStatus } from "./answered.ts";
-import { WORK_CATEGORIES } from "./categories.ts";
-import { Recap } from "./Recap.tsx";
-import { NowBlock } from "./NowBlock.tsx";
 import { EvidenceMarkdown } from "./EvidenceMarkdown.tsx";
-import { Brief } from "./Brief.tsx";
+import { Details, Next, Plan, Recently, StatusLine, WorkingNow } from "./NowSections.tsx";
 import { WorkflowHistory } from "./WorkflowHistory.tsx";
 import { replyKey, replyStatus, type ReplyState } from "./reply.ts";
 import { answerLines, chosenAnswers, optionOf, questionKey, splitQuestions } from "./questions.ts";
-import { askIdentity, threadsToOpen, type Ask, type Row, type RowKind, type View } from "./view.ts";
+import { askIdentity, threadsToOpen, type Ask, type RowKind, type View } from "./view.ts";
 import { replies, useIsOrchestrator, useOrchestration } from "./useOrchestration.ts";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
@@ -40,11 +37,12 @@ function Dot({ kind, className }: { kind: RowKind; className?: string }) {
   return <span aria-hidden className={cx("size-[7px] shrink-0 rounded-full", DOT[kind], className)} />;
 }
 
-export function Button({ variant, onClick, children, tabIndex }: { variant: "primary" | "quiet" | "outline"; onClick: () => void; children: ReactNode; tabIndex?: number }) {
+export function Button({ variant, onClick, children, tabIndex, className, title }: { variant: "primary" | "quiet" | "outline"; onClick: () => void; children: ReactNode; tabIndex?: number; className?: string; title?: string }) {
   return (
     <button
       type="button"
       tabIndex={tabIndex}
+      title={title}
       onClick={onClick}
       className={cx(
         "h-[26px] rounded-md px-2.5 text-xs font-medium transition-[transform,background-color] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none",
@@ -52,6 +50,7 @@ export function Button({ variant, onClick, children, tabIndex }: { variant: "pri
         variant === "primary" && "bg-primary text-primary-foreground",
         variant === "quiet" && "text-muted-foreground hover:bg-accent hover:text-foreground",
         variant === "outline" && "border border-border text-foreground hover:bg-accent",
+        className,
       )}
     >
       {children}
@@ -265,128 +264,20 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
           </>
         ) : null}
         {ask.links.map((l) => <UrlLink key={l.href} href={l.href} title={l.title} className={linkButton}>Open {l.label}</UrlLink>)}
-        {threads.map((t) => <Button key={t} variant="primary" onClick={() => actions.openThread(t)}>{threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
+        {threads.map((t) => <Button key={t} variant="primary" onClick={() => actions.openThread(t)}>{ask.key === "chat-mismatch" ? "Open chat" : threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
       </div>
     </div>
   );
 }
 
-function TeamRow({ row, open, onToggle, actions, threadId }: { row: Row; open: boolean; onToggle: () => void; actions: Actions; threadId: string | null }) {
-  return (
-    <div className={cx("rounded-lg", open && "bg-sidebar")}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={onToggle}
-        className="grid w-full grid-cols-[7px_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-lg px-2 py-[7px] text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary"
-      >
-        <Dot kind={row.kind} className={cx("mt-1.5", row.running && "animate-pulse motion-reduce:animate-none")} />
-        <span className={cx("truncate text-sm", row.kind === "done" && "text-muted-foreground")}>
-          {row.label && <span className="mr-1.5 tabular-nums text-subtle-foreground">{row.label}</span>}
-          {row.name}
-        </span>
-        <span className="text-xs leading-[1.6] tabular-nums text-subtle-foreground">{row.age}</span>
-        <span className={cx("col-start-2 col-end-4 truncate text-xs", row.kind === "stuck" ? "text-foreground" : "text-muted-foreground")}>{row.step}</span>
-      </button>
-      <Reveal open={open}>
-        <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 pl-[25px] pr-2 pt-0.5 text-xs">
-          <dt className="text-subtle-foreground">Status</dt><dd className="m-0 [overflow-wrap:anywhere]">{row.status}</dd>
-          <dt className="text-subtle-foreground">Last report</dt><dd className="m-0 [overflow-wrap:anywhere]">{row.lastReport}</dd>
-          <dt className="text-subtle-foreground">Runs</dt><dd className="m-0 [overflow-wrap:anywhere]">{row.runs}</dd>
-          <dt className="text-subtle-foreground">Context</dt><dd className="m-0 [overflow-wrap:anywhere]">{row.context}</dd>
-          <dt className="text-subtle-foreground">Gate</dt><dd className="m-0 [overflow-wrap:anywhere]">{row.gate}</dd>
-        </dl>
-        <div className="flex gap-1.5 pb-2.5 pl-[25px] pr-2 pt-2">
-          {threadId && <Button variant="outline" tabIndex={open ? 0 : -1} onClick={() => actions.openThread(threadId)}>Open thread</Button>}
-        </div>
-      </Reveal>
-    </div>
-  );
-}
-
-function Fold({ label, onClick, expanded }: { label: string; onClick: () => void; expanded: boolean }) {
-  return (
-    <button type="button" aria-expanded={expanded} onClick={onClick} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-[7px] text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground">
-      <Dot kind="done" />
-      {label}
-    </button>
-  );
-}
-
-function Team({ view, actions, threadIds }: { view: View; actions: Actions; threadIds: Record<string, string> }) {
-  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
-  const [showDone, setShowDone] = useState(false);
-  const toggle = (id: string) => setOpen((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const row = (r: Row) => <TeamRow key={r.id} row={r} open={open.has(r.id)} onToggle={() => toggle(r.id)} actions={actions} threadId={threadIds[r.id] ?? null} />;
-
-  if (view.state === "planning") {
-    return (
-      <section>
-        <div className="px-0.5 pb-1.5 text-xs text-subtle-foreground">Team</div>
-        <div className="px-0.5 text-xs text-muted-foreground">Subtasks appear here once the orchestrator writes its plan.</div>
-        {view.active.length > 0 && <div className="-mx-2 mt-1.5 flex flex-col">{view.active.map(row)}</div>}
-      </section>
-    );
-  }
-  if (view.state === "done") {
-    const all = view.done.length + view.active.length;
-    return (
-      <section className="-mx-2 flex flex-col">
-        <Fold expanded={showDone} label={showDone ? "Hide the team" : `Show the team (${all})`} onClick={() => setShowDone(!showDone)} />
-        {showDone && [...view.active, ...view.done].map(row)}
-      </section>
-    );
-  }
-  return (
-    <section>
-      <div className="flex items-baseline justify-between px-0.5 pb-1.5 text-xs text-subtle-foreground">
-        <span>{view.teamLabel}</span>
-        <span>{view.activeLabel}</span>
-      </div>
-      <div className="-mx-2 flex flex-col">
-        {WORK_CATEGORIES.filter((category) => category !== "Done").map((category) => {
-          const grouped = view.active.filter((r) => (r.running || r.kind === "you" ? "Active" : r.kind === "wait" ? "Planned" : "Idle / waiting") === category);
-          return grouped.length ? <section key={category} aria-label={category}><h3 className="m-0 px-2 pb-1 pt-3 text-xs font-medium text-subtle-foreground">{category} · {grouped.length}</h3>{grouped.map(row)}</section> : null;
-        })}
-        {view.done.length > 0 && <Fold expanded={showDone} label={showDone ? "Hide done" : `${view.done.length} done`} onClick={() => setShowDone(!showDone)} />}
-        {showDone && view.done.map(row)}
-      </div>
-    </section>
-  );
-}
-
-function History({ view }: { view: View }) {
-  const [open, setOpen] = useState(false);
-  const { history } = view;
-  return (
-    <section className="border-t border-border pt-3">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-xs text-subtle-foreground hover:text-foreground">
-        {open ? "Hide history" : "History"}
-      </button>
-      <Reveal open={open}>
-        <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 pt-2.5 text-xs">
-          <dt className="text-subtle-foreground">Sessions</dt><dd className="m-0">{history.sessions}</dd>
-          {history.handover && <><dt className="text-subtle-foreground">Handover</dt><dd className="m-0 [overflow-wrap:anywhere]">{history.handover}</dd></>}
-          <dt className="text-subtle-foreground">Ledger</dt><dd className="m-0 [overflow-wrap:anywhere]">{history.ledger.replace(/^\/(Users|home)\/[^/]+/, "~")}</dd>
-          {history.notes.length > 0 && (
-            <><dt className="text-subtle-foreground">Notes</dt><dd className="m-0 flex flex-col gap-1 [overflow-wrap:anywhere]">{history.notes.map((n, i) => <span key={i}>{n}</span>)}</dd></>
-          )}
-          {history.warnings.length > 0 && (
-            <><dt className="text-subtle-foreground">Unread</dt><dd className="m-0 flex flex-col gap-1 [overflow-wrap:anywhere]">{history.warnings.map((w, i) => <span key={i}>{w}</span>)}</dd></>
-          )}
-        </dl>
-      </Reveal>
-    </section>
-  );
-}
-
-function ThreadRecap({ view, threadId, withTitle, block }: { view: View; threadId: string; withTitle: boolean; block: ReactNode }) {
+function ThreadTitle({ threadId, goal }: { threadId: string; goal: string | null }) {
   const title = experimental_useSidebarThreads().threads.find((t) => t.id === threadId)?.displayTitle ?? null;
-  return <Recap view={view} title={title} withTitle={withTitle}>{block}</Recap>;
+  return (
+    <div className="flex flex-col gap-1">
+      {title && <h1 className="m-0 min-w-0 text-lg font-semibold leading-[1.3] tracking-[-0.015em] [overflow-wrap:anywhere] [text-wrap:balance]">{title}</h1>}
+      {goal && <p className="m-0 line-clamp-2 text-muted-foreground [overflow-wrap:anywhere] [text-wrap:pretty]" title={goal}>{goal}</p>}
+    </div>
+  );
 }
 
 export function Message({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
@@ -408,7 +299,8 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   composersRef.current = composers;
   const navigate = useBbNavigate();
   const [sent, setSent] = useState<string | null>(null);
-  const [section, setSection] = useState<"now" | "work" | "activity">("now");
+  const [section, setSection] = useState<"work" | "activity" | null>(null);
+  const depthRef = useRef<HTMLDivElement>(null);
   const replyMutation = experimental_useRpcMutation({ contract, method: "reply" });
   useSyncExternalStore(replies.subscribe, replies.version);
   const liveAsks = state.kind === "ready" ? [...state.view.asks, ...state.view.answered].filter((ask) => ask.replies.length).map(replyKeyOf) : null;
@@ -470,44 +362,63 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
   const { view, threadIds } = state;
   const { questions, rest } = splitQuestions(view.asks);
   const askThread = (ask: Ask) => (ask.key in threadIds ? threadIds[ask.key]! : null);
+  const page = variant === "page";
+  const evidence = (content: string, sourcePath: string, hostId: string | null) => <EvidenceMarkdown content={content} sourcePath={sourcePath} hostId={hostId} threadId={threadId} workspace={state.workspace} />;
+  const showActivity = () => {
+    setSection("activity");
+    requestAnimationFrame(() => depthRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+  const nudgeKey = view.nudge ? `nudge\u0000${view.nudge.label}` : "";
+  const needsYou = view.asks.length > 0 || view.answered.length > 0 || view.nudge !== null;
   return (
-    <div className={cx("flex flex-col gap-6 text-sm leading-[1.45] text-foreground", variant === "tab" ? "h-full overflow-y-auto px-4 pb-4 pt-5" : "mx-auto w-full max-w-[680px] px-6 pb-6 pt-6")}>
-      <ThreadRecap view={view} threadId={threadId} withTitle={variant === "page"} block={<NowBlock now={view.now} variant={variant} renderEvidence={(content, sourcePath, hostId) => <EvidenceMarkdown content={content} sourcePath={sourcePath} hostId={hostId} threadId={threadId} workspace={state.workspace} />} ledgerPath={state.ledger.path} report={state.report} workspace={state.workspace} threadIds={threadIds} openThread={actions.openThread} />} />
+    <div className={cx("flex flex-col gap-6 text-sm leading-[1.45] text-foreground", page ? "mx-auto w-full max-w-[680px] px-6 pb-6 pt-6" : "h-full overflow-y-auto px-4 pb-4 pt-5")}>
+      <header className="flex flex-col gap-3">
+        {page && <ThreadTitle threadId={threadId} goal={view.recap.goal} />}
+        <StatusLine sections={view.sections} variant={variant} />
+      </header>
 
-      <nav aria-label="Orchestration sections" className="flex gap-1 border-b border-border pb-2">
-        {(["now", "work", "activity"] as const).map((item) => <button key={item} type="button" aria-pressed={section === item} onClick={() => setSection(item)} className={cx("rounded-md px-3 py-1.5 text-xs capitalize hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary", section === item ? "bg-accent font-medium text-foreground" : "text-muted-foreground")}>{item === "now" ? `Now${view.asks.length ? ` · ${view.asks.length}` : ""}` : item}</button>)}
-      </nav>
-      {section === "now" ? <>
-      <section>
-        <h2 className="m-0 text-base font-semibold leading-[1.35] tracking-[-0.01em] [text-wrap:balance]">{view.heading}</h2>
-        <p className="m-0 mt-1 text-muted-foreground [text-wrap:pretty]">{view.subline}</p>
-        {view.nudge && (
-          <div className="mt-2.5">
-            {sent === `nudge\u0000${view.nudge.label}`
-              ? <span className="text-xs text-muted-foreground">Question started in the chat composer</span>
-              : <Button variant="outline" onClick={() => actions.fill(`nudge\u0000${view.nudge!.label}`, view.nudge!.draft)}>{view.nudge.label}</Button>}
-          </div>
-        )}
-      </section>
-
-      {view.asks.length > 0 && (
-        <section className="flex flex-col gap-2">
+      {needsYou && (
+        <section aria-label="Needs you" className="flex flex-col gap-2">
+          <h2 className="m-0 px-0.5 text-xs font-semibold uppercase tracking-[0.04em] text-subtle-foreground">Needs you</h2>
           {questions.length > 0 && <QuestionsCard questions={questions} actions={actions} />}
           {rest.map((ask) => <AskCard key={ask.key} ask={ask} actions={actions} threadId={askThread(ask)} />)}
+          {view.nudge && (
+            <div className="flex flex-col gap-2 rounded-[10px] border border-[color-mix(in_oklab,var(--destructive)_35%,transparent)] bg-[color-mix(in_oklab,var(--destructive)_8%,var(--background))] px-3 pb-2.5 pt-3">
+              <p className="m-0 text-sm font-semibold leading-[1.4] [overflow-wrap:anywhere]">{view.nudge.text}</p>
+              <div>
+                {sent === nudgeKey
+                  ? <span className="text-xs text-muted-foreground">Question started in the chat composer</span>
+                  : <Button variant="outline" className="min-w-0 max-w-full" title={view.nudge.label} onClick={() => actions.fill(nudgeKey, view.nudge!.draft)}><span className="block truncate">{view.nudge.label}</span></Button>}
+              </div>
+            </div>
+          )}
+          {view.answered.length === 1 && <AnsweredCard ask={view.answered[0]!} actions={actions} />}
+          {view.answered.length > 1 && (
+            <div aria-label="Answered" className="flex flex-col divide-y divide-border rounded-[10px] border border-border">
+              {view.answered.map((ask) => <AnsweredCard key={ask.key} ask={ask} actions={actions} bare />)}
+            </div>
+          )}
         </section>
       )}
 
-      {view.answered.length === 1 && <AnsweredCard ask={view.answered[0]!} actions={actions} />}
-      {view.answered.length > 1 && (
-        <section aria-label="Answered" className="flex flex-col divide-y divide-border rounded-[10px] border border-border">
-          {view.answered.map((ask) => <AnsweredCard key={ask.key} ask={ask} actions={actions} bare />)}
-        </section>
-      )}
+      <WorkingNow sections={view.sections} variant={variant} threadIds={threadIds} openThread={actions.openThread} />
+      {page && view.sections.next && <Next text={view.sections.next} />}
+      <Plan key={variant} sections={view.sections} variant={variant} threadIds={threadIds} openThread={actions.openThread} />
+      {page && <Recently sections={view.sections} onMore={showActivity} />}
+      <Details
+        view={view}
+        ledger={state.ledger}
+        report={state.report}
+        renderLedgerText={(content) => evidence(content, state.ledger.path, state.workspace?.ledgerHostId ?? null)}
+        renderReport={(content) => evidence(content, `${state.workspace?.rootPath ?? "/"}/`, state.workspace?.hostId ?? null)}
+      />
 
-      <Brief ledger={state.ledger} view={view} threadId={threadId} workspace={state.workspace} />
-      <Team view={view} actions={actions} threadIds={threadIds} />
-      {view.state !== "planning" && <History view={view} />}
-      </> : <WorkflowHistory key={`${threadId}:${section}`} ledger={state.ledger} view={view} openThread={actions.openThread} mode={section} renderEvidence={(content) => <EvidenceMarkdown content={content} sourcePath={state.ledger.path} hostId={state.workspace?.ledgerHostId ?? null} threadId={threadId} workspace={state.workspace} />} />}
+      <div ref={depthRef} className="flex flex-col gap-4">
+        <nav aria-label="More about this orchestration" className="flex gap-1 border-b border-border pb-2">
+          {(["work", "activity"] as const).map((item) => <button key={item} type="button" aria-pressed={section === item} onClick={() => setSection(section === item ? null : item)} className={cx("rounded-md px-3 py-1.5 text-xs capitalize hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary", section === item ? "bg-accent font-medium text-foreground" : "text-muted-foreground")}>{item}</button>)}
+        </nav>
+        {section && <WorkflowHistory key={`${threadId}:${section}`} ledger={state.ledger} view={view} openThread={actions.openThread} mode={section} renderEvidence={(content) => evidence(content, state.ledger.path, state.workspace?.ledgerHostId ?? null)} />}
+      </div>
     </div>
   );
 }

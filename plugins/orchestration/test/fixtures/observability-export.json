@@ -1,0 +1,1915 @@
+{
+  "schema": "orchestrate-ledger-export",
+  "schema_version": 1,
+  "ledger": "/home/owner/project/orchestrate/orchestration-observability.md",
+  "orchestrator": {
+    "id": "thr_3kp87mtayp",
+    "raw": "thr_3kp87mtayp"
+  },
+  "goal": "Make the bb Orchestration view show what an orchestration is doing right now, backed by a structured «Now» ledger block, and add a read-only team-roles bb plugin.",
+  "status": "active",
+  "status_raw": "active",
+  "backend": "bb-threads",
+  "base": "main of github.com/kartollikaa/bb-plugins (0d651ee); origin/main of kartollikaa/kartollika-ai-hub for I1",
+  "brief": "Started 2026-11-16T14:04+0300. Six subtasks briefed; nothing delivered yet.\n### Completed\n- R1 live-activity research — verified (report in history/orchestration-observability/R1-live-activity.md)\n### Remaining\n- R1 research → D1 design (owner confirms) → I1 (ai-hub PR, owner merges) and I2 (view)\n- D2 design (owner confirms) → I3 (team-roles plugin)\n### Evidence\n- none",
+  "project_profile": [
+    {
+      "row": "delivery",
+      "value": "bb-plugins: commits on a feature branch, pushed to origin, one plugin per commit (subject starts with the plugin id). kartollika-ai-hub: a pull request to kartollikaa/kartollika-ai-hub. Research: the researcher's report.",
+      "source": "bb-plugins AGENTS.md «Rules»; ai-hub history (#38, #39, #52 merged as PRs)"
+    },
+    {
+      "row": "change and areas",
+      "value": "`git diff main...<branch>` (bb-plugins) / the PR diff (ai-hub); areas are files",
+      "source": "git"
+    },
+    {
+      "row": "checks",
+      "value": "bb-plugins: in the plugin folder `npm test`, `npm run typecheck` (or `npx tsc -p .`), `bb plugin build`; read on the delivered commit in a gate worktree. ai-hub orchestrate: its python tests under `plugins/orchestrate/tests` and `scripts/test_*.py`, read on the PR head",
+      "source": "bb-plugins docs/workflow.md «Change loop»; ai-hub plugins/orchestrate/README.md"
+    },
+    {
+      "row": "review",
+      "value": "independent reviewer thread (role reviewer, team 0.2.0) on the exact delivered revision, against the brief, design doc and AGENTS.md; design docs: the owner confirms",
+      "source": "owner's standing rule (independent review); delegation (design decisions = owner)"
+    },
+    {
+      "row": "landing",
+      "value": "bb-plugins: fast-forward/rebase onto main and push to main once checks pass (orchestrator). ai-hub: merge the PR (owner's decision)",
+      "source": "bb-plugins AGENTS.md «Commits and pushes to `main` are fine once checks pass»; owner's standing rule (merges need an owner decision)"
+    },
+    {
+      "row": "after landing",
+      "value": "bb-plugins: `git -C ~/Projects/bb pull --ff-only`, `bb plugin reload <id>` (new plugin: `bb plugin install path:~/Projects/bb --plugin team-roles --yes`), `bb plugin list` shows running, changed behaviour checked in the running bb (UI not seeable → owner check with exact steps, marked unverified). No release: orchestration and team-roles are unpublished. ai-hub: orchestrator runs `claude plugin marketplace update kartollika-ai-hub` and `claude plugin update orchestrate@kartollika-ai-hub`, checks the installed version",
+      "source": "owner's answer 2026-11-16T14:30+0300"
+    },
+    {
+      "row": "access",
+      "value": "orchestrator: git/gh for both repos, bb CLI, plugin reload/install. Subtasks: git in own worktree, npm, bb plugin build; I1: gh pr create on ai-hub",
+      "source": "briefs; first reports confirm"
+    }
+  ],
+  "delegation": {
+    "quotes": [
+      "«Yeah, I approve, so please act as an orchestrator user plugin.» — 2026-11-16T14:00+0300 (approving the proposed slices O1, O2, O3, T1)",
+      "standing: «Commits and pushes to `main` are fine once checks pass.» — bb-plugins AGENTS.md «Rules», in base 0d651ee before this orchestration",
+      "standing: «Ask Dmitrii before: a first marketplace publication, releasing an unpublished plugin, …» — bb-plugins AGENTS.md «Rules»"
+    ],
+    "classes": [
+      {
+        "class": "process",
+        "decision": "orchestrator",
+        "basis": "always"
+      },
+      {
+        "class": "design decisions",
+        "decision": "owner",
+        "basis": "not named; the two design docs go to the owner for confirmation"
+      },
+      {
+        "class": "model and effort",
+        "decision": "orchestrator",
+        "basis": "role table team 0.2.0 (standing)"
+      },
+      {
+        "class": "landing",
+        "decision": "orchestrator, not a landing that releases to users — bb-plugins main only; ai-hub PR merge: owner, after the gate and independent review",
+        "basis": "standing: bb-plugins AGENTS.md; owner's answer 2026-11-16T14:30+0300: «You merge it after the review (recommended)»"
+      },
+      {
+        "class": "after landing",
+        "decision": "orchestrator for local reload/install of bb-plugins plugins; orchestrator updates the installed orchestrate plugin after I1 merges; owner for releases",
+        "basis": "bb-plugins AGENTS.md «Done means seen working»; owner's answer 2026-11-16T14:30+0300: «Orchestrator updates it (recommended)»; releases: «Ask Dmitrii before»"
+      },
+      {
+        "class": "archiving sessions",
+        "decision": "orchestrator",
+        "basis": "default"
+      },
+      {
+        "class": "cleaning up working files",
+        "decision": "orchestrator",
+        "basis": "default"
+      },
+      {
+        "class": "publishing",
+        "decision": "owner",
+        "basis": "not named; nothing published (no marketplace.json entry for team-roles)"
+      },
+      {
+        "class": "credentials, identity, irreversible, scope",
+        "decision": "owner",
+        "basis": "never delegated"
+      }
+    ]
+  },
+  "subtasks": [
+    {
+      "id": "R1",
+      "name": null,
+      "session": "thr_em67d6h8se",
+      "session_raw": "thr_em67d6h8se",
+      "role": {
+        "raw": "researcher (team 0.2.0)",
+        "name": "researcher",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-sonnet-5-5 / medium (role)",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "report + thread-storage/thr_em67d6h8se/R1-live-activity.md",
+      "version": "report 2026-11-16",
+      "areas": "none (read-only)",
+      "depends_on": [],
+      "status": {
+        "value": "verified",
+        "raw": "verified — facts spot-checked; copy in history/orchestration-observability/"
+      },
+      "gate": "no landing"
+    },
+    {
+      "id": "D1",
+      "name": null,
+      "session": "thr_3vmqbfzb87",
+      "session_raw": "thr_3vmqbfzb87 (#3, archived; #2 thr_7pezmze6qn and #1 archived)",
+      "role": {
+        "raw": "designer (team 0.2.0)",
+        "name": "designer",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-opus-5-5 / high (role)",
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "bb-plugins feature/orchestration-now-design",
+      "version": "db1f783 → landed 8f52057 on main",
+      "areas": "plugins/orchestration/docs/now-block.md",
+      "depends_on": [
+        "(R1",
+        "verified)"
+      ],
+      "status": {
+        "value": "verified",
+        "raw": "verified — landed 8f52057 on main (rebased db1f783, doc identical); docs only, no after-landing"
+      },
+      "gate": "Gates G-D1"
+    },
+    {
+      "id": "D2",
+      "name": null,
+      "session": "thr_f78zevw7bp",
+      "session_raw": "thr_f78zevw7bp (#2; was thr_v3mv2b35zk, archived)",
+      "role": {
+        "raw": "designer (team 0.2.0)",
+        "name": "designer",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-opus-5-5 / high (role)",
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "bb-plugins feature/team-roles-design (local commits, not pushed; reachable in ~/Projects/bb)",
+      "version": "ae823e0 (landed on main)",
+      "areas": "plugins/team-roles/docs/design.md",
+      "depends_on": [],
+      "status": {
+        "value": "verified",
+        "raw": "verified — landed ae823e0 on main 2026-11-16T15:45+0300, doc only, no after-landing"
+      },
+      "gate": "Gates G-D2"
+    },
+    {
+      "id": "I1",
+      "name": null,
+      "session": "thr_qjs9u9ay8h",
+      "session_raw": "thr_qjs9u9ay8h",
+      "role": {
+        "raw": "implementer (team 0.2.0)",
+        "name": "implementer",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-sonnet-5-5 / medium (role)",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "kartollika-ai-hub PR from feature/orchestrate-now-block",
+      "version": null,
+      "areas": "ai-hub plugins/orchestrate/**",
+      "depends_on": [
+        "D1",
+        "(owner-confirmed)"
+      ],
+      "status": {
+        "value": "verified",
+        "raw": "verified — merged eeb9ce1 (PR #53 @5adb1fb); installed orchestrate 0.17.0; ack #51, working files removed, thread archived"
+      },
+      "gate": "Gates G-I1"
+    },
+    {
+      "id": "I2",
+      "name": null,
+      "session": "thr_8wn32kum9s",
+      "session_raw": "thr_8wn32kum9s (#2; #1 thr_2gq6xuv7fi archived)",
+      "role": {
+        "raw": "implementer (team 0.2.0)",
+        "name": "implementer",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-sonnet-5-5 / medium (role)",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "bb-plugins feature/orchestration-now-block",
+      "version": null,
+      "areas": "plugins/orchestration/** except docs/now-block.md; docs/plugins.md orchestration entry",
+      "depends_on": [
+        "D1",
+        "(confirmed",
+        "landed)"
+      ],
+      "status": {
+        "value": "delivered",
+        "raw": "delivered — 7daf018 on origin feature/orchestration-now-block (rebased on 6e1b580, 5 commits); gate: review"
+      },
+      "gate": "Gates G-I2"
+    },
+    {
+      "id": "RV-D1",
+      "name": null,
+      "session": "thr_kf9kx8uktv",
+      "session_raw": "thr_kf9kx8uktv (archived)",
+      "role": {
+        "raw": "reviewer (team 0.2.0)",
+        "name": "reviewer",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-opus-5-5 / high (role)",
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "review report on D1 @9417212",
+      "version": "report 2026-11-16 (thread-storage/thr_kpk3hf9pr5/RV-D1-report.md)",
+      "areas": "none (read-only)",
+      "depends_on": [],
+      "status": {
+        "value": "verified",
+        "raw": "verified — rounds 1–3 done, approve on ce876ec"
+      },
+      "gate": "no landing"
+    },
+    {
+      "id": "RV-D2",
+      "name": null,
+      "session": "thr_35arpan2p6",
+      "session_raw": "thr_35arpan2p6",
+      "role": {
+        "raw": "reviewer (team 0.2.0)",
+        "name": "reviewer",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-opus-5-5 / high (role)",
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "review report on D2 @1a7a830",
+      "version": "report 2026-11-16 (thread-storage/thr_kpk3hf9pr5/RV-D2-report.md)",
+      "areas": "none (read-only)",
+      "depends_on": [],
+      "status": {
+        "value": "verified",
+        "raw": "verified — report read; re-review of the fix goes to this thread"
+      },
+      "gate": "no landing"
+    },
+    {
+      "id": "RV-I3",
+      "name": null,
+      "session": "thr_nkphzxd9ph",
+      "session_raw": "thr_nkphzxd9ph",
+      "role": {
+        "raw": "reviewer (team 0.2.0)",
+        "name": "reviewer",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-opus-5-5 / high (role)",
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "review report on I3 @ec90438, f0aa6c7",
+      "version": "report 2026-11-16 (thread-storage/thr_arftevzyhg/RV-I3-report.md)",
+      "areas": "none (read-only)",
+      "depends_on": [],
+      "status": {
+        "value": "verified",
+        "raw": "verified — approve on f0aa6c7 (2 new nits, not blocking); archived"
+      },
+      "gate": "no landing"
+    },
+    {
+      "id": "RV-I1",
+      "name": null,
+      "session": "thr_z7dh2cj2sn",
+      "session_raw": "thr_z7dh2cj2sn",
+      "role": {
+        "raw": "reviewer (team 0.2.0)",
+        "name": "reviewer",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-opus-5-5 / high (role)",
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "review report on I1 PR #53 @a2cf93d",
+      "version": "report 2026-11-16 (thread-storage/thr_arftevzyhg/RV-I1-report.md)",
+      "areas": "none (read-only)",
+      "depends_on": [],
+      "status": {
+        "value": "verified",
+        "raw": "verified — approve on 5adb1fb (round 2); archived"
+      },
+      "gate": "no landing"
+    },
+    {
+      "id": "RV-I2",
+      "name": null,
+      "session": "thr_npgzcvjaud",
+      "session_raw": "thr_npgzcvjaud",
+      "role": {
+        "raw": "reviewer (team 0.2.0)",
+        "name": "reviewer",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-opus-5-5 / high (role)",
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "review report on I2 @7daf018",
+      "version": null,
+      "areas": "none (read-only)",
+      "depends_on": [],
+      "status": {
+        "value": "working",
+        "raw": "working — briefed (#50)"
+      },
+      "gate": "no landing"
+    },
+    {
+      "id": "I3",
+      "name": null,
+      "session": "thr_i23d38zv2f",
+      "session_raw": "thr_i23d38zv2f (#2, archived; #1 thr_y9t5xv2ztw archived)",
+      "role": {
+        "raw": "implementer (team 0.2.0)",
+        "name": "implementer",
+        "source": "team 0.2.0"
+      },
+      "model_effort": {
+        "raw": "claude-sonnet-5-5 / medium (role)",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "inherits": false,
+        "source": "role",
+        "model_source": "role",
+        "effort_source": "role",
+        "capped": false,
+        "uncompared": false,
+        "requested": null
+      },
+      "delivery": "bb-plugins feature/team-roles",
+      "version": null,
+      "areas": "plugins/team-roles/** except docs/design.md; .bb/plugins.json; README.md table; docs/plugins.md new entry; docs/publication.md new row; AGENTS.md (D1 precedent rule, per design.md)",
+      "depends_on": [
+        "D2",
+        "(landed",
+        "ae823e0)"
+      ],
+      "status": {
+        "value": "verified",
+        "raw": "verified — landed 6e1b580 on main; installed from path, running; CLI checked; page/Propose: owner checked «Looks right»"
+      },
+      "gate": "Gates G-I3"
+    }
+  ],
+  "done_when": {
+    "R1": [],
+    "D1": [
+      "Ledger block format with example and old-ledger fallback — read the doc",
+      "Export field(s), JSON shape, schema-version rule — read the doc",
+      "View top block and team row mockup with data sources — read the doc",
+      "I1/I2 slices with areas, shared contract strings, Done when — read the doc",
+      "Owner questions with options and recommendation — read the doc",
+      "Section 6: owner waits never invisible — view rule for unformatted lines + chat/ledger mismatch, skill enforcement (check/hook), us26 incident as test case — read the doc"
+    ],
+    "D2": [],
+    "I1": [
+      "now-block.md I1 Done when (incl. section 6: a turn waiting on the owner cannot end without an `ask:` line); plugin tests pass; export prints the new field and still exits 0 on an old fixture"
+    ],
+    "I2": [
+      "now-block.md I2 Done when (incl. section 6: the us26 «For the owner» lines show as waiting on the owner); npm test, typecheck, bb plugin build pass; node --test cases for new block, old ledger, no live data",
+      "After landing: reloaded, running, Now block seen in the running bb (or owner check, marked unverified)"
+    ],
+    "I3": [
+      "design.md I3 Done when; npm test, typecheck, bb plugin build pass; no writes under ~/.claude/plugins",
+      "After landing: installed from path, running, page seen in the running bb (or owner check, marked unverified)"
+    ]
+  },
+  "landing_queue": [
+    "D1 — design doc; owner confirms, then lands on main (docs only); unblocks I1, I2",
+    "D2 — design doc; owner confirms, then lands on main; unblocks I3",
+    "I2 — orchestration view; after D1",
+    "I3 — team-roles plugin; after D2; touches docs/plugins.md and README.md like I2 (different entries) — conflict step at gate",
+    "I1 — ai-hub PR; owner merges after the gate and review; then orchestrator updates the installed plugin"
+  ],
+  "current_checkpoint": {
+    "text": "D1 landed 8f52057 (verified). I1 (ai-hub PR) and I2 (view) unblocked and working; I3 working on team-roles. I3 done (owner checked the page). I1 merged eeb9ce1, orchestrate 0.17.0 installed. Gate G-I2 landed 0d8700c (RV-I2 r2 approve; ff push 6e1b580..0d8700c; installed from path, running). Owner to look at the Right now block. I2 closed (ack #60, no working files), archived. Owner: view not human-readable → D3 #1 delivered human-view.md 0e56b77 (Q1–Q7, owner asked); D3 #1 rotated, archived; D3 #2 delivered genui section 374f766 (ack #63); Owner confirmed all A; design landed ff 0d8700c..374f766; genui-probe removed (Q11); D3 #2 archived; V1 implementer started (#64). Then review + implementer.  Waking on I1, I2, RV-I3 reports. D1 #3 acked #38, working files none, archived.\n- notifications: thr_arftevzyhg set to input-only (was inherit/all); `--level inherit` undoes it",
+    "time": null,
+    "background_waits": [],
+    "archive_after_handover": [],
+    "structured": false,
+    "updated": null,
+    "doing": null,
+    "waiting_on": [],
+    "next": null,
+    "blocked_by": null
+  },
+  "contracts": [
+    {
+      "artifact": "`R1-live-activity.md`",
+      "produced_by": "R1",
+      "used_by": "D1",
+      "state": "produced; sent to D1 (#9)"
+    },
+    {
+      "artifact": "`plugins/orchestration/docs/now-block.md`",
+      "produced_by": "D1",
+      "used_by": "I1, I2",
+      "state": "produced — on main 8f52057"
+    },
+    {
+      "artifact": "export field names defined in now-block.md",
+      "produced_by": "I1",
+      "used_by": "I2",
+      "state": "pending"
+    },
+    {
+      "artifact": "`plugins/team-roles/docs/design.md`",
+      "produced_by": "D2",
+      "used_by": "I3",
+      "state": "produced — on main ae823e0"
+    }
+  ],
+  "decisions_in_force": [
+    {
+      "scope": "model and effort",
+      "decision": "orchestrator session effort set by the owner (subtasks unchanged) — 2026-11-16T17:25+0300 (host clock); carried to any successor orchestrator",
+      "evidence": "this thread"
+    },
+    {
+      "scope": "scope",
+      "decision": "owner waits must always show in the view, and the skill must not let it recur: «make sure that it wouldn't happen again, because it has already happened twice during the day»",
+      "evidence": "us26 ledger: free-text «For the owner» lines → notes (owner.ts:69-73)"
+    },
+    {
+      "scope": "plan",
+      "decision": "slices O1/O2/O3/T1 approved: «Yeah, I approve, so please act as an orchestrator user plugin.»",
+      "evidence": "this thread, 2026-11-16"
+    }
+  ],
+  "unacked_messages": [],
+  "gates": [
+    {
+      "id": "G-D1",
+      "heading": "G-D1 — D1 @9417212",
+      "subtask": "D1",
+      "version": null,
+      "archived": null,
+      "stages": [
+        {
+          "name": "landed",
+          "kind": "other",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T14:50+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "2026-11-16T14:50+0300 (host clock) — 8 commits 0d651ee..db1f783 rebased onto origin/main ae823e0 → 8f52057; now-block.md blob equal to db1f783's; diff vs ae823e0 only that file; base re-read = HEAD~8 immediately before push; ff push ae823e0..8f52057; ~/Projects/bb pulled ff to 8f52057. After landing: none (docs only). Conflicts: I3 areas do not include now-block.md. Signals: landed D1 (#38), unblocked I1 (#39), I2 (#40)"
+        },
+        {
+          "name": "owner",
+          "kind": "other",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T16:35+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "design confirmed 2026-11-16T16:35+0300 «Confirm (recommended)»"
+        },
+        {
+          "name": "state",
+          "kind": "other",
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T14:45+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "414b4ac+f09637a+9417212 on 0d651ee (= origin/main), one file plugins/orchestration/docs/now-block.md +738 — 2026-11-16T14:45+0300"
+        },
+        {
+          "name": "checks",
+          "kind": "checks",
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": null,
+          "text": "docs-only change; plugin checks n/a"
+        },
+        {
+          "name": "review round 3",
+          "kind": "review",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T16:20+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "RV-D1 on ce876ec — approve 2026-11-16T16:20+0300; 3 nits (Q8 under wrong «Decided» heading; note shown twice; grouped card answering) → D1 #3 (#32)"
+        },
+        {
+          "name": "review round 2",
+          "kind": "review",
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T15:58+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "RV-D1 on 5bb07dc — changes needed 2026-11-16T15:58+0300: 1–6, 8 resolved; blocking: name fallback shows slug (255/391 rows); nit: match-title; checkout-record note = my D2 landing on ~/Projects/bb main, reviewed revision unaffected → accepted"
+        },
+        {
+          "name": "review",
+          "kind": "review",
+          "state": "pending",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T15:15+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "RV-D1 thr_kf9kx8uktv — changes needed 2026-11-16T15:15+0300: 1 Q7 not isolated (moot: owner chose A); 2 closed ledgers → «needs you» (168 asks on cozy-redesign); 3 waiting-on↔ask matching rule; 4 export sample ≠ example; 5 stale anchor; 6 narrow tab loses folds; 7 short-name fallback; nits — returned to D1 (#23)"
+        },
+        {
+          "name": "round 2",
+          "kind": "other",
+          "state": "pending",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T15:40+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "5bb07dc delivered 2026-11-16T15:40+0300 (diff 11244e7..5bb07dc doc only +160/−66); re-review RV-D1 (#26) — pending"
+        },
+        {
+          "name": "owner",
+          "kind": "other",
+          "state": "pending",
+          "state_source": "inferred",
+          "time": null,
+          "text": "Q2/Q3/Q4/Q6/Q7 answered, all in doc @11244e7 (diff 9417212..11244e7 read: 6+/6−, Q7 only); design confirmation pending"
+        }
+      ],
+      "summary": {
+        "checks": {
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": null
+        },
+        "review": {
+          "state": "pending",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T15:15+03:00",
+            "precision": "time",
+            "offset": true
+          }
+        }
+      }
+    },
+    {
+      "id": "G-D2",
+      "heading": "G-D2 — D2 @1a7a830",
+      "subtask": "D2",
+      "version": null,
+      "archived": "history/orchestration-observability/979490e517b478440b7d071a5e2f58e613a0171dc22b91d63ee95f14075e48ea.md",
+      "stages": [],
+      "summary": {}
+    },
+    {
+      "id": "G-I3",
+      "heading": "G-I3 — I3 @ec90438",
+      "subtask": "I3",
+      "version": null,
+      "archived": null,
+      "stages": [
+        {
+          "name": "state",
+          "kind": "other",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T15:05+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "origin/feature/team-roles = ec90438 (66e018e plugin, ec90438 indexes) on ae823e0; merges clean onto origin/main 8f52057; 45 files +5431/−1 — 2026-11-16T15:05+0300 (host clock)"
+        },
+        {
+          "name": "checks",
+          "kind": "checks",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T15:05+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "gate worktree /tmp/gate-i3 at ec90438, plugins/team-roles: npm ci 0, npm test 0 (44/44 pass), npm run typecheck 0, bb plugin build 0 (dist/app.js, app.css); tree clean after; logs thread-storage/thr_arftevzyhg/i3-*.log — 2026-11-16T15:05+0300 (host clock)"
+        },
+        {
+          "name": "review",
+          "kind": "review",
+          "state": "failed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T15:30+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "RV-I3 thr_nkphzxd9ph — approve 2026-11-16T15:30+0300 (host clock); checks rerun 0/0/0/0, guard mutation test fails as it should, no-write checksums equal; deviations accepted; should-fix 1 RoleDetail states (R11) + nits 2–8 → returned to I3 (#42) as process: fix before landing, then re-review of the fix diff by RV-I3"
+        },
+        {
+          "name": "round 2",
+          "kind": "other",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T16:05+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "I3 #2 delivered f0aa6c7 (ack #42; acted on #43): 95dc383 item 3, f0aa6c7 items 1,4,5,6,8 + 2 tests; gate run on f0aa6c7: npm ci 0, npm test 0 (46/46), typecheck 0 (covers test/), build 0, tree clean; merges clean onto 8f52057; re-review sent to RV-I3 (#45) — 2026-11-16T16:05+0300 (host clock)"
+        },
+        {
+          "name": "review round 2",
+          "kind": "review",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T16:30+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "RV-I3 approve on f0aa6c7 — 2026-11-16T16:30+0300 (host clock); nits (snapshot.error → Loading forever; blank lines RoleList.tsx:20-21) not blocking"
+        },
+        {
+          "name": "landed",
+          "kind": "other",
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T16:30+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "2026-11-16T16:30+0300 (host clock) — 4 commits ae823e0..f0aa6c7 rebased onto 8f52057 → 6e1b580 (ff8462e, 83e6681, 310e3b5, 6e1b580); team-roles + index files identical to f0aa6c7; base re-read = HEAD~4 before push; ~/Projects/bb pulled"
+        },
+        {
+          "name": "after landing",
+          "kind": "after_landing",
+          "state": "failed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T17:20+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "npm install --include=dev (lockfile unchanged); `bb plugin install path:~/Projects/bb --plugin team-roles --yes` exit 0 (first try failed: deps not installed in checkout); `bb plugin list`: team-roles@0.1.0 running; `bb team-roles list` / `--json` exit 0: team 0.2.0, 6 roles, generated current, codex 6 installed current; team install + ~/.codex/agents checksum 029dad85f828 before = after. Page, narrow layout, Propose: owner check — «Looks right» 2026-11-16T17:20+0300 (host clock)"
+        },
+        {
+          "name": "signals",
+          "kind": "other",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": null,
+          "text": "landed I3 (#46, ack); RV-I3, I3 #2 archived; old I3 scratch files in /tmp removed (named by I3)"
+        },
+        {
+          "name": "conflicts",
+          "kind": "conflicts",
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": null,
+          "text": "I2 changes docs/plugins.md (orchestration entry) and README? — different entries; re-check at I2's gate"
+        },
+        {
+          "name": "done when",
+          "kind": "done_when",
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": null,
+          "text": "DW 2–4 (page, CLI via bb, Propose) only after landing (install from path) → after-landing step"
+        }
+      ],
+      "summary": {
+        "checks": {
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T15:05+03:00",
+            "precision": "time",
+            "offset": true
+          }
+        },
+        "review": {
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T16:30+03:00",
+            "precision": "time",
+            "offset": true
+          }
+        },
+        "after_landing": {
+          "state": "failed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T17:20+03:00",
+            "precision": "time",
+            "offset": true
+          }
+        },
+        "conflicts": {
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": null
+        },
+        "done_when": {
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": null
+        }
+      }
+    },
+    {
+      "id": "G-I1",
+      "heading": "G-I1 — I1 PR #53 @a2cf93d",
+      "subtask": "I1",
+      "version": null,
+      "archived": null,
+      "stages": [
+        {
+          "name": "state",
+          "kind": "other",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T16:05+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "PR #53 OPEN, head a2cf93d, base main a192b46 (= origin/main), MERGEABLE, no auto-merge; 23 files; merges clean — 2026-11-16T16:05+0300 (host clock)"
+        },
+        {
+          "name": "checks",
+          "kind": "checks",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T16:05+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "gate worktree /tmp/gate-i1 at a2cf93d: all 8 plugins/orchestrate test scripts 0, check-generic-skills 0, check-no-stack-commands 0, claude plugin validate 0; tree clean; log thread-storage/thr_arftevzyhg/i1-checks.log — 2026-11-16T16:05+0300 (host clock)"
+        },
+        {
+          "name": "review",
+          "kind": "review",
+          "state": "failed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T16:50+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "RV-I1 thr_z7dh2cj2sn — approve 2026-11-16T16:50+0300 (host clock): all I1 Done when confirmed; export == spec §2 JSON == current.json; 57 real ledgers 0 diffs in old keys; Stop hook no-op outside orchestrator, blocks once, fails open; choices accepted incl. marketplace.json bump. Should-fix: 1 wrapped continuation joins wrong Now key (false Blocked); 2 owner_errors vs owner_items split differ (nested bullets); 3 hook should read last_assistant_message. Nits: 4 NOTHING prefixes vs I2 rule 4; 5 root README test line. → returned to I1 (#48), README line as area extension"
+        },
+        {
+          "name": "outside area",
+          "kind": "other",
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": null,
+          "text": ".claude-plugin/marketplace.json 0.17.0 bump (repo convention, 0764103) — to judge; root README pre-commit list lacks test_owner_wait_stop.py — to decide with review"
+        },
+        {
+          "name": "round 2",
+          "kind": "other",
+          "state": "failed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T17:05+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "I1 5adb1fb (ack #48), 6 new tests (fail-first per I1); gate run on 5adb1fb: all 8 test scripts, generic, no-stack, validate plugin+root exit 0; tree clean; merges clean onto a192b46; PR OPEN MERGEABLE no auto-merge; log i1b-checks.log; re-review RV-I1 (#49) — 2026-11-16T17:05+0300 (host clock)"
+        },
+        {
+          "name": "review round 2",
+          "kind": "review",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T17:35+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "RV-I1 approve on 5adb1fb 2026-11-16T17:35+0300 (host clock); findings 1–3, nit 5 fixed; nit 4 mostly (exact «Nothing pending» still no error, view shows it — not blocking); export byte-equal to a2cf93d on 57 ledgers; report RV-I1-round2.md"
+        },
+        {
+          "name": "landed",
+          "kind": "other",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T17:45+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "2026-11-16T17:45+0300 (host clock) — owner «Re «I1: merge PR #53 …»: Merge it»; `gh pr merge 53 --merge --match-head-commit 5adb1fb…` → MERGED, merge commit eeb9ce1 (merge commits are the repo convention, e.g. a192b46). After landing: `claude plugin marketplace update kartollika-ai-hub`, `claude plugin update orchestrate@kartollika-ai-hub` 0.16.0→0.17.0; `claude plugin list` 0.17.0. Signal: landed I1 (#51)"
+        },
+        {
+          "name": "landing",
+          "kind": "landing",
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": null,
+          "text": "owner merges after review; then orchestrator updates installed orchestrate plugin"
+        }
+      ],
+      "summary": {
+        "checks": {
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T16:05+03:00",
+            "precision": "time",
+            "offset": true
+          }
+        },
+        "review": {
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T17:35+03:00",
+            "precision": "time",
+            "offset": true
+          }
+        },
+        "landing": {
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": null
+        }
+      }
+    },
+    {
+      "id": "G-I2",
+      "heading": "G-I2 — I2 @7daf018",
+      "subtask": "I2",
+      "version": null,
+      "archived": null,
+      "stages": [
+        {
+          "name": "state",
+          "kind": "other",
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T17:15+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "origin/feature/orchestration-now-block = 7daf018, contains origin/main 6e1b580; files plugins/orchestration/** + docs/plugins.md — 2026-11-16T17:15+0300 (host clock)"
+        },
+        {
+          "name": "checks",
+          "kind": "checks",
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T17:15+03:00",
+            "precision": "time",
+            "offset": true
+          },
+          "text": "gate worktree at 7daf018, plugins/orchestration: npm ci 0, npm test 0 (193, 0 fail), typecheck 0, bb plugin build 0; tree clean; logs i2-*.log — 2026-11-16T17:15+0300 (host clock)"
+        },
+        {
+          "name": "review",
+          "kind": "review",
+          "state": "pending",
+          "state_source": "inferred",
+          "time": null,
+          "text": "RV-I2 thr_npgzcvjaud (#50) — pending; producer side PR #53 5adb1fb named in its brief"
+        },
+        {
+          "name": "order",
+          "kind": "other",
+          "state": "unknown",
+          "state_source": "inferred",
+          "time": null,
+          "text": "I2 consumes I1's export; I1 not merged yet — I2 may land first (it falls back on old exports: source none/text)"
+        }
+      ],
+      "summary": {
+        "checks": {
+          "state": "passed",
+          "state_source": "inferred",
+          "time": {
+            "at": "2026-11-16T17:15+03:00",
+            "precision": "time",
+            "offset": true
+          }
+        },
+        "review": {
+          "state": "pending",
+          "state_source": "inferred",
+          "time": null
+        }
+      }
+    }
+  ],
+  "decision_journal": [
+    {
+      "when": {
+        "raw": "2026-11-16T20:20+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T20:20+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Owner confirmed Q1–Q11 A; landed design 374f766 on main (docs only, ff); genui-probe removed; V1 started (#64, V1.brief)",
+      "basis": "owner answer; git push"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T20:05+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T20:05+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D3 #2 374f766: host genui can't render in plugin view; recommend native GenUI-styled; Q8–Q11 asked; test subthread thr_rhixvadkrc archived",
+      "basis": "D3 #2 report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T19:40+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T19:40+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D3 #1 delivered 0e56b77 (ack #61, #62), rotate; archived; D3 #2 thr_bqdh6ngyxa for genui (#63); owner asked Q1–Q7",
+      "basis": "D3 report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T19:15+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T19:15+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Owner adds: genui progress blocks in Now/header — validate, research, prototype → D3 (#62)",
+      "basis": "owner message"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T19:10+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T19:10+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Owner: «Something's off» — view must be human-readable at first glance; started D3 designer thr_wgpp44h7xw (brief #61, D3.brief)",
+      "basis": "owner message"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T18:55+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T18:55+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "I2 closed (ack #60), archived",
+      "basis": "its report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T18:50+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T18:50+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "RV-I2 r2 approve 0d8700c (ack #58), archived; landed ff 6e1b580..0d8700c; orchestration reinstalled path:~/Projects/bb (was preserved-source), running; unpublished → no release",
+      "basis": "RV-I2 r2; git push; bb plugin list"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T18:30+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T18:30+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "I2 0d8700c fixes r1 (ack #57); «nothing pending» confirmed in 0.17.0 exporter; round 2 to RV-I2 (#58)",
+      "basis": "I2 report; ledger_export.py:89"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T18:05+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T18:05+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "RV-I2 r1 on 7daf018: changes needed (ack #50); findings to I2 (#57); F5 decided: view follows merged I1 rule",
+      "basis": "RV-I2-r1.md"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T17:52+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T17:52+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Took over from thr_arftevzyhg as thr_3kp87mtayp; I2 ack #55; I1 already archived (closed, #51 dropped); #56 to RV-I2; takeover notice sent",
+      "basis": "handover brief #52, H8"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T16:00+0300",
+        "time": {
+          "at": "2026-11-16T16:00+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "RV-D1 round 2: changes needed (name fallback). Checkout-record difference on ~/Projects/bb was my D2 landing (ff to ae823e0); reviewed revision 5bb07dc immutable → review accepted. D1 #3 thr_3vmqbfzb87 started to fix it",
+      "basis": "RV-D1 round-2 report; H4"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:55+0300",
+        "time": {
+          "at": "2026-11-16T15:55+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D1 #2 rotate after 330e678 (Q8, ack #29; diff 5bb07dc..330e678 read, doc only): stopped, archived (tree clean). No replacement until RV-D1 round 2 needs one — nothing else left",
+      "basis": "its rotate report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:50+0300",
+        "time": {
+          "at": "2026-11-16T15:50+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "owner",
+      "decision": "D1 Q8: up to 5 free-text cards, from 6 on one folded card counted once",
+      "basis": "«Re «D1: How an active orchestration …»: Up to 5 cards, … (recommended)»"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:47+0300",
+        "time": {
+          "at": "2026-11-16T15:47+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D2 #2 closed (ack #27, working files none); archived thr_f78zevw7bp and RV-D2 thr_35arpan2p6 (worktrees clean)",
+      "basis": "their reports; git status"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:45+0300",
+        "time": {
+          "at": "2026-11-16T15:45+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D2 decisions commit ae823e0 read (ack #25); landed on main by ff push; D2 verified; I3 unblocked (#28)",
+      "basis": "git push 0d651ee..ae823e0"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:40+0300",
+        "time": {
+          "at": "2026-11-16T15:40+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D1 #2 delivered 5bb07dc (ack #23), new owner Q8; round-2 review sent to RV-D1 (#26); Q8 ask: line",
+      "basis": "its report; git log"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:35+0300",
+        "time": {
+          "at": "2026-11-16T15:35+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "owner",
+      "decision": "D2 design confirmed; Q1 no marketplace.json entry until publication approved; Q2 keep teamRoot; Q3 composer page; Q4 «Team roles»",
+      "basis": "«Re «D2: …»: … (recommended)» ×5"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:30+0300",
+        "time": {
+          "at": "2026-11-16T15:30+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "RV-D2 round 2: approve on ab7ea07 (ack #24); 5 ask: lines for D2 confirmation + Q1–Q4",
+      "basis": "RV-D2 report (thread-storage RV-D2-round2.md)"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:20+0300",
+        "time": {
+          "at": "2026-11-16T15:20+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D2 #2 delivered ab7ea07 (ack #22); round-2 review sent to RV-D2 (#24)",
+      "basis": "its report; git log"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:15+0300",
+        "time": {
+          "at": "2026-11-16T15:15+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "G-D1 returned to D1 (#23). Finding 1 moot (owner chose Q7 A). Finding 2: on a `closed` ledger free-text «For the owner» lines are flagged notes, never «needs you»; active ledgers keep the rule. Finding 5: anchor stale grace to last turn's start",
+      "basis": "RV-D1 report; owner scope words (waits never invisible) concern live orchestrations"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:10+0300",
+        "time": {
+          "at": "2026-11-16T15:10+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D2 session replaced (rotate, context 204k): thr_v3mv2b35zk stopped, archived (tree clean; 065d7aa on feature/team-roles-design); D2 #2 thr_f78zevw7bp; ack #20",
+      "basis": "D2 rotate report (thread-storage/thr_kpk3hf9pr5/D2-rotate.md); handover case 3"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:00+0300",
+        "time": {
+          "at": "2026-11-16T15:00+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D1 11244e7 read: Q7 to Decided, no open questions; ack #21",
+      "basis": "git diff 9417212 11244e7"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:55+0300",
+        "time": {
+          "at": "2026-11-16T14:55+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "owner",
+      "decision": "D1 Q7: Stop hook stops the turn once",
+      "basis": "«Re «D1: What the orchestrator's turn-end check …»: Stop the turn once (recommended)»"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:50+0300",
+        "time": {
+          "at": "2026-11-16T14:50+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "G-D2 returned to D2 (#20) on RV-D2 «changes needed»; owner asks for D2 deferred until the fixed doc passes re-review (Q1 facts were wrong)",
+      "basis": "RV-D2 report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:45+0300",
+        "time": {
+          "at": "2026-11-16T14:45+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D1 #2 updated to 9417212 (owner answers in doc; ack #18); RV-D1 thr_kf9kx8uktv spawned for G-D1",
+      "basis": "its report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:40+0300",
+        "time": {
+          "at": "2026-11-16T14:40+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Acks #10, #12 from D1 #2; archived thr_yc4bw8qaah (idle, nothing in flight, worktree clean, all acks in). D1 report adds Q7 (Stop hook: stop once / no hook / every time) — ask after D1 folds #18",
+      "basis": "D1 report; git status"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:35+0300",
+        "time": {
+          "at": "2026-11-16T14:35+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D1 #2 delivered f09637a (acks #7–#9); doc predates owner answers (#18) — D1 active on #18; gate waits for its updated report",
+      "basis": "its report; thread active"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:30+0300",
+        "time": {
+          "at": "2026-11-16T14:30+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "owner",
+      "decision": "I1's PR: the owner merges it after the gate and review; the orchestrator updates the installed orchestrate plugin afterwards",
+      "basis": "«You merge it after the review (recommended)»; «Orchestrator updates it (recommended)»"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:30+0300",
+        "time": {
+          "at": "2026-11-16T14:30+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "owner",
+      "decision": "D1: «Right now» block, tab stays «Now»; stale mark 10 min after last turn; old ledgers: old text, 3 lines with Show all and its age; subtask rows always show a short name",
+      "basis": "«Re «D1: …»: … (recommended)» ×4, this thread"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:25+0300",
+        "time": {
+          "at": "2026-11-16T14:25+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "thr_yc4bw8qaah «In flight»: nothing in flight, no gate/landing/waits",
+      "basis": "its message"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:22+0300",
+        "time": {
+          "at": "2026-11-16T14:22+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Acks #13–#16 from D2, I1, I2, I3; RV-D2 reviewer thr_35arpan2p6 spawned for G-D2",
+      "basis": "their reports"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:15+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T14:15+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Took over from thr_yc4bw8qaah as thr_kpk3hf9pr5",
+      "basis": "handover brief #11, record H2"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T17:45+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T17:45+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "owner",
+      "decision": "PR #53 merge",
+      "basis": "«Re «I1: merge PR #53 (orchestrate 0.17.0)»: Merge it»"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T17:45+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T17:45+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Merged PR #53 pinned to 5adb1fb → eeb9ce1; orchestrate 0.17.0 installed; I1 verified. Rotating out: session budget reached",
+      "basis": "gh; weight notice"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T17:25+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T17:25+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "owner",
+      "decision": "Orchestrator thread runs at the owner-set effort; subtasks keep their role effort",
+      "basis": "owner's instruction"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T17:20+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T17:20+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "owner",
+      "decision": "team-roles page checked",
+      "basis": "«Re «team-roles: look at the new «Team roles» page once»: Looks right»"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T17:15+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T17:15+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "I2 #2 delivered 7daf018 (ack #47): gate checks green; RV-I2 spawned (opus/high)",
+      "basis": "its report; gate run"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T17:05+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T17:05+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "I1 delivered 5adb1fb (ack #48): gate checks green; re-review to RV-I1 (#49)",
+      "basis": "its report; gate run"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T16:50+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T16:50+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "RV-I1 approve with 3 should-fix → returned to I1 (#48) before the owner merge: finding 1 would show a false «Blocked» in I2's view; I1 areas extended to root README.md (one test line)",
+      "basis": "RV-I1 report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T16:30+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T16:30+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "RV-I3 approve f0aa6c7 → I3 landed 6e1b580, installed, CLI verified; owner check ask for the page. I2 rotate (201k; ack #40; 3 local commits, clean): archived, I2 #2 thr_8wn32kum9s from refs/heads/feature/orchestration-now-block",
+      "basis": "gate runs; their reports"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T16:05+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T16:05+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "I1 delivered PR #53 a2cf93d (ack #39): gate checks green, RV-I1 spawned. I3 #2 delivered f0aa6c7 (ack #42): checks green, re-review to RV-I3",
+      "basis": "their reports; gate runs"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:40+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T15:40+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "I3 rotate (context 200k; ack #42; nothing edited, ec90438 pushed, tree clean): thr_y9t5xv2ztw archived; I3 #2 thr_i23d38zv2f started (sonnet/medium, worktree from origin/feature/team-roles). I3's «owner installs» wait is not an owner item: after-landing install is the orchestrator's (profile)",
+      "basis": "its rotate report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:32+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T15:32+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "RV-I3 thread archived by mistake, unarchived at once (kept for re-review)",
+      "basis": "bb thread unarchive"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:30+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T15:30+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "RV-I3 approve with should-fix (RoleDetail ignores design R11 states); returned to I3 (#42) rather than land with a known spec deviation; nits 3–6, 8 bundled (cheap, I3 areas)",
+      "basis": "RV-I3 report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T15:05+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T15:05+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "G-I3 started: checks green on ec90438; RV-I3 thr_nkphzxd9ph spawned (opus/high, role)",
+      "basis": "gate logs"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:55+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T14:55+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "I3 acks #28, #37; delivered ec90438 (claims: 44/44 tests, typecheck, build; DW 2–4 need install = after landing). Archived thr_kpk3hf9pr5 (all acks in, nothing in flight, idle; ledger outside its worktree)",
+      "basis": "I3 reports"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:52+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T14:52+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D1 #3 ack #38: landing re-checked, working file deleted; thread archived (content landed; local branch at db1f783 only)",
+      "basis": "its report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:50+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T14:50+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "G-D1 landed: D1 rebased onto ae823e0 → 8f52057, ff pushed to main; D1 verified; «landed» D1 #38, «unblocked» I1 #39, I2 #40",
+      "basis": "owner confirmation forwarded by thr_kpk3hf9pr5; git push"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:45+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T14:45+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "thr_kpk3hf9pr5 «In flight»: nothing; idle. D1 db1f783 pre-checked: merges clean onto origin/main ae823e0",
+      "basis": "its output; git merge-tree"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:42+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T14:42+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Acks #34 D1 (db1f783 unchanged, tree clean), #35 I1, #36 I2 (both waiting on «unblocked», no edits)",
+      "basis": "their reports"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T14:40+0300 (host clock)",
+        "time": {
+          "at": "2026-11-16T14:40+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Took over from thr_kpk3hf9pr5 as thr_arftevzyhg",
+      "basis": "handover brief #33, record H5"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T16:35+0300",
+        "time": {
+          "at": "2026-11-16T16:35+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "owner",
+      "decision": "D1 «Now» design confirmed",
+      "basis": "«Re «D1: Confirm the «Now» layer design»: Confirm (recommended)»"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T16:30+0300",
+        "time": {
+          "at": "2026-11-16T16:30+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "RV-D1 archived (worktree clean). Rotating out: session budget reached",
+      "basis": "weight notice"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T16:28+0300",
+        "time": {
+          "at": "2026-11-16T16:28+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D1 #3 nits commit db1f783 (ack #32) read: Q8 moved to owner list; no double note; grouped card answered per line, T2 lines grouped — accepted as implementation choices within Q8",
+      "basis": "git diff ce876ec db1f783"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T16:20+0300",
+        "time": {
+          "at": "2026-11-16T16:20+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "RV-D1 round 3 approve on ce876ec (ack #31); nits to D1 #3 (#32); owner asked to confirm the design",
+      "basis": "RV-D1 round-3 report"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T16:10+0300",
+        "time": {
+          "at": "2026-11-16T16:10+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "D1 #3 delivered ce876ec (brief #30 acted on; diff 330e678..ce876ec doc only +13/−8); round 3 sent to RV-D1 (#31)",
+      "basis": "its report; git log"
+    },
+    {
+      "when": {
+        "raw": "2026-11-16T16:02+0300",
+        "time": {
+          "at": "2026-11-16T16:02+03:00",
+          "precision": "time",
+          "offset": true
+        }
+      },
+      "decided_by": "orchestrator",
+      "decision": "Archived 10 journal rows of orchestrator #1 to history/orchestration-observability/journal-to-2026-11-16T1505.md",
+      "basis": "state budget"
+    }
+  ],
+  "for_the_owner": [
+    "note: human-view design confirmed 2026-11-16T20:20+0300: «Confirm: all recommended (A)» (Q1–Q11 A)",
+    "note: owner looked at the Right now block 2026-11-16T19:05+0300: «Something's off … format it for the human representation … see in the first glance the current state» → D3 design",
+    "note: PR #53 merged 2026-11-16T17:45+0300 (host clock) on the owner's «Merge it»; orchestrate 0.17.0 installed (new sessions load it)",
+    "note: team-roles page checked by the owner 2026-11-16T17:20+0300 (host clock): «Looks right»",
+    "note: D1 design confirmed by the owner 2026-11-16T16:35+0300: «Re «D1: Confirm the «Now» layer design»: Confirm (recommended)» — next: land db1f783",
+    "note: D1 Q8 answered 2026-11-16T15:50+0300: up to 5 cards, from 6 on one folded card counted once — forwarded to D1 #2 (#29)",
+    "note: D2 landed on main ae823e0; confirmed by the owner 2026-11-16T15:35+0300 with Q1 leave out of marketplace.json, Q2 keep teamRoot, Q3 composer page, Q4 «Team roles» — forwarded to D2 #2 (#25)",
+    "note: D1 Q7 answered 2026-11-16T14:55+0300: Stop hook stops the turn once — forwarded to D1 #2 (#21)",
+    "note: D1 Q2–Q6 answered by the owner 2026-11-16T14:30+0300 (host clock): «Right now» block, tab stays «Now»; stale after 10 min; old ledgers show 3 lines of old text with Show all and its age; every subtask row always shows a short name — forwarded to D1 #2 (#18)"
+  ],
+  "handovers": [
+    {
+      "id": "H9",
+      "role": "D3",
+      "from": "thr_wgpp44h7xw",
+      "to": "thr_bqdh6ngyxa",
+      "to_id": "thr_bqdh6ngyxa",
+      "why": "2026-11-16T19:40+0300; session budget reached",
+      "time": {
+        "at": "2026-11-16T19:40+03:00",
+        "precision": "time",
+        "offset": true
+      },
+      "next_step": null
+    },
+    {
+      "id": "H8",
+      "role": "orchestrator",
+      "from": "thr_arftevzyhg",
+      "to": "thr_3kp87mtayp (took over 2026-11-16T17:50+0300)",
+      "to_id": "thr_3kp87mtayp",
+      "why": "2026-11-16T17:47+0300 (host clock); session budget reached",
+      "time": {
+        "at": "2026-11-16T17:47+03:00",
+        "precision": "time",
+        "offset": true
+      },
+      "next_step": "RV-I2 verdict → return to I2 #2 or land 7daf018 on main → reload orchestration, look at the Right now block; I1 closing reply; finish"
+    },
+    {
+      "id": "H7",
+      "role": "I2",
+      "from": "thr_2gq6xuv7fi",
+      "to": "thr_8wn32kum9s",
+      "to_id": "thr_8wn32kum9s",
+      "why": "2026-11-16T16:30+0300 (host clock); session budget reached",
+      "time": {
+        "at": "2026-11-16T16:30+03:00",
+        "precision": "time",
+        "offset": true
+      },
+      "next_step": "NowBlock.tsx, useOrchestration wiring, TeamRow, view tests, docs, push (rotate report thread-storage/thr_arftevzyhg/I2-rotate.md; brief I2-2.brief)"
+    },
+    {
+      "id": "H6",
+      "role": "I3",
+      "from": "thr_y9t5xv2ztw",
+      "to": "thr_i23d38zv2f",
+      "to_id": "thr_i23d38zv2f",
+      "why": "2026-11-16T15:40+0300 (host clock); session budget reached",
+      "time": {
+        "at": "2026-11-16T15:40+03:00",
+        "precision": "time",
+        "offset": true
+      },
+      "next_step": "#42 fixes on top of ec90438 (rotate report in thread log; brief thread-storage/thr_arftevzyhg/I3-2.brief)"
+    },
+    {
+      "id": "H5",
+      "role": "orchestrator",
+      "from": "thr_kpk3hf9pr5",
+      "to": "thr_arftevzyhg (took over 2026-11-16T14:40+0300 (host clock))",
+      "to_id": "thr_arftevzyhg",
+      "why": "2026-11-16T16:30+0300; session budget reached",
+      "time": {
+        "at": "2026-11-16T16:30+03:00",
+        "precision": "time",
+        "offset": true
+      },
+      "next_step": "wait for the owner's «Re «D1: Confirm the «Now» layer design»: …» (in thr_kpk3hf9pr5 until the owner moves) → land D1 db1f783 (rebase onto main ae823e0, ff push) → «landed» D1 #3, «unblocked» I1, I2; I3 working (#28 unacked)"
+    },
+    {
+      "id": "H4",
+      "role": "D1",
+      "from": "thr_7pezmze6qn",
+      "to": "thr_3vmqbfzb87",
+      "to_id": "thr_3vmqbfzb87",
+      "why": "2026-11-16T15:55+0300; session budget reached",
+      "time": {
+        "at": "2026-11-16T15:55+03:00",
+        "precision": "time",
+        "offset": true
+      },
+      "next_step": "fix RV-D1 round-2 findings on top of 330e678 (last report: thread-storage/thr_kpk3hf9pr5/D1-rotate.md)"
+    },
+    {
+      "id": "H3",
+      "role": "D2",
+      "from": null,
+      "to": null,
+      "to_id": null,
+      "why": null,
+      "time": null,
+      "next_step": null
+    },
+    {
+      "id": "H1",
+      "role": "D1",
+      "from": null,
+      "to": null,
+      "to_id": null,
+      "why": null,
+      "time": null,
+      "next_step": null
+    },
+    {
+      "id": "H2",
+      "role": "orchestrator",
+      "from": "thr_yc4bw8qaah",
+      "to": "thr_kpk3hf9pr5 (took over 2026-11-16T14:15+0300)",
+      "to_id": "thr_kpk3hf9pr5",
+      "why": "2026-11-16T15:05+0300; session budget reached",
+      "time": {
+        "at": "2026-11-16T15:05+03:00",
+        "precision": "time",
+        "offset": true
+      },
+      "next_step": "gate D2 @1a7a830; wait for D1 #2; forward owner answers to D1 Q2/Q3/Q4/Q6"
+    }
+  ],
+  "unread_sections": {},
+  "warnings": []
+}

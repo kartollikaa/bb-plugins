@@ -20,6 +20,7 @@ const SCAN_TTL_MS = 10_000;
 const AGENT_TTL_MS = 15_000;
 const FINISHED_AGENT_TTL_MS = 10 * 60_000;
 const OUTPUT_LIMIT = 1_200;
+const BRIEF_LIMIT = 600;
 const REPLY_DEDUPE_MS = 5_000;
 const OWNER_MESSAGES = 20;
 const EVENT_PAGE = 100;
@@ -114,6 +115,7 @@ export default async function plugin(bb: BbPluginApi) {
       withOutput ? bb.sdk.threads.output({ threadId }).catch(() => null) : Promise.resolve(null),
     ]);
     const execution = obj(obj(obj(turns[0]).data).execution);
+    const record = obj(obj(thread).thread ?? thread);
     const usage = obj(obj(context).usage);
     const text = output?.output?.trim() ?? null;
     const agent: Agent = {
@@ -122,10 +124,31 @@ export default async function plugin(bb: BbPluginApi) {
       contextUsed: num(usage.usedTokens),
       contextWindow: num(usage.modelContextWindow),
       lastOutput: text ? text.slice(0, OUTPUT_LIMIT) : null,
-      lastReportAt: num(obj(obj(thread).thread).latestAttentionAt) ?? num(obj(thread).latestAttentionAt),
+      lastReportAt: num(record.latestAttentionAt),
+      archivedAt: num(record.archivedAt),
     };
     agentCache.set(threadId, { at: Date.now(), agent });
     return agent;
+  }
+
+  const briefCache = new Map<string, string | null>();
+  async function briefOf(threadId: string): Promise<string | null> {
+    if (briefCache.has(threadId)) return briefCache.get(threadId)!;
+    const events = await bb.sdk.threads.events.list({ threadId, order: "asc", limit: "1", types: ["client/turn/requested"] }).catch(() => null);
+    if (events === null) return null;
+    const input = obj(obj(events[0]).data).input;
+    const text = (Array.isArray(input) ? input : []).map((part) => obj(part).text).filter((t): t is string => typeof t === "string").join("\n").slice(0, BRIEF_LIMIT) || null;
+    briefCache.set(threadId, text);
+    return text;
+  }
+
+  /** The first message of each part's thread: it names a child the ledger doesn't list yet and describes every Plan step. */
+  async function childBriefs(threadId: string, ledger: LedgerSummary): Promise<Record<string, string>> {
+    const named = ledger.subtasks.flatMap((s) => (s.threadId ? [s.threadId] : []));
+    const children = await bb.sdk.threads.list({ parentThreadId: threadId, limit: 100 }).catch(() => []);
+    const ids = [...new Set([...named, ...children.map((t) => t.id)])];
+    const entries = await Promise.all(ids.map(async (id) => [id, await briefOf(id)] as const));
+    return Object.fromEntries(entries.filter((e): e is readonly [string, string] => e[1] !== null));
   }
 
   const observations = new Map<string, { observation: Observation | null; savedAt: number }>();
@@ -171,7 +194,7 @@ export default async function plugin(bb: BbPluginApi) {
       return { state: "error", message: error instanceof Error ? error.message : String(error) };
     }
     const agents: Record<string, Agent> = {};
-    const [answers, report, ownerThread, storage] = await Promise.all([
+    const [answers, report, ownerThread, storage, briefs] = await Promise.all([
       answersFor(threadId, summary).catch((error) => {
         bb.log.warn(`can't read the owner's answers: ${String(error)}`);
         return { answered: {}, askFirstSeen: {} };
@@ -179,6 +202,7 @@ export default async function plugin(bb: BbPluginApi) {
       bb.sdk.threads.output({ threadId }).then((value) => reportOf(value.output)).catch(() => null),
       bb.sdk.threads.get({ threadId }).catch(() => null),
       bb.sdk.threads.storageLocation({ threadId }).catch(() => null),
+      childBriefs(threadId, summary).catch(() => ({})),
       ...summary.subtasks.map(async (subtask) => {
         if (!subtask.threadId) return;
         const live = LIVE_STATUSES.has(subtask.status ?? "");
@@ -195,7 +219,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (local !== null && remote?.contentEncoding === "utf8" && remote.content === local) workspace.ledgerHostId = workspace.hostId;
     }
     const ledgerModifiedAt = await stat(ledger.path).then((s) => s.mtimeMs, () => null);
-    return { state: "ledger", ledger: summary, agents, report, workspace, ...answers, ledgerModifiedAt, readAt: Date.now() };
+    return { state: "ledger", ledger: summary, agents, report, workspace, ...answers, briefs, ledgerModifiedAt, readAt: Date.now() };
   }
 
   const sendReply = replySender(async (threadId, text) => {

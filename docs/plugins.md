@@ -234,11 +234,13 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 - **What:** a full-page Orchestration view that an orchestrator's thread redirects to (chat in a
   collapsible `ThreadChat` rail that docks to its composer when folded, Full chat goes back), plus a fixed side-panel tab and a context-card
   row, all only on a thread that an orchestrate ledger's first line names. The `orchestrationView`
-  setting (on by default) is written by the title-bar switch and a matching thread-header action. One status sentence, a card per thing that needs the
-  owner, a «Right now» block under the goal (the orchestrator's live step, what it waits on and
-  since when, next step, blockers, from the ledger's Now block and bb's thread events; old ledgers
-  fall back to their free-text checkpoint), the team as one row per subtask plus the orchestrator's running child threads the ledger
-  doesn't list yet (bb's `parentThreadId`), and a goal/history fold. A quick-reply option sends
+  setting (on by default) is written by the title-bar switch and a matching thread-header action. It reads in plain language, parts by name
+  and never by id: a status line (status word, sentence, a segmented progress bar, «N of M parts
+  done»; reviewers are a stage of their part), Needs you, Working now (live steps and the
+  orchestrator), Next, a Plan as a numbered timeline in landing order with a state and one-line
+  description per step (the orchestrator's running child threads the ledger doesn't list yet
+  included, via bb's `parentThreadId`), Recently, and a folded Details
+  with the raw ledger text (free-text checkpoints show only there). A quick-reply option sends
   `Re «title»: option` to the orchestrator (`threads.send`, `queue-if-active`); Answer and Land it
   only fill its composer. A pending approval or question card shows the interaction's own words
   (`threads.interactions.list`); only such a card offers Open thread.

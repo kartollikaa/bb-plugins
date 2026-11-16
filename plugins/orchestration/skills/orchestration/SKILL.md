@@ -39,25 +39,54 @@ several name the thread, the newest wins.
 
 ## What it shows
 
-- **Recap**, on top: the orchestrator thread's title, goal and overall phase, with the recorded
-  status qualification when available; decisions stay in Activity.
-- **Right now**, under the goal in every tab: the orchestrator's live state and current step, its last turn,
-  `doing`, what it waits on and since when, `next`, `blocked by` and its last decision, from the ledger's
-  Now block (keyed lines at the head of «Current checkpoint») and bb's thread events. The header gives the block's age and,
-  when the orchestrator has run well after it was written, says so and mutes it. Old ledgers show their free-text
-  checkpoint or a «no Now block yet» line. A last message that asks the owner while the ledger records no ask
-  gets a needs-you card. «Checkpoint as written» and «Full last report» are folds in this block.
+- The page opens with the orchestrator thread's title and goal, then these sections (the tab is
+  the same, narrower):
+  It reads as plain language: parts by name, never by id, and no SHAs, message numbers, acks or
+  gate ids (docs/human-view.md). Top to bottom:
+  - **Status line:** one status word (Needs you, In progress, Waiting, Blocked, Paused, Stuck,
+    Closed, Done, Planning), one sentence, a segmented progress bar with a segment per part (done,
+    running, in progress, needs you, stuck, not started; hover names the part) and «N of M parts
+    done». A reviewer is a stage of the part it reviews, never a part of its own.
+  - **Needs you:** question and decision cards, a nudge for a stuck part («Ask the orchestrator
+    about «name»»), then answered asks.
+  - **Working now:** the running parts with their live step and age, then the orchestrator: what it
+    is doing or waits for, or what it last said. The tab shows the running parts only.
+  - **Next** (page only): the ledger's next step as a sentence.
+  - **Plan:** a numbered timeline, read-only, in landing order: the ledger's parts in subtask order,
+    the ones its «Landing queue» names re-seated in queue order, unlisted children last. Each step
+    has its number (a ✓ once done) on a vertical line, its name, its state (`Done`, `Now · …`,
+    `Waits on you · …`, `Next · …`) and one plain description line: the thread brief's first
+    sentence, else the first «Done when» criterion, else the delivery, else the landing-queue entry. From nine steps the
+    leading done steps fold into «Steps 1–N done». A step expands to Note, Last report, Checks,
+    Review, Runs, Context, Details and Open thread. An open part whose session bb archived reads «Its
+    session has ended; the ledger may be behind». The tab folds the whole Plan to «Plan · N of M
+    done». To keep it current, keep «Subtasks» and «Landing queue» in landing order and give each
+    brief a `<id>: <one sentence>` first line.
+  - **Recently** (page only): the latest three decisions, newest first, without acks, takeovers and
+    archiving; Show more opens Activity.
+  - **Details for debugging**, folded: the raw status, the checkpoint as written, the orchestrator's
+    full last report, its brief, ids, ledger file, sessions and handover. A ledger time ahead of this
+    computer's clock shows as a clock time, and the fold says the clocks disagree.
+  - **Work | Activity** under it.
+  A part's name is the ledger's name, else its child thread's brief («D3: design …»), else its
+  delivery's branch or file, else its status note, else its id.
+- A free-text checkpoint (no Now block) shows only in Details. A last message that asks the owner
+  while the ledger records no ask gets a needs-you card.
 - **Needs you:** subtasks at `question`, `ready` or `card`, a pending approval in any subtask's
   thread or the orchestrator's own, and every `ask:` line under the ledger's «For the owner» (on an
   active ledger any line that is not a note is a wait). A `ready` card shows the status note, Delivery, Version and gate line;
   an open «For the owner» line naming that subtask or linking only its thread replaces it. A pending
   approval or question card shows the interaction's own question, options or command. Only such a
-  card, held in another thread, has Open thread; every other card answers the orchestrator.
-- **Stuck:** a `working` or `briefed` subtask that hasn't reported for `QUIET_MS` (a report is the
-  end of the thread's latest turn), or `FAILURES_STUCK` failed checks, review, done-when or conflicts
+  card, held in another thread, has Open thread; every other card answers the orchestrator. When the
+  orchestrator is idle with a question in the chat and none in its ledger, the card reads
+  «Asked in the chat: <question>» with its choices or fields and «Open chat»: the question is the last
+  interactive ```` ```ui ```` card's title and button labels, else the last `Waiting on you:` line,
+  else the last paragraph.
+- **Stuck:** a `working` or `briefed` subtask that has been quiet for `QUIET_MS`, or `FAILURES_STUCK` failed checks, review, done-when or conflicts
   stages across its open gates; both constants are in `src/view.ts`. A `blocked` subtask is stuck
   too, with the note after the status word as its cause. A subtask at `gate` is waiting
-  on the orchestrator and never counts as quiet. While something needs you, the subline and the
+  on the orchestrator and never counts as quiet. Quiet is read from the live thread: a running turn is
+  never quiet; an idle thread counts from its last report (the end of its latest turn). While something needs you, the subline and the
   context-card row still name a stuck agent.
 - **Done:** `landed`, `verified` or `dropped`. A closed ledger with open work shows a conflict. A done subtask whose
   thread is running again shows as working («Running again · …») and keeps the view out of «done».
@@ -123,7 +152,7 @@ One bullet per item. A bullet that starts with `ask:` becomes a card that says w
 - On an active ledger every other line that is not a note is a wait on the owner: a line that states a wait in
   free text shows as an ask card with a «written as free text» chip (from six such lines one grouped card,
   answered line by line, counted once). `note:`, `answered …`, `Q (answered …):`, `ask (draft):` and «Nothing waiting …»
-  lines are information: they show under History and never count as needs you. On a `closed` ledger free-text lines
+  lines are information: they show under Details and never count as needs you. On a `closed` ledger free-text lines
   are notes. An `ask:` with no title is a note too. An idle orchestrator whose last message ends with `Waiting on you:`
   or holds an interactive form while no ask is recorded gets a needs-you card.
 - A ` | ` segment without one of the keys above stays with the field before it, so a title or a
@@ -171,7 +200,7 @@ If the tab says no installed orchestrate could export the ledger, point the sett
 
 ## Work and activity
 
-Now keeps the existing attention cards and live team. Work shows the plan with meaningful
+Needs you, Working now and the Plan stay above. Work shows the plan with meaningful
 task names (the delivery description when no name was recorded), status, dependencies and
 filters for remaining or finished work. Expand a task for its scope, acceptance criteria,
 delivery evidence, revision and conversation. Shared criteria stay labeled with their group;
@@ -209,10 +238,10 @@ paused and closed states take precedence; a closed ledger with open or running w
 conflict. Idle tasks never count as running agents. Finished tasks awaiting ledger closure say so.
 Missing live activity is not evidence of completion.
 
-Now includes Brief: the ledger's Markdown result, or completed and remaining task records for
+Details includes Brief: the ledger's Markdown result, or completed and remaining task records for
 older ledgers. Outcome notes stay visible. A missing
 brief is never replaced with an invented success claim. New exports may provide `status_raw`
-and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence. Full last report (in the Right now block) opens the
+and `brief`; older v1 exports remain supported. Work and Activity retain revisions and evidence. The full last report (in Details) opens the
 last assistant response in place, preserving its links; long reports explicitly say they were shortened.
 A report is a conversation record, not independent verification of its claims.
 

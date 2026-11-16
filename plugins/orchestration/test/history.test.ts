@@ -49,7 +49,7 @@ test("task descriptions, scope, criteria and gate evidence survive the snapshot 
   data.done_when = { T1: ["Named mutation controls pass"], "T2–T7": ["Use the approved plan"] };
   const result = summarizeExport(data, "/ledger.md");
   assert.equal(result.subtasks[0]!.delivery, "Measurement and rollback");
-  assert.equal(result.subtasks[0]!.name, "Measurement and rollback");
+  assert.equal(result.subtasks[0]!.name, null, "the view names a row from its delivery, not the export summary");
   assert.equal(result.subtasks[0]!.areas, "scripts/**");
   assert.deepEqual(result.subtasks[0]!.criteria, ["Named mutation controls pass"]);
   assert.deepEqual(result.subtasks[1]!.criteria, ["Shared criterion (T2–T7): Use the approved plan"]);

@@ -162,6 +162,9 @@ One state word with a colour dot, then one sentence, then the progress count:
 | closed, or every part done | **Done** | `All 7 parts done` |
 | no subtasks yet | **Planning** | `The orchestrator is splitting the goal into parts` |
 
+Quiet comes from the thread's live state: a running turn is never quiet, whatever the age of its
+last report or its current step; an idle thread counts from its last report.
+
 Then `· 6 of 7 parts done` and, when no ask waits, `· nothing needs you`. The state word is a word
 and a colour, never colour alone. The context-card row (`rowLabel`) uses the same sentence.
 
@@ -175,8 +178,13 @@ that lives in a subtask's thread. What changes is the text:
   page: Approve the draft`).
 - Below it, one line of why, then links, then the buttons, then `asked 12 min ago`.
 - Stuck parts are cards here too, with the existing nudge («Ask the orchestrator about it»).
-- The mismatch card of now-block.md section 6 stays, reworded: `The orchestrator asked you something
-  in the chat that isn't in its ledger` with «Open chat».
+- The mismatch card of now-block.md section 6 stays and shows the question itself:
+  `Asked in the chat: Allow recording these instructions in the task ledger?`, then
+  `Choices: «Allow ledger update» / «Leave ledger unchanged»` (or `It asks for: <fields>` for a
+  form), its age and «Open chat». The question is the orchestrator's last interactive ```` ```ui ````
+  card (its Card or Form title, else its Select label, else its first field; choices are the
+  Button, Buttons and Select labels), else its last `Waiting on you:` line, else its last paragraph.
+  Without any of them it keeps the old wording.
 
 When nothing waits, there is no section; the status line says `nothing needs you`.
 
@@ -206,20 +214,40 @@ when there is no `next:`.
 
 ### 2.6 Plan
 
-One row per part, reviewers folded into the part they review. Open parts first, then done parts, each
-in the ledger's order; done parts fold under «N done» when there are more than eight rows:
+A numbered timeline, read-only: one step per part, reviewers folded into the part they review, a
+vertical line from step to step. The view redraws on every ledger read, so when the orchestrator
+adds, splits, reorders or finishes a step, the timeline follows. Owner, on the change (2026-11-16):
+«Yes: numbered steps with descriptions, orchestrator keeps it current».
 
 ```
-● Design   · Readable orchestration view          In progress · 12 min
-✓ Research · Live activity in bb                                  Done
-✓ Design   · «Right now» block                                    Done
+ ✓  Research · Live activity                                         Done
+ │  Research what a bb plugin can read about a thread's live activity
+ ✓  Design · Orchestration now design                                Done
+ │  Ledger block format with example and old-ledger fallback
+ 4  Build · Orchestration now block                 Now · Ready for checks
+ │  Orchestration view
+ 5  Build · Team roles                                  Next · Not started
 ```
 
+- **Order:** landing order. The ledger's parts keep their subtask order, and the ones the «Landing
+  queue» names take their places in queue order; a part the queue doesn't name (research, a
+  no-landing design) stays where the ledger has it. Without a queue, the subtask order. Child
+  threads the ledger doesn't list yet come last.
+- **Number and mark:** each step's number in a circle, a ✓ instead once it is done. The circle's
+  colour is the part's state, as in the progress bar.
+- **State:** done, now (running, at a gate or stuck), waits on you, next (not started). The right
+  column reads `Now · <status word> · <age>`, `Waits on you · …`, `Next · …`, or just `Done`.
+- **Description:** one plain line under the name, cleaned like the rest (section 3.3), cut at 140
+  characters: the first sentence of the part thread's brief after `<id>:`, else the first «Done
+  when» criterion (without «— read the doc»; one that only points at another doc's «Done when» is
+  skipped), else the delivery's branch or file name, else the landing-queue entry's first clause. A line that only repeats the name is
+  skipped for the next source. A ledger part keeps its ledger naming; its brief only describes it.
+- From nine steps, the done steps the timeline starts with fold into «Steps 1–N done»; numbering
+  doesn't change. The tab folds the whole Plan to «Plan · N of M done».
 - A part = a «Subtasks» row whose role is not reviewer, plus child threads the ledger doesn't name
   yet. A reviewer row (`role.name` = `reviewer`, or id `RV-<id>`) is a stage of `<id>`'s part: while
   it runs it appears in Working now as `Review · <part name>`; its verdict shows in the part's
   expanded row (`Review approved`, `Review asked for changes`).
-- The right column is the status word (section 3.2) and, while it runs, its age.
 - `after <name>` in muted text for a part that waits on another (`depends_on`).
 - A row expands to: the status note, cleaned; the last report gist; the gate stages in words
   (`Checks passed · Review approved · Landed`); runs, context; «Open thread». Ids, versions and
@@ -253,13 +281,17 @@ as one folded line, then Details. Next and Recently are page-only.
    Plan, Recently), never ledger keys (`doing`, `waiting on`, `checkpoint`, `gate`).
 2. **Names, not ids.** A subtask's row is `<role noun> · <name>` (`Design · Readable orchestration
    view`); in running text it is its name in «». The id shows only in its Details line (Q3). The owner is «you». A thread is its title or the
-   part's name, never `thr_…`.
+   part's name, never `thr_…`. A name over about 40 characters is cut at a word with `…` in titles;
+   the full name opens the row's Details line.
 3. **Plain status words** (3.2), not the protocol's (`briefed`, `delivered`, `gate`, `verified`).
 4. **Times are relative** from bb's own clocks first: `just now`, `12 min`, `2 h 5 min`, `yesterday
    14:05`, a date after a week. A ledger time later than now shows as its clock time (`19:10`), never
    as an empty age, and Details notes the skew (1.6).
 5. **Cleaned free text.** Every orchestrator-written string shown at first glance goes through the
-   cleanup of 3.3.
+   cleanup of 3.3. «Last said» and other last words drop bb directives (`::browser-preview{…}`)
+   and fenced blocks first; `#66 (numbered timeline)` reads `numbered timeline`, and a word left
+   hanging before a removed `#N` (`sent back for #66;`) goes with it.
+   A live tool step (`Running rm -f $D/r3-* · 15 s`) is bb's own text and is shown as-is.
 6. **One line per item**, subject first, at most ~110 characters on the page and ~70 in the tab; the
    rest under the row's expand or Details.
 7. **Skip bookkeeping.** Journal rows whose decision starts with or only states: acks, archiving rows

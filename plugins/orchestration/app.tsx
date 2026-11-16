@@ -38,7 +38,7 @@ function StatusRow({ threadId }: ExperimentalThreadContextCardProps) {
     <ThreadContextCardRow
       leading={<span aria-hidden className={`size-[7px] rounded-full ${attention ? "bg-attention" : "bg-foreground"}`} />}
       label={view.rowLabel}
-      title={`${view.heading}. ${view.subline}`}
+      title={[view.rowLabel, view.sections.status.progress].filter(Boolean).join(" · ")}
       onClick={() => (viewSwitch.on ? openView(threadId, true) : panel.openTab({ tab: TAB }))}
     />
   );
