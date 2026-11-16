@@ -438,6 +438,7 @@ export function asksInChat(report: string | null | undefined): boolean {
 
 export interface ChatQuestion {
   question: string;
+  context?: string;
   /** Button, Buttons and Select options, in order. */
   choices: string[];
   /** A form's field labels. */
@@ -451,7 +452,7 @@ const firstQuoted = (body: string, call: RegExp) => {
   const at = body.search(call);
   return at === -1 ? null : quoted(body.slice(at))[0] ?? null;
 };
-const CHAT_PARAGRAPH_MAX = 300;
+const CHAT_PARAGRAPH_MAX = 160;
 
 /** What the orchestrator's last message asks: its interactive ```ui card (title, choices, form fields), else its last «Waiting on you:» line, else its last paragraph. */
 export function chatQuestion(report: string | null | undefined): ChatQuestion | null {
@@ -468,22 +469,37 @@ export function chatQuestion(report: string | null | undefined): ChatQuestion | 
   }
   const words = spokenText(report);
   const waiting = words.split("\n").map((line) => line.trim()).filter((line) => WAITING_ON_YOU.test(line)).at(-1);
-  if (waiting) return { question: waiting.replace(WAITING_ON_YOU, "").trim(), choices: [], fields: [] };
+  if (waiting) return shortQuestion(waiting.replace(WAITING_ON_YOU, "").trim());
   const paragraph = words.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean).at(-1);
   if (!paragraph) return null;
-  return { question: paragraph.length > CHAT_PARAGRAPH_MAX ? `${paragraph.slice(0, CHAT_PARAGRAPH_MAX - 1).trimEnd()}…` : paragraph, choices: [], fields: [] };
+  return shortQuestion(paragraph);
+}
+
+function shortQuestion(text: string): ChatQuestion {
+  const first = text.match(/^.*?[?!.](?=\s|$)/)?.[0] ?? text;
+  const review = /(?:look at|review|check).*(?:orchestration view|new view)/i.test(first);
+  const title = review ? "Does the new Orchestration view look right?" : first;
+  const question = title.length > CHAT_PARAGRAPH_MAX ? `${title.slice(0, CHAT_PARAGRAPH_MAX - 1).trimEnd()}…` : title;
+  const context = review ? text : text.slice(question.length).trim();
+  return { question, choices: [], fields: [], ...(context ? { context } : {}) };
+}
+
+export function sameChatQuestion(a: string, b: string): boolean {
+  const key = (text: string) => text.normalize("NFKC").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  return !!key(a) && key(a) === key(b);
 }
 
 /** The chat-ask card's wording: the question in plain words, then its choices or fields. */
 export function chatAskCard(asked: ChatQuestion | null, clean: (text: string) => string): { title: string; text: string } {
-  if (!asked) return { title: "The orchestrator asked you something in the chat that isn't in its ledger", text: "Open the chat to answer it; its full last report is under Details." };
+  if (!asked) return { title: "The orchestrator has a question for you", text: "Reply here when you're ready." };
   const question = clean(asked.question) || asked.question;
   const lines = [
+    "Reply here when you're ready.",
     asked.choices.length ? `Choices: ${asked.choices.map((c) => `«${c}»`).join(" / ")}` : null,
     asked.fields.length ? `It asks for: ${asked.fields.join(", ")}` : null,
-    "Answer it in the chat; the ledger doesn't record this question.",
+    asked.context ? clean(asked.context) : null,
   ].filter(Boolean);
-  return { title: `Asked in the chat: ${question}`, text: lines.join("\n\n") };
+  return { title: question, text: lines.join("\n\n") };
 }
 
 const ageSince = (iso: string | null, now: number): string => {
@@ -504,7 +520,8 @@ function updatedOf(input: ViewInput, source: NowView["source"], block: LedgerSum
   return { age, stale, from: "block", label: `updated ${age === "now" ? "just now" : `${age} ago`}${stale ? " · the orchestrator has run since" : ""}` };
 }
 
-function buildNow(input: ViewInput, openAsks: Ask[]): NowView {
+function buildNow(input: ViewInput, allAsks: Ask[]): NowView {
+  const openAsks = allAsks.filter((a) => !a.answered);
   const { ledger, now } = input;
   const live = input.live[input.orchestratorThreadId] ?? null;
   const activity = input.activity?.[input.orchestratorThreadId] ?? null;
@@ -539,8 +556,17 @@ function buildNow(input: ViewInput, openAsks: Ask[]): NowView {
   const liveCommands = live?.backgroundCommands ?? 0;
   if (liveCommands > backgroundWaits.length) waits.push({ who: "background", label: "Background", subtask: null, what: `${plural(liveCommands, "command", "commands")} running`, age: "", kind: "background" });
 
-  const mismatch = ledger.status !== "closed" && state === "idle" && openAsks.filter((a) => a.kind === "owner").length === 0
+  const reportedQuestion = asksInChat(input.report?.text) ? chatQuestion(input.report?.text)?.question : null;
+  const question = reportedQuestion ?? ownerWaits.at(-1)?.what;
+  const matching = question ? allAsks.flatMap((a) => a.group ?? [a]).filter((a) => a.kind === "owner" && (reportedQuestion ? sameChatQuestion(a.replyTitle ?? a.title ?? "", question) : ownerWaitMatches(question, a.replyTitle ?? a.title ?? ""))) : [];
+  const answered = matching.some((a) => a.answered && (activity?.lastTurnStartedAt ?? 0) <= a.answered.at);
+  const mismatch = ledger.status !== "closed" && state === "idle" && !matching.some((a) => !a.answered) && !answered
     && (asksInChat(input.report?.text) || ownerWaits.length > 0);
+  if (answered) {
+    for (let i = waits.length - 1; i >= 0; i--) {
+      if (waits[i]!.kind === "owner" && matching.some((a) => ownerWaitMatches(waits[i]!.what, a.replyTitle ?? a.title ?? ""))) waits.splice(i, 1);
+    }
+  }
   if (mismatch) waits.push({ who: "owner", label: "You", subtask: null, what: "asked in the chat", age: "", kind: "owner" });
 
   const lastTurnStartedAt = activity?.lastTurnStartedAt ?? live?.latestAttentionAt ?? null;
@@ -634,9 +660,9 @@ export function buildView(input: ViewInput): View {
     .sort((a, b) => STUCK_ORDER[a.reason!] - STUCK_ORDER[b.reason!] || (a.lastReport ?? 0) - (b.lastReport ?? 0));
   active.sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || stuck.findIndex((c) => c.subtask.id === a.id) - stuck.findIndex((c) => c.subtask.id === b.id));
   const done = rows.filter((r) => r.kind === "done");
-  const nowView = buildNow(input, asks);
+  const nowView = buildNow(input, allAsks);
   if (nowView.mismatch) {
-    const asked = chatQuestion(input.report?.text) ?? (ledger.now?.waitingOn ?? []).filter((w) => w.who.toLowerCase() === "owner").map((w) => ({ question: w.what, choices: [], fields: [] })).at(-1) ?? null;
+    const asked = (asksInChat(input.report?.text) ? chatQuestion(input.report?.text) : null) ?? (ledger.now?.waitingOn ?? []).filter((w) => w.who.toLowerCase() === "owner").map((w) => ({ question: w.what, choices: [], fields: [] })).at(-1) ?? null;
     const card = chatAskCard(asked, (text) => capitalize(names.clean(text)));
     asks.unshift({
       key: "chat-mismatch", who: "Orchestrator", subtask: null, since: orchestrator?.latestAttentionAt || null, age: orchestrator?.latestAttentionAt ? shortAge(now - orchestrator.latestAttentionAt) : "",

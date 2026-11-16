@@ -152,3 +152,59 @@ test("Details is folded and names the clock skew", async () => {
   assert.match(html, /ledger times are ahead of this computer&#x27;s clock|ledger times are ahead of this computer's clock/);
   assert.doesNotMatch(html, /Checkpoint as written/, "folded until opened");
 });
+
+test("chat question action focuses the owner's composer without sending, navigating or changing a draft", async () => {
+  const dom = new JSDOM("<html><body></body></html>", { url: "http://localhost" });
+  for (const key of ["window", "document", "HTMLElement", "Element", "Node", "MutationObserver"])
+    Object.defineProperty(globalThis, key, { value: dom.window[key as keyof typeof dom.window], configurable: true });
+  Object.defineProperty(globalThis, "ResizeObserver", { value: class { observe() {} disconnect() {} }, configurable: true });
+  const { renderSlot } = await import("@get-bb/plugin-sdk/testing/app");
+  const { AskCard, fillComposer } = await loadTsx(new URL("../src/OrchestrationTab.tsx", import.meta.url));
+  const { act } = await import("@testing-library/react");
+  const { buildView } = await import("../src/view.ts");
+  const view = buildView({
+    ledger: { path: "/ledger.md", goal: "Review", status: "active", subtasks: [], forTheOwner: [], orchestratorSessions: 1, lastHandover: null, warnings: [], checkpoint: null, lastDecision: null },
+    agents: {}, live: { thr_owner: { status: "idle", hasPendingInteraction: false, latestAttentionAt: 1, createdAt: 0 } },
+    orchestratorThreadId: "thr_owner", now: 2, report: { text: "Waiting on you: Review the layout?" },
+  });
+  const ask = view.asks[0]!;
+  for (const scenario of ["same chat", "child selected"]) {
+    let selected = scenario === "child selected" ? "thr_child" : "thr_owner";
+    let revealed = 0;
+    let focused = 0;
+    let changes = 0;
+    let forbidden = 0;
+    const composer = (threadId: string) => ({ scope: { kind: "thread", threadId }, isEmpty: false,
+      focus: () => { assert.equal(selected, "thr_owner"); focused++; },
+      replace: () => { changes++; }, insert: () => { changes++; }, submit: () => { forbidden++; },
+    });
+    const owner = composer("thr_owner");
+    const child = composer("thr_child");
+    child.focus = () => { forbidden++; };
+    const actions = {
+      sent: null, replyState: () => null,
+      fill: (_key: string, text: string) => {
+        assert.equal(text, "");
+        selected = "thr_owner";
+        revealed++;
+        assert.equal(fillComposer([child, owner], "thr_owner", text), true);
+      },
+      reply: () => { forbidden++; }, replyMany: () => { forbidden++; }, openThread: () => { forbidden++; },
+    };
+    const label = scenario === "child selected" ? "Show question" : "Answer";
+    const slot = renderSlot({ component: AskCard }, { ask, actions, threadId: "thr_owner", questionAction: label });
+    try {
+      assert.equal(slot.container.querySelectorAll("button").length, 1);
+      const button = slot.getByRole("button", { name: label });
+      await act(async () => { button.click(); });
+      assert.equal(revealed, 1, scenario);
+      assert.equal(focused, 1, scenario);
+      assert.equal(changes, 0, "existing text/mentions/attachments stay untouched");
+      assert.equal(forbidden, 0, "no navigation, reply endpoint or submit");
+      assert.equal(slot.inspection.navigateCalls.length, 0);
+      assert.equal(slot.container.querySelectorAll("textarea").length, 0, "card creates no extra composer");
+    } finally { slot.lifecycle.unmount(); }
+  }
+  assert.equal(fillComposer([], "thr_owner", ""), false);
+  dom.window.close();
+});

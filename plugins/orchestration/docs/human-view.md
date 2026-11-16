@@ -770,3 +770,21 @@ Each with the recommended option first.
   - **A (recommended):** look at «GenUI probe» in the sidebar, then remove it with
     `bb plugin remove genui-probe`. Its source stays in `docs/prototypes/`.
   - B: keep it until V1 lands.
+
+## Chat-question cards (B1–B3)
+
+The pending chat question is an owner task, with a short title and separate context. Its primary
+copy is “Reply here when you're ready.” Ledger diagnostics are folded in Details: “No matching
+open ask was found in the ledger”, with the limitation that title matching ignores case and
+punctuation and cannot establish semantic equivalence. This supersedes the mismatch wording in
+section 2.3. A corresponding open ask yields one ledger card; unrelated asks and notes leave the
+chat fallback visible. An answered corresponding ask stays quiet for a stale report. A turn
+started after its answer may re-ask; absent turn timing does not establish a new ask.
+
+Answer focuses the same orchestrator composer (including a folded rail's dock), preserving its
+draft. With a child selected, Show question selects the orchestrator, reveals chat and focuses it.
+The side-panel tab uses the existing thread composer. These actions do not send or navigate to
+the same route. Only ledger choices use the validated reply endpoint. UI-extracted choices stay
+context. The extractor reads only the latest report: a review closing line becomes “Does the new
+Orchestration view look right?”, while status and follow-ups remain context. Earlier answered UI
+cards are never searched or resurrected.

@@ -447,6 +447,7 @@ function View({ threadId, chatId }: { threadId: string; chatId: string }) {
           variant="page"
           openChild={(childId) => openView(threadId, false, childId)}
           revealComposer={revealComposer}
+          questionAction={chatId === threadId ? "Answer" : "Show question"}
           noneAction={<Button variant="primary" onClick={() => openChat(threadId)}>Open chat</Button>}
         />
       </div>

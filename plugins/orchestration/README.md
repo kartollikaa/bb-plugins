@@ -250,3 +250,11 @@ evidence. Evidence counts mean records exist, not that checks passed. Expand dep
 inspect their tasks; selecting a dependency resets the filter to All work. Evidence uses the
 same source-host validated Markdown/file preview as Brief. Missing evidence and revision are
 explicit. This view works without GenUI. See [integration decision](docs/genui-integration.md).
+
+Chat-only owner questions stay visible as one compact card. **Answer** focuses the orchestrator's
+composer without sending or changing its draft; **Show question** first selects its conversation
+when a child is open. Extracted UI choices are context only; quick replies still require ledger
+offered answers. The view compares question titles ignoring case and punctuation, so paraphrases
+can remain as separate questions. A matching answered ask stays quiet until a later turn re-asks.
+Maintenance diagnostics remain folded under Details. Only the latest report supplies a chat
+question; follow-up status prose is context, not the question title.

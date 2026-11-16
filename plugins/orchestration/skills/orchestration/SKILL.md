@@ -259,3 +259,12 @@ is a record count, never a passed-check count. Expand a task to inspect dependen
 evidence links and recorded revision. Dependency buttons select that task in All work. Missing
 evidence/revision remain explicit; requirements do not certify results. No GenUI installation
 is required and no new refresh service is introduced.
+
+Chat questions use **Answer** to reveal/focus the orchestrator composer, or **Show question** when
+a child conversation must first be replaced. These actions preserve drafts and never send.
+Only ledger-offered answers use the reply endpoint; extracted UI choices are supporting context.
+Keep the same short ask title in the ledger and closing line: the view matches titles ignoring
+case and punctuation, not meaning. An unrelated ask does not suppress the chat question. Matching
+answered asks remain quiet unless a later turn re-asks; missing turn timing is not proof of a
+re-ask. Details contains the matching diagnostic. Only the latest report is inspected; old UI
+cards are not searched. Keep follow-ups in separate context, outside the short question title.

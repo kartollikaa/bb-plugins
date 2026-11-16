@@ -655,7 +655,7 @@ test("the chat-ask card shows the question from the ui card with its choices, it
   const v = nowOf({ now: nowBlock(), lives: { thr_orch: live(7) }, report: LEDGER_CARD });
   assert.equal(v.now.mismatch, true);
   const ask = v.asks.find((a) => a.key === "chat-mismatch")!;
-  assert.equal(ask.title, "Asked in the chat: Allow recording these instructions in the task ledger?");
+  assert.equal(ask.title, "Allow recording these instructions in the task ledger?");
   assert.match(ask.text, /Choices: «Allow ledger update» \/ «Leave ledger unchanged»/);
   assert.equal(ask.age, "7m");
   assert.equal(v.threadIds["chat-mismatch"], "thr_orch");
@@ -669,6 +669,68 @@ test("chatQuestion reads Form fields, Buttons lists, a Waiting on you line, else
   assert.equal(chatQuestion("Done with I2.\nWaiting on you: connect the Pixel\n::browser-preview{session=\"x\"}")?.question, "connect the Pixel");
   assert.equal(chatQuestion("First part.\n\nShould I rotate V1 now?\n\n```sh\nls\n```")?.question, "Should I rotate V1 now?");
   assert.equal(chatQuestion(null), null);
+});
+
+const REVIEW_QUESTION = "Does the new Orchestration view look right?";
+const REVIEW_CLOSING = "Waiting on you: a look at the new view in this thread's Orchestration view, using «Looks right» or «Something's off» above. Once it looks right I'll close the orchestration. Two follow-ups you approved are still to do: people-friendly ledger notes and correct times (Q5/Q6), and a progress strip (Q10).";
+
+test("chat matching distinguishes corresponding open, unrelated, notes-only, answered and re-asked questions", () => {
+  const report = `Waiting on you: ${REVIEW_QUESTION}`;
+  const make = (forTheOwner: string[], answered = {}, lastTurnStartedAt = NOW - 10 * MIN) => buildView({
+    ledger: ledger([], { forTheOwner }), agents: {}, live: { thr_orch: live(5) },
+    orchestratorThreadId: "thr_orch", now: NOW, report: { text: report }, answered,
+    activity: { thr_orch: act({ lastTurnStartedAt }) },
+  });
+  const line = `ask: ${REVIEW_QUESTION} | why: Your review is needed before this orchestration closes. | options: Looks right / Something's off`;
+  const open = make([line]);
+  assert.equal(open.asks.length, 1);
+  assert.equal(open.asks[0]!.key, "owner-0");
+  assert.deepEqual(open.asks[0]!.replies.map((r) => r.label), ["Looks right", "Something's off"]);
+  assert.equal(open.now.mismatch, false);
+  const unrelated = make(["ask: Allow publication? | options: Yes / No"]);
+  assert.equal(unrelated.asks.length, 2);
+  assert.equal(unrelated.asks[0]!.key, "chat-mismatch");
+  const notes = make(["note: Review is next"]);
+  assert.equal(notes.asks.length, 1);
+  const answer = { [REVIEW_QUESTION]: { answer: "Looks right", at: NOW - 8 * MIN } };
+  const stale = make([line], answer);
+  assert.equal(stale.asks.length, 0);
+  assert.equal(stale.answered.length, 1);
+  assert.notEqual(stale.sections.status.word, "Needs you");
+  const waiting = buildView({
+    ledger: ledger([], { forTheOwner: [line], now: nowBlock({ waitingOn: [{ who: "owner", subtask: null, what: REVIEW_QUESTION, since: null }] }) }),
+    agents: {}, live: { thr_orch: live(5) }, orchestratorThreadId: "thr_orch", now: NOW,
+    report: { text: report }, answered: answer,
+  });
+  assert.equal(waiting.asks.length, 0);
+  assert.equal(waiting.now.waits.filter((w) => w.kind === "owner").length, 0);
+  const again = make([line], answer, NOW - 6 * MIN);
+  assert.equal(again.asks[0]!.key, "chat-mismatch");
+  assert.equal(again.asks[0]!.replyTitle, null);
+  assert.deepEqual(again.asks[0]!.replies, []);
+});
+
+test("title matching ignores punctuation/case but does not guess paraphrases", () => {
+  const match = (title: string) => nowOf({ now: nowBlock(), lives: { thr_orch: live(5) }, report: `Waiting on you: ${REVIEW_QUESTION}`, extra: { forTheOwner: [`ask: ${title}`] } }).now.mismatch;
+  assert.equal(match("does the new Orchestration view look right"), false);
+  assert.equal(match("Does the old Orchestration view look right?"), true);
+  assert.equal(match("Review the layout?"), true);
+});
+
+test("incident closing line has a concise title, separate context, and never searches a previous report", () => {
+  const question = chatQuestion(REVIEW_CLOSING)!;
+  assert.equal(question.question, REVIEW_QUESTION);
+  assert.match(question.context!, /Q5\/Q6.*Q10/);
+  assert.doesNotMatch(question.question, /Q5|Q6|Q10|follow-ups/);
+  const v = nowOf({ now: nowBlock(), lives: { thr_orch: live(5) }, report: REVIEW_CLOSING });
+  const card = v.asks[0]!;
+  assert.equal(card.title, REVIEW_QUESTION);
+  assert.match(card.text, /Reply here when you're ready/);
+  assert.doesNotMatch(`${card.title} ${card.text}`, /isn't in its ledger|ledger doesn't record/);
+  const old = chatQuestion('```ui\nCard("Old answered question?", [Button("Yes")])\n```');
+  assert.equal(old?.question, "Old answered question?");
+  assert.equal(chatQuestion(REVIEW_CLOSING)?.question, REVIEW_QUESTION);
+  assert.equal(nowOf({ now: nowBlock(), lives: { thr_orch: live(5) }, report: "Finished. Nothing waits on you." }).asks.length, 0);
 });
 
 test("quiet comes from the thread's live state: a running turn with recent activity is never quiet", () => {
