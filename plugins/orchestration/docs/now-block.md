@@ -1,7 +1,8 @@
 # The «Now» layer of an orchestration
 
-Status: draft for the owner's confirmation. Sections 1–3 are complete; sections 4 and 5 wait on R1's
-report on live activity and are marked where they do.
+Status: complete draft for the owner's confirmation. Section 4 builds on R1's report on live
+activity (`R1-live-activity.md`, bb 0.49.0, plugin SDK 0.6.132). Q1 and Q5 were decided by the
+orchestrator; Q2–Q4, Q6 and Q7 wait on the owner.
 
 Two parts build from this document: **I1** in kartollika-ai-hub (`plugins/orchestrate`: the skill,
 the ledger schema, the export) and **I2** in this repo (`plugins/orchestration`: the view). Section 5
@@ -46,6 +47,18 @@ What fails today, by source:
    (`src/ledger.ts:86`).
 7. **No live activity.** The view knows whether a thread has a turn running (bb sidebar `status`,
    `src/useOrchestration.ts:95-110`), but not what the turn is doing. Section 4 covers what bb exposes.
+8. **A wait on the owner can be invisible.** `src/owner.ts:43` (`ASK_PREFIX`) makes an ask only of
+   `ask:`, `Q:`, `question:` and `Q (asked …):` lines; every other «For the owner» line is a note
+   (`src/owner.ts:69-73`), and `test/owner.test.ts:36-41` asserts it, so `Waiting: owner merge of …`
+   is a note. On 2026-11-16 the us26 orchestration waited on the owner with the free-text line
+   `- connect Pixel 9a (5C111JEBF10513) via USB/wireless debugging, app signed in on drma-dy → device
+   check resumes in thr_bjp39sjv29`: the view showed nothing waiting while the orchestrator waited
+   (`…-Projects-work-drinkit-ai-hub/orchestrate/us26-candidate-button-split.md`, since rewritten
+   with proper `ask:` lines). The owner: «make sure that it wouldn't happen again, because it has
+   already happened twice during the day». The skill has no check at the end of a turn: orchestrate
+   0.16.0 `hooks/hooks.json` has only `SessionStart(compact)` and `PostToolUse(*)`, and
+   `scripts/orchestration_ledger.py` `owner_warnings` (line 231) reports free text as a warning
+   only when `check` or a helper runs.
 
 ## Requirements
 
@@ -77,6 +90,13 @@ What fails today, by source:
 - **N12** From the top block the owner can open the thread of a subtask it names, read the checkpoint
   as written and the orchestrator's full last report.
 - **N13** I1 and I2 share exact, named contract strings, so each is built and tested alone.
+- **N14** The view never shows «nothing waits on you» while the orchestrator waits on the owner: a
+  «For the owner» line in any shape other than a note counts as an ask, and an orchestrator that
+  asked in the chat without an ask line is flagged.
+- **N15** On hosts with turn-end hooks, an orchestrator turn that waits on the owner cannot end
+  without an `ask:` line for it; elsewhere the rule text and `check` say so.
+- **N16** Live activity costs at most one filtered, cursor-based event read per changed thread, and
+  is refreshed by bb's thread events, not a new timer.
 
 ## Options
 
@@ -119,7 +139,12 @@ V1: the owner asked for the state to be what they see first, wherever they are i
 event update; the export parses them into new keys of `current_checkpoint` without a version bump;
 the view puts a «Right now» block under the goal that joins those lines with bb's live thread state,
 dates every line and flags a block older than the orchestrator's last turn. Old ledgers show their
-free-text checkpoint and the orchestrator's last status line in the same place.
+free-text checkpoint and the orchestrator's last status line in the same place. Running turns show
+their current step from bb's thread events, read by the plugin's own fold and refreshed by those
+events, not a timer (section 4). A wait on the owner gets two guards: the view treats every
+«For the owner» line that is not a note as a wait and flags a question asked only in the chat, and
+the skill's Stop hook keeps an orchestrator turn from ending on such a wait without an `ask:` line
+(section 6).
 
 ## Design
 
@@ -259,7 +284,7 @@ by `structured` being absent and treats it as `structured: false`.
 | `orchestratorLive` | bb sidebar entry of the orchestrator thread: `status`, `latestAttentionAt`, `hasPendingInteraction` (`useOrchestration.ts:95-110`) | yes |
 | `lastReport` | `snapshot.report`: the orchestrator thread's last output (`server.ts:178`); its first line is the turn's status line the skill asks for (§6 «What reaches the owner») | yes, folded |
 | `ledgerModifiedAt` | the ledger file's mtime, which `exportLedger` already stats (`server.ts:71`) | no: I2 adds it to the snapshot |
-| `liveActivity` | what the orchestrator's or a subtask's running turn is doing now | **pending R1** (section 4) |
+| `liveActivity` | what the orchestrator's or a subtask's running turn is doing now: turn start, current step and its start, background work | no: I2 adds the `activity` RPC (section 4) |
 | `report gist` | a subtask's last output, first line, matched against the protocol header | the text is there (`Agent.lastOutput`); the parsing is new |
 
 `LedgerSummary` gains:
@@ -302,16 +327,21 @@ Work in progress                                                      [phase.lab
 Rules:
 
 - **Orchestrator line.** `running` while the sidebar status is `starting`, `active` or `stopping`
-  (the existing `BUSY` set), shown with the pulsing dot the team rows use, and the live activity
-  line from section 4 when there is one; `asking` when `hasPendingInteraction`; `idle since
-  <latestAttentionAt>` otherwise; `not in bb's thread list` when the sidebar has no entry (N9).
+  (the existing `BUSY` set), shown with the pulsing dot the team rows use, followed by section 4's
+  activity when there is one: `● Orchestrator · running 4m · Running npm test · 40s` (turn age from
+  `activity.turnStartedAt`, step and its age from `activity.step` and `activity.stepStartedAt`);
+  `asking` when `hasPendingInteraction`; `idle since <latestAttentionAt>` otherwise; `not in bb's
+  thread list` when the sidebar has no entry (N9).
 - **Last turn.** First line of `lastReport` via `firstLine(…, 140)` with the age of
   `latestAttentionAt`. Hidden while the orchestrator runs, because the line belongs to the turn
   before.
 - **Doing / Next / Blocked by.** One line each, `firstLine(…, 220)`. `Blocked by` only when not
   null, in the foreground colour with the word «Blocked» (not colour alone).
-- **Waits on.** One row per `waitingOn` entry in ledger order, then one per background wait. `who`
-  shows as the subtask id, «You» for `owner`, «Background» for a background wait, else as written.
+- **Waits on.** One row per `waitingOn` entry in ledger order, then one «You» row per open owner ask
+  (section 6) that no `waiting on: owner` line already names, then one per background wait, then
+  one `Background · <n> commands running` row when section 4's live count exceeds the ledger's
+  background waits. `who` shows as the subtask id, «You» for `owner`, «Background» for a background
+  wait, else as written.
   The age is from `since`. A row whose `subtask` has a thread in `view.threadIds` is a button that
   opens it (`actions.openThread`, as the team rows do) (N12). At most five rows; more fold under
   «N more».
@@ -347,10 +377,11 @@ are tested in `test/view.test.ts` without rendering:
 ```ts
 export interface NowView {
   source: "block" | "text" | "none";
-  orchestrator: { state: "running" | "asking" | "idle" | "unknown"; age: string; activity: string | null };
+  orchestrator: { state: "running" | "asking" | "idle" | "unknown"; age: string; activity: string | null; background: number };
   lastTurn: RecapLine | null;
   doing: string | null;
   waits: { who: string; label: string; subtask: string | null; what: string; age: string; kind: "subtask" | "owner" | "background" | "other" }[];
+  mismatch: boolean;               // section 6: asked in the chat, no ask line
   next: string | null;
   blockedBy: string | null;
   lastDecision: RecapLine | null;
@@ -376,7 +407,8 @@ export interface NowView {
   (`src/ledger.ts:86`). I1's skill rule fills the name in new ledgers.
 - **Step**, first that applies, after the existing pending, stuck and child cases of `stepOf`, which
   stay as they are:
-  1. live activity of its running turn (section 4, pending R1);
+  1. while its turn runs: the live step with its age (`Running npm test · 40s`), else `Turn
+     running 4m` (section 4);
   2. for `working`, `briefed` and `blocked`: the status note after the status word when the
      ledger has one (`statusNote`, already in `view.ts`);
   3. for `working`: the report gist, the `<gist>` of a last-output first line matching
@@ -395,21 +427,91 @@ block.
 
 ### 4. Live activity
 
-**Pending R1** (`R1-live-activity.md`). What the view already reads, from the code:
+Sources, from R1 (`R1-live-activity.md`, findings 1a–5) and the code that reads them today:
 
-- bb sidebar per thread: `status`, `latestAttentionAt`, `hasPendingInteraction`, `createdAt`,
-  `parentThreadId`, `displayTitle`, `isHidden` (`useOrchestration.ts:95-110`), pushed to the app by
-  `experimental_useSidebarThreads`, no polling.
-- per subtask, cached 15 s: `threads.get`, `threads.context` (context use), the last
-  `client/turn/requested` event (model, effort), `threads.output` (last text)
-  (`server.ts:105-128`).
+| What | Source | Cost per refresh |
+|---|---|---|
+| a turn is running; it asks | bb sidebar `status`, `hasPendingInteraction`, already read (`useOrchestration.ts:95-110`) | none: pushed to the app |
+| what it asks | `threads.interactions.list` through the existing `pending` RPC (`server.ts:220`) | unchanged |
+| turn start | the latest `turn/started` with no top-level `turn/completed` after it (R1 1b) | the fold below |
+| current step and its start | an `item/started` whose `item.id` has no `item/completed` yet; label from `stepText` (R1 2a–2c): the command's first words, `presentation.label.pending`, or the tool name; `presentation.suppress` items are skipped | the fold below |
+| background work, count | sidebar `activity.backgroundCommands` and `activity.backgroundAgents` (R1 3a, 3b) | none: pushed |
+| background work, what | `item/backgroundTask/progress` and `…/completed` events: `description` of each task with no `completed` yet (R1 3a, S3) | the fold below |
 
-This section will name the source of «what the running turn is doing now» for the orchestrator and
-for a subtask, its refresh path within N8, its cost per snapshot, and its failure behaviour.
+An idle thread can still run background work (R1 S3), so «is anything running» reads the sidebar
+counts, not `status` alone. Provider subagents are counted, not listed: R1 saw a count of one active
+agent while thread-tree's `subagents` fold listed none running, so a list would contradict the count.
+
+**The fold (I2, `src/activity.ts`).** A pure fold over one thread's typed events, kept per thread on
+the server:
+
+```ts
+export const ACTIVITY_EVENT_TYPES = ["turn/started", "turn/completed", "item/started", "item/completed",
+  "item/backgroundTask/progress", "item/backgroundTask/completed"] as const;
+
+export interface ThreadActivity {
+  turnStartedAt: number | null;    // epoch ms; null when no turn runs
+  step: string | null;             // «Running npm test», «Loading skill», «Thinking»
+  stepStartedAt: number | null;    // createdAt of that item/started
+  background: { description: string; startedAt: number }[];
+}
+```
+
+I2 copies `foldSignalEvents`, `stepText`, `commandGist` and the paging of `createSignalReader` from
+`plugins/thread-tree/src/threadSignals.ts` (first read: newest-first pages of 100 typed rows;
+then `order: "asc", afterSeq: lastSeq`; 4 reads at a time; at most 400 threads cached), with the
+nested-turn rule (`isTopLevelCompletion`) and their tests, trims them to `ThreadActivity`, and adds
+`stepStartedAt` and the background list, which thread-tree does not return (R1 2b).
+
+Copy, not a call to thread-tree's `threadSignals` RPC: AGENTS.md «Plugins stay independent» bars
+imports, and a runtime call makes live activity disappear without a trace when thread-tree is off
+or changes its output; its output also lacks the step's start and the background detail, so using
+it would need a thread-tree change for an orchestration feature. The cost is about a hundred
+duplicated lines, the kind of duplication AGENTS.md already accepts for vendored UI.
+
+**Contract and refresh (N8, N16).** A batched, keyed RPC in `src/contract.ts`, shaped like
+thread-tree's `threadSignals` (`plugins/thread-tree/server.ts:78-83`):
+
+```ts
+activity: {
+  input: z.object({ keys: z.array(z.string().min(1)).min(1).max(50) }),
+  output: z.record(z.string(), threadActivitySchema.nullable()),
+  keyTags: (key: string) => [`activity:${key}`],
+},
+```
+
+- The app asks for the orchestrator and every subtask thread whose sidebar `status` is in `BUSY` or
+  whose sidebar background count is above zero. Idle threads are not read.
+- The server subscribes, once, to `experimental_thread.events`, `thread.active`, `thread.idle` and
+  `thread.failed` (R1 4); for a thread already in its fold map it schedules one
+  `bb.rpc.experimental_invalidate([`activity:<threadId>`])` per `ACTIVITY_REFRESH_MS` = 2 s, as
+  thread-tree does with `SIGNAL_REFRESH_MS` (`thread-tree/server.ts:39, 204-214`). bb already
+  coalesces `experimental_thread.events` to one per second per thread.
+- The query has no interval. The 20 s snapshot and the orchestrator turn signal stay as they are;
+  ages tick with the view's existing clock (`useNow`). `docs/genui-integration.md` «Refresh is
+  unchanged» stays true for the snapshot; I2 adds one sentence there that live steps follow bb's
+  thread events.
+
+Cost: an invalidated running thread costs one `events.list` with `types` and `afterSeq`, which
+returns only the new step rows (R1 5: unfiltered logs run to 611 KB per 400 events; the typed,
+cursor-based read returns `[]` when nothing changed). With ten running threads that is at most five
+small reads a second; with all idle, none.
+
+**Failure behaviour.**
+
+| Case | Result |
+|---|---|
+| `events.list` fails for a thread | that key returns `null`; the row and the orchestrator line show the sidebar state without a step (`running`, `Turn running` without an age), and the ledger step as before; one `bb.log.warn` per thread per failure streak |
+| plugin reloaded | the fold map is empty; the first query rebuilds it from the newest-first pages |
+| thread not in the sidebar | not asked for; ledger-only, with the note of section 3 (N9) |
+| a step stays open after its turn ended | `turn/completed` clears open steps, as in thread-tree's fold |
+| a newer bb renames an event type | the fold sees no rows: no step, no error; the sidebar state still shows |
+
+**Privacy.** The step embeds the first words of a running command (`commandGist`, R1 S2). It is shown
+only in the owner's own view, as thread-tree's tooltip already does, and is never written to the
+ledger, the export or a message.
 
 ### 5. Implementation slices
-
-**Pending R1** for I2's live-activity items; the rest is fixed.
 
 #### Shared contract strings
 
@@ -419,57 +521,174 @@ for a subtask, its refresh path within N8, its cost per snapshot, and its failur
 | `- updated:` `- doing:` `- waiting on:` `- next:` `- blocked by:` | ledger keys, lower case, in this order | I1 skill, I1 export |
 | `for:` `since:` | fields of a `waiting on:` line, ` \| `-separated | I1 skill, I1 export |
 | `owner` | `who` of an owner wait | I1 skill; I2 shows «You» |
+| `- ask:` `- note:` | the only two «For the owner» line forms, unchanged | I1 skill, `check`, Stop hook; I2 parses |
+| `Waiting on you: ` / `Nothing waits on you.` (Russian ledgers: `Ждёт тебя: ` / `Ничего не ждёт.`) | the last line of an orchestrator turn's message | I1 skill and Stop hook; I2 mismatch rule |
 | `current_checkpoint.structured`, `.updated`, `.doing`, `.waiting_on[].{raw,who,subtask,what,since}`, `.next`, `.blocked_by` | export JSON | I1 writes, I2 reads |
 | `orchestrate-ledger-export`, `schema_version` `1` | export, unchanged | both |
 | `REPORT_HEADER` = `^\[orchestrate [^\]]+\]\s+(\S+)\s+(working\|question\|blocked\|delivered\|updated\|rotate):\s*(.*)$` | first line of a subtask report, from `references/protocol.md` line 90 | I2 parses; I1 changes nothing |
 
+`ACTIVITY_EVENT_TYPES`, the `activity` RPC and its `activity:<threadId>` tag are I2's alone.
+
 #### I1 — kartollika-ai-hub `plugins/orchestrate`
 
-Areas: `skills/orchestrate/SKILL.md` (§3 init, §6 step 4, §7 resume, §8 finish: write the block),
-`skills/orchestrate/references/ledger.md` («Schema», «Subtask statuses» note rule, «Old
-vocabulary», «Overall state and brief»), `skills/orchestrate-handover/SKILL.md` where it reads
-or writes «Current checkpoint» (lines 58, 72, 138, 163 in 0.16.0: a takeover rewrites the block),
-`scripts/ledger_export.py`, `scripts/orchestration_ledger.py` (`check` warning),
-`docs/ledger-export.md`, `scripts/test_ledger_export.py`, `scripts/test_orchestration_ledger.py`,
-`tests/fixtures/ledger-export/`, and the plugin version the repo's release procedure bumps.
+Areas: `skills/orchestrate/SKILL.md` (§3 init, §6 step 4 and «What reaches the owner», §7 resume,
+§8 finish: write the block; section 6's rule), `skills/orchestrate/references/ledger.md` («Schema»,
+«Subtask statuses» note rule, «Old vocabulary», «Overall state and brief», «For the owner»),
+`skills/orchestrate-handover/SKILL.md` where it reads or writes «Current checkpoint» (lines 58, 72,
+138, 163 in 0.16.0: a takeover rewrites the block), `hooks/hooks.json` (a `Stop` entry),
+`scripts/owner-wait-stop.py` (new), `scripts/ledger_export.py`, `scripts/orchestration_ledger.py`
+(`check` warning and `errors`), `docs/ledger-export.md`, `scripts/test_ledger_export.py`,
+`scripts/test_orchestration_ledger.py`, a test for the hook, `tests/fixtures/ledger-export/`,
+`tests/fixtures/owner-wait/`, and the plugin version the repo's release procedure bumps.
 
 Done when:
 
-1. `export` of `tests/fixtures/ledger-export/current.md`, which carries the filled example above,
-   prints `structured: true` and the keys and values of section 2's sample; a test asserts it.
-2. `export` of `bare.md`, `legacy-ru.md`, `real-shaped.md` and a free-text-checkpoint fixture exits
-   0 with `structured: false`, `waiting_on: []`, and `text`, `time`, `background_waits`,
-   `archive_after_handover` equal to what 0.16.0 prints for them; a test asserts it.
-3. A repeated `doing:` gives the first value and the warning; a `waiting on:` without `for:` or
-   `since:` gives `what` = the rest and `since` = `null`; a test each.
-4. `check` on a ledger without `doing:` prints the warning and exits 0; with the block, no warning.
-5. The skill text and `ledger.md` «Schema» show the block with the key order of the contract table,
-   and §6 step 4 says to rewrite it, `updated:` included, in every event update.
+1. `export` of `tests/fixtures/ledger-export/current.md`, which carries section 1's filled example,
+   prints `structured: true` and section 2's sample; `bare.md`, `legacy-ru.md`, `real-shaped.md` and
+   a free-text-checkpoint fixture export with `structured: false`, `waiting_on: []`, and `text`,
+   `time`, `background_waits`, `archive_after_handover` equal to 0.16.0's output. Tests assert both.
+2. A repeated `doing:` gives the first value and the warning; a `waiting on:` without `for:` or
+   `since:` gives `what` = the rest and `since: null`; `check` warns on a ledger without `doing:`
+   and exits 0. A test each.
+3. `check` on `tests/fixtures/owner-wait/us26-free-text.md` lists the free-text owner line and, on a
+   ledger with `waiting on: owner` and no `ask:`, that wait, under `errors` in its JSON, and exits
+   0; on the fixed ledger `errors` is empty. Tests assert it.
+4. `owner-wait-stop.py`, tested with fixtures: the us26 ledger plus a transcript whose last message
+   ends in a ```` ```ui ```` fence with `Buttons` → prints `{"decision": "block", …}` naming the
+   ledger line; the same input with `stop_hook_active: true` → no output; the fixed ledger → no
+   output; a transcript that never loaded the orchestrate skill → no output, exit 0.
+5. The skill text and `ledger.md` «Schema» show the block in the contract's key order; §6 step 4
+   says to rewrite it, `updated:` included, in every event update; «What reaches the owner» carries
+   section 6's rule and closing line.
 
 #### I2 — bb-plugins `plugins/orchestration`
 
-Areas: `src/contract.ts`, `src/ledger.ts`, `src/view.ts`, `src/Recap.tsx` (or a new
-`src/NowBlock.tsx`), `src/Brief.tsx`, `src/OrchestrationTab.tsx`, `server.ts`
-(`ledgerModifiedAt`), `test/`, `README.md`, `skills/orchestration/SKILL.md`, `PLUGIN_OVERVIEW.md`
-if its text names the recap; `docs/plugins.md` orchestration entry. Not `docs/now-block.md`.
+Areas: `src/contract.ts`, `src/ledger.ts`, `src/owner.ts`, `src/view.ts`, `src/activity.ts` (new),
+`src/useOrchestration.ts`, `src/Recap.tsx` (or a new `src/NowBlock.tsx`), `src/Brief.tsx`,
+`src/OrchestrationTab.tsx`, `server.ts` (`ledgerModifiedAt`, the `activity` RPC and its event
+subscription), `test/`, `docs/genui-integration.md` (the one refresh sentence), `README.md`,
+`skills/orchestration/SKILL.md`, `PLUGIN_OVERVIEW.md` if its text names the recap;
+`docs/plugins.md` orchestration entry. Not `docs/now-block.md`.
 
-Done when (live-activity items to be added after R1):
+Done when:
 
 1. `node --test` cases in `test/view.test.ts` build `view.now` from: a structured block; a block
-   whose `updated` is older than the orchestrator's last turn by more than `STALE_GRACE_MS`
-   (stale) and by less (not stale); a free-text checkpoint (`source: "text"`); an export without
-   `structured` (`source: "none"`); no sidebar entry (`state: "unknown"`).
-2. `node --test` cases in `test/ledger.test.ts` read section 2's sample into `LedgerSummary.now` and
-   an old v1 export (no new keys) into `now: null` without a new warning.
-3. A `working` row whose last output starts with a `REPORT_HEADER` line shows only the gist; a
-   `working — <note>` status cell shows the note.
-4. `npm test`, `npm run typecheck`, `bb plugin build` pass in `plugins/orchestration`.
-5. After landing, in the running bb: the Right now block is seen on this orchestration's view
-   (`thr_yc4bw8qaah`) and on one free-text ledger; else an owner check with the exact steps, marked
-   unverified (AGENTS.md «Done means seen working»).
+   older than the orchestrator's last turn by more than `STALE_GRACE_MS` (stale) and by less (not
+   stale); a free-text checkpoint (`source: "text"`); an export without `structured` (`source:
+   "none"`); no sidebar entry (`state: "unknown"`); a running orchestrator with an activity
+   (`activity` = step and age) and with `null` activity (no step, no error).
+2. `test/ledger.test.ts` reads section 2's sample into `LedgerSummary.now` and an old v1 export into
+   `now: null` without a new warning. `test/owner.test.ts`: the us26 line
+   `connect Pixel 9a (5C111JEBF10513) via USB/wireless debugging, app signed in on drma-dy → device
+   check resumes in thr_bjp39sjv29` is an ask with `format: "free text"` and puts the orchestration in
+   `needs`; `Waiting: owner merge of kartollikaa/bb-plugins#12` and `Nothing lands until you approve
+   the DB migration` become asks (lines 39–40 change); `note: …`, `answered …`, `Q (answered …): …`,
+   `Nothing waiting …` and `Nothing waits on owner input.` stay notes; a view case with notes only, an
+   idle orchestrator and a last report ending `Waiting on you: connect the Pixel` gives
+   `now.mismatch: true`, and the same report while the orchestrator runs, or ending `Nothing waits on
+   you.`, gives `false`.
+3. `test/activity.test.ts`: an open `item/started` gives the step and `stepStartedAt`; its
+   `item/completed` clears it; `turn/completed` clears open steps; a nested turn's completion does
+   not end the outer turn; a background `progress` without `completed` is listed; a second read asks
+   with `afterSeq` = the last seq. A server test: an `experimental_thread.events` event for a thread
+   in the fold map invalidates `activity:<id>` once within 2 s; for another thread, nothing.
+4. A `working` row whose last output starts with a `REPORT_HEADER` line shows only the gist; a
+   `working — <note>` status cell shows the note; a running subtask with an activity shows its step
+   and age. `npm test`, `npm run typecheck` and `bb plugin build` pass in `plugins/orchestration`.
+5. After landing, in the running bb: the Right now block on this orchestration's view
+   (`thr_yc4bw8qaah`) shows a running step while the orchestrator works, and one free-text ledger
+   shows its fallback; else an owner check with the exact steps, marked unverified (AGENTS.md «Done
+   means seen working»).
 
 I2 does not wait for I1 to land: its tests use fixtures, and against an installed orchestrate
-without the keys it shows the old-exporter fallback.
+without the keys it shows the old-exporter fallback. Section 6's view rules work on today's ledgers.
+
+### 6. A wait on the owner is never invisible
+
+The us26 incident (Problem 8) had two failures: the skill let a turn end waiting on the owner with
+no `ask:` line, and the view read the free-text line as a note. Each side gets its own guard, so
+either catches the miss alone (N14, N15).
+
+#### a) The view reads every non-note line as a wait (I2)
+
+`parseOwnerItem` (`src/owner.ts:70`) classifies a «For the owner» line by the first rule that
+matches:
+
+| # | Line | Result |
+|---|---|---|
+| 1 | starts with `note:` | note, as today |
+| 2 | starts with `answered` or `Q (answered …):` | note: a record of an answer |
+| 3 | starts with `ask (draft):` | note: not yet asked |
+| 4 | starts with `Nothing waiting`, `Nothing waits`, `Nothing for the owner`, `Quiet:` or `Ничего не ждёт` (case-insensitive) | note: says nothing waits |
+| 5 | matches `ASK_PREFIX` | ask with `format: "ask"`, parsed as today |
+| 6 | anything else | ask with `format: "free text"`; the title is the line as written |
+
+`OwnerItem`'s ask variant gains `format: "ask" | "free text"`. A free-text ask renders as an ask
+card with a muted chip «written as free text», counts towards «needs you» and the tab count, gets
+a «You» row in Waits on, and is answered like any ask. This reverses the rule of
+`test/owner.test.ts:36-41` (from the README's «The dialog keep showing even when i answered»):
+answer records stay notes by rules 2 and 4; lines that state a wait (lines 39–40) become asks.
+The orchestrator decided it in the handover of D1 #2, on the owner's «make sure that it wouldn't
+happen again».
+
+**Mismatch.** `view.now.mismatch` is true when all of these hold:
+
+- the orchestrator is not running (`BUSY`) and not asking (`hasPendingInteraction`, which already
+  shows as a thread ask): an owner's reply would start a turn, so idle means unanswered;
+- no open ask of either format;
+- and one of: the last non-empty line of `lastReport` starts with `Waiting on you:` or `Ждёт
+  тебя:`; `lastReport` holds a ```` ```ui ```` fence whose body names `Form`, `Button`, `Buttons` or
+  `Select` (`docs/genui-integration.md` names `Form`; I2 checks the others against the installed
+  GenUI catalog); the block has a `waiting on: owner` line.
+
+Then the Now tab's attention list opens with a needs-you card «The orchestrator asked you in its
+last message, but its ledger records no ask», with «Full last report» and «Open chat», and Waits on
+gets a «You · asked in the chat» row. `snapshot.report` is the orchestrator's last output
+(`server.ts:178`), so no new read is needed.
+
+#### b) The skill cannot end such a turn silently (I1)
+
+Rule text for SKILL.md §6 «What reaches the owner» and `ledger.md` «For the owner»:
+
+> Every wait on the owner is an `ask:` line. Before a turn ends waiting on the owner — a question, a
+> step only they can run (connect a device, sign in, approve), a choice offered in the chat — each
+> item is an `ask:` line in «For the owner» and a `waiting on: owner` line in Current checkpoint,
+> both written in this turn. Chat text, buttons, forms and the host's question tools show the
+> question; they never replace the line. A «For the owner» line that is neither `ask:` nor `note:`
+> is an error: rewrite it before the turn ends. The turn's message ends with `Waiting on you:
+> <ask titles, «; »-separated>` or `Nothing waits on you.`
+
+`check`: its JSON gains `errors` (a list of strings) for free-text owner lines and for a `waiting
+on: owner` line no `ask:` matches; it still exits 0, so every helper mutation keeps its «warnings,
+exit 0» contract (`orchestration_ledger.py`; exit 1 stays «unreadable»).
+
+**Stop hook.** `hooks/hooks.json` gains `"Stop": [{"hooks": [{"type": "command", "command":
+"command -v python3 >/dev/null 2>&1 || exit 0; python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/owner-wait-stop.py\""}]}]`.
+The script:
+
+1. reads the hook input; exits 0 with no output when `stop_hook_active` is true, so it blocks a
+   turn at most once;
+2. finds the session's ledger with `scan()` from `compact-reminder.py` (skill invocation and the
+   ledgers this session wrote); none → exit 0, so non-orchestrator sessions pay one transcript scan;
+3. blocks when the ledger has a free-text «For the owner» line, or a `waiting on: owner` line
+   without a matching `ask:`, or the transcript's last assistant message ends with `Waiting on you:`
+   or holds an interactive ```` ```ui ```` fence while the ledger has no open `ask:`. It prints
+   `{"decision": "block", "reason": "<ledger path>: <each offending line or message>; write each wait
+   on the owner as an `ask:` line, then end the turn"}`;
+4. any read or parse error → exit 0, no output: the hook never traps a session.
+
+Rejected: a `PostToolUse` check (runs on every tool call and cannot tell the turn's end); making
+`check` fail (breaks the exit-0 contract the helpers rely on); the view rule alone (it reveals the
+miss but leaves the ledger wrong for resume and handover). Hosts without Stop hooks (Codex) get the
+rule text and `check`; the view rule covers them.
+
+#### c) The incident as a test case
+
+`tests/fixtures/owner-wait/us26-free-text.md` (I1) is a minimal ledger whose «For the owner» holds
+only `- connect Pixel 9a (5C111JEBF10513) via USB/wireless debugging, app signed in on drma-dy →
+device check resumes in thr_bjp39sjv29`, rebuilt from that line because the real ledger has since
+been fixed. I2's `test/owner.test.ts` uses the same line. Both suites run it as the incident's
+regression case (I1 Done when 3–4, I2 Done when 2).
 
 ## What it does not cover
 
@@ -479,15 +698,26 @@ without the keys it shows the old-exporter fallback.
 - The context-card row and the narrow tab beyond the compact form above.
 - History of past blocks: each update replaces the block; the decision journal and gates keep the
   history.
+- A list of running provider subagents: counted only, until R1's count/fold mismatch is explained
+  with a truly running Agent call.
+- Turn-end enforcement on hosts without Stop hooks; there the rule text, `check` and the view rule
+  apply.
 - Release of `orchestration` (unpublished, `docs/publication.md`) and the update of the installed
   orchestrate plugin (the owner's, per the ledger's «For the owner»).
 
+## Decided
+
+- **Q1** (where the block lives) → A, keyed lines inside «Current checkpoint», and **Q5** (`check` on
+  a ledger without `doing:`) → A, warn and exit 0: decided by the orchestrator (message #8), as
+  implementation choices without product-visible effect; recorded in the orchestration's decision
+  journal.
+- **Free-text «For the owner» lines are waits** (section 6 a): decided by the orchestrator in the
+  handover of D1 #2, on the owner's request that the us26 miss not happen again.
+- **Live activity is computed by I2's own fold**, not thread-tree's RPC (section 4): follows
+  AGENTS.md «Plugins stay independent».
+
 ## Open questions for the owner
 
-Q1–Q6 are design decisions, which this orchestration's delegation keeps with the owner.
-
-- **Q1. Where the block lives.** A: keyed lines inside «Current checkpoint» (recommended: old
-  readers keep working, one section to maintain). B: a new «Now» section.
 - **Q2. The block's title in the view.** A: «Right now», with the tab staying «Now» (recommended:
   the tab is about what needs you; the block is about what happens). B: rename the tab
   «Attention» and title the block «Now».
@@ -497,10 +727,11 @@ Q1–Q6 are design decisions, which this orchestration's delegation keeps with t
 - **Q4. Free-text checkpoints of old ledgers.** A: show them clamped to three lines with «Show all»
   and the ledger's age (recommended: no line is guessed to be current). B: show only «This ledger
   has no Now block yet» and keep the text folded.
-- **Q5. `check` warning on a ledger without `doing:`.** A: warn, exit 0 (recommended: it nudges the
-  migration the way «For the owner» warnings do). B: no warning.
 - **Q6. Name of what a subtask resolves.** A: the skill asks for two to eight words after the id in
   the «Subtasks» id cell (recommended: the export already reads it). B: leave names optional; rows
   keep showing the delivery.
-
-Questions from section 4 follow R1's report.
+- **Q7. The Stop hook on an orchestrator turn that waits on the owner without an `ask:` line.** A:
+  block the turn once with the reason, so the orchestrator writes the line before it stops
+  (recommended: the miss happened twice in a day with the rule text alone). B: no hook; `check`
+  errors and the view's mismatch card only. C: block on every stop until fixed (risks a loop when the
+  orchestrator cannot write the ledger).
