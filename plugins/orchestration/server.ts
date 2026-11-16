@@ -13,6 +13,7 @@ import { exportScriptCandidates, ledgerFor, scanLedgers, type LedgerFile } from 
 import { resolveOwner } from "./src/route.ts";
 import { quickReplyTitles, REPLY_MODE, replySender, toDelivery } from "./src/reply.ts";
 import { validReply } from "./src/questions.ts";
+import { createActivityReader, createRefreshScheduler, type ActivityListArgs } from "./src/activity.ts";
 
 const run = promisify(execFile);
 const SCAN_TTL_MS = 10_000;
@@ -193,7 +194,8 @@ export default async function plugin(bb: BbPluginApi) {
       ]);
       if (local !== null && remote?.contentEncoding === "utf8" && remote.content === local) workspace.ledgerHostId = workspace.hostId;
     }
-    return { state: "ledger", ledger: summary, agents, report, workspace, ...answers, readAt: Date.now() };
+    const ledgerModifiedAt = await stat(ledger.path).then((s) => s.mtimeMs, () => null);
+    return { state: "ledger", ledger: summary, agents, report, workspace, ...answers, ledgerModifiedAt, readAt: Date.now() };
   }
 
   const sendReply = replySender(async (threadId, text) => {
@@ -232,6 +234,15 @@ export default async function plugin(bb: BbPluginApi) {
     return Object.fromEntries(entries);
   }
 
+  const activity = createActivityReader({
+    listEvents: (args: ActivityListArgs) => bb.sdk.threads.events.list(args as Parameters<typeof bb.sdk.threads.events.list>[0]),
+    log: (message) => bb.log.warn(message),
+  });
+  const refreshActivity = createRefreshScheduler({ has: activity.has, invalidate: (tags) => bb.rpc.experimental_invalidate(tags) });
+  for (const event of ["experimental_thread.events", "thread.active", "thread.idle", "thread.failed"] as const) {
+    bb.events.on(event, ({ thread }) => refreshActivity(thread.id));
+  }
+
   bb.rpc.register(contract, {
     orchestrators: async () => ({ ids: [...new Set((await ledgers()).map((ledger) => ledger.orchestratorId))] }),
     owner: async ({ threadId }) => {
@@ -249,6 +260,7 @@ export default async function plugin(bb: BbPluginApi) {
     snapshot: ({ threadId }) => snapshot(threadId),
     reply: ({ threadId, text }) => reply(threadId, text),
     pending: ({ threadId, threadIds }) => pending(threadId, threadIds),
+    activity: async ({ keys }) => Object.fromEntries(await Promise.all(keys.map(async (key) => [key, await activity.read(key).catch(() => null)] as const))),
     setOrchestrationView: async ({ on }) => ({ on: (await settings.experimental_set({ orchestrationView: on })).orchestrationView }),
   });
 }

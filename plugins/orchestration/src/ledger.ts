@@ -55,6 +55,26 @@ function gateLine(summary: Json, failures: number): string {
   return line[0]!.toUpperCase() + line.slice(1);
 }
 
+const atOf = (value: unknown): string | null => str(obj(value).at);
+
+/** The checkpoint's Now block; null for an exporter that predates it (no `structured` key). */
+function nowBlock(checkpoint: Json): LedgerSummary["now"] {
+  if (typeof checkpoint.structured !== "boolean") return null;
+  return {
+    structured: checkpoint.structured,
+    updated: atOf(checkpoint.updated),
+    doing: str(checkpoint.doing),
+    waitingOn: arr(checkpoint.waiting_on).map(obj).flatMap((wait) => {
+      const who = str(wait.who);
+      if (!who) return [];
+      return [{ who, subtask: str(wait.subtask), what: str(wait.what) ?? str(wait.raw) ?? "", since: atOf(wait.since) }];
+    }),
+    next: str(checkpoint.next),
+    blockedBy: str(checkpoint.blocked_by),
+    backgroundWaits: arr(checkpoint.background_waits).flatMap((wait) => (typeof wait === "string" && wait.trim() ? [wait] : [])),
+  };
+}
+
 export function summarizeExport(data: unknown, path: string): LedgerSummary {
   const root = obj(data);
   const warnings = arr(root.warnings).flatMap((w) => (typeof w === "string" ? [w] : []));
@@ -128,6 +148,7 @@ export function summarizeExport(data: unknown, path: string): LedgerSummary {
     lastHandover: last ? { why: str(last.why), at: str(obj(last.time).at) } : null,
     warnings,
     checkpoint: checkpointText ? { text: checkpointText, at: str(obj(checkpoint.time).at) } : null,
+    now: nowBlock(checkpoint),
     lastDecision: lastJournal ? { text: str(lastJournal.decision)!, at: str(obj(obj(lastJournal.when).time).at) } : null,
   };
 }

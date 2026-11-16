@@ -39,6 +39,17 @@ export const ledgerSummarySchema = z.object({
   /** «Current checkpoint» and the newest «Decision journal» row: what the recap says is happening now. */
   checkpoint: z.object({ text: z.string(), at: z.string().nullable() }).nullable(),
   lastDecision: z.object({ text: z.string(), at: z.string().nullable() }).nullable(),
+  /** The Now block of «Current checkpoint»; null when the export predates it (no `structured` key). */
+  now: z.object({
+    structured: z.boolean(),
+    updated: z.string().nullable(),
+    doing: z.string().nullable(),
+    waitingOn: z.array(z.object({ who: z.string(), subtask: z.string().nullable(), what: z.string(), since: z.string().nullable() })),
+    next: z.string().nullable(),
+    blockedBy: z.string().nullable(),
+    /** The checkpoint's `background wait:` lines. */
+    backgroundWaits: z.array(z.string()),
+  }).nullable().optional(),
   workflow: z.array(z.object({
     kind: z.enum(["decision", "gate", "handover"]),
     task: z.string().nullable(),
@@ -48,6 +59,16 @@ export const ledgerSummarySchema = z.object({
   })).optional(),
 });
 export type LedgerSummary = z.infer<typeof ledgerSummarySchema>;
+
+/** What a thread's running turn is doing now, from its event log. Times are epoch ms. */
+export const threadActivitySchema = z.object({
+  turnStartedAt: z.number().nullable(),
+  lastTurnStartedAt: z.number().nullable(),
+  step: z.string().nullable(),
+  stepStartedAt: z.number().nullable(),
+  background: z.array(z.object({ description: z.string(), startedAt: z.number() })),
+});
+export type ThreadActivity = z.infer<typeof threadActivitySchema>;
 
 export const agentSchema = z.object({
   model: z.string().nullable(),
@@ -82,6 +103,8 @@ export const snapshotSchema = z.discriminatedUnion("state", [
     askFirstSeen: z.record(z.string(), z.number()),
     workspace: z.object({ environmentId: z.string(), rootPath: z.string(), hostId: z.string(), ledgerHostId: z.string().nullable(), storageRootPath: z.string().nullable() }).nullable().optional(),
     report: z.object({ text: z.string(), truncated: z.boolean() }).nullable().optional(),
+    /** The ledger file's modification time, epoch ms. */
+    ledgerModifiedAt: z.number().nullable().optional(),
     readAt: z.number(),
   }),
 ]);
@@ -112,6 +135,11 @@ export const contract = {
   pending: {
     input: z.object({ threadId: z.string().min(1).max(100), threadIds: z.array(z.string().regex(/^thr_[a-z0-9]+$/i)).max(50) }),
     output: z.record(z.string(), pendingSchema.nullable()),
+  },
+  activity: {
+    input: z.object({ keys: z.array(z.string().min(1)).min(1).max(50) }),
+    output: z.record(z.string(), threadActivitySchema.nullable()),
+    keyTags: (key: string) => [`activity:${key}`],
   },
   setOrchestrationView: {
     input: z.object({ on: z.boolean() }),

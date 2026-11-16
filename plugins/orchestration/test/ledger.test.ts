@@ -103,3 +103,29 @@ test("the task's gate cell remains visible when its detailed gate was not export
   }, "/ledger.md");
   assert.equal(summary.subtasks[0]!.gateLine, "G7 scoped PASS; runtime gaps OPEN");
 });
+
+test("a ledger with the Now block reads it into `now`", () => {
+  const data = JSON.parse(readFileSync(new URL("./fixtures/current-now.json", import.meta.url), "utf8"));
+  const summary = summarizeExport(data, "/x/now.md");
+  assert.equal(summary.now?.structured, true);
+  assert.equal(summary.now?.updated, "2026-11-16T14:32+03:00");
+  assert.equal(summary.now?.doing, "waiting — see «waiting on»; D2 drafting team-roles design");
+  assert.deepEqual(summary.now?.waitingOn.map((w) => [w.who, w.subtask, w.since]), [["R1", "R1", "2026-11-16T14:04+03:00"], ["D1", "D1", "2026-11-16T14:04+03:00"], ["owner", null, "2026-11-16T14:04+03:00"]]);
+  assert.equal(summary.now?.next, "on R1's report: send «unblocked» to D1 for sections 4–5");
+  assert.equal(summary.now?.blockedBy, null);
+  assert.deepEqual(summary.now?.backgroundWaits, ["checks on 9f1c2ab; restart with `make wait-checks`"]);
+  assert.deepEqual(summary.warnings, []);
+});
+
+test("an old v1 export without `structured` reads as `now: null` and adds no warning", () => {
+  const summary = summarizeExport(fixture, "/x/current.md");
+  assert.equal(summary.now, null);
+  assert.deepEqual(summary.warnings, []);
+});
+
+test("an export with `structured: false` has an empty block, not null", () => {
+  const data = { ...fixture, current_checkpoint: { ...fixture.current_checkpoint, structured: false, updated: null, doing: null, waiting_on: [], next: null, blocked_by: null } };
+  const now = summarizeExport(data, "/x/free.md").now;
+  assert.equal(now?.structured, false);
+  assert.deepEqual(now?.waitingOn, []);
+});
