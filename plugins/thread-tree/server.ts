@@ -16,13 +16,21 @@ import {
   githubFolderViewSchema,
   githubSettingsPatchSchema,
 } from "./src/githubFolder";
-import { sectionPatchSchema, SETTINGS } from "./src/settings";
+import { readReviewSettings, REVIEW_SETTINGS, sectionPatchSchema, SETTINGS } from "./src/settings";
 import { createThreadPullRequestReader, threadPullRequestSchema } from "./src/threadPullRequests";
 import { createProjectFolderHistory, lineageProjectIds } from "./src/projectFolders";
 import { ARCHIVE_CLAIM_TTL_MS, createArchiveClaims, createArchiveHistory, releaseUnarchived } from "./src/archiveUndo";
 import { archiveScopes, dirtyEnvironmentIds, MAX_THREADS_PER_CALL } from "./src/orchestrations";
 import { createSignalReader, threadSignalsSchema, type SignalListArgs } from "./src/threadSignals";
-import { agentReviewPrompt, mergeEnvironmentOf, projectForRepo, PR_STATUS_PLUGIN_ID, repoSlugFromPrUrl } from "./src/pullRequestActions";
+import {
+  agentReviewSpawnArgs,
+  mergeEnvironmentOf,
+  projectForRepo,
+  PR_STATUS_PLUGIN_ID,
+  repoSlugFromPrUrl,
+  reviewExecution,
+  type ProviderModelCatalog,
+} from "./src/pullRequestActions";
 import { pullRequestStatusRowSchema } from "./src/threadPullRequests";
 
 /** At most one refresh per thread this often; bb already debounces its events to one a second. */
@@ -137,7 +145,7 @@ export const rpcContract = defineRpcContract({
 });
 
 export default async function plugin(bb: BbPluginApi) {
-  const settings = bb.settings.define(SETTINGS);
+  const settings = bb.settings.define({ ...SETTINGS, ...REVIEW_SETTINGS });
   const folder = createSubagentFolder({
     listEvents: (args) => bb.sdk.threads.events.list(args),
     log: (message) => bb.log.warn(message),
@@ -226,6 +234,15 @@ export default async function plugin(bb: BbPluginApi) {
     updatedAt: project.updatedAt,
   }));
 
+  const providerModelCatalogs = async (projectId: string): Promise<ProviderModelCatalog[]> => {
+    const providers = (await bb.sdk.providers.list().catch(() => [])).filter((provider) => provider.available);
+    const catalogs = await Promise.all(providers.map(async (provider) => {
+      const result = await bb.sdk.providers.models({ projectId, providerId: provider.id }).catch(() => null);
+      return result && !result.modelLoadError ? { providerId: provider.id, models: result.models } : null;
+    }));
+    return catalogs.filter((catalog) => catalog !== null);
+  };
+
   bb.rpc.register(rpcContract, {
     reviewProjects: async ({ keys }) => {
       const projects = await listProjects();
@@ -235,12 +252,13 @@ export default async function plugin(bb: BbPluginApi) {
       const repo = repoSlugFromPrUrl(url);
       const project = repo ? projectForRepo(repo, await listProjects()) : null;
       if (!project) throw new Error(`No project uses ${repo ?? url}`);
-      const thread = await bb.sdk.threads.spawn({
-        projectId: project.projectId,
-        environment: { type: "project-default" },
-        title: `Review #${number} ${title}`.slice(0, 200),
-        prompt: agentReviewPrompt({ url, number }),
-      });
+      const { reviewModel, reviewReasoningLevel } = readReviewSettings(await settings.get());
+      const { execution, warning } = reviewExecution(
+        { model: reviewModel, reasoningLevel: reviewReasoningLevel },
+        reviewModel.trim() ? await providerModelCatalogs(project.projectId) : [],
+      );
+      if (warning) bb.log.warn(`agent review of ${url}: ${warning}`);
+      const thread = await bb.sdk.threads.spawn(agentReviewSpawnArgs({ projectId: project.projectId, url, number, title, execution }));
       return { threadId: thread.id, projectId: project.projectId };
     },
     mergePullRequest: async ({ environmentId, url }) => {

@@ -72,3 +72,71 @@ export function agentReviewPrompt({ url, number }: { url: string; number: number
     "Report findings most severe first, each with file and line, and end with a verdict: approve or request changes.",
   ].join("\n");
 }
+
+/** The reasoning setting value that keeps the review model's own default. */
+export const REVIEW_REASONING_DEFAULT = "default";
+
+export interface ReviewModelChoice {
+  model: string;
+  reasoningLevel: string;
+}
+
+export interface ProviderModelCatalog {
+  providerId: string;
+  models: readonly {
+    model: string;
+    reasoningDiscovery?: "known" | "unknown";
+    supportedReasoningEfforts: readonly { reasoningEffort: string }[];
+  }[];
+}
+
+type ExecutionSource = "explicit";
+
+export interface ReviewExecution {
+  providerId?: string;
+  model?: string;
+  reasoningLevel?: string;
+  executionInputSources?: { providerId: ExecutionSource; model: ExecutionSource; reasoningLevel?: ExecutionSource };
+}
+
+/**
+ * The provider is the first catalog offering the model, since a model id only runs on its own provider.
+ * A blank model, or one no available provider offers, leaves the project's defaults; a reasoning level
+ * the model doesn't support leaves the model's default, because bb refuses the spawn otherwise.
+ */
+export function reviewExecution(choice: ReviewModelChoice, catalogs: readonly ProviderModelCatalog[]): { execution: ReviewExecution; warning: string | null } {
+  const model = choice.model.trim();
+  if (!model) return { execution: {}, warning: null };
+  for (const catalog of catalogs) {
+    const entry = catalog.models.find((candidate) => candidate.model === model);
+    if (!entry) continue;
+    const level = choice.reasoningLevel === REVIEW_REASONING_DEFAULT ? null : choice.reasoningLevel;
+    const supported = level !== null && (entry.reasoningDiscovery === "unknown" || entry.supportedReasoningEfforts.some((effort) => effort.reasoningEffort === level));
+    return {
+      execution: {
+        providerId: catalog.providerId,
+        model,
+        ...(supported ? { reasoningLevel: level } : {}),
+        executionInputSources: { providerId: "explicit", model: "explicit", ...(supported ? { reasoningLevel: "explicit" as const } : {}) },
+      },
+      warning: level !== null && !supported ? `${model} doesn't support reasoning level ${level}; the review uses the model's default` : null,
+    };
+  }
+  return { execution: {}, warning: `No available provider offers ${model}; the review uses the project's default model` };
+}
+
+export function agentReviewSpawnArgs({ projectId, url, number, title, execution }: {
+  projectId: string;
+  url: string;
+  number: number;
+  title: string;
+  execution: ReviewExecution;
+}) {
+  return {
+    projectId,
+    environment: { type: "project-default" as const },
+    title: `Review #${number} ${title}`.slice(0, 200),
+    prompt: agentReviewPrompt({ url, number }),
+    ...execution,
+  };
+}

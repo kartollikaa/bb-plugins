@@ -35,7 +35,12 @@ An unclaimed PR whose repo is the remote of a bb project also offers Agent
 review (a robot icon): it starts a thread in that project (the most recently
 updated one when several share the remote) that reviews the PR with `gh`,
 without checking out its branch or posting to GitHub, and opens it; the row then
-offers Open its thread. A PR GitHub calls ready to merge, when it is the open
+offers Open its thread. The review runs on the `reviewModel` setting (default `claude-opus-5-5`) at
+`reviewReasoningLevel` (default `medium`), on whichever available provider offers that
+model. A blank model, or one no available provider offers, uses the project's
+default model and reasoning; a level the model doesn't support uses the model's
+default. Both fallbacks still start the review and log a warning to
+`bb plugin logs thread-tree`. A PR GitHub calls ready to merge, when it is the open
 current-branch PR of a thread's environment, offers Merge instead: a toast asks
 to confirm, then bb's GitHub PR Status merges it with a merge commit. The
 server refuses when that environment's PR is no longer this one.

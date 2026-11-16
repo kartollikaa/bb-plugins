@@ -81,6 +81,40 @@ export const SETTINGS = {
   },
 } as const;
 
+const reviewModel = z.string().max(200);
+const REVIEW_REASONING_LEVELS = ["default", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+/** Read by the server only, so they stay out of the sidebar's view settings. */
+export const REVIEW_SETTINGS = {
+  reviewModel: {
+    type: "string",
+    label: "Model for PR review",
+    description: "The model an agent review of a pull request runs on, such as claude-opus-5-5. Blank, or a model no available provider offers, uses the project's default model.",
+    experimental_schema: reviewModel,
+    default: "claude-opus-5-5",
+  },
+  reviewReasoningLevel: {
+    type: "select",
+    label: "Reasoning level for PR review",
+    description: "Model default, or a level the model doesn't support, uses the model's own default.",
+    options: REVIEW_REASONING_LEVELS as string[],
+    experimental_optionLabels: { default: "Model default", minimal: "Minimal", low: "Low", medium: "Medium", high: "High", xhigh: "Extra high", max: "Max" },
+    default: "medium",
+  },
+} as const;
+
+export type ReviewSettings = { reviewModel: string; reviewReasoningLevel: string };
+
+/** Stored values are trusted less than their schema: anything off-type falls back to the default. */
+export function readReviewSettings(values: Record<string, unknown> | undefined): ReviewSettings {
+  const model = reviewModel.safeParse(values?.reviewModel);
+  const level = values?.reviewReasoningLevel;
+  return {
+    reviewModel: model.success ? model.data : REVIEW_SETTINGS.reviewModel.default,
+    reviewReasoningLevel: typeof level === "string" && REVIEW_REASONING_LEVELS.includes(level) ? level : REVIEW_SETTINGS.reviewReasoningLevel.default,
+  };
+}
+
 /** In default display order. */
 export const SIDEBAR_SECTIONS = [
   { id: "github", key: "showGithub", label: "Pull requests", icon: "Github" },

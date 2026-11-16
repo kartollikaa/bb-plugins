@@ -2,12 +2,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   agentReviewPrompt,
+  agentReviewSpawnArgs,
+  reviewExecution,
+  type ProviderModelCatalog,
   mergeEnvironmentOf,
   projectForRepo,
   pullRequestActions,
   repoSlugFromPrUrl,
   repoSlugFromRemote,
 } from "../src/pullRequestActions.ts";
+import { readReviewSettings } from "../src/settings.ts";
 import type { PullRequestStatusRow } from "../src/threadPullRequests.ts";
 
 test("a project's remote names its GitHub repo in every form git writes it", () => {
@@ -60,4 +64,75 @@ test("the review prompt names the PR and keeps the agent off GitHub and off the 
   assert.match(prompt, /#7/);
   assert.match(prompt, /don't post/i);
   assert.match(prompt, /don't check out/i);
+});
+
+const efforts = (...levels: string[]) => levels.map((reasoningEffort) => ({ reasoningEffort }));
+const catalogs: ProviderModelCatalog[] = [
+  { providerId: "codex", models: [{ model: "gpt-5.5", supportedReasoningEfforts: efforts("minimal", "low", "medium", "high") }] },
+  {
+    providerId: "claude-code",
+    models: [
+      { model: "claude-sonnet-5-5", supportedReasoningEfforts: efforts("low", "medium", "high") },
+      { model: "claude-opus-5-5", supportedReasoningEfforts: efforts("low", "medium", "high", "xhigh", "max") },
+    ],
+  },
+];
+const review = { projectId: "proj_1", url: "https://github.com/a/b/pull/7", number: 7, title: "Fix it" };
+
+test("by default the review spawns on Opus 5.5 at medium reasoning, on the provider that offers it", () => {
+  const { reviewModel, reviewReasoningLevel } = readReviewSettings(undefined);
+  assert.deepEqual({ reviewModel, reviewReasoningLevel }, { reviewModel: "claude-opus-5-5", reviewReasoningLevel: "medium" });
+  const { execution, warning } = reviewExecution({ model: reviewModel, reasoningLevel: reviewReasoningLevel }, catalogs);
+  assert.equal(warning, null);
+  assert.deepEqual(agentReviewSpawnArgs({ ...review, execution }), {
+    projectId: "proj_1",
+    environment: { type: "project-default" },
+    title: "Review #7 Fix it",
+    prompt: agentReviewPrompt({ url: review.url, number: 7 }),
+    providerId: "claude-code",
+    model: "claude-opus-5-5",
+    reasoningLevel: "medium",
+    executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit" },
+  });
+});
+
+test("the chosen model and reasoning level reach the spawn", () => {
+  const { reviewModel, reviewReasoningLevel } = readReviewSettings({ reviewModel: " gpt-5.5 ", reviewReasoningLevel: "high" });
+  const { execution } = reviewExecution({ model: reviewModel, reasoningLevel: reviewReasoningLevel }, catalogs);
+  const args = agentReviewSpawnArgs({ ...review, execution });
+  assert.equal(args.providerId, "codex");
+  assert.equal(args.model, "gpt-5.5");
+  assert.equal(args.reasoningLevel, "high");
+});
+
+test("Model default leaves reasoning to the model, and an unsupported level is dropped with a warning", () => {
+  const modelDefault = reviewExecution({ model: "claude-opus-5-5", reasoningLevel: "default" }, catalogs);
+  assert.equal(modelDefault.warning, null);
+  assert.equal("reasoningLevel" in modelDefault.execution, false);
+  assert.deepEqual(modelDefault.execution.executionInputSources, { providerId: "explicit", model: "explicit" });
+
+  const unsupported = reviewExecution({ model: "claude-sonnet-5-5", reasoningLevel: "max" }, catalogs);
+  assert.equal(unsupported.execution.model, "claude-sonnet-5-5");
+  assert.equal("reasoningLevel" in unsupported.execution, false);
+  assert.match(unsupported.warning ?? "", /doesn't support reasoning level max/);
+});
+
+test("a model whose provider doesn't list its reasoning levels still gets the chosen level", () => {
+  const unknown: ProviderModelCatalog[] = [{ providerId: "acp", models: [{ model: "m", reasoningDiscovery: "unknown", supportedReasoningEfforts: [] }] }];
+  assert.equal(reviewExecution({ model: "m", reasoningLevel: "high" }, unknown).execution.reasoningLevel, "high");
+});
+
+test("a blank model or one no available provider offers keeps the project's defaults", () => {
+  const blank = reviewExecution({ model: "  ", reasoningLevel: "medium" }, catalogs);
+  assert.deepEqual(blank, { execution: {}, warning: null });
+  const missing = reviewExecution({ model: "claude-opus-9", reasoningLevel: "medium" }, catalogs);
+  assert.deepEqual(missing.execution, {});
+  assert.match(missing.warning ?? "", /No available provider offers claude-opus-9/);
+  const args = agentReviewSpawnArgs({ ...review, execution: missing.execution });
+  assert.deepEqual(Object.keys(args).sort(), ["environment", "projectId", "prompt", "title"]);
+});
+
+test("off-type stored review settings fall back to their defaults", () => {
+  assert.deepEqual(readReviewSettings({ reviewModel: 5, reviewReasoningLevel: "turbo" }), { reviewModel: "claude-opus-5-5", reviewReasoningLevel: "medium" });
+  assert.deepEqual(readReviewSettings({ reviewModel: "", reviewReasoningLevel: "default" }), { reviewModel: "", reviewReasoningLevel: "default" });
 });
