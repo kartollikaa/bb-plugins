@@ -1,0 +1,218 @@
+{
+  "version": 1,
+  "roles": {
+    "designer": {
+      "intent": "Decide the shape of a change — interfaces, data flow, behaviour, UI or architecture — and write the decision down before anyone builds it; writes its design document, never code.",
+      "tier": "strongest",
+      "effort": "high",
+      "access": "edit",
+      "shell": true,
+      "web": false,
+      "source": "roles/designer.md",
+      "runtimes": {
+        "claude-code": {
+          "agent": "team:designer",
+          "model": "opus",
+          "effort": "high",
+          "disallowed_tools": [
+            "WebFetch",
+            "WebSearch"
+          ],
+          "features": {},
+          "unenforced": []
+        },
+        "codex": {
+          "agent": "team-designer",
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "disallowed_tools": [],
+          "features": {},
+          "unenforced": [
+            "You must not search or read the web. This runtime does not block it, so the limit is yours to keep."
+          ]
+        }
+      }
+    },
+    "implementer": {
+      "intent": "Make a change exactly as a complete brief describes it — code, tests and docs — run the project's checks and hand in committed work with its evidence.",
+      "tier": "mid",
+      "effort": "medium",
+      "access": "edit",
+      "shell": true,
+      "web": false,
+      "source": "roles/implementer.md",
+      "runtimes": {
+        "claude-code": {
+          "agent": "team:implementer",
+          "model": "sonnet",
+          "effort": "medium",
+          "disallowed_tools": [
+            "WebFetch",
+            "WebSearch"
+          ],
+          "features": {},
+          "unenforced": []
+        },
+        "codex": {
+          "agent": "team-implementer",
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "disallowed_tools": [],
+          "features": {},
+          "unenforced": [
+            "You must not search or read the web. This runtime does not block it, so the limit is yours to keep."
+          ]
+        }
+      }
+    },
+    "planner": {
+      "intent": "Split a goal into ordered slices, each with its areas, dependencies, contracts and a checkable «Done when» — a plan, no code.",
+      "tier": "strongest",
+      "effort": "high",
+      "access": "read-only",
+      "shell": true,
+      "web": false,
+      "source": "roles/planner.md",
+      "runtimes": {
+        "claude-code": {
+          "agent": "team:planner",
+          "model": "opus",
+          "effort": "high",
+          "disallowed_tools": [
+            "Edit",
+            "Write",
+            "NotebookEdit",
+            "MultiEdit",
+            "Agent",
+            "WebFetch",
+            "WebSearch"
+          ],
+          "features": {},
+          "unenforced": []
+        },
+        "codex": {
+          "agent": "team-planner",
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "disallowed_tools": [],
+          "features": {},
+          "unenforced": [
+            "You must not create, edit or delete files yourself, or start other agents to do it for you; only the commands your process tells you to run may write files. This runtime does not block it, so the limit is yours to keep, and a change you make voids your result.",
+            "You must not search or read the web. This runtime does not block it, so the limit is yours to keep."
+          ]
+        }
+      }
+    },
+    "researcher": {
+      "intent": "Answer a bounded question from the code, the project's docs or public sources, with every fact sourced and the uncertainty stated; reads and runs read-only commands, edits nothing.",
+      "tier": "mid",
+      "effort": "medium",
+      "access": "read-only",
+      "shell": true,
+      "web": true,
+      "source": "roles/researcher.md",
+      "runtimes": {
+        "claude-code": {
+          "agent": "team:researcher",
+          "model": "sonnet",
+          "effort": "medium",
+          "disallowed_tools": [
+            "Edit",
+            "Write",
+            "NotebookEdit",
+            "MultiEdit",
+            "Agent"
+          ],
+          "features": {},
+          "unenforced": []
+        },
+        "codex": {
+          "agent": "team-researcher",
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "disallowed_tools": [],
+          "features": {},
+          "unenforced": [
+            "You must not create, edit or delete files yourself, or start other agents to do it for you; only the commands your process tells you to run may write files. This runtime does not block it, so the limit is yours to keep, and a change you make voids your result."
+          ]
+        }
+      }
+    },
+    "reviewer": {
+      "intent": "Independently review a change against its brief and the project's rules, and return a verdict with findings that each show how the code fails; reads and runs checks, edits nothing.",
+      "tier": "strongest",
+      "effort": "high",
+      "access": "read-only",
+      "shell": true,
+      "web": false,
+      "source": "roles/reviewer.md",
+      "runtimes": {
+        "claude-code": {
+          "agent": "team:reviewer",
+          "model": "opus",
+          "effort": "high",
+          "disallowed_tools": [
+            "Edit",
+            "Write",
+            "NotebookEdit",
+            "MultiEdit",
+            "Agent",
+            "WebFetch",
+            "WebSearch"
+          ],
+          "features": {},
+          "unenforced": []
+        },
+        "codex": {
+          "agent": "team-reviewer",
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "disallowed_tools": [],
+          "features": {},
+          "unenforced": [
+            "You must not create, edit or delete files yourself, or start other agents to do it for you; only the commands your process tells you to run may write files. This runtime does not block it, so the limit is yours to keep, and a change you make voids your result.",
+            "You must not search or read the web. This runtime does not block it, so the limit is yours to keep."
+          ]
+        }
+      }
+    },
+    "runner": {
+      "intent": "Execute mechanical steps exactly as given — builds, checks, installs, screenshots, scripted migrations — and report each command, exit code, log and artifact without fixing or judging anything.",
+      "tier": "mid",
+      "effort": "low",
+      "access": "read-only",
+      "shell": true,
+      "web": false,
+      "source": "roles/runner.md",
+      "runtimes": {
+        "claude-code": {
+          "agent": "team:runner",
+          "model": "sonnet",
+          "effort": "low",
+          "disallowed_tools": [
+            "Edit",
+            "Write",
+            "NotebookEdit",
+            "MultiEdit",
+            "Agent",
+            "WebFetch",
+            "WebSearch"
+          ],
+          "features": {},
+          "unenforced": []
+        },
+        "codex": {
+          "agent": "team-runner",
+          "model": "gpt-6.1-sol",
+          "effort": "low",
+          "disallowed_tools": [],
+          "features": {},
+          "unenforced": [
+            "You must not create, edit or delete files yourself, or start other agents to do it for you; only the commands your process tells you to run may write files. This runtime does not block it, so the limit is yours to keep, and a change you make voids your result.",
+            "You must not search or read the web. This runtime does not block it, so the limit is yours to keep."
+          ]
+        }
+      }
+    }
+  }
+}
