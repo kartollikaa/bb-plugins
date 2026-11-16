@@ -105,15 +105,16 @@ Left to right, fixed 32px height:
   title column aligned and turns into a state by changing colour only. Rejected: a blank slot (reads
   as a hole), collapsing the slot for idle rows (titles jump sideways when state changes and
   siblings misalign), a hollow ring (noise across dozens of rows).
-- **PR:** a tinted 14px icon only when a PR needs action (checks failing, conflicts, changes
-  requested, ready to merge); the number and title are in its tooltip, click opens GitHub. Nothing
-  otherwise. A thread with several PRs tints the icon for the most urgent one, and hovering or
-  clicking it opens a card listing them all, actionable first; each opens on GitHub (owner, after v2
-  shipped: hovering the icon of a thread with several PRs showed nothing). A failed thread shows
+- **PR:** a 12px icon on an 18px tinted chip only when a PR needs action (checks failing, conflicts,
+  changes requested, ready to merge); the number and title are in its tooltip, click opens GitHub.
+  Nothing otherwise. A thread with several PRs tints the icon for the most urgent one, and hovering
+  or clicking it opens a card listing them all, actionable first; each opens on GitHub (owner, after
+  v2 shipped: hovering the icon of a thread with several PRs showed nothing). A failed thread shows
   Retry and no PR icon. Owner: the PR line "feels like too much information … I see the pull
   request, but I don't use it." Rejected: today's scrolling second line, a one-word pill (costs
   about 40% of the title at 300px), and a PR icon revealed on hover (invisible on touch and to
-  keyboard users, and it competes with the hover actions).
+  keyboard users, and it competes with the hover actions). The owner tried a 14px icon and kept
+  12px.
 - **Provider:** always shown, in a fixed slot right before the age, at full contrast, with a
   per-provider brand tint (setting: tint or monochrome). Owner: "there should be an icon of LLM
   provider … since I use Claude and Codex simultaneously." The plugin maps provider id to tint

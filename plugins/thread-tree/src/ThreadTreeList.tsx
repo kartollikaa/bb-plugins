@@ -1330,7 +1330,7 @@ function PullRequestIcon({ pullRequest, list }: { pullRequest: RowPullRequest; l
       }}
       className={cn("flex size-[18px] shrink-0 items-center justify-center rounded-[5px] outline-none hover:brightness-125 focus-visible:ring-1 focus-visible:ring-sidebar-ring", look.className, look.chipClassName)}
     >
-      <Icon name={look.icon} aria-hidden className="size-3.5" />
+      <Icon name={look.icon} aria-hidden className="size-3" />
     </button>
   );
   if (!several) return button;
@@ -1382,7 +1382,7 @@ function PullRequestIcon({ pullRequest, list }: { pullRequest: RowPullRequest; l
                     className="flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left outline-none hover:bg-accent focus-visible:bg-accent"
                   >
                     <span className={cn("mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-[5px]", itemLook ? [itemLook.className, itemLook.chipClassName] : "text-muted-foreground")}>
-                      <Icon name={itemLook?.icon ?? (item.pr.state === "merged" ? "GitMerge" : "GitPullRequest")} aria-hidden className="size-3.5" />
+                      <Icon name={itemLook?.icon ?? (item.pr.state === "merged" ? "GitMerge" : "GitPullRequest")} aria-hidden className="size-3" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">
