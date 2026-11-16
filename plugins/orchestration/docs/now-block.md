@@ -428,11 +428,14 @@ export interface NowView {
 ```
 
 - **Name** (what it resolves; the owner's answer to Q6: always a short name). The first non-empty
-  of: the id cell's name (`src/ledger.ts:86`, which I1's skill rule fills in new ledgers); the
-  subtask thread's title without its ` · <id>` suffix (`childLabel(...).rest`, `src/view.ts:295`);
-  the delivery; the status note. Each is clamped to eight words with «…» (`shortName`, new in
-  `src/view.ts`). With none of them the row shows only its id, never an empty name (today
-  `src/view.ts:227` gives `""`).
+  of: the id cell's name (which I1's skill rule fills in new ledgers); the delivery; the status
+  note (`statusNote`, `src/view.ts:204`). The first two are `subtask.name` as today, since
+  `src/ledger.ts:86` already falls back from the name to the delivery. Each is clamped to eight
+  words with «…» (`shortName`, new in `src/view.ts`). With none of them the row shows only its id,
+  never an empty name (today `src/view.ts:227` gives `""`). The subtask thread's title is not a
+  source: the protocol titles subtask sessions `<slug> · <task-id>` (orchestrate 0.16.0
+  `references/protocol.md:17`), so `childLabel(...).rest` (`src/view.ts:295`) is the
+  orchestration's slug, the same on every row.
 - **Step**, first that applies, after the existing pending, stuck and child cases of `stepOf`, which
   stay as they are:
   1. while its turn runs: the live step with its age (`Running npm test · 40s`), else `Turn
@@ -555,7 +558,7 @@ ledger, the export or a message.
 | `owner` | `who` of an owner wait | I1 skill; I2 shows «You» |
 | `- ask:` `- note:` | the only two «For the owner» line forms, unchanged | I1 skill, `check`, Stop hook; I2 parses |
 | `Waiting on you: ` / `Nothing waits on you.` (Russian ledgers: `Ждёт тебя: ` / `Ничего не ждёт.`) | the last line of an orchestrator turn's message. Detection, the same in both slices: the message's last non-empty line, trimmed, starts with `Waiting on you:` or `Ждёт тебя:` | I1 skill and Stop hook; I2 mismatch rule |
-| Owner-wait match | a `waiting on: owner` line matches an open `ask:` when its `for:` value (else the rest of the line), trimmed, with one pair of surrounding `«»` or `""` and a trailing `…` or `...` removed, is case-insensitively a prefix of the ask's title, or the title a prefix of it. A value empty after stripping matches nothing. Section 1's example matches the ask «Merge the orchestrate plugin PR (I1) yourself, or let me merge it after it passes checks and an independent review» | I1 `check` and Stop hook; I2 «You» rows |
+| Owner-wait match | a `waiting on: owner` line matches an open `ask:` when its `for:` value (else the rest of the line), trimmed, with one pair of surrounding `«»` or `""` and a trailing `…` or `...` removed, is case-insensitively a prefix of the ask's title, or the title a prefix of it. The title is the ask's title as `parseAsk` returns it (`src/owner.ts:45`), before the view removes a subtask prefix such as `T2:` (`named.rest`, `src/view.ts:381`), so I1 and I2 compare the same string. A value empty after stripping matches nothing. Section 1's example matches the ask «Merge the orchestrate plugin PR (I1) yourself, or let me merge it after it passes checks and an independent review» | I1 `check` and Stop hook; I2 «You» rows |
 | Interactive GenUI names: `Form`, `Button`, `Buttons`, `Select` | a ```` ```ui ```` fence counts as a question when its body holds one of these as a whole word | I1 Stop hook; I2 mismatch rule |
 | `closed` | the export's `status` of a finished ledger, as `buildView` already reads it (`src/view.ts:451`) | I1 Stop hook skips it; I2 keeps its free-text lines as notes |
 | `current_checkpoint.structured`, `.updated`, `.doing`, `.waiting_on[].{raw,who,subtask,what,since}`, `.next`, `.blocked_by` | export JSON | I1 writes, I2 reads |
@@ -640,8 +643,10 @@ Done when:
    in the fold map invalidates `activity:<id>` once within 2 s; for another thread, nothing.
 4. A `working` row whose last output starts with a `REPORT_HEADER` line shows only the gist; a
    `working — <note>` status cell shows the note; a running subtask with an activity shows its step
-   and age; a subtask with no name and no delivery shows its thread title without ` · <id>`, and
-   with nothing at all its id, never `""`; the tab variant renders both folds and `Blocked by`.
+   and age; a subtask with no name shows its delivery, and one titled `cozy-redesign · T3` with
+   delivery `PR #41` shows `PR #41`, not `cozy-redesign`; with no name and no delivery its status
+   note, and with nothing at all its id, never `""`; the tab variant renders both folds and
+   `Blocked by`.
    `npm test`, `npm run typecheck` and `bb plugin build` pass in `plugins/orchestration`.
 5. After landing, in the running bb: the Right now block on this orchestration's view
    (`thr_yc4bw8qaah`) shows a running step while the orchestrator works, and one free-text ledger
