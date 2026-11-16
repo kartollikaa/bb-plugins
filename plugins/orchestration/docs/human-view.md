@@ -2,7 +2,8 @@
 
 Status: draft for the owner's confirmation. Builds on [now-block.md](now-block.md), which landed as
 the «Right now» block (0d8700c). Mockup: [human-view-mockup.html](human-view-mockup.html), and the
-ASCII version in section 4.
+ASCII version in section 4. Generative UI: section 6, with its prototypes in
+[prototypes/](prototypes/).
 
 ## Problem
 
@@ -553,6 +554,119 @@ Done when:
 in SKILL.md and `references/ledger.md`, the helpers stamping times, with a test that a stamped
 `updated:` equals the host clock to the minute. Export unchanged. V1 does not wait for it.
 
+## 6. Generative UI
+
+The owner (2026-11-16): «if possible, you should also make the blocks like generative UI with the
+progress on the orchestration on the first page in now or just in the header … validating that it's
+actually possible to do and do some research and prototypes about it.»
+
+Checked on bb 0.49.0, SDK 0.6.132 (`bundled-types/bb-plugin-sdk-app.d.ts`), GenUI 0.3.2
+(`d8cac8d`, the installed source under `~/.bb/plugins/cache/git/github.com/ComicBit/bb-plugin-genui/`).
+[genui-integration.md](genui-integration.md) has the earlier findings; they still hold.
+
+### 6.1 What bb allows
+
+| Route | Works? | Source |
+|---|---|---|
+| A ```` ```ui ```` fence in the SDK `Markdown` a plugin renders | **No.** It shows as a code block. | SDK, `ExperimentalCodeFenceRendererRegistration`: «Fences elsewhere (user messages, file previews, plugin Markdown) keep BB's code block.» Seen: probe section 1 below, 0 GenUI mounts. |
+| GenUI's `::ui{id}` message directive | **No.** | The SDK documents directives for assistant message Markdown only (`PluginMessageDirectiveRegistration`). GenUI's directive only renders UIs saved by the retired `show_ui` tool (`ui/UiDirective.tsx`), so nothing new can be saved for it. |
+| Importing GenUI's renderer | **No.** | GenUI's `package.json` has no exports. `app.tsx` only registers slots: the code-fence renderer, the `ui` directive and the Gallery panel. This repo's rules forbid cross-plugin imports, and copying it would bring in the whole spec compiler. |
+| Calling GenUI over RPC | **No.** | `experimental_useRpcQuery` takes a `pluginId`, so one plugin can read another's RPC. But `bb plugin rpc list genui` shows no published methods, and its private `get_ui` returns spec source, not rendered UI. |
+| Host `ThreadChat` inside a plugin view | **Yes**, for the messages of a real thread | The fences in an embedded `ThreadChat` go through GenUI's slot. Seen: probe section 2 mounted the block with `data-genui-renderer="slot"`. The Orchestration view's side rail is this component (`src/OrchestratorPage.tsx:398`). |
+| The plugin renders GenUI's spec language itself | Possible; no value | It would mean rewriting GenUI's compiler and catalog for data the view already has in typed form. No model writes the view's UI. |
+| Native components in GenUI's visual style | **Yes** | Probe sections 3a and 3b below, built from this orchestration's real ledger. |
+
+What `ThreadChat` can't do: it renders a thread's whole transcript, never one chosen message. A block
+in it comes from an agent's reply, so it costs a model turn and freezes at that reply. The exceptions
+are `Threads()` and `PullRequest`, which read live from bb, and `Changes` and `Commits`, which keep a
+snapshot with a Refresh button. Orchestrator threads already get GenUI's instructions. GenUI gives them
+to top-level threads that no plugin started (`server.ts:294`), so the orchestrator can write
+```` ```ui ```` in its replies today, and they render in the side rail and in Full chat.
+
+**Header placements** (native components only; the SDK has no slot for content in bb's own thread
+title bar):
+
+- the Orchestration view's own header. The view owns it, on the page and in the narrow tab;
+- `experimental_threadContextSegment`: a segment of the context row above the composer in bb's
+  normal thread view, so Full chat could show the progress too;
+- `experimental_threadContextCardSection`: a titled section of the thread context card;
+- `ThreadChat`'s `leadingContent`: content above the side rail's conversation, scrolling with it.
+
+### 6.2 Prototypes and what rendered
+
+**P1: a GenUI progress block for this orchestration.** The spec is
+[prototypes/progress.ui](prototypes/progress.ui): a row of Metrics (State, Parts, Running), `Progress(6,
+max: 7)`, a warning Callout with the owner's ask, `Steps` for the seven parts, and `Threads([…])`.
+`bb genui ask` opened a subthread whose agent has GenUI's tools. Its `check_ui` call returned «No
+errors» and a text version. The rendered block (seen in P2's section 2, headless bb at its
+`serverUrl`, dark theme):
+
+![GenUI block rendered inside a plugin view's ThreadChat](prototypes/shots/genui-in-threadchat.jpg)
+
+The block shows the Metric row (an orange «Needs you», a green «6 of 7»), a green bar at 6/7, the
+callout, six checked steps and step 7 «current» with its detail, and the Threads card («2 · 1
+running · updated just now»). It renders the way GenUI renders in chat. The numbers are typed into
+the spec, so it was stale as soon as it was written; only the Threads card follows bb.
+
+**P2: the `genui-probe` scratch plugin**,
+[prototypes/genui-probe/](prototypes/genui-probe/). It is a nav panel with three sections. Its server
+runs the orchestrate exporter on this ledger and maps the result with
+`lib/progress.ts`, a pure function with tests. It is not a plugin of this repo: it has no index or
+catalog entry and is not part of the shipped Orchestration code. It was installed from its path and
+opened in headless bb. DOM counts per section are below; each element screenshot was read:
+
+| Section | DOM | Seen |
+|---|---|---|
+| 1. `<Markdown>` with a ```` ```ui ```` fence | 0 `[data-genui-fence]`, 1 `<pre>` | a «UI» code block showing the spec source ([shot](prototypes/shots/fence-in-plugin-markdown.jpg)) |
+| 2. `<ThreadChat variant="timeline">` of the P1 subthread | 1 `[data-genui-fence]`, renderer `slot` | the P1 block, fully rendered (shot above) |
+| 3a. Native header strip | — | `● Needs you  1 decision` and a 7-segment bar (grey · orange · 5 green) `5/7` ([shot](prototypes/shots/native-header-strip.jpg)) |
+| 3b. Native Now card | — | the state line, `5 of 7 parts done`, the segmented bar, the ask as a warning box, seven step rows with ✓ ● ◐ glyphs and status words ([shot](prototypes/shots/native-now-card.jpg)) |
+
+![Native header strip](prototypes/shots/native-header-strip.jpg)
+
+![Native Now card](prototypes/shots/native-now-card.jpg)
+
+The native blocks show 5 of 7 because they read the ledger as it is: the I2 row is stale, as in
+4.2. The «Readable orchestration view» part comes from a probe setting, since the ledger has no D3
+row yet. In the dark theme the running segment (`bg-primary`) is almost white; the build would need
+its own token for it. Not checked: the light theme, the narrow tab and the real Orchestration
+view, because shipped view code is unchanged.
+
+Reproduce: `cd plugins/orchestration/docs/prototypes/genui-probe && npm install && npm test &&
+bb plugin build && bb plugin install "path:$PWD" --yes`. Then set `chatThreadId` (a thread whose
+reply holds a ```` ```ui ```` block) with `bb plugin config genui-probe set …` and open «GenUI
+probe» in the sidebar.
+
+### 6.3 Recommendation: native components, styled like GenUI
+
+Build the progress as the view's own components, styled after GenUI's Progress, Steps, Metric and
+Callout:
+
+- **Status line (2.2) gets a segmented bar**: one segment per part, coloured by its state (done,
+  running, waiting, not started). The page and the narrow tab show it as in 3a. `6 of 7 parts done`
+  stays as text, and each segment's tooltip names its part.
+- **Needs you** cards keep their buttons (2.3) and take the callout look.
+- **Plan rows (2.6)** use step glyphs, as in 3b.
+
+Why not GenUI in the view:
+
+1. It can't render there (6.1). The only route is a `ThreadChat` of some thread, which needs an
+   agent turn per update and shows a whole transcript.
+2. The view's data is typed and live: the snapshot every 20 seconds plus bb's live thread state. A
+   GenUI block is a frozen reply.
+3. GenUI is an optional third-party plugin, and its fence slot is `experimental_`. The view must
+   work without it.
+4. Native components can use every header placement (6.1), the narrow tab and both themes. They need
+   no model call and add no instructions to sessions.
+
+GenUI belongs in the chat. The orchestrator can already end a report to the owner with a
+```` ```ui ```` block, and it renders in the side rail; Q9 decides whether that becomes a rule.
+
+V1 (section 5) grows by one file, `src/Progress.tsx`: the segmented bar and the step glyphs. Its
+tests check the segment count and states against the Plan, and that the bar has a text alternative
+(`5 of 7 parts done`). The probe's `lib/progress.ts` is a sketch, not the implementation; V1 builds
+on `view.ts`.
+
 ## What it does not cover
 
 - The Work and Activity tabs, the context-card row beyond using the status sentence, refresh rules,
@@ -600,3 +714,27 @@ Each with the recommended option first.
     ledger may be behind».
   - B: count it as done.
   - C: show nothing extra.
+- **Q8. The progress block in the view: native or GenUI (section 6)?** Host GenUI can't render in a
+  plugin view's own content (6.1).
+  - **A (recommended):** native components styled like GenUI: a segmented bar in the status line,
+    step glyphs in the Plan, live from the view's data (6.3, probe 3a/3b).
+  - B: embed a `ThreadChat` of a status thread where an agent posts a GenUI progress block: a model
+    turn per update, a whole transcript, frozen between updates.
+  - C: write a renderer for GenUI's spec language in this plugin: a large copy for data the view
+    already has in typed form.
+- **Q9. Should the orchestrator end its reports to you with a GenUI progress block in the chat?**
+  It already can (6.1); this decides whether that becomes a rule.
+  - **A (recommended):** no rule for now. The view shows the progress live, and a block in the chat
+    freezes at its reply and costs output tokens each turn.
+  - B: only at milestones (an ask for you, a landing), through instructions this plugin adds to
+    orchestrator threads (`bb.agents.contributeInstructions`).
+  - C: every report.
+- **Q10. Show the progress strip in bb's normal thread view too?**
+  - **A (recommended):** yes, after V1: a compact segment in the context row above the composer
+    (`experimental_threadContextSegment`: `● Needs you · 5/7`) that opens the Orchestration view.
+    Full chat and the view switched off then still show the state.
+  - B: only in the Orchestration view.
+- **Q11. The `genui-probe` scratch plugin is installed in your bb.**
+  - **A (recommended):** look at «GenUI probe» in the sidebar, then remove it with
+    `bb plugin remove genui-probe`. Its source stays in `docs/prototypes/`.
+  - B: keep it until V1 lands.

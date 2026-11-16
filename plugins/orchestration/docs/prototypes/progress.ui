@@ -1,0 +1,19 @@
+Card("orchestration-observability", [
+  Row([
+    Metric("State", "Needs you", note: "1 decision", tone: "warn"),
+    Metric("Parts", "6 of 7", note: "done", tone: "good"),
+    Metric("Running", "1", note: "design")
+  ]),
+  Progress(6, max: 7, label: "Parts done", tone: "good"),
+  Callout("Confirm the readable-view design and answer its questions Q1–Q7.", tone: "warn", title: "Needs you"),
+  Steps([
+    {title: "Research · Live activity in bb", status: "done"},
+    {title: "Design · «Right now» block", status: "done"},
+    {title: "Build · Ledger «Now» format (orchestrate plugin)", status: "done"},
+    {title: "Build · «Right now» block in the view", status: "done"},
+    {title: "Design · Team roles plugin", status: "done"},
+    {title: "Build · Team roles plugin", status: "done"},
+    {title: "Design · Readable orchestration view", detail: "Waits for your confirmation; Generative UI section in progress", status: "current"}
+  ]),
+  Threads(["thr_bqdh6ngyxa", "thr_3kp87mtayp"])
+])
