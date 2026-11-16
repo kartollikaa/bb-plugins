@@ -34,11 +34,12 @@ only durable way to change a role is a change to its source, which v1 proposes t
 
 ## Requirements
 
-1. **R1 List.** One page lists every role of the installed `team` plugin with its intent, tier,
-   effort, access, shell and web flags, and per runtime its agent name, model and effort.
-2. **R2 Detail.** A role's detail adds, per runtime, the disallowed tools, the session features, the
-   limits the runtime does not enforce, and the full prompt exactly as `render_roles.py resolve`
-   prints it; plus the role's source file and its generated files.
+1. **R1 List.** One page lists every role of the installed `team` plugin with its intent, its
+   access, shell and web flags, and per runtime its model and effort.
+2. **R2 Detail.** A role's detail adds the role's tier and effort, and per runtime the agent name, the
+   disallowed tools, the session features, the limits the runtime does not enforce, and the full
+   prompt exactly as `render_roles.py resolve` prints it; plus the role's source file and its
+   generated files.
 3. **R3 Locate.** The server finds the install without a hard-coded version or marketplace folder and
    follows a plugin update with no change to `team-roles`.
 4. **R4 Read-only.** `team-roles` writes nothing in the team install, the Codex home or Claude Code's
@@ -191,7 +192,10 @@ function scriptArgv(root: string, call: ScriptCall): string[]
   maxBuffer: 2 MiB, env: process.env })` — no shell. `CODEX_HOME` passes through, because the
   installer's destination depends on it.
 - One run per `(root, call)` at a time; concurrent callers share the promise. Results are cached
-  until Refresh or until `roles.json`'s or `installed_plugins.json`'s `mtimeMs` changes.
+  until Refresh or until the `mtimeMs` of one of these changes: `roles.json`,
+  `installed_plugins.json`, or the Codex destination's `.team-agents.json` (the installer rewrites it
+  on every `--apply` that changes anything, so the Codex state follows an apply without a Refresh). A
+  missing file counts as `mtimeMs` 0.
 - Outputs are untrusted text: parsed with zod (`lib/parse.ts`), length-capped, and rendered as text
   or through bb's `Markdown`; never as HTML.
 
@@ -229,22 +233,69 @@ type RoleDetail = RoleRow & {
 `roles_table`). Runtimes come from the file, not from a list in this plugin, so a third runtime added
 to `adapters/runtimes.json` appears without a change here.
 
-**Staleness (R5)** from `--check`: exit 0 → `current`; exit 1 with lines `missing: …`, `stale: …`,
-`not produced by any role: …` → `stale` with those lines; a line starting `error:` → `invalid` (a role
-or the adapter doesn't parse); timeout, spawn failure or other output → `unknown` with the reason.
+Both parsers work line by line on a named stream. They recognise the lines below. Any other line
+goes into an «other output» list that the expanded status shows. An unrecognised line never
+downgrades a result that recognised lines already establish. The test fixtures are the outputs
+quoted here, taken from team 0.2.0 on a temporary copy of the install (see «Sources read»).
 
-**Codex status (R6)** from the dry run's lines `^(install|update|unchanged|remove|forget|conflict|keep)\s+(.+)$`
-and its exit code:
+**Staleness (R5)** from `render_roles.py --check`. It writes nothing to stdout; every line it
+prints goes to **stderr** (`render_roles.py`, `main`).
 
-| Plan | State | Shown |
+| Exit | stderr lines recognised | State |
 |---|---|---|
-| every step `unchanged` | `installed` | «Codex agents: 6 installed, current» |
-| every step `install` | `not-installed` | «Codex agents not installed» + apply command |
-| any `install`/`update`/`remove`/`forget`, no conflict | `pending` | counts per action + apply command |
-| any `conflict` (exit 1) | `conflict` | the file names + «edited since install; compare, then rerun with --force» (the installer's own advice) |
-| any `keep`, no conflict (exit 0) | `pending` | the file names + «edited after install, no role produces them; they stay as your own files» |
-| `error: generated files are not current` (exit 1, no plan lines) | `blocked` | «blocked: generated files are stale» |
-| anything else | `unknown` | the reason |
+| 0 | none expected | `current` |
+| 1 | one or more of `^missing: (.+)$`, `^stale: (.+)$`, `^not produced by any role: (.+)$`, plus the advice trailer `run scripts/render_roles.py and commit the result` (tolerated, not shown as a problem) | `stale`, with the problem lines |
+| 1 | `^error: (.+)$` and no problem line (a role or the adapter doesn't parse) | `invalid`, with the message |
+| 1 | neither | `unknown: --check failed without a reason` |
+| other, timeout, spawn failure | — | `unknown` with the reason |
+
+Observed on 0.2.0:
+- A fresh copy exits 0 with both streams empty.
+- With `roles/reviewer.md` edited and a stray `codex/agents/team-ghost.toml`, it exits 1 and prints
+  on stderr `stale: agents/reviewer.md`, `stale: codex/agents/team-reviewer.toml`,
+  `not produced by any role: codex/agents/team-ghost.toml`, then
+  `run scripts/render_roles.py and commit the result`.
+- With an unknown tier, it exits 1 and prints on stderr
+  `error: claude-code: no tier mapping for runner's 'huge'`.
+
+**Codex status (R6)** from `install_codex_agents.py` with no flags, which is a dry run.
+
+The plan lines are on **stdout** and match `^(install|update|unchanged|remove|forget|conflict|keep)\s+(\S.*)$`.
+The file in the last group is a path in the destination folder. stdout also carries the tolerated
+trailer `dry run: nothing changed; rerun with --apply`. `applied to …` is the trailer of `--apply`,
+which is never passed; it is tolerated too.
+
+**stderr** carries the rest:
+- The `keep` summary `edited after install and no role produces them any more, so they stay as
+  your own files: <names>` (tolerated; the plan lines already name the files).
+- The conflict summary `left alone, edited since install or not written by this script: <names>;
+  compare them, then rerun with --force to replace` (tolerated, same reason).
+- When the generated files are stale, the `--check` problem lines followed by
+  `error: generated files are not current; run scripts/render_roles.py first`.
+- Any other `error: …`, such as a manifest the script didn't write.
+
+| Recognised lines | State | Shown |
+|---|---|---|
+| plan lines, any `conflict` (exit 1) | `conflict` | the file names + «edited since install; compare, then rerun with --force» (the installer's own advice) |
+| plan lines, every one `unchanged` (exit 0) | `installed` | «Codex agents: 6 installed, current» |
+| plan lines, every one `install` (exit 0) | `not-installed` | «Codex agents not installed» + apply command |
+| plan lines, otherwise (exit 0): some `install`/`update`/`remove`/`forget`/`keep` | `pending` | counts per action + apply command; `keep` files with «edited after install, no role produces them; they stay as your own files» |
+| no plan lines; stderr has `error: generated files are not current…` | `blocked` | «blocked: generated files are stale» + the problem lines |
+| no plan lines; stderr has another `error: …` | `unknown` | that message |
+| no plan lines and no `error:` line (an empty plan: the root has no `codex/agents/team-*.toml` and the destination no manifest) | `unknown` | «the installer planned nothing» — never `installed` |
+| exit other than 0/1, timeout, spawn failure, or an exit that contradicts the plan (`conflict` with exit 0, exit 1 without `conflict` or `error:`) | `unknown` | the reason |
+
+Observed on 0.2.0:
+- Against `~/.codex/agents` it exits 0 with six `unchanged …/team-<role>.toml` lines and the
+  `dry run:` trailer; stderr is empty.
+- Against an empty `--dest` it exits 0 with six `install` lines and the trailer; it does not create
+  the folder.
+- Against a `--dest` holding a foreign `team-reviewer.toml` and a manifest that lists an edited
+  `team-old.toml` and a missing `team-gone.toml`, it exits 1. stdout has `install` ×5,
+  `conflict …/team-reviewer.toml`, `forget …/team-gone.toml`, `keep …/team-old.toml` and the
+  trailer; stderr has the two summary lines. The folder's checksums were unchanged afterwards.
+- On the stale copy above it exits 1 with no stdout; stderr has the three problem lines and then
+  `error: generated files are not current; run scripts/render_roles.py first`.
 
 `dest` is the folder in the plan's paths. `applyCommand` is
 `python3 <root>/scripts/install_codex_agents.py --apply` — shown with a Copy button, never run.
