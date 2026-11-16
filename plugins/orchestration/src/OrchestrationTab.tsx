@@ -16,11 +16,13 @@ const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boo
 const replyKeyOf = (ask: Ask) => replyKey(ask.replyTitle ?? "", ask.replies.map((r) => r.label));
 
 /** Puts text into the orchestrator's composer and focuses it; never sends. Keeps a draft the owner already started. */
-function fillComposer(composers: readonly PluginComposerApi[], threadId: string, text: string): boolean {
+export function fillComposer(composers: readonly PluginComposerApi[], threadId: string, text: string): boolean {
   const composer = composers.find((c) => c.scope.kind === "thread" && c.scope.threadId === threadId);
   if (!composer) return false;
-  if (composer.isEmpty) composer.replace({ text, mentions: [] });
-  else composer.insert(text, { at: "end", block: true });
+  if (text) {
+    if (composer.isEmpty) composer.replace({ text, mentions: [] });
+    else composer.insert(text, { at: "end", block: true });
+  }
   composer.focus();
   return true;
 }
@@ -211,13 +213,13 @@ function QuestionsCard({ questions, actions }: { questions: Ask[]; actions: Acti
   );
 }
 
-function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threadId: string | null }) {
+export function AskCard({ ask, actions, threadId, questionAction = "Answer" }: { ask: Ask; actions: Actions; threadId: string | null; questionAction?: string }) {
   const sent = actions.sent === askIdentity(ask);
   const id = askIdentity(ask);
   const remembered = ask.replies.length ? actions.replyState(replyKeyOf(ask)) : null;
   /** A finished send on a card that still waits belongs to an earlier asking of the same line. */
   const replied = remembered?.kind === "sent" ? null : remembered;
-  const threads = threadsToOpen(ask, threadId);
+  const threads = ask.key === "chat-mismatch" ? [] : threadsToOpen(ask, threadId);
   const answerable = (ask.kind === "question" || ask.kind === "owner") && ask.drafts;
   return (
     <div className="flex flex-col gap-2 rounded-[10px] border border-[color-mix(in_oklab,var(--attention)_35%,transparent)] bg-[color-mix(in_oklab,var(--attention)_12%,var(--background))] px-3 pb-2.5 pt-3">
@@ -264,7 +266,8 @@ function AskCard({ ask, actions, threadId }: { ask: Ask; actions: Actions; threa
           </>
         ) : null}
         {ask.links.map((l) => <UrlLink key={l.href} href={l.href} title={l.title} className={linkButton}>Open {l.label}</UrlLink>)}
-        {threads.map((t) => <Button key={t} variant="primary" onClick={() => actions.openThread(t)}>{ask.key === "chat-mismatch" ? "Open chat" : threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
+        {ask.key === "chat-mismatch" && <Button variant="primary" onClick={() => actions.fill(id, "")}>{questionAction}</Button>}
+        {threads.map((t) => <Button key={t} variant="primary" onClick={() => actions.openThread(t)}>{threads.length > 1 ? `Open ${t}` : "Open thread"}</Button>)}
       </div>
     </div>
   );
@@ -291,7 +294,7 @@ export function Message({ title, body, action }: { title: string; body: string; 
 }
 
 /** `revealComposer` runs before a draft goes in; the page uses it to focus its composer. */
-export function OrchestrationTab({ threadId, revealComposer, variant = "tab", noneAction, openChild }: { threadId: string; revealComposer?: () => Promise<void>; variant?: "tab" | "page"; noneAction?: ReactNode; openChild?: (id: string) => void }) {
+export function OrchestrationTab({ threadId, revealComposer, questionAction = "Answer", variant = "tab", noneAction, openChild }: { threadId: string; revealComposer?: () => Promise<void>; questionAction?: string; variant?: "tab" | "page"; noneAction?: ReactNode; openChild?: (id: string) => void }) {
   const isOrchestrator = useIsOrchestrator(threadId);
   const state = useOrchestration(threadId, isOrchestrator);
   const composers = useComposers();
@@ -342,7 +345,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
         await revealComposer?.();
         const until = Date.now() + 3000;
         while (Date.now() < until) {
-          if (fillComposer(composersRef.current, threadId, text)) { setSent(key); return; }
+          if (fillComposer(composersRef.current, threadId, text)) { if (text) setSent(key); return; }
           await new Promise((resolve) => setTimeout(resolve, 50));
         }
         toast.error("Could not open the orchestrator composer. Try again.");
@@ -381,7 +384,7 @@ export function OrchestrationTab({ threadId, revealComposer, variant = "tab", no
         <section aria-label="Needs you" className="flex flex-col gap-2">
           <h2 className="m-0 px-0.5 text-xs font-semibold uppercase tracking-[0.04em] text-subtle-foreground">Needs you</h2>
           {questions.length > 0 && <QuestionsCard questions={questions} actions={actions} />}
-          {rest.map((ask) => <AskCard key={ask.key} ask={ask} actions={actions} threadId={askThread(ask)} />)}
+          {rest.map((ask) => <AskCard key={ask.key} ask={ask} actions={actions} threadId={askThread(ask)} questionAction={questionAction} />)}
           {view.nudge && (
             <div className="flex flex-col gap-2 rounded-[10px] border border-[color-mix(in_oklab,var(--destructive)_35%,transparent)] bg-[color-mix(in_oklab,var(--destructive)_8%,var(--background))] px-3 pb-2.5 pt-3">
               <p className="m-0 text-sm font-semibold leading-[1.4] [overflow-wrap:anywhere]">{view.nudge.text}</p>

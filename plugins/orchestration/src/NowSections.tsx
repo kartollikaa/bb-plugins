@@ -281,6 +281,7 @@ export function Details({ view, ledger, report, renderLedgerText, renderReport }
           <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
             {details.statusRaw && <Fact label="Status">{details.statusRaw}</Fact>}
             {now.updated.label && <Fact label="Checkpoint">{now.updated.label}</Fact>}
+            {now.mismatch && <Fact label="Chat question">No matching open ask was found in the ledger. Titles are compared ignoring case and punctuation; paraphrases may not match.</Fact>}
             {details.skew && <Fact label="Clock">Some ledger times are later than this computer's clock; they show as clock times.</Fact>}
             <Fact label="Ledger">{history.ledger.replace(/^\/(Users|home)\/[^/]+/, "~")}</Fact>
             <Fact label="Sessions">{history.sessions}</Fact>
