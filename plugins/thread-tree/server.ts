@@ -24,21 +24,18 @@ import { archiveScopes, dirtyEnvironmentIds, MAX_THREADS_PER_CALL } from "./src/
 import { createSignalReader, threadSignalsSchema, type SignalListArgs } from "./src/threadSignals";
 import {
   agentReviewSpawnArgs,
-  catalogOffers,
   mergeEnvironmentOf,
   projectForRepo,
   PR_STATUS_PLUGIN_ID,
   repoSlugFromPrUrl,
   reviewExecution,
-  reviewProviderOrder,
-  type ProviderModelCatalog,
 } from "./src/pullRequestActions";
+import { loadReviewCatalogs, spawnWithFallback } from "./src/agentReview";
 import { pullRequestStatusRowSchema } from "./src/threadPullRequests";
 
 /** At most one refresh per thread this often; bb already debounces its events to one a second. */
 const SIGNAL_REFRESH_MS = 2_000;
 const signalTag = (threadId: string) => `signals:${threadId}`;
-const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 
 const pullRequestUrlSchema = z.string().max(400).regex(/^https:\/\/(?:www\.)?github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*$/i);
@@ -237,33 +234,7 @@ export default async function plugin(bb: BbPluginApi) {
     updatedAt: project.updatedAt,
   }));
 
-  /** Stops at the first provider offering `model`; a catalog that fails to load is logged and skipped. */
-  const providerModelCatalogs = async (projectId: string, model: string): Promise<ProviderModelCatalog[]> => {
-    const [providers, projectDefaults] = await Promise.all([
-      bb.sdk.providers.list().catch((error) => {
-        bb.log.warn(`agent review: listing providers failed: ${errorMessage(error)}`);
-        return [];
-      }),
-      bb.sdk.projects.defaultExecutionOptions({ projectId }).catch(() => null),
-    ]);
-    const available = providers.filter((provider) => provider.available).map((provider) => provider.id);
-    const catalogs: ProviderModelCatalog[] = [];
-    for (const providerId of reviewProviderOrder(available, projectDefaults?.providerId ?? null)) {
-      try {
-        const result = await bb.sdk.providers.models({ projectId, providerId });
-        if (result.modelLoadError) {
-          bb.log.warn(`agent review: ${providerId} models unavailable: ${result.modelLoadError.code}`);
-          continue;
-        }
-        const catalog = { providerId, models: result.models };
-        catalogs.push(catalog);
-        if (catalogOffers(catalog, model)) break;
-      } catch (error) {
-        bb.log.warn(`agent review: listing ${providerId} models failed: ${errorMessage(error)}`);
-      }
-    }
-    return catalogs;
-  };
+  const warn = (message: string) => bb.log.warn(message);
 
   bb.rpc.register(rpcContract, {
     reviewProjects: async ({ keys }) => {
@@ -277,15 +248,15 @@ export default async function plugin(bb: BbPluginApi) {
       const { reviewModel, reviewReasoningLevel } = readReviewSettings(await settings.get());
       const { execution, warning } = reviewExecution(
         { model: reviewModel, reasoningLevel: reviewReasoningLevel },
-        reviewModel.trim() ? await providerModelCatalogs(project.projectId, reviewModel) : [],
+        reviewModel.trim() ? await loadReviewCatalogs(bb.sdk, warn, { projectId: project.projectId, model: reviewModel }) : [],
       );
-      if (warning) bb.log.warn(`agent review of ${url}: ${warning}`);
-      const spawn = (chosen: typeof execution) => bb.sdk.threads.spawn(agentReviewSpawnArgs({ projectId: project.projectId, url, number, title, execution: chosen }));
-      const thread = await spawn(execution).catch((error) => {
-        if (Object.keys(execution).length === 0) throw error;
-        bb.log.warn(`agent review of ${url}: ${execution.model} was refused (${errorMessage(error)}); using the project's default model`);
-        return spawn({});
-      });
+      if (warning) warn(`agent review of ${url}: ${warning}`);
+      const thread = await spawnWithFallback(
+        (chosen) => bb.sdk.threads.spawn(agentReviewSpawnArgs({ projectId: project.projectId, url, number, title, execution: chosen })),
+        execution,
+        warn,
+        `agent review of ${url}`,
+      );
       return { threadId: thread.id, projectId: project.projectId };
     },
     mergePullRequest: async ({ environmentId, url }) => {

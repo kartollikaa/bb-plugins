@@ -113,8 +113,8 @@ export function catalogOffers(catalog: ProviderModelCatalog, model: string): boo
 
 /**
  * The provider is the first catalog offering the model, since a model id only runs on its own provider.
- * A blank model, or one no catalog offers, leaves the project's defaults. The reasoning level is always
- * sent, because bb fills a missing one from the project's defaults rather than the model's.
+ * A blank model, or one no catalog offers, leaves the project's defaults. The level sent is the chosen one,
+ * else the model's default; a model without a default sends none, and bb fills in the project's level.
  */
 export function reviewExecution(choice: ReviewModelChoice, catalogs: readonly ProviderModelCatalog[]): { execution: ReviewExecution; warning: string | null } {
   const model = choice.model.trim();
@@ -132,7 +132,7 @@ export function reviewExecution(choice: ReviewModelChoice, catalogs: readonly Pr
         ...(level ? { reasoningLevel: level } : {}),
         executionInputSources: { providerId: "explicit", model: "explicit", ...(level ? { reasoningLevel: "explicit" as const } : {}) },
       },
-      warning: chosen !== null && !supported ? `${model} doesn't support reasoning level ${chosen}; the review uses the model's default` : null,
+      warning: chosen !== null && !supported ? `${model} doesn't support reasoning level ${chosen}; the review uses ${level ? "the model's default" : "the project's level"}` : null,
     };
   }
   return { execution: {}, warning: `No available provider offers ${model}; the review uses the project's default model` };

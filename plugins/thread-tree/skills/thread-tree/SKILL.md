@@ -39,9 +39,12 @@ without checking out its branch or posting to GitHub, and opens it; the row then
 offers Open its thread. The review runs on the `reviewModel` setting (default `claude-opus-5-5`) at
 `reviewReasoningLevel` (default `medium`), on the available provider that offers that model, the project's own provider
 first. A blank model, one no available provider offers, or one bb refuses at
-spawn uses the project's default model and reasoning; a level the model doesn't
-support uses the model's default. Each fallback still starts the review and logs
-a warning to `bb plugin logs thread-tree`. A PR GitHub calls ready to merge, when it is the open
+spawn (provider disabled or unknown, reasoning level or options it can't run)
+uses the project's default model and reasoning. Model default, or a level the
+model doesn't support, sends the model's default level; a model without one
+gets the project's level. Each fallback still starts the review and logs a
+warning to `bb plugin logs thread-tree`; any other spawn failure is reported
+as an error, without a second try. A PR GitHub calls ready to merge, when it is the open
 current-branch PR of a thread's environment, offers Merge instead: a toast asks
 to confirm, then bb's GitHub PR Status merges it with a merge commit. The
 server refuses when that environment's PR is no longer this one.
@@ -243,7 +246,7 @@ Folder item; `none`).
 Numbers (1–50): `recentLimit` (Recent Activity rows), `recentMoreLimit` (rows after Show more).
 Number (hours, 0–8760): `hideInactiveProjectsAfterHours` (default 24; 0 never hides a folder).
 String: `reviewModel` (model id for Agent review, default `claude-opus-5-5`; blank uses the project's default).
-Select: `reviewReasoningLevel` (`default` for the model's own, `minimal`, `low`, `medium` (the default), `high`, `xhigh`, `max`).
+Select: `reviewReasoningLevel` (`default` for the model's own, or the project's when the model has none, `minimal`, `low`, `medium` (the default), `high`, `xhigh`, `max`).
 The order of Pull requests, Automations and Recent Activity, the project order, and which groups are
 folded are not settings: each browser client keeps them itself. The user changes them in the
 sidebar by dragging a header or from its right-click menu; the Sections menu (the

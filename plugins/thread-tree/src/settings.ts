@@ -96,7 +96,7 @@ export const REVIEW_SETTINGS = {
   reviewReasoningLevel: {
     type: "select",
     label: "Reasoning level for PR review",
-    description: "Model default, or a level the model doesn't support, uses the model's own default.",
+    description: "Model default, or a level the model doesn't support, uses the model's own default, or the project's level when the model has none.",
     options: REVIEW_REASONING_LEVELS as string[],
     experimental_optionLabels: { default: "Model default", minimal: "Minimal", low: "Low", medium: "Medium", high: "High", xhigh: "Extra high", max: "Max" },
     default: "medium",

@@ -135,6 +135,10 @@ test("a model whose provider doesn't list its reasoning levels gets the chosen l
   const modelDefault = reviewExecution({ model: "m", reasoningLevel: "default" }, unknown).execution;
   assert.equal("reasoningLevel" in modelDefault, false);
   assert.deepEqual(modelDefault.executionInputSources, { providerId: "explicit", model: "explicit" });
+  const unknownCatalog: ProviderModelCatalog[] = [{ providerId: "acp", models: [{ model: "m", defaultReasoningEffort: "", supportedReasoningEfforts: efforts("low") }] }];
+  const unsupported = reviewExecution({ model: "m", reasoningLevel: "max" }, unknownCatalog);
+  assert.equal("reasoningLevel" in unsupported.execution, false);
+  assert.match(unsupported.warning ?? "", /the review uses the project's level$/);
 });
 
 test("a blank model or one no available provider offers keeps the project's defaults", () => {
