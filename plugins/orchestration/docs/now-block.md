@@ -2,7 +2,7 @@
 
 Status: complete draft for the owner's confirmation. Section 4 builds on R1's report on live
 activity (`R1-live-activity.md`, bb 0.49.0, plugin SDK 0.6.132). Q1 and Q5 were decided by the
-orchestrator; Q2–Q4, Q6 and Q7 wait on the owner.
+orchestrator, Q2–Q4 and Q6 by the owner (see «Decided»); Q7 waits on the owner.
 
 Two parts build from this document: **I1** in kartollika-ai-hub (`plugins/orchestrate`: the skill,
 the ledger schema, the export) and **I2** in this repo (`plugins/orchestration`: the view). Section 5
@@ -354,7 +354,7 @@ Rules:
   updated + STALE_GRACE_MS`, i.e. a turn ended well after the last update, though the skill rewrites
   the block in every event update. Then the header reads `updated 2h ago · written before the
   orchestrator's last turn` and the block's text is muted. `STALE_GRACE_MS` is 10 minutes, an owner
-  threshold next to `QUIET_MS` in `src/view.ts` (question Q3). A `date`-precision or unparseable
+  threshold next to `QUIET_MS` in `src/view.ts` (Q3, decided). A `date`-precision or unparseable
   `updated` shows the date and is never marked stale. `updated` missing on a structured block: the age
   comes from `ledgerModifiedAt` with the words `ledger written <age> ago`.
 
@@ -716,20 +716,21 @@ regression case (I1 Done when 3–4, I2 Done when 2).
 - **Live activity is computed by I2's own fold**, not thread-tree's RPC (section 4): follows
   AGENTS.md «Plugins stay independent».
 
+Decided by the owner on 2026-11-16, in the orchestrator thread (message #18), each the recommended
+option; the owner's words follow each one:
+
+- **Q2. The block's title** → A: the block is titled «Right now» and the tab stays «Now». «Right
+  now» block, tab stays «Now».
+- **Q3. Staleness grace** → `STALE_GRACE_MS` = 10 minutes (section 3, «Age and staleness»). «10 min
+  after its last turn».
+- **Q4. Free-text checkpoints of old ledgers** → A: the text clamped to three lines with «Show all»
+  and the ledger's age (section 3, «Fallbacks»). «Old text, 3 lines with Show all and its age».
+- **Q6. Name of what a subtask resolves** → A: the skill asks for two to eight words after the id
+  in the «Subtasks» id cell, and every row shows it (section 1, «Rules for the skill text»).
+  «Always a short name».
+
 ## Open questions for the owner
 
-- **Q2. The block's title in the view.** A: «Right now», with the tab staying «Now» (recommended:
-  the tab is about what needs you; the block is about what happens). B: rename the tab
-  «Attention» and title the block «Now».
-- **Q3. Staleness grace.** 10 minutes (recommended: a turn writes the ledger before it sends its
-  messages and ends; 10 minutes covers that without hiding a skipped update for long), 5 minutes,
-  or 20 minutes.
-- **Q4. Free-text checkpoints of old ledgers.** A: show them clamped to three lines with «Show all»
-  and the ledger's age (recommended: no line is guessed to be current). B: show only «This ledger
-  has no Now block yet» and keep the text folded.
-- **Q6. Name of what a subtask resolves.** A: the skill asks for two to eight words after the id in
-  the «Subtasks» id cell (recommended: the export already reads it). B: leave names optional; rows
-  keep showing the delivery.
 - **Q7. The Stop hook on an orchestrator turn that waits on the owner without an `ask:` line.** A:
   block the turn once with the reason, so the orchestrator writes the line before it stops
   (recommended: the miss happened twice in a day with the rule text alone). B: no hook; `check`
