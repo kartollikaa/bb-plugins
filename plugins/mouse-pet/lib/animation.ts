@@ -3,7 +3,8 @@ const FULL_CYCLE = Math.PI * 2;
 const LEG_PHASES = [0, .58, .48, .06] as const;
 const BOUND_PHASES = [0, .47, .055, .53] as const;
 const running = (speed: number) => Math.min(Math.max((speed - 55) / 95, 0), 1);
-export const strideLength = (speed: number) => 14 + Math.min(speed / 38, 1) * 3 + running(speed) * 18;
+export const strideLength = (speed: number) => 14 + Math.min(speed / 38, 1) * 3 + running(speed) * 29;
+export const HOP_LAUNCH = .11;
 
 function pulse(phase: number, start: number, duration: number) {
   const progress = Math.max(0, Math.min((phase - start) / duration, 1));
@@ -13,31 +14,30 @@ function pulse(phase: number, start: number, duration: number) {
 export function gaitFrame(phase: number, speed: number) {
   const effort = Math.min(speed / 38, 1);
   const run = running(speed);
-  const stance = .62 - run * .29;
+  const stance = .62 - run * .34;
   const stride = strideLength(speed) * effort;
   const feet = LEG_PHASES.map((offset, index) => {
     const step = (phase + offset + (BOUND_PHASES[index] - offset) * run) % 1;
     const swing = Math.max((step - stance) / (1 - stance), 0);
     const reach = step < stance ? stance / 2 - step : stance * -.5 * Math.cos(Math.PI * swing);
+    const raised = Math.sin(Math.PI * swing) ** 2;
     return {
       reach: reach * stride,
-      lift: Math.sin(Math.PI * swing) ** 2 * (2.2 + run) * effort,
+      lift: raised * (2.2 + run) * effort,
+      contact: 1 - raised,
     };
   });
-  const airborne = pulse(phase, .24, .36);
-  const compression = pulse(phase, .12, .18) + pulse(phase, .57, .18);
   return {
     feet,
     tail: Math.sin((phase - .18) * FULL_CYCLE) * (1.7 + run * 2.4) * effort,
-    bound: airborne * run ** 2 * 3.8,
-    shape: (airborne * .04 - compression * .035) * run ** 2,
+    bound: pulse(phase, .12, .65) * run ** 2 * 3.3,
   };
 }
 
 export function hopHeight(progress: number, startingHeight = 0) {
-  const launch = startingHeight > 0 ? 0 : .12;
+  const launch = startingHeight > 0 ? 0 : HOP_LAUNCH;
   const flight = Math.max(0, Math.min((progress - launch) / (.87 - launch), 1));
-  return (startingHeight + 58 * flight) * (1 - flight);
+  return (startingHeight + 88 * flight) * (1 - flight);
 }
 
 export function turnFrame(from: number, to: number, progress: number) {

@@ -31,13 +31,15 @@ test("a sprint has a single raised bound between hind push-off and front landing
   assert.ok(landing.bound < flight.bound);
   assert.equal(landing.feet[1].lift, 0);
   assert.equal(landing.feet[3].lift, 0);
-  assert.ok(gaitFrame(.7, 150).bound < .01);
+  assert.ok(gaitFrame(.84, 150).bound < .01);
+  assert.ok(strideLength(150) / 150 > .3);
 });
 
 test("a hop rises and falls between grounded anticipation and landing", () => {
   assert.equal(hopHeight(0), 0);
   assert.equal(hopHeight(.1), 0);
   assert.ok(hopHeight(.4) > hopHeight(.2));
+  assert.ok(hopHeight(.49) > 21);
   assert.ok(hopHeight(.6) > hopHeight(.8));
   assert.equal(hopHeight(.9), 0);
   assert.equal(hopHeight(1), 0);
