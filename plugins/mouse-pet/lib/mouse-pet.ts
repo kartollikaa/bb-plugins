@@ -33,15 +33,15 @@ const STYLE = `
 [${ROOT_ATTR}] svg { overflow: visible; }
 
 [${ROOT_ATTR}] .mp-leg, [${ROOT_ATTR}] .mp-tail, [${ROOT_ATTR}] .mp-eye,
-[${ROOT_ATTR}] .mp-figure, [${ROOT_ATTR}] .mp-impact, [${ROOT_ATTR}] .mp-wash { transform-box: view-box; }
+[${ROOT_ATTR}] .mp-impact, [${ROOT_ATTR}] .mp-wash { transform-box: view-box; }
 [${ROOT_ATTR}] .mp-tail { transform-origin: 12px 19px; transform: rotate(var(--mp-tail, 0deg)); }
-[${ROOT_ATTR}] .mp-eye { transform-origin: 38px 14.5px; animation: mp-blink 5s infinite; }
+[${ROOT_ATTR}] .mp-eye { transform-origin: 38px 14.5px; }
+[${ROOT_ATTR}] [data-mode="sit"]:not([data-moving]) .mp-eye { animation: mp-blink 3.8s .7s infinite; }
 [${ROOT_ATTR}] .mp-eye-state, [${ROOT_ATTR}] .mp-eye-closed { transition: opacity .18s ease; }
 [${ROOT_ATTR}] .mp-eye-closed { opacity: 0; }
-[${ROOT_ATTR}] .mp-figure { transform: translateY(var(--mp-bob, 0px)); }
 [${ROOT_ATTR}] .mp-impact { transform-origin: 24px 28px; }
 [${ROOT_ATTR}] [data-mode="press"] { cursor: grab; }
-[${ROOT_ATTR}] [data-mode="carry"] { cursor: grabbing; }
+[${ROOT_ATTR}] [data-mode="carry"] { cursor: default; }
 [${ROOT_ATTR}] .mp-pose, [${ROOT_ATTR}] .mp-head, [${ROOT_ATTR}] .mp-front,
 [${ROOT_ATTR}] .mp-grip, [${ROOT_ATTR}] .mp-leg-pose, [${ROOT_ATTR}] .mp-tail-pose {
   transform-box: view-box;
@@ -221,6 +221,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   let clickTimer = 0;
   let hopStarted: number | null = null;
   let hopLift = 0;
+  let hopStartHeight = 0;
   let stride = 0;
   let gaitSpeed = 0;
   let face: number = pet.direction;
@@ -233,6 +234,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     mouse.style.transform = `translate3d(${pet.x.toFixed(2)}px, ${(-(lift + hopLift)).toFixed(2)}px, 0)`;
     const mode = motion.matches ? "sit" : gesture?.phase ?? descent?.phase ?? attention?.phase ?? pet.mode;
     if (mouse.dataset.mode !== mode) mouse.dataset.mode = mode;
+    mouse.toggleAttribute("data-moving", gaitSpeed > 4);
     if (mode === "carry" || mode === "fall") {
       mouse.style.setProperty("--mp-swing", `${swing.toFixed(2)}deg`);
       mouse.style.setProperty("--mp-leg-swing", `${(swing * -.55).toFixed(2)}deg`);
@@ -261,7 +263,6 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     const washTarget = !gesture && pet.mode === "groom" ? -14 * (1 - Math.cos(time / 83)) : 0;
     wash += (washTarget - wash) * (1 - Math.exp(-dt / 40));
     mouse.style.setProperty("--mp-tail", `${tail.toFixed(2)}deg`);
-    mouse.style.setProperty("--mp-bob", `${gait.bob.toFixed(2)}px`);
     mouse.style.setProperty("--mp-breath", breath.toFixed(3));
     mouse.style.setProperty("--mp-wash", `${wash.toFixed(2)}deg`);
     if (attention?.phase === "sniff") {
@@ -273,12 +274,14 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       const foot = gait.feet[index];
       leg.style.transform = `translateY(${(-foot.lift).toFixed(2)}px) rotate(${foot.angle.toFixed(2)}deg)`;
     });
-    face += (pet.direction - face) * (1 - Math.exp(-dt / 35));
+    const facing = pet.velocity === 0 ? pet.direction : Math.sign(pet.velocity);
+    face += (facing - face) * (1 - Math.exp(-dt / 35));
+    if (Math.abs(face - facing) < .012) face = facing;
     flip.style.setProperty("--mp-turn", face.toFixed(3));
 
     if (hopStarted !== null) {
       const progress = (time - hopStarted) / HOP_MS;
-      hopLift = hopHeight(progress);
+      hopLift = hopHeight(progress, hopStartHeight);
       if (progress >= 1) hopStarted = null;
     }
   };
@@ -372,9 +375,9 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     stopLoop();
     if (motion.matches) {
       sit();
+      gaitSpeed = 0;
       flip.style.setProperty("--mp-turn", String(pet.direction));
       mouse.style.removeProperty("--mp-tail");
-      mouse.style.removeProperty("--mp-bob");
       mouse.style.removeProperty("--mp-breath");
       mouse.style.removeProperty("--mp-wash");
       legs.forEach((leg) => leg.style.removeProperty("transform"));
@@ -387,7 +390,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const clearClick = () => {
     window.clearTimeout(clickTimer);
     hopStarted = null;
-    hopLift = 0;
+    hopLift = hopStartHeight = 0;
     hop.removeAttribute("data-hop");
     squeak.removeAttribute("data-visible");
   };
@@ -398,6 +401,8 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     squeak.setAttribute("data-visible", "");
     clickTimer = window.setTimeout(clearClick, SQUEAK_MS);
     if (!motion.matches) {
+      hopStartHeight = hopLift = lift;
+      lift = 0;
       hopStarted = performance.now();
       pet = startle(pet);
     }
@@ -420,7 +425,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     event.preventDefault();
     lift = Math.min(hopLift, maxLift(viewportHeight()));
     clearClick();
-    pet.velocity = 0;
+    pet = { ...pet, velocity: 0, direction: face < 0 ? -1 : 1 };
     attention = cursor = null;
     mouse.setPointerCapture(event.pointerId);
     gesture = {
@@ -462,7 +467,9 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     const held = !motion.matches && performance.now() - gesture.started >= HOLD_MS;
     const carrying = gesture.phase === "carry";
     releaseCapture();
-    if (carrying || lift > 0) {
+    if (!carrying && canClick && !held) {
+      reactToClick();
+    } else if (carrying || lift > 0) {
       sit();
       if (lift > 4) {
         descent = { phase: "fall", elapsed: 0, lift };
@@ -471,8 +478,6 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
         swing = tuck = 0;
       }
       swingVelocity = 0;
-    } else if (canClick && !held) {
-      reactToClick();
     }
     render();
   };

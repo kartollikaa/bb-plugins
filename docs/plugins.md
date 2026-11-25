@@ -128,9 +128,10 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   and squeak, hold to carry it, or pause the pointer low and ahead of the mouse to invite a sniff.
   It skids before turning at a run and stretches after sleeping. Only the mouse takes clicks.
 - **How:** a content script (`lib/mouse-pet.ts`) appends a fixed `[data-mouse-pet]` layer to `body`
-  and moves the sprite with a `requestAnimationFrame` loop. Legs, tail, blink and poses are CSS
-  keyframes keyed on `data-mode`. Autonomous movement lives in `lib/pet.ts`, and grip and sniff
-  geometry in `lib/interaction.ts`. With `prefers-reduced-motion` it sits still and shows "Pi!" on a click.
+  and moves the sprite with a `requestAnimationFrame` loop. Gait follows distance traveled, and
+  CSS poses articulate the head, paws and body. `lib/pet.ts` drives autonomous movement,
+  `lib/animation.ts` samples gait and jumps, and `lib/interaction.ts` handles grip and sniff geometry.
+  With `prefers-reduced-motion` it sits still and shows "Pi!" on a click.
 - **No commands or settings:** the server entry is empty because bb requires one. Turn the pet off by
   disabling the plugin.
 - **Agent skill:** `skills/mouse-pet/`.

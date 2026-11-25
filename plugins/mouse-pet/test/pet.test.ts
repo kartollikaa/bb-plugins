@@ -80,6 +80,19 @@ test("a walking pet turns immediately at the edge", () => {
   assert.equal(next.direction, 1);
 });
 
+test("a sprint that enters a skid before reaching full speed never speeds up while braking", () => {
+  const edge = maxX(VIEWPORT);
+  let next = advance(pet({ mode: "run", x: edge - 19 }), 90, VIEWPORT, constant(0));
+  assert.equal(next.mode, "skid");
+  for (let elapsed = 0; elapsed < SKID_MS; elapsed += 16) {
+    const slower = advance(next, 16, VIEWPORT, constant(0));
+    assert.ok(Math.abs(slower.velocity) <= Math.abs(next.velocity));
+    assert.ok(slower.x >= next.x && slower.x <= edge);
+    next = slower;
+  }
+  assert.equal(next.direction, -1);
+});
+
 test("a long pause between frames moves it no further than one capped frame", () => {
   const next = advance(pet({ mode: "run", x: 100 }), 60_000, VIEWPORT, constant(0));
   assert.ok(next.x - 100 <= (150 * MAX_FRAME_MS) / 1000 + 0.001);

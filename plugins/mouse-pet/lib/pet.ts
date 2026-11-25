@@ -94,12 +94,13 @@ export function advance(pet: Pet, dtMs: number, viewportWidth: number, random: R
   const limit = maxX(viewportWidth);
   let { x, velocity, direction } = pet;
   const edge = direction === -1 ? 0 : limit;
-  const skidDistance = Math.min(16, limit / 2);
+  const skidDistance = Math.min(20, limit / 2);
   if (pet.mode === "skid" && pet.remainingMs > 0) {
     const remainingFraction = Math.max(0, 1 - dt / pet.remainingMs);
-    const distance = Math.min(Math.abs(x - edge), skidDistance);
-    x = edge - direction * distance * remainingFraction ** 2;
-    velocity = direction * distance * remainingFraction * 2_000 / pet.remainingMs;
+    const slowed = velocity * remainingFraction;
+    const traveled = (velocity + slowed) * Math.min(dt, pet.remainingMs) / 2_000;
+    x += traveled;
+    velocity = (edge - x) * direction > 0 ? slowed : 0;
   } else {
     const target = direction * SPEED_PX_PER_S[pet.mode];
     const difference = target - velocity;
@@ -111,7 +112,6 @@ export function advance(pet: Pet, dtMs: number, viewportWidth: number, random: R
   const hitsEdge = direction === -1 ? x <= 0 : x >= limit;
   x = Math.max(0, Math.min(x, limit));
   if (limit > 0 && pet.mode === "run" && velocity * direction >= 75 && Math.abs(x - edge) <= skidDistance) {
-    x = edge - direction * Math.min(Math.abs(pet.x - edge), skidDistance);
     return { ...pet, x, velocity, mode: "skid", remainingMs: SKID_MS };
   }
   if (hitsEdge && isMoving(pet.mode)) {
