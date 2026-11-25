@@ -2,7 +2,8 @@ import { advance, maxX, PET_WIDTH, type Direction, type Pet } from "./pet.ts";
 
 export const CHEESE_WIDTH = PET_WIDTH;
 export const BITE_MS = 520;
-const CUTS = [46, 41.5, 36.5, 32.3, 28.1, 23.6, 18.5, 12.5] as const;
+// Each successive cut removes approximately one eighth of the projected cheese silhouette.
+const CUTS = [46, 40.3, 35.2, 30.8, 26.4, 21.6, 16.5, 10.5] as const;
 const BITES_PER_VISIT = 2;
 const BETWEEN_VISITS_MS = 5_500;
 const LEAVE_ALONE_MS = 8_000;
