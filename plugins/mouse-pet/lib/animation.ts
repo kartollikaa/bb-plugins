@@ -1,10 +1,11 @@
 const FULL_CYCLE = Math.PI * 2;
 
-const LEG_PHASES = [0, .58, .48, .06] as const;
+const LEG_PHASES = [0, .25, .5, .75] as const;
 const BOUND_PHASES = [0, .47, .055, .53] as const;
 const running = (speed: number) => Math.min(Math.max((speed - 55) / 95, 0), 1);
 export const strideLength = (speed: number) => 14 + Math.min(speed / 38, 1) * 3 + running(speed) * 29;
 export const HOP_LAUNCH = .11;
+export const HOP_TOUCHDOWN = .87;
 
 function pulse(phase: number, start: number, duration: number) {
   const progress = Math.max(0, Math.min((phase - start) / duration, 1));
@@ -17,7 +18,8 @@ export function gaitFrame(phase: number, speed: number) {
   const stance = .62 - run * .34;
   const stride = strideLength(speed) * effort;
   const feet = LEG_PHASES.map((offset, index) => {
-    const step = (phase + offset + (BOUND_PHASES[index] - offset) * run) % 1;
+    const shift = (BOUND_PHASES[index] - offset + 1.5) % 1 - .5;
+    const step = (phase + offset + shift * run + 1) % 1;
     const swing = Math.max((step - stance) / (1 - stance), 0);
     const reach = step < stance ? stance / 2 - step : stance * -.5 * Math.cos(Math.PI * swing);
     const raised = Math.sin(Math.PI * swing) ** 2;
@@ -36,7 +38,7 @@ export function gaitFrame(phase: number, speed: number) {
 
 export function hopHeight(progress: number, startingHeight = 0) {
   const launch = startingHeight > 0 ? 0 : HOP_LAUNCH;
-  const flight = Math.max(0, Math.min((progress - launch) / (.87 - launch), 1));
+  const flight = Math.max(0, Math.min((progress - launch) / (HOP_TOUCHDOWN - launch), 1));
   return (startingHeight + 88 * flight) * (1 - flight);
 }
 
@@ -45,6 +47,17 @@ export function turnFrame(from: number, to: number, progress: number) {
   const yaw = from + (to - from) * eased;
   const profile = Math.min(Math.abs(yaw) / .7, 1);
   return { yaw, width: .55 + .45 * Math.abs(yaw), profile: profile * profile };
+}
+
+export interface Spring {
+  value: number;
+  velocity: number;
+}
+
+export function followSpring(spring: Spring, target: number, dtMs: number): Spring {
+  const step = Math.min(dtMs, 32) / 1_000;
+  const velocity = spring.velocity + ((target - spring.value) * 210 - spring.velocity * 18) * step;
+  return { value: spring.value + velocity * step, velocity };
 }
 
 export const FALL_GRAVITY = 5_500;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fallFrame, gaitFrame, hopHeight, strideLength, turnFrame } from "../lib/animation.ts";
+import { fallFrame, followSpring, gaitFrame, hopHeight, strideLength, turnFrame } from "../lib/animation.ts";
 
 test("all feet settle and the gait stops swinging the tail at rest", () => {
   for (const speed of [0, 15, 38, 150]) {
@@ -20,6 +20,13 @@ test("a grounded paw stays put in the room while the body walks over it", () => 
     assert.equal(second.lift, 0);
     assert.ok(Math.abs(second.reach - first.reach + .1 * strideLength(speed)) < .0001);
     assert.ok(gaitFrame(.82, speed).feet[0].lift > 0);
+  }
+});
+
+test("walking advances each paw through the same motion one quarter-cycle apart", () => {
+  const feet = gaitFrame(0, 38).feet;
+  for (const [index, foot] of feet.entries()) {
+    assert.deepEqual(foot, gaitFrame(index / 4, 38).feet[0]);
   }
 });
 
@@ -50,6 +57,18 @@ test("a second hop starts at the current height and ends on the floor", () => {
   assert.equal(hopHeight(0, height), height);
   assert.ok(hopHeight(.14, height) > height);
   assert.equal(hopHeight(.9, height), 0);
+});
+
+test("the carried body trails the grip and returns gradually after the cursor stops", () => {
+  let body = { value: 0, velocity: 0 };
+  body = followSpring(body, -7, 16);
+  assert.ok(body.value < 0 && body.value > -7);
+  for (let index = 0; index < 12; index++) body = followSpring(body, -7, 16);
+  const lag = body.value;
+  body = followSpring(body, 0, 16);
+  assert.ok(body.value < 0 && Math.abs(body.value - lag) < 2);
+  for (let index = 0; index < 45; index++) body = followSpring(body, 0, 16);
+  assert.ok(Math.abs(body.value) < .05);
 });
 
 test("both turn directions pass through a front-facing pose without flattening the profile", () => {

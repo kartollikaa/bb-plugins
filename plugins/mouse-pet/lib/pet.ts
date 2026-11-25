@@ -1,4 +1,4 @@
-export type PetMode = "walk" | "run" | "sit" | "groom" | "sleep" | "skid" | "stretch";
+export type PetMode = "walk" | "run" | "sit" | "perch" | "groom" | "sleep" | "skid" | "stretch";
 export type Direction = 1 | -1;
 export type IdleView = "profile" | "front" | "back";
 
@@ -16,12 +16,13 @@ export const MAX_FRAME_MS = 100;
 export const SKID_MS = 260;
 
 const SPEED_PX_PER_S: Record<PetMode, number> = {
-  walk: 38, run: 150, sit: 0, groom: 0, sleep: 0, skid: 0, stretch: 0,
+  walk: 38, run: 150, sit: 0, perch: 0, groom: 0, sleep: 0, skid: 0, stretch: 0,
 };
 const DURATION_MS: Record<PetMode, readonly [number, number]> = {
   walk: [2_000, 5_000],
   run: [1_500, 3_500],
   sit: [1_500, 4_000],
+  perch: [1_800, 3_500],
   groom: [2_000, 3_500],
   sleep: [6_000, 14_000],
   skid: [SKID_MS, SKID_MS],
@@ -30,7 +31,8 @@ const DURATION_MS: Record<PetMode, readonly [number, number]> = {
 const AFTER_MOVING: ReadonlyArray<readonly [PetMode, number]> = [
   ["walk", 25],
   ["run", 25],
-  ["sit", 25],
+  ["sit", 15],
+  ["perch", 10],
   ["groom", 15],
   ["sleep", 10],
 ];

@@ -108,6 +108,7 @@ test("a moving pet that runs out of time picks the next mode by weight", () => {
     [0, "walk"],
     [0.3, "run"],
     [0.6, "sit"],
+    [0.7, "perch"],
     [0.8, "groom"],
     [0.95, "sleep"],
   ];
@@ -136,6 +137,13 @@ test("a sit can face forward, away, or along the floor", () => {
     const moving = advance({ ...resting, remainingMs: 1 }, 16, VIEWPORT, constant(.5));
     assert.equal(moving.idleView, "profile");
   }
+});
+
+test("a perch stays on the floor before resuming movement", () => {
+  const perched = advance(pet({ mode: "perch", remainingMs: 300 }), 100, VIEWPORT, constant(.5));
+  assert.equal(perched.x, 100);
+  assert.equal(perched.mode, "perch");
+  assert.equal(advance({ ...perched, remainingMs: 1 }, 16, VIEWPORT, constant(.5)).mode, "walk");
 });
 
 test("the pet stretches after sleeping and wakes into a walk", () => {

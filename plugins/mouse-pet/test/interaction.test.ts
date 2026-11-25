@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { carryPosition, sniffDistance } from "../lib/interaction.ts";
+import { carryPosition, gripArmPath, sniffDistance } from "../lib/interaction.ts";
 
 test("the grip follows the cursor on both sides", () => {
   const point = { x: 300, y: 200 };
@@ -12,6 +12,14 @@ test("carry keeps the sprite inside the window", () => {
   assert.deepEqual(carryPosition({ x: 0, y: 0 }, 1, 800, 600), { x: 0, lift: 569 });
   assert.deepEqual(carryPosition({ x: 800, y: 600 }, -1, 800, 600), { x: 752, lift: 0 });
   assert.deepEqual(carryPosition({ x: 5, y: 5 }, 1, 15, 15), { x: 0, lift: 0 });
+});
+
+test("the arm bends as the body moves while the gripping paw stays on the cursor", () => {
+  const still = gripArmPath(true, -27, { x: .94, y: 1.12 }, { x: 0, y: 0 });
+  const trailing = gripArmPath(true, -34, { x: .94, y: 1.2 }, { x: -7, y: 3 });
+  assert.notEqual(still, trailing);
+  assert.match(still, / 33 4$/);
+  assert.match(trailing, / 33 4$/);
 });
 
 test("the mouse only approaches a nearby cursor ahead of its nose and close to the floor", () => {

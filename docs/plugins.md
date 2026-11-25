@@ -131,6 +131,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
   and moves the sprite with a `requestAnimationFrame` loop. Gait follows distance traveled, and
   CSS poses articulate the head, paws and body. `lib/pet.ts` drives autonomous movement,
   `lib/animation.ts` samples gait and jumps, and `lib/interaction.ts` handles grip and sniff geometry.
+  `lib/snack.ts` tracks the one piece of cheese the mouse fetches and eats on its own.
   With `prefers-reduced-motion` it sits still and shows "Pi!" on a click.
 - **No commands or settings:** the server entry is empty because bb requires one. Turn the pet off by
   disabling the plugin.
