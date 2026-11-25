@@ -23,3 +23,21 @@ export function hopHeight(progress: number, startingHeight = 0) {
   const flight = Math.max(0, Math.min((progress - launch) / (.87 - launch), 1));
   return (startingHeight + 58 * flight) * (1 - flight);
 }
+
+export function turnFrame(from: number, to: number, progress: number) {
+  const eased = progress * progress * (3 - 2 * progress);
+  const yaw = from + (to - from) * eased;
+  const profile = Math.min(Math.abs(yaw) / .7, 1);
+  return { yaw, width: .55 + .45 * Math.abs(yaw), profile: profile * profile };
+}
+
+export const FALL_GRAVITY = 5_500;
+
+export function fallFrame(lift: number, x: number, vx: number, vy: number, time: number) {
+  const landingTime = (vy + Math.sqrt(vy ** 2 + 2 * FALL_GRAVITY * lift)) / FALL_GRAVITY;
+  const t = Math.min(time, landingTime);
+  return {
+    lift: time >= landingTime ? 0 : lift + vy * t - FALL_GRAVITY * t ** 2 / 2,
+    x: x + vx * t,
+  };
+}

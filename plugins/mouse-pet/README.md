@@ -4,8 +4,9 @@ A small grey mouse lives along the bottom edge of the bb window. Its paws and ta
 It accelerates into a run, skids before a fast turn, curls up to sleep and stretches when it wakes.
 
 - Click the mouse to make it hop, squeak "Pi!" and bolt.
-- Hold it for about half a second, then move the pointer to carry it within the window. Release at
-  the floor to set it down, or higher up to watch it drop and land.
+- Hold it for about half a second, then move the pointer to carry it within the window. It hangs
+  by its forepaws and responds to the pointer's speed in both directions. Release at the floor to
+  set it down, or release it in motion to let it fall with the pointer's velocity.
 - Pause the pointer low and just ahead of the mouse. It may take a couple of steps to sniff it.
   Lift the pointer a little during the sniff and the mouse rears up to follow.
 

@@ -9,8 +9,9 @@ The Mouse Pet plugin puts a small grey mouse along the bottom edge of the bb win
 it reaches an edge at a run and stretches after sleeping. A click makes it hop, squeak "Pi!" and bolt.
 
 Hold the primary button on the mouse for about half a second to pick it up and carry it inside the
-window. Release near the floor to set it down, or higher up to make it drop and land. If the window
-loses focus, the mouse returns to the floor. To invite a sniff, leave the pointer still, low and
+window. It hangs by its forepaws and follows the pointer's momentum. Release near the floor to set
+it down, or higher up to let it drop. If the window loses focus, the mouse returns to the floor.
+To invite a sniff, leave the pointer still, low and
 just ahead of the mouse. Lift it slightly during the sniff and the mouse rears up to follow.
 
 It has no CLI command, agent tool or setting. Only the mouse itself catches clicks; the strip it moves
