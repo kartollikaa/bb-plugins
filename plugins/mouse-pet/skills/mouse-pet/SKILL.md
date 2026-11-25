@@ -16,8 +16,9 @@ it down, or higher up to let it drop. If the window loses focus, the mouse retur
 To invite a sniff, leave the pointer still, low and
 just ahead of the mouse. Lift it slightly during the sniff and the mouse rears up to follow.
 
-The mouse can pull one piece of cheese in at a window edge. It leaves the piece on the floor and
-can pass it before it decides to eat. Once it finishes the piece, it can fetch another one.
+The mouse can pull one mouse-sized piece of cheese in at a window edge and leave it at a random
+distance. It can pass the cheese before it takes a bite. It can fetch another piece once it finishes
+the current one.
 
 It has no CLI command, agent tool or setting. Only the mouse itself catches clicks; the strip it moves
 in lets them through. To get rid of it, disable the plugin in bb's plugin settings

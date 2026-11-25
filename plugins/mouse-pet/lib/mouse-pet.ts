@@ -59,9 +59,13 @@ const STYLE = `
 [${ROOT_ATTR}] .mp-hop[data-hop] .mp-impact { animation: mp-hop-impact ${HOP_MS}ms ease-in-out both; }
 [${ROOT_ATTR}] svg { overflow: visible; }
 [${ROOT_ATTR}] .mp-cheese {
-  position: absolute; left: 0; bottom: ${FLOOR_GAP}px; width: ${CHEESE_WIDTH}px; height: 9px;
+  position: absolute; left: 0; bottom: ${FLOOR_GAP}px; width: ${CHEESE_WIDTH}px; height: ${PET_HEIGHT}px;
   pointer-events: none;
 }
+[${ROOT_ATTR}] .mp-cheese[data-edge="1"] svg { transform: scaleX(-1); }
+[${ROOT_ATTR}] .mp-cheese[data-bites="0"] .mp-bite-first,
+[${ROOT_ATTR}] .mp-cheese:is([data-bites="0"], [data-bites="1"]) .mp-bite-second,
+[${ROOT_ATTR}] .mp-cheese:not([data-bites="3"]) .mp-bite-third { display: none; }
 
 [${ROOT_ATTR}] .mp-tail, [${ROOT_ATTR}] .mp-eye,
 [${ROOT_ATTR}] .mp-impact, [${ROOT_ATTR}] .mp-wash { transform-box: view-box; }
@@ -248,19 +252,23 @@ const BACK_SPRITE = `
 
 const CHEESE = `
 <div class="mp-cheese" hidden>
-  <svg viewBox="0 0 13 9" aria-hidden="true" focusable="false">
-    <path class="mp-cheese-side" fill="#efab39" stroke="#b96b24" stroke-width=".55" stroke-linejoin="round"/>
-    <path class="mp-cheese-top" fill="#ffdb73" stroke="#b96b24" stroke-width=".55" stroke-linejoin="round"/>
-    <circle cx="3.6" cy="6.5" r="1" fill="#ce8229"/>
-    <ellipse cx="5.1" cy="3.5" rx=".9" ry=".52" fill="#e3a242"/>
+  <svg viewBox="0 0 48 29" aria-hidden="true" focusable="false">
+    <mask id="mp-cheese-bites" maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="29">
+      <rect width="48" height="29" fill="white"/>
+      <circle class="mp-bite-first" cx="45" cy="13" r="6.3" fill="black"/>
+      <circle class="mp-bite-second" cx="45" cy="22" r="7.4" fill="black"/>
+      <circle class="mp-bite-third" cx="38.8" cy="18" r="7.4" fill="black"/>
+    </mask>
+    <g mask="url(#mp-cheese-bites)">
+      <path d="M2.5 14.5 45.5 12v11.7L2.5 27z" fill="#efab39" stroke="#b96b24" stroke-width=".85" stroke-linejoin="round"/>
+      <path d="M2.5 14.5 31 2.6 45.5 12 2.5 16.3z" fill="#ffdb73" stroke="#b96b24" stroke-width=".85" stroke-linejoin="round"/>
+      <ellipse cx="12.5" cy="21.4" rx="3.5" ry="2.65" fill="#ce8229"/>
+      <ellipse cx="24.5" cy="9.6" rx="3.1" ry="1.55" fill="#e3a242"/>
+      <ellipse cx="29" cy="18.8" rx="3.1" ry="2.15" fill="#ce8229"/>
+      <ellipse cx="34.5" cy="8.2" rx="1.65" ry=".95" fill="#edb346"/>
+    </g>
   </svg>
 </div>`;
-
-const CHEESE_SHAPES = [
-  ["M1 4h11v3.5L1 8z", "M1 4 8.6 1l3.4 3-11 .8z"],
-  ["M1 4h8l-.65 1.4.7 1.8L1 8z", "M1 4 7 1.55l2 2.5-.65.6L1 4.8z"],
-  ["M1 4.8h5.9l-.8 1.2.7 1.35L1 8z", "M1 4.8 5.5 3.05l1.4 1.75H1z"],
-] as const;
 
 function prefersReducedMotion(): MediaQueryList {
   return window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -301,8 +309,6 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const legs = Array.from(root.querySelectorAll<SVGElement>(".mp-leg"));
   const grip = Array.from(root.querySelectorAll<SVGElement>(".mp-grip path"));
   const cheese = root.querySelector<HTMLElement>(".mp-cheese")!;
-  const cheeseSide = cheese.querySelector(".mp-cheese-side")!;
-  const cheeseTop = cheese.querySelector(".mp-cheese-top")!;
   document.head.append(style);
   document.body.append(root);
 
@@ -359,12 +365,9 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     if (snack.cheese && !cheese.hidden) {
       cheese.style.transform = `translateX(${snack.cheese.x.toFixed(2)}px)`;
       const portion = String(snack.cheese.bites);
-      if (cheese.dataset.bites !== portion) {
-        const [side, top] = CHEESE_SHAPES[snack.cheese.bites];
-        cheese.dataset.bites = portion;
-        cheeseSide.setAttribute("d", side);
-        cheeseTop.setAttribute("d", top);
-      }
+      const edge = String(snack.cheese.edge);
+      if (cheese.dataset.bites !== portion) cheese.dataset.bites = portion;
+      if (cheese.dataset.edge !== edge) cheese.dataset.edge = edge;
     }
   };
 

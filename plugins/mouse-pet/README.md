@@ -10,8 +10,9 @@ look around from its haunches, turn to face you or sit with its back to you.
   set it down, or release it in motion to let it fall with the pointer's velocity.
 - Pause the pointer low and just ahead of the mouse. It may take a couple of steps to sniff it.
   Lift the pointer a little during the sniff and the mouse rears up to follow.
-- The mouse sometimes pulls a piece of cheese in from an edge. It leaves the cheese on the floor
-  and may pass it a few times before nibbling it. There is only one piece at a time.
+- The mouse sometimes pulls a mouse-sized piece of cheese in from an edge and leaves it at a
+  different distance each time. It may pass the cheese a few times before taking bites.
+  There is only one piece at a time.
 
 Only the mouse takes clicks. With reduced motion on, it sits still and shows "Pi!" on a click.
 

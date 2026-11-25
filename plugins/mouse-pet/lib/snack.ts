@@ -1,18 +1,19 @@
 import { maxX, PET_WIDTH, type Direction, type Pet } from "./pet.ts";
 
-export const CHEESE_WIDTH = 13;
-const FETCH_MS = 960;
+export const CHEESE_WIDTH = PET_WIDTH;
 const BITE_MS = 310;
+const BITES = 4;
 const LEAVE_ALONE_MS = 8_000;
 
 interface Cheese {
   x: number;
   bites: number;
   tryAfter: number;
+  edge: Direction;
 }
 
 type SnackAction =
-  | { kind: "fetch"; started: number; fromX: number; direction: Direction }
+  | { kind: "fetch"; started: number; fromX: number; direction: Direction; distance: number }
   | { kind: "eat"; started: number; initialBites: number };
 
 export interface Snack {
@@ -46,14 +47,18 @@ export function advanceSnack(
 ): { snack: Snack; pet: Pet } {
   const { action, cheese } = snack;
   if (action?.kind === "fetch") {
-    const progress = Math.min((time - action.started) / FETCH_MS, 1);
+    const duration = 640 + action.distance * 13;
+    const progress = Math.min((time - action.started) / duration, 1);
     const limit = maxX(width);
     const edge = action.direction === 1 ? limit : 0;
     const reach = ease(Math.max(0, Math.min(1, progress / .29)));
     const pull = ease(Math.max(0, (progress - .39) / .61));
-    const petX = clamp(action.fromX + (edge - action.fromX) * reach - action.direction * 27 * pull, limit);
-    const cheeseCenter = action.direction === 1 ? width - 21 * pull : 21 * pull;
-    const piece = progress >= .39 ? { x: cheeseCenter - CHEESE_WIDTH / 2, bites: 0, tryAfter: time + LEAVE_ALONE_MS } : null;
+    const petX = clamp(action.fromX + (edge - action.fromX) * reach - action.direction * (action.distance + 27) * pull, limit);
+    const fromEdge = -CHEESE_WIDTH / 2 + (action.distance + CHEESE_WIDTH / 2) * pull;
+    const cheeseCenter = action.direction === 1 ? width - fromEdge : fromEdge;
+    const piece = progress >= .39
+      ? { x: cheeseCenter - CHEESE_WIDTH / 2, bites: 0, tryAfter: time + LEAVE_ALONE_MS, edge: action.direction }
+      : null;
     return {
       snack: { ...snack, cheese: piece, action: progress === 1 ? null : action },
       pet: settle(pet, petX),
@@ -62,16 +67,21 @@ export function advanceSnack(
   if (action?.kind === "eat" && cheese) {
     const bites = action.initialBites + Math.floor((time - action.started) / BITE_MS);
     return {
-      snack: bites >= 3
+      snack: bites >= BITES
         ? createSnack(time)
         : { ...snack, cheese: { ...cheese, bites } },
       pet: settle(pet),
     };
   }
 
+  if (pet.mode === "sleep" || pet.mode === "stretch" || pet.mode === "groom" || pet.mode === "perch") {
+    return { snack, pet };
+  }
+
   if (cheese) {
     const nose = pet.x + (pet.direction === 1 ? 45 : 3);
-    const touching = Math.abs(nose - cheese.x - CHEESE_WIDTH / 2) <= 10;
+    const inwardEdge = cheese.x + (cheese.edge === -1 ? CHEESE_WIDTH - 4 : 4);
+    const touching = pet.direction === cheese.edge && Math.abs(nose - inwardEdge) <= 11;
     if (!touching || snack.touching || time < cheese.tryAfter) {
       return { snack: touching === snack.touching ? snack : { ...snack, touching }, pet };
     }
@@ -88,8 +98,11 @@ export function advanceSnack(
   const nearEdge = Math.min(pet.x, limit - pet.x) <= 14;
   if (time < snack.availableAt || limit < 70 || !nearEdge) return { snack, pet };
   const direction = pet.x < limit / 2 ? -1 : 1;
+  const farthest = Math.min(146, limit - CHEESE_WIDTH / 2 - 6);
+  const nearest = Math.min(60, farthest - 8);
+  const distance = nearest + (farthest - nearest) * random();
   return {
-    snack: { ...snack, action: { kind: "fetch", started: time, fromX: pet.x, direction } },
+    snack: { ...snack, action: { kind: "fetch", started: time, fromX: pet.x, direction, distance } },
     pet: settle({ ...pet, direction }),
   };
 }
