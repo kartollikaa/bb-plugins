@@ -172,6 +172,7 @@ test("resting never flips the direction", () => {
 test("a click makes it run the other way", () => {
   const scared = startle(pet({ mode: "sleep", direction: 1 }));
   assert.equal(scared.mode, "run");
+  assert.equal(scared.velocity, -150);
   assert.equal(scared.direction, -1);
   assert.ok(scared.remainingMs > 0);
 });

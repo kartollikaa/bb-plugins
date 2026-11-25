@@ -132,7 +132,8 @@ export function advance(pet: Pet, dtMs: number, viewportWidth: number, random: R
 
 /** A click: the pet bolts the other way. */
 export function startle(pet: Pet): Pet {
-  return { ...pet, mode: "run", direction: reverse(pet.direction), remainingMs: STARTLE_MS };
+  const direction = reverse(pet.direction);
+  return { ...pet, mode: "run", direction, velocity: direction * SPEED_PX_PER_S.run, remainingMs: STARTLE_MS };
 }
 
 /** Keeps the pet inside the window after a resize. */

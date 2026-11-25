@@ -476,7 +476,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
 
   const updateGesture = (time: number, dt: number) => {
     if (!gesture) return;
-    if (gesture.phase === "press" && lift > 0) lift = Math.max(0, lift - dt * .13);
+    if (gesture.phase === "press" && hopStarted !== null) pet = advance(pet, dt, viewportWidth(), Math.random);
     if (gesture.phase === "carry") {
       const age = time - gesture.pickedUpAt;
       tuck = Math.min(age / 115, 1);
@@ -587,19 +587,18 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     hop.removeAttribute("data-hop");
     squeak.removeAttribute("data-visible");
   };
-  const reactToClick = () => {
-    clearClick();
+  const startHop = () => {
     void hop.offsetWidth;
     hop.setAttribute("data-hop", "");
+    hopStartHeight = hopLift = Math.min(maxLift(viewportHeight()), Math.max(3, lift));
+    lift = 0;
+    hopStarted = performance.now();
+    pet = startle(pet);
+    showProfile();
+  };
+  const squeakOnClick = () => {
     squeak.setAttribute("data-visible", "");
     clickTimer = window.setTimeout(clearClick, SQUEAK_MS);
-    if (!motion.matches) {
-      hopStartHeight = hopLift = lift;
-      lift = 0;
-      hopStarted = performance.now();
-      pet = startle(pet);
-      showProfile();
-    }
   };
   const releaseCapture = () => {
     const pointerId = gesture?.pointerId;
@@ -635,7 +634,8 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       pointerId: event.pointerId, started: time, movedAt: time, velocity: { x: 0, y: 0 },
       point: start, start, phase: "press", pickedUpAt: 0, gripOffset: { x: 0, y: 0 },
     };
-    if (!motion.matches) render();
+    if (!motion.matches) startHop();
+    render();
   };
   const onMove = (event: PointerEvent) => {
     const point = { x: event.clientX, y: event.clientY };
@@ -648,6 +648,9 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       if (motion.matches) return;
       const time = performance.now();
       if (gesture.phase === "press" && Math.hypot(point.x - gesture.start.x, point.y - gesture.start.y) >= DRAG_START_PX) {
+        lift = hopLift;
+        clearClick();
+        pet.velocity = 0;
         gesture.gripOffset = {
           x: pet.x + screenGripX(pet.direction) - gesture.start.x,
           y: viewportHeight() - FLOOR_GAP - PET_HEIGHT + GRIP_Y - lift - gesture.start.y,
@@ -686,7 +689,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     const speed = carrying ? cursorVelocity(gesture, performance.now()) : { x: 0, y: 0 };
     releaseCapture();
     if (!carrying && canClick && !held) {
-      reactToClick();
+      squeakOnClick();
     } else if (carrying || lift > 0) {
       sit();
       if (lift > 0 || speed.y < -160) {
