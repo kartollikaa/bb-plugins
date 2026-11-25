@@ -342,7 +342,8 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
 
   const render = () => {
     mouse.style.transform = `translate3d(${pet.x.toFixed(2)}px, ${(-(lift + hopLift)).toFixed(2)}px, 0)`;
-    const mode = motion.matches ? "sit" : gesture?.phase ?? descent?.phase ?? attention?.phase ?? snack.action?.kind ?? pet.mode;
+    const snackPose = snack.action?.kind === "seek" ? undefined : snack.action?.kind;
+    const mode = motion.matches ? "sit" : gesture?.phase ?? descent?.phase ?? attention?.phase ?? snackPose ?? pet.mode;
     if (mouse.dataset.mode !== mode) mouse.dataset.mode = mode;
     mouse.toggleAttribute("data-moving", gaitSpeed > 4);
     if (mode === "carry" || mode === "fall") {

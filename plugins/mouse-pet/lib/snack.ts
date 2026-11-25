@@ -1,19 +1,22 @@
-import { maxX, PET_WIDTH, type Direction, type Pet } from "./pet.ts";
+import { advance, maxX, PET_WIDTH, type Direction, type Pet } from "./pet.ts";
 
 export const CHEESE_WIDTH = PET_WIDTH;
 const BITE_MS = 310;
 const BITES = 4;
 const LEAVE_ALONE_MS = 8_000;
+const NOTICE_AGAIN_MS = 3_600;
 
 interface Cheese {
   x: number;
   bites: number;
   tryAfter: number;
+  noticeAfter: number;
   edge: Direction;
 }
 
 type SnackAction =
   | { kind: "fetch"; started: number; fromX: number; direction: Direction; distance: number }
+  | { kind: "seek"; updatedAt: number }
   | { kind: "eat"; started: number; initialBites: number };
 
 export interface Snack {
@@ -45,10 +48,15 @@ function fitCheese(cheese: Cheese, width: number): Cheese {
 const settle = (pet: Pet, x = pet.x): Pet =>
   ({ ...pet, x, velocity: 0, mode: "sit", idleView: "profile", remainingMs: 950 });
 
+const beginEating = (snack: Snack, cheese: Cheese, pet: Pet, time: number): { snack: Snack; pet: Pet } => ({
+  snack: { ...snack, touching: true, action: { kind: "eat", started: time, initialBites: cheese.bites } },
+  pet: settle({ ...pet, direction: cheese.edge }),
+});
+
 export function interruptSnack(snack: Snack, time: number, width: number): Snack {
   if (!snack.action) return snack;
   const cheese = snack.cheese
-    ? { ...fitCheese(snack.cheese, width), tryAfter: time + LEAVE_ALONE_MS }
+    ? { ...fitCheese(snack.cheese, width), tryAfter: time + LEAVE_ALONE_MS, noticeAfter: time + LEAVE_ALONE_MS }
     : null;
   return { ...snack, cheese, action: null, availableAt: time + 3_000, touching: false };
 }
@@ -73,11 +81,30 @@ export function advanceSnack(
     const fromEdge = -CHEESE_WIDTH / 2 + (action.distance + CHEESE_WIDTH / 2) * pull;
     const cheeseCenter = action.direction === 1 ? width - fromEdge : fromEdge;
     const piece = progress >= .39
-      ? { x: cheeseCenter - CHEESE_WIDTH / 2, bites: 0, tryAfter: time + LEAVE_ALONE_MS, edge: action.direction }
+      ? {
+        x: cheeseCenter - CHEESE_WIDTH / 2,
+        bites: 0,
+        tryAfter: time + LEAVE_ALONE_MS,
+        noticeAfter: time + LEAVE_ALONE_MS,
+        edge: action.direction,
+      }
       : null;
     return {
       snack: { ...snack, cheese: piece, action: progress === 1 ? null : action },
       pet: settle(pet, petX),
+    };
+  }
+  if (action?.kind === "seek" && cheese) {
+    const target = clamp(cheese.x + inwardOffset(cheese.edge) - noseOffset(cheese.edge), maxX(width));
+    const distance = target - pet.x;
+    if (Math.abs(distance) <= 3) return beginEating(snack, cheese, settle(pet, target), time);
+    const direction = distance < 0 ? -1 : 1;
+    const seeking: Pet = {
+      ...pet, direction, mode: Math.abs(distance) > 42 ? "run" : "walk", idleView: "profile", remainingMs: 1_000,
+    };
+    return {
+      snack: { ...snack, action: { kind: "seek", updatedAt: time } },
+      pet: advance(seeking, time - action.updatedAt, width, random),
     };
   }
   if (action?.kind === "eat" && cheese) {
@@ -98,16 +125,19 @@ export function advanceSnack(
     const nose = pet.x + noseOffset(pet.direction);
     const inwardEdge = cheese.x + inwardOffset(cheese.edge);
     const touching = pet.direction === cheese.edge && Math.abs(nose - inwardEdge) <= 11;
+    if (!touching && time >= cheese.tryAfter && time >= cheese.noticeAfter) {
+      const nextCheese = { ...cheese, noticeAfter: time + NOTICE_AGAIN_MS };
+      const nextSnack = { ...snack, cheese: nextCheese, touching: false };
+      if (random() < .74) return { snack: { ...nextSnack, action: { kind: "seek", updatedAt: time } }, pet };
+      return { snack: nextSnack, pet };
+    }
     if (!touching || snack.touching || time < cheese.tryAfter) {
       return { snack: touching === snack.touching ? snack : { ...snack, touching }, pet };
     }
     const visits = snack.visits + 1;
-    const choosing = visits > 1 && (visits >= 4 || random() < .55);
+    const choosing = visits > 1 && (visits >= 4 || random() < .72);
     if (!choosing) return { snack: { ...snack, touching, visits }, pet };
-    return {
-      snack: { ...snack, touching, visits, action: { kind: "eat", started: time, initialBites: cheese.bites } },
-      pet: settle(pet),
-    };
+    return beginEating({ ...snack, visits }, cheese, pet, time);
   }
 
   const limit = maxX(width);

@@ -17,8 +17,8 @@ To invite a sniff, leave the pointer still, low and
 just ahead of the mouse. Lift it slightly during the sniff and the mouse rears up to follow.
 
 The mouse can pull one mouse-sized piece of cheese in at a window edge and leave it at a random
-distance. It can pass the cheese before it takes a bite. It can fetch another piece once it finishes
-the current one.
+distance. It can pass the cheese before it takes a bite. After leaving it alone for a while it
+may run straight over to eat. It can fetch another piece once it finishes the current one.
 
 It has no CLI command, agent tool or setting. Only the mouse itself catches clicks; the strip it moves
 in lets them through. To get rid of it, disable the plugin in bb's plugin settings
