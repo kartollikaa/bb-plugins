@@ -4,7 +4,6 @@ const LEG_PHASES = [0, .25, .5, .75] as const;
 const BOUND_PHASES = [0, .47, .055, .53] as const;
 const running = (speed: number) => Math.min(Math.max((speed - 55) / 95, 0), 1);
 export const strideLength = (speed: number) => 14 + Math.min(speed / 38, 1) * 3 + running(speed) * 29;
-export const HOP_LAUNCH = .11;
 export const HOP_TOUCHDOWN = .87;
 
 function pulse(phase: number, start: number, duration: number) {
@@ -37,8 +36,7 @@ export function gaitFrame(phase: number, speed: number) {
 }
 
 export function hopHeight(progress: number, startingHeight = 0) {
-  const launch = startingHeight > 0 ? 0 : HOP_LAUNCH;
-  const flight = Math.max(0, Math.min((progress - launch) / (HOP_TOUCHDOWN - launch), 1));
+  const flight = Math.max(0, Math.min(progress / HOP_TOUCHDOWN, 1));
   return (startingHeight + 88 * flight) * (1 - flight);
 }
 

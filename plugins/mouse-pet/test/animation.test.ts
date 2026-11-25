@@ -42,9 +42,9 @@ test("a sprint has a single raised bound between hind push-off and front landing
   assert.ok(strideLength(150) / 150 > .3);
 });
 
-test("a hop rises and falls between grounded anticipation and landing", () => {
+test("a click hop lifts on the first frame and returns to the floor", () => {
   assert.equal(hopHeight(0), 0);
-  assert.equal(hopHeight(.1), 0);
+  assert.ok(hopHeight(1 / 60 / .42) > 3);
   assert.ok(hopHeight(.4) > hopHeight(.2));
   assert.ok(hopHeight(.49) > 21);
   assert.ok(hopHeight(.6) > hopHeight(.8));

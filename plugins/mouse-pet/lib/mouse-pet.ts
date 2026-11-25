@@ -3,12 +3,12 @@ import {
   carryPosition, DRAG_START_PX, FLOOR_GAP, GRIP_X, GRIP_Y, gripPoint, LONG_PRESS_MS,
   maxLift, PET_HEIGHT, screenGripX, scruffPath, sniffDistance, type Point,
 } from "./interaction.ts";
-import { FALL_GRAVITY, fallFrame, followSpring, gaitFrame, HOP_LAUNCH, hopHeight, HOP_TOUCHDOWN, strideLength, turnFrame, type Spring } from "./animation.ts";
+import { FALL_GRAVITY, fallFrame, followSpring, gaitFrame, hopHeight, HOP_TOUCHDOWN, strideLength, turnFrame, type Spring } from "./animation.ts";
 import { advanceSnack, BITE_MS, biteMaskPath, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "./snack.ts";
 
 const ROOT_ATTR = "data-mouse-pet";
 const SQUEAK_MS = 700;
-const HOP_MS = 560;
+const HOP_MS = 420;
 const SNIFF_DWELL_MS = 650;
 const APPROACH_MS = 320;
 const SNIFF_MS = 900;
@@ -156,8 +156,7 @@ const STYLE = `
 @keyframes mp-blink { 0%, 89%, 94%, 100% { transform: scaleY(1); } 91% { transform: scaleY(.12); } }
 @keyframes mp-hop-impact {
   0%, 100% { transform: none; }
-  11% { transform: scale(1.06, .88); }
-  28% { transform: scale(.98, 1.07); }
+  12% { transform: scale(.98, 1.07); }
   65% { transform: scale(1, 1.02); }
   91% { transform: scale(1.045, .91); }
 }
@@ -546,14 +545,13 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     if (gesture) updateGesture(time, dt);
     else if (descent) updateDescent(time, dt);
     else if (snack.action || !updateAttention(time)) {
-      const anticipating = hopStarted !== null && hopStartHeight === 0 && time - hopStarted < HOP_MS * HOP_LAUNCH;
       const wasEatingOrFetching = Boolean(snack.action);
       if (hopStarted === null) {
         const next = advanceSnack(snack, pet, time, viewportWidth(), Math.random);
         snack = next.snack;
         pet = next.pet;
       }
-      if (!anticipating && !wasEatingOrFetching && !snack.action) pet = advance(pet, dt, viewportWidth(), Math.random);
+      if (!wasEatingOrFetching && !snack.action) pet = advance(pet, dt, viewportWidth(), Math.random);
     }
     drawMotion(time, dt, pet.x - x);
     render();
