@@ -41,7 +41,9 @@ export function interruptSnack(snack: Snack, time: number, width: number): Snack
   return { ...snack, cheese, action: null, availableAt: time + 3_000, touching: false };
 }
 
-export function advanceSnack(snack: Snack, pet: Pet, time: number, width: number, random: () => number) {
+export function advanceSnack(
+  snack: Snack, pet: Pet, time: number, width: number, random: () => number,
+): { snack: Snack; pet: Pet } {
   const { action, cheese } = snack;
   if (action?.kind === "fetch") {
     const progress = Math.min((time - action.started) / FETCH_MS, 1);
