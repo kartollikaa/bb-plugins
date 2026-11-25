@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { advanceSnack, CHEESE_WIDTH, createSnack, interruptSnack } from "../lib/snack.ts";
+import { advanceSnack, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "../lib/snack.ts";
 import type { Pet } from "../lib/pet.ts";
 
 const WIDTH = 800;
@@ -50,6 +50,29 @@ test("cheese never interrupts sleep, a waking stretch, grooming or perching", ()
     const next = advanceSnack(snack, resting, 15_000, WIDTH, preferToEat);
     assert.equal(next.snack.action, null);
     assert.equal(next.pet, resting);
+  }
+});
+
+test("the mouse can finish cheese from either side after the window shrinks", () => {
+  for (const direction of [-1, 1] as const) {
+    const atEdge = direction === -1 ? nearEdge : { ...nearEdge, x: WIDTH - 48, direction };
+    const distant = () => .99;
+    const fetch = advanceSnack(createSnack(0), atEdge, 12_000, WIDTH, distant);
+    const placed = advanceSnack(fetch.snack, fetch.pet, 15_000, WIDTH, distant);
+    const fitted = resizeSnack(placed.snack, 24_000, 120);
+    const cheese = fitted.cheese!;
+    const mouth = cheese.x + (direction === -1 ? CHEESE_WIDTH - 4 : 4);
+    const x = mouth - (direction === -1 ? 3 : 45);
+    assert.ok(x >= 0 && x + 48 <= 120);
+    assert.ok(cheese.x >= 0 && cheese.x + CHEESE_WIDTH <= 120);
+    const approaching = { ...nearEdge, x, direction };
+    const first = advanceSnack(fitted, approaching, 24_100, 120, preferToEat);
+    const away = { ...approaching, x: x === 0 ? 72 : 0 };
+    const left = advanceSnack(first.snack, away, 24_500, 120, preferToEat);
+    const eating = advanceSnack(left.snack, approaching, 25_000, 120, preferToEat);
+    const done = advanceSnack(eating.snack, eating.pet, 26_300, 120, preferToEat);
+    assert.equal(eating.snack.action?.kind, "eat");
+    assert.equal(done.snack.cheese, null);
   }
 });
 

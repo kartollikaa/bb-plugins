@@ -1,7 +1,7 @@
 import { advance, createPet, fit, maxX, MAX_FRAME_MS, PET_WIDTH, startle, type Pet } from "./pet.ts";
 import { carryPosition, FLOOR_GAP, GRIP_X, GRIP_Y, gripArmPath, HOLD_MS, maxLift, PET_HEIGHT, sniffDistance, type Point } from "./interaction.ts";
 import { FALL_GRAVITY, fallFrame, followSpring, gaitFrame, HOP_LAUNCH, hopHeight, HOP_TOUCHDOWN, strideLength, turnFrame, type Spring } from "./animation.ts";
-import { advanceSnack, CHEESE_WIDTH, createSnack, interruptSnack } from "./snack.ts";
+import { advanceSnack, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "./snack.ts";
 
 const ROOT_ATTR = "data-mouse-pet";
 const SQUEAK_MS = 700;
@@ -116,14 +116,14 @@ const STYLE = `
 
 [${ROOT_ATTR}] [data-mode="sit"] .mp-head { transform: translateY(-1px) rotate(-6deg); }
 [${ROOT_ATTR}] [data-mode="perch"] .mp-pose {
-  transform: translate(-2px, 1px) rotate(-16deg) scale(.96, 1.06); transition-duration: .24s;
+  transform: translate(-1.5px, 1px) rotate(-12deg) scale(1.02, .97); transition-duration: .24s;
 }
 [${ROOT_ATTR}] [data-mode="perch"] .mp-head { transform: translate(-.4px, -.8px) rotate(-5deg); }
 [${ROOT_ATTR}] [data-mode="perch"] .mp-eye-state { transform: translate(var(--mp-look-x, 0px), var(--mp-look-y, 0px)); }
-[${ROOT_ATTR}] [data-mode="perch"] .mp-front { transform: rotate(-67deg); }
-[${ROOT_ATTR}] [data-mode="perch"] .mp-far-front { opacity: .35; }
-[${ROOT_ATTR}] [data-mode="perch"] .mp-leg-pose { transform: translateY(-3.5px) scaleY(.77); }
-[${ROOT_ATTR}] [data-mode="perch"] .mp-tail-pose { transform: rotate(-19deg); }
+[${ROOT_ATTR}] [data-mode="perch"] .mp-front { transform: translate(.6px, 1px) rotate(-15deg); }
+[${ROOT_ATTR}] [data-mode="perch"] .mp-far-front { transform: translate(-1.3px, .5px); opacity: .72; }
+[${ROOT_ATTR}] [data-mode="perch"] .mp-leg-pose { transform: translateY(-1px) scaleY(.83); }
+[${ROOT_ATTR}] [data-mode="perch"] .mp-tail-pose { transform: rotate(-26deg); }
 [${ROOT_ATTR}] [data-mode="fetch"] .mp-head { transform: translateX(2px) rotate(9deg); }
 [${ROOT_ATTR}] [data-mode="fetch"] .mp-front { transform: rotate(-87deg); }
 [${ROOT_ATTR}] [data-mode="eat"] .mp-head { animation: mp-nibble .31s ease-in-out infinite; }
@@ -373,6 +373,14 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
 
   const sit = () => { pet = { ...pet, velocity: 0, mode: "sit", idleView: "profile", remainingMs: 900 }; };
 
+  const showProfile = () => {
+    face = pet.direction;
+    turn = { from: face, to: face, progress: 1 };
+    delete flip.dataset.depthView;
+    flip.style.setProperty("--mp-turn", String(face));
+    flip.style.setProperty("--mp-profile", "1");
+  };
+
   const drawMotion = (time: number, dt: number, distance: number) => {
     let hopInFlight = false;
     if (hopStarted !== null) {
@@ -565,8 +573,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     if (motion.matches) {
       sit();
       gaitSpeed = 0;
-      flip.style.setProperty("--mp-turn", String(pet.direction));
-      flip.style.setProperty("--mp-profile", "1");
+      showProfile();
       flip.style.removeProperty("--mp-bound");
       mouse.style.removeProperty("--mp-tail");
       mouse.style.removeProperty("--mp-breath");
@@ -596,6 +603,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       lift = 0;
       hopStarted = performance.now();
       pet = startle(pet);
+      showProfile();
     }
   };
   const releaseCapture = () => {
@@ -694,10 +702,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const onVisibility = () => { if (document.hidden) cancelInteraction(); };
   const onResize = () => {
     clearAttention();
-    snack = interruptSnack(snack, performance.now(), viewportWidth());
-    if (snack.cheese) {
-      snack.cheese.x = Math.max(0, Math.min(snack.cheese.x, viewportWidth() - CHEESE_WIDTH));
-    }
+    snack = resizeSnack(snack, performance.now(), viewportWidth());
     pet = fit(pet, viewportWidth());
     if (gesture?.phase === "carry") placeAtGrip(1);
     lift = Math.min(lift, maxLift(viewportHeight()));
@@ -716,7 +721,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   window.addEventListener("blur", cancelInteraction, options);
   window.addEventListener("resize", onResize, options);
   motion.addEventListener("change", syncMotion, options);
-  flip.style.setProperty("--mp-turn", String(face));
+  showProfile();
   render();
   syncMotion();
 

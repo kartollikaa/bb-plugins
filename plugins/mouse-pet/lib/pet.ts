@@ -122,7 +122,7 @@ export function advance(pet: Pet, dtMs: number, viewportWidth: number, random: R
   if (limit > 0 && pet.mode === "run" && velocity * direction >= 75 && Math.abs(x - edge) <= skidDistance) {
     return { ...pet, x, velocity, mode: "skid", remainingMs: SKID_MS };
   }
-  if (hitsEdge && isMoving(pet.mode)) {
+  if (limit > 0 && hitsEdge && isMoving(pet.mode)) {
     direction = reverse(direction);
     velocity = 0;
   }

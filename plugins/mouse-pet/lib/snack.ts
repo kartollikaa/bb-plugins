@@ -30,6 +30,17 @@ export function createSnack(time: number): Snack {
 
 const clamp = (x: number, limit: number) => Math.max(0, Math.min(x, limit));
 const ease = (p: number) => p * p * (3 - 2 * p);
+const noseOffset = (direction: Direction) => direction === 1 ? PET_WIDTH - 3 : 3;
+const inwardOffset = (direction: Direction) => direction === 1 ? 4 : CHEESE_WIDTH - 4;
+
+function fitCheese(cheese: Cheese, width: number): Cheese {
+  const farthest = Math.max(0, width - CHEESE_WIDTH);
+  const reach = noseOffset(cheese.edge) - inwardOffset(cheese.edge);
+  const x = cheese.edge === 1
+    ? Math.min(farthest, Math.max(cheese.x, reach))
+    : clamp(cheese.x, Math.min(farthest, maxX(width) + reach));
+  return x === cheese.x ? cheese : { ...cheese, x };
+}
 
 const settle = (pet: Pet, x = pet.x): Pet =>
   ({ ...pet, x, velocity: 0, mode: "sit", idleView: "profile", remainingMs: 950 });
@@ -37,9 +48,14 @@ const settle = (pet: Pet, x = pet.x): Pet =>
 export function interruptSnack(snack: Snack, time: number, width: number): Snack {
   if (!snack.action) return snack;
   const cheese = snack.cheese
-    ? { ...snack.cheese, x: clamp(snack.cheese.x, width - CHEESE_WIDTH), tryAfter: time + LEAVE_ALONE_MS }
+    ? { ...fitCheese(snack.cheese, width), tryAfter: time + LEAVE_ALONE_MS }
     : null;
   return { ...snack, cheese, action: null, availableAt: time + 3_000, touching: false };
+}
+
+export function resizeSnack(snack: Snack, time: number, width: number): Snack {
+  const idle = interruptSnack(snack, time, width);
+  return idle.cheese ? { ...idle, cheese: fitCheese(idle.cheese, width), touching: false } : idle;
 }
 
 export function advanceSnack(
@@ -79,8 +95,8 @@ export function advanceSnack(
   }
 
   if (cheese) {
-    const nose = pet.x + (pet.direction === 1 ? 45 : 3);
-    const inwardEdge = cheese.x + (cheese.edge === -1 ? CHEESE_WIDTH - 4 : 4);
+    const nose = pet.x + noseOffset(pet.direction);
+    const inwardEdge = cheese.x + inwardOffset(cheese.edge);
     const touching = pet.direction === cheese.edge && Math.abs(nose - inwardEdge) <= 11;
     if (!touching || snack.touching || time < cheese.tryAfter) {
       return { snack: touching === snack.touching ? snack : { ...snack, touching }, pet };

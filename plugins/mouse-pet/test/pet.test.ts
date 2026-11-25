@@ -185,7 +185,9 @@ test("a new pet starts inside the window", () => {
 
 test("a window narrower than the pet pins it to the left", () => {
   assert.equal(maxX(10), 0);
-  assert.equal(advance(pet({ mode: "run", x: 0 }), 50, 10, constant(0)).x, 0);
+  const next = advance(pet({ mode: "run", x: 0, direction: -1 }), 50, 10, constant(0));
+  assert.equal(next.x, 0);
+  assert.equal(next.direction, -1);
 });
 
 test("fit pulls a pet back after the window shrinks", () => {
