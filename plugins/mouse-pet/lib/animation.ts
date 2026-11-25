@@ -1,15 +1,20 @@
 const FULL_CYCLE = Math.PI * 2;
 
 const LEG_PHASES = [0, .58, .48, .06] as const;
+export const strideLength = (speed: number) => 14 + Math.min(speed / 150, 1) * 9;
 
 export function gaitFrame(phase: number, speed: number) {
   const effort = Math.min(speed / 38, 1);
   const run = Math.min(Math.max((speed - 38) / 112, 0), 1);
+  const stance = .62 - run * .18;
+  const stride = strideLength(speed) * effort;
   const feet = LEG_PHASES.map((offset) => {
-    const step = (phase + offset) * FULL_CYCLE;
+    const step = (phase + offset) % 1;
+    const swing = Math.max((step - stance) / (1 - stance), 0);
+    const reach = step < stance ? stance / 2 - step : stance * -.5 * Math.cos(Math.PI * swing);
     return {
-      angle: Math.cos(step) * (18 + run * 9) * effort,
-      lift: Math.max(0, Math.sin(step)) * (1.1 + run * 1.1) * effort,
+      reach: reach * stride,
+      lift: Math.sin(Math.PI * swing) ** 2 * (2.2 + run) * effort,
     };
   });
   return {

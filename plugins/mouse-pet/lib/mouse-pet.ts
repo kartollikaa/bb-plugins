@@ -1,6 +1,6 @@
 import { advance, createPet, fit, maxX, MAX_FRAME_MS, PET_WIDTH, startle, type Pet } from "./pet.ts";
 import { carryPosition, FLOOR_GAP, HOLD_MS, maxLift, PET_HEIGHT, sniffDistance, type Point } from "./interaction.ts";
-import { FALL_GRAVITY, fallFrame, gaitFrame, hopHeight, turnFrame } from "./animation.ts";
+import { FALL_GRAVITY, fallFrame, gaitFrame, hopHeight, strideLength, turnFrame } from "./animation.ts";
 
 const ROOT_ATTR = "data-mouse-pet";
 const SQUEAK_MS = 700;
@@ -15,6 +15,21 @@ const FUR = "#c9c9d6";
 const FUR_FAR = "#a3a3b3";
 const PINK = "#f3a2b6";
 const INK = "#2b2b36";
+
+const PAWS = [
+  { x: 16, y: 21.3, hock: -2.4, toe: 1.8 },
+  { x: 31, y: 20.6, hock: .65, toe: 1.25 },
+  { x: 20, y: 21.4, hock: -2.6, toe: 2.05 },
+  { x: 35, y: 20.9, hock: .55, toe: 1.45 },
+] as const;
+
+function pawPath(index: number, reach = 0, lift = 0) {
+  const { x, y, hock, toe } = PAWS[index];
+  const footX = (x + reach).toFixed(2);
+  const footY = (27.2 - lift).toFixed(2);
+  const bend = (x + hock + reach * .42).toFixed(2);
+  return `M${x} ${y}Q${bend} ${(24.6 - lift * .42).toFixed(2)} ${footX} ${footY}q${toe * .5} .55 ${toe} .2`;
+}
 
 const STYLE = `
 [${ROOT_ATTR}] {
@@ -34,7 +49,7 @@ const STYLE = `
 [${ROOT_ATTR}] .mp-hop[data-hop] .mp-impact { animation: mp-hop-impact ${HOP_MS}ms ease-in-out both; }
 [${ROOT_ATTR}] svg { overflow: visible; }
 
-[${ROOT_ATTR}] .mp-leg, [${ROOT_ATTR}] .mp-tail, [${ROOT_ATTR}] .mp-eye,
+[${ROOT_ATTR}] .mp-tail, [${ROOT_ATTR}] .mp-eye,
 [${ROOT_ATTR}] .mp-impact, [${ROOT_ATTR}] .mp-wash { transform-box: view-box; }
 [${ROOT_ATTR}] .mp-tail { transform-origin: 12px 19px; transform: rotate(var(--mp-tail, 0deg)); }
 [${ROOT_ATTR}] .mp-eye { transform-origin: 38px 14.5px; }
@@ -141,10 +156,10 @@ const SPRITE = `
         <path class="mp-tail" d="M12 19C5 20 2 14 6 9" fill="none" stroke="${PINK}" stroke-width="1.8" stroke-linecap="round"/>
       </g>
       <g class="mp-figure">
-        <g class="mp-leg-pose" stroke-linecap="round" stroke-width="2.6">
-          <path class="mp-leg" d="M16 21q-1 5 0 6.5h1.4" stroke="${FUR_FAR}" fill="none" style="transform-origin:16px 21px"/>
-          <g class="mp-far-front"><path class="mp-leg" d="M31 21q-1 5 0 6.5h1.4" stroke="${FUR_FAR}" fill="none" style="transform-origin:31px 21px"/></g>
-          <path class="mp-leg" d="M20 21q-1 5 0 6.5h1.4" stroke="${FUR}" fill="none" style="transform-origin:20px 21px"/>
+        <g class="mp-leg-pose" stroke-linecap="round" fill="none">
+          <path class="mp-leg" d="${pawPath(0)}" stroke="${FUR_FAR}" stroke-width="2.6"/>
+          <g class="mp-far-front"><path class="mp-leg" d="${pawPath(1)}" stroke="${FUR_FAR}" stroke-width="2"/></g>
+          <path class="mp-leg" d="${pawPath(2)}" stroke="${FUR}" stroke-width="2.85"/>
         </g>
         <g class="mp-doze">
           <ellipse cx="23" cy="17" rx="14.5" ry="7.5" fill="${FUR}"/>
@@ -160,7 +175,7 @@ const SPRITE = `
         </g>
         <g class="mp-front">
           <g class="mp-wash">
-            <path class="mp-leg" d="M35 21q-.8 4.6.4 6.5h1.4" fill="none" stroke="${FUR}" stroke-width="2.6" stroke-linecap="round" style="transform-origin:35px 21px"/>
+            <path class="mp-leg" d="${pawPath(3)}" fill="none" stroke="${FUR}" stroke-width="2.15" stroke-linecap="round"/>
           </g>
         </g>
         <g class="mp-grip" fill="none" stroke-width="2.5" stroke-linecap="round">
@@ -276,7 +291,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     const movingOnFloor = !gesture && !descent && pet.mode !== "skid" && (!attention || attention.phase === "approach");
     const speed = movingOnFloor && dt > 0 ? distance * 1_000 / dt : 0;
     gaitSpeed += (speed - gaitSpeed) * (1 - Math.exp(-dt / 44));
-    const stepLength = 15 + Math.min(gaitSpeed / 150, 1) * 12;
+    const stepLength = strideLength(gaitSpeed);
     stride = (stride + (movingOnFloor ? distance : 0) / stepLength) % 1;
     const gait = gaitFrame(stride, gaitSpeed);
     const dozing = !gesture && pet.mode === "sleep";
@@ -296,7 +311,8 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     }
     legs.forEach((leg, index) => {
       const foot = gait.feet[index];
-      leg.style.transform = `translateY(${(-foot.lift).toFixed(2)}px) rotate(${foot.angle.toFixed(2)}deg)`;
+      const shape = pawPath(index, foot.reach, foot.lift);
+      if (leg.getAttribute("d") !== shape) leg.setAttribute("d", shape);
     });
     const facing = Math.abs(pet.velocity) < 9 ? pet.direction : Math.sign(pet.velocity);
     if (turn.to !== facing) turn = { from: face, to: facing, progress: 0 };
@@ -430,7 +446,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       mouse.style.removeProperty("--mp-tail");
       mouse.style.removeProperty("--mp-breath");
       mouse.style.removeProperty("--mp-wash");
-      legs.forEach((leg) => leg.style.removeProperty("transform"));
+      legs.forEach((leg, index) => leg.setAttribute("d", pawPath(index)));
       render();
     } else {
       frame = requestAnimationFrame(tick);

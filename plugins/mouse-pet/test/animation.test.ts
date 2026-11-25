@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fallFrame, gaitFrame, hopHeight, turnFrame } from "../lib/animation.ts";
+import { fallFrame, gaitFrame, hopHeight, strideLength, turnFrame } from "../lib/animation.ts";
 
 test("all feet settle and the gait stops swinging the tail at rest", () => {
   for (const speed of [0, 15, 38, 150]) {
@@ -9,6 +9,17 @@ test("all feet settle and the gait stops swinging the tail at rest", () => {
     assert.ok(feet.every(({ lift }) => lift >= 0));
     assert.equal(feet.some(({ lift }) => lift > 0), speed > 0);
     assert.equal(Math.abs(tail) > 0, speed > 0);
+  }
+});
+
+test("a grounded paw stays put in the room while the body walks over it", () => {
+  for (const speed of [38, 150]) {
+    const first = gaitFrame(.1, speed).feet[0];
+    const second = gaitFrame(.2, speed).feet[0];
+    assert.equal(first.lift, 0);
+    assert.equal(second.lift, 0);
+    assert.ok(Math.abs(second.reach - first.reach + .1 * strideLength(speed)) < .0001);
+    assert.ok(gaitFrame(.82, speed).feet[0].lift > 0);
   }
 });
 
