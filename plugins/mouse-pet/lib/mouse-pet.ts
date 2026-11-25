@@ -1,8 +1,15 @@
-import { advance, createPet, fit, PET_WIDTH, startle, type Pet } from "./pet.ts";
+import { advance, createPet, fit, maxX, MAX_FRAME_MS, PET_WIDTH, startle, type Pet } from "./pet.ts";
+import { carryPosition, FLOOR_GAP, HOLD_MS, maxLift, PET_HEIGHT, sniffDistance, type Point } from "./interaction.ts";
+import { gaitFrame, hopHeight } from "./animation.ts";
 
 const ROOT_ATTR = "data-mouse-pet";
 const SQUEAK_MS = 700;
 const HOP_MS = 420;
+const SNIFF_DWELL_MS = 650;
+const APPROACH_MS = 320;
+const SNIFF_MS = 900;
+const REAR_MS = 650;
+const LAND_MS = 180;
 
 const FUR = "#c9c9d6";
 const FUR_FAR = "#a3a3b3";
@@ -15,41 +22,78 @@ const STYLE = `
   pointer-events: none; overflow: visible;
 }
 [${ROOT_ATTR}] .mp-mouse {
-  position: absolute; left: 0; bottom: 2px; width: ${PET_WIDTH}px; height: 29px;
+  position: absolute; left: 0; bottom: ${FLOOR_GAP}px; width: ${PET_WIDTH}px; height: ${PET_HEIGHT}px;
   pointer-events: auto; cursor: pointer; will-change: transform; user-select: none;
+  touch-action: none;
   -webkit-tap-highlight-color: transparent;
 }
 [${ROOT_ATTR}] .mp-hop, [${ROOT_ATTR}] .mp-flip, [${ROOT_ATTR}] svg { display: block; width: 100%; height: 100%; }
-[${ROOT_ATTR}] .mp-flip[data-dir="-1"] { transform: scaleX(-1); }
-[${ROOT_ATTR}] .mp-hop[data-hop] { animation: mp-hop ${HOP_MS}ms cubic-bezier(.3, .7, .4, 1); }
+[${ROOT_ATTR}] .mp-flip { transform: scaleX(var(--mp-turn, 1)); }
+[${ROOT_ATTR}] .mp-hop[data-hop] .mp-impact { animation: mp-hop-impact ${HOP_MS}ms ease-in-out both; }
 [${ROOT_ATTR}] svg { overflow: visible; }
 
-[${ROOT_ATTR}] .mp-leg, [${ROOT_ATTR}] .mp-tail, [${ROOT_ATTR}] .mp-eye, [${ROOT_ATTR}] .mp-figure { transform-box: view-box; }
-[${ROOT_ATTR}] .mp-leg { animation: mp-swing var(--mp-step, .2s) ease-in-out infinite alternate; animation-play-state: paused; }
-[${ROOT_ATTR}] .mp-leg[data-phase="b"] { animation-direction: alternate-reverse; }
-[${ROOT_ATTR}] .mp-tail { transform-origin: 12px 18px; animation: mp-tail 1.6s ease-in-out infinite alternate; }
-[${ROOT_ATTR}] .mp-eye { transform-origin: 38px 14.5px; animation: mp-blink 4.5s infinite; }
-[${ROOT_ATTR}] .mp-eye-closed, [${ROOT_ATTR}] .mp-z { display: none; }
-[${ROOT_ATTR}] .mp-figure { transform-origin: 24px 29px; }
-
-[${ROOT_ATTR}] [data-mode="walk"] { --mp-step: .24s; }
-[${ROOT_ATTR}] [data-mode="run"] { --mp-step: .09s; }
-[${ROOT_ATTR}] [data-mode="walk"] .mp-leg, [${ROOT_ATTR}] [data-mode="run"] .mp-leg { animation-play-state: running; }
-[${ROOT_ATTR}] [data-mode="run"] .mp-figure { animation: mp-bob .18s ease-in-out infinite alternate; }
-[${ROOT_ATTR}] [data-mode="run"] .mp-tail { animation-duration: .25s; }
-[${ROOT_ATTR}] [data-mode="walk"] .mp-tail { animation-duration: .8s; }
-
-[${ROOT_ATTR}] [data-mode="groom"] .mp-paw { stroke: ${FUR_FAR}; animation: mp-wash .3s ease-in-out infinite alternate; animation-play-state: running; }
-[${ROOT_ATTR}] [data-mode="groom"] .mp-tail, [${ROOT_ATTR}] [data-mode="sit"] .mp-tail { animation-duration: 2.4s; }
-
-[${ROOT_ATTR}] [data-mode="sleep"] .mp-legs, [${ROOT_ATTR}] [data-mode="sleep"] .mp-paw, [${ROOT_ATTR}] [data-mode="sleep"] .mp-eye { display: none; }
-[${ROOT_ATTR}] [data-mode="sleep"] .mp-eye-closed { display: inline; }
-[${ROOT_ATTR}] [data-mode="sleep"] .mp-figure { transform: translateY(3px) scaleY(.88); }
-[${ROOT_ATTR}] [data-mode="sleep"] .mp-tail { animation-duration: 3.6s; }
-[${ROOT_ATTR}] [data-mode="sleep"] .mp-z {
-  display: block; position: absolute; left: 100%; bottom: 60%; margin-left: -4px;
-  font: 600 11px/1 ui-monospace, monospace; color: var(--muted-foreground); animation: mp-z 2.4s ease-out infinite;
+[${ROOT_ATTR}] .mp-leg, [${ROOT_ATTR}] .mp-tail, [${ROOT_ATTR}] .mp-eye,
+[${ROOT_ATTR}] .mp-figure, [${ROOT_ATTR}] .mp-impact, [${ROOT_ATTR}] .mp-wash { transform-box: view-box; }
+[${ROOT_ATTR}] .mp-tail { transform-origin: 12px 19px; transform: rotate(var(--mp-tail, 0deg)); }
+[${ROOT_ATTR}] .mp-eye { transform-origin: 38px 14.5px; animation: mp-blink 5s infinite; }
+[${ROOT_ATTR}] .mp-eye-state, [${ROOT_ATTR}] .mp-eye-closed { transition: opacity .18s ease; }
+[${ROOT_ATTR}] .mp-eye-closed { opacity: 0; }
+[${ROOT_ATTR}] .mp-figure { transform: translateY(var(--mp-bob, 0px)); }
+[${ROOT_ATTR}] .mp-impact { transform-origin: 24px 28px; }
+[${ROOT_ATTR}] [data-mode="press"] { cursor: grab; }
+[${ROOT_ATTR}] [data-mode="carry"] { cursor: grabbing; }
+[${ROOT_ATTR}] .mp-pose, [${ROOT_ATTR}] .mp-head, [${ROOT_ATTR}] .mp-front,
+[${ROOT_ATTR}] .mp-grip, [${ROOT_ATTR}] .mp-leg-pose, [${ROOT_ATTR}] .mp-tail-pose {
+  transform-box: view-box;
+  transition: transform .16s ease-out, opacity .16s ease-out;
 }
+[${ROOT_ATTR}] .mp-pose { transform-origin: 24px 28px; }
+[${ROOT_ATTR}] .mp-head { transform-origin: 32px 17px; }
+[${ROOT_ATTR}] .mp-front { transform-origin: 35px 21px; }
+[${ROOT_ATTR}] .mp-wash { transform-origin: 35px 21px; transform: rotate(var(--mp-wash, 0deg)); }
+[${ROOT_ATTR}] .mp-grip { opacity: 0; }
+[${ROOT_ATTR}] .mp-leg-pose { transform-origin: 19px 21px; }
+[${ROOT_ATTR}] .mp-tail-pose { transform-origin: 12px 19px; }
+[${ROOT_ATTR}] :is([data-mode="press"], [data-mode="carry"]) .mp-head { transform: rotate(-11deg) translateY(-1px); }
+[${ROOT_ATTR}] [data-mode="press"] .mp-front { transition-duration: .38s; transform: rotate(-95deg); }
+[${ROOT_ATTR}] [data-mode="carry"] .mp-front { opacity: 0; transform: rotate(-150deg); }
+[${ROOT_ATTR}] [data-mode="carry"] .mp-grip { opacity: 1; }
+[${ROOT_ATTR}] [data-mode="carry"] .mp-leg-pose { transform: translate(-2px, 2px) rotate(var(--mp-leg-swing, 0deg)); }
+[${ROOT_ATTR}] [data-mode="carry"] .mp-tail-pose { transform: rotate(var(--mp-tail-swing, 0deg)); }
+[${ROOT_ATTR}] :is([data-mode="carry"], [data-mode="fall"]) .mp-pose {
+  transform-origin: 33px 4px;
+  transform: rotate(var(--mp-swing, 0deg)) scale(var(--mp-body-width, 1), var(--mp-body-height, 1));
+  transition: none;
+}
+[${ROOT_ATTR}] [data-mode="sniff"] .mp-head { transform: translateX(var(--mp-sniff, 0px)) rotate(5deg); }
+[${ROOT_ATTR}] [data-mode="rear"] .mp-pose { transform-origin: 17px 27px; transform: rotate(-19deg) scale(.96, 1.07); }
+[${ROOT_ATTR}] [data-mode="rear"] .mp-head { transform: rotate(-10deg) translateY(-1px); }
+[${ROOT_ATTR}] [data-mode="rear"] .mp-front { transform: rotate(-84deg); }
+[${ROOT_ATTR}] [data-mode="land"] .mp-pose { animation: mp-land ${LAND_MS}ms ease-out; }
+[${ROOT_ATTR}] [data-mode="skid"] .mp-pose { animation: mp-skid .26s ease-in-out; }
+[${ROOT_ATTR}] [data-mode="skid"] .mp-leg-pose { animation: mp-skid-feet .26s ease-in-out; }
+[${ROOT_ATTR}] [data-mode="skid"] .mp-tail-pose { animation: mp-skid-tail .26s ease-out; }
+[${ROOT_ATTR}] [data-mode="stretch"] .mp-pose { animation: mp-stretch .62s ease-in-out both; }
+[${ROOT_ATTR}] [data-mode="stretch"] .mp-front { animation: mp-stretch-paw .62s ease-in-out; }
+
+[${ROOT_ATTR}] [data-mode="sit"] .mp-head { transform: translateY(-1px) rotate(-6deg); }
+[${ROOT_ATTR}] [data-mode="groom"] .mp-head { transform: translate(-.6px, .3px) rotate(6deg); }
+[${ROOT_ATTR}] [data-mode="groom"] .mp-front { transform: rotate(-104deg); }
+[${ROOT_ATTR}] :is([data-mode="sleep"], [data-mode="stretch"]) .mp-eye-state { opacity: 0; }
+[${ROOT_ATTR}] :is([data-mode="sleep"], [data-mode="stretch"]) .mp-eye-closed { opacity: 1; }
+[${ROOT_ATTR}] [data-mode="sleep"] .mp-pose {
+  transform: translateY(2px) scale(1.03, .88); transition-duration: .36s;
+}
+[${ROOT_ATTR}] [data-mode="sleep"] .mp-head { transform: translate(-1px, 1px) rotate(10deg); }
+[${ROOT_ATTR}] [data-mode="sleep"] .mp-front { transform: rotate(-35deg); }
+[${ROOT_ATTR}] [data-mode="sleep"] .mp-leg-pose { transform: translateY(-2px) scaleY(.65); }
+[${ROOT_ATTR}] [data-mode="sleep"] .mp-tail-pose { transform: rotate(-25deg); }
+[${ROOT_ATTR}] .mp-doze { transform-box: view-box; transform-origin: 24px 28px; transform: scaleY(var(--mp-breath, 1)); }
+[${ROOT_ATTR}] .mp-z {
+  opacity: 0; position: absolute; left: 100%; bottom: 60%; margin-left: -4px;
+  font: 600 11px/1 ui-monospace, monospace; color: var(--muted-foreground);
+}
+[${ROOT_ATTR}] [data-mode="sleep"] .mp-z { animation: mp-z 2.6s .45s ease-out infinite; }
 
 [${ROOT_ATTR}] .mp-squeak {
   display: none; position: absolute; left: 50%; bottom: 100%; margin-bottom: 4px; padding: 2px 7px;
@@ -59,40 +103,68 @@ const STYLE = `
 }
 [${ROOT_ATTR}] .mp-squeak[data-visible] { display: block; animation: mp-pop ${SQUEAK_MS}ms ease-out; }
 
-@keyframes mp-swing { from { transform: rotate(-38deg); } to { transform: rotate(38deg); } }
-@keyframes mp-wash { from { transform: rotate(-125deg); } to { transform: rotate(-158deg); } }
-@keyframes mp-tail { from { transform: rotate(-9deg); } to { transform: rotate(11deg); } }
-@keyframes mp-bob { from { transform: translateY(0); } to { transform: translateY(-1.5px); } }
-@keyframes mp-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
-@keyframes mp-hop { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-16px); } }
+@keyframes mp-blink { 0%, 89%, 94%, 100% { transform: scaleY(1); } 91% { transform: scaleY(.12); } }
+@keyframes mp-hop-impact {
+  0%, 100% { transform: none; }
+  12% { transform: scale(1.05, .83); }
+  29% { transform: scale(.98, 1.09); }
+  65% { transform: scale(.99, 1.035); }
+  90% { transform: scale(1.06, .85); }
+}
+@keyframes mp-land {
+  0%, 100% { transform: none; }
+  25% { transform: scale(1.09, .84); }
+  65% { transform: scale(.99, 1.025); }
+}
+@keyframes mp-skid { 0%, 100% { transform: none; } 42% { transform: translate(-1px, 1px) scale(1.06, .94); } }
+@keyframes mp-skid-feet { 0%, 100% { transform: none; } 45% { transform: translateX(2px) rotate(-15deg); } }
+@keyframes mp-skid-tail { 0%, 100% { transform: none; } 44% { transform: rotate(28deg); } }
+@keyframes mp-stretch { 0% { transform: translateY(2px) scale(1.03, .88); } 50% { transform: translate(1px, 1px) skewY(4deg) scale(1.09, .91); } 100% { transform: none; } }
+@keyframes mp-stretch-paw { 0%, 100% { transform: none; } 50% { transform: rotate(-33deg); } }
 @keyframes mp-z { from { opacity: 0; transform: translate(0, 4px); } 25% { opacity: 1; } to { opacity: 0; transform: translate(5px, -9px); } }
 @keyframes mp-pop { from { opacity: 0; transform: translate(-50%, 4px); } 15% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } to { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  [${ROOT_ATTR}] * { animation: none !important; }
+  [${ROOT_ATTR}] * { animation: none !important; transition: none !important; }
 }
 `;
 
 const SPRITE = `
 <svg viewBox="0 0 48 29" aria-hidden="true" focusable="false">
-  <g class="mp-tail"><path d="M12 19C5 20 2 14 6 9" fill="none" stroke="${PINK}" stroke-width="1.8" stroke-linecap="round"/></g>
-  <g class="mp-figure">
-    <g class="mp-legs" stroke-linecap="round" stroke-width="2.6">
-      <path class="mp-leg" data-phase="a" d="M16 21v6.5" stroke="${FUR_FAR}" style="transform-origin:16px 21px"/>
-      <path class="mp-leg" data-phase="b" d="M31 21v6.5" stroke="${FUR_FAR}" style="transform-origin:31px 21px"/>
-      <path class="mp-leg" data-phase="b" d="M20 21v6.5" stroke="${FUR}" style="transform-origin:20px 21px"/>
+  <g class="mp-impact">
+    <g class="mp-pose">
+      <g class="mp-tail-pose">
+        <path class="mp-tail" d="M12 19C5 20 2 14 6 9" fill="none" stroke="${PINK}" stroke-width="1.8" stroke-linecap="round"/>
+      </g>
+      <g class="mp-figure">
+        <g class="mp-leg-pose" stroke-linecap="round" stroke-width="2.6">
+          <path class="mp-leg" d="M16 21q-1 5 0 6.5h1.4" stroke="${FUR_FAR}" fill="none" style="transform-origin:16px 21px"/>
+          <path class="mp-leg" d="M31 21q-1 5 0 6.5h1.4" stroke="${FUR_FAR}" fill="none" style="transform-origin:31px 21px"/>
+          <path class="mp-leg" d="M20 21q-1 5 0 6.5h1.4" stroke="${FUR}" fill="none" style="transform-origin:20px 21px"/>
+        </g>
+        <g class="mp-doze">
+          <ellipse cx="23" cy="17" rx="14.5" ry="7.5" fill="${FUR}"/>
+          <g class="mp-head">
+            <ellipse cx="38" cy="16" rx="7.5" ry="5.4" fill="${FUR}"/>
+            <circle cx="33.5" cy="9.6" r="4.3" fill="${FUR}"/>
+            <circle cx="33.5" cy="9.6" r="2.6" fill="${PINK}"/>
+            <circle cx="45" cy="17" r="1.6" fill="${PINK}"/>
+            <path d="M42 18.4 47.5 17.2M42 19.2 47.5 20.6" fill="none" stroke="${FUR_FAR}" stroke-width=".6" stroke-linecap="round"/>
+            <g class="mp-eye-state"><circle class="mp-eye" cx="38" cy="14.5" r="1.2" fill="${INK}"/></g>
+            <path class="mp-eye-closed" d="M36.6 14.7q1.4 1.1 2.8 0" fill="none" stroke="${INK}" stroke-width="1" stroke-linecap="round"/>
+          </g>
+        </g>
+        <g class="mp-front">
+          <g class="mp-wash">
+            <path class="mp-leg" d="M35 21q-.8 4.6.4 6.5h1.4" fill="none" stroke="${FUR}" stroke-width="2.6" stroke-linecap="round" style="transform-origin:35px 21px"/>
+          </g>
+        </g>
+        <g class="mp-grip" fill="none" stroke-width="2.5" stroke-linecap="round">
+          <path d="M29 15Q27 8 31 5" stroke="${FUR_FAR}"/>
+          <path d="M34 18Q38 9 33 4" stroke="${FUR}"/>
+        </g>
+      </g>
     </g>
-    <ellipse cx="23" cy="17" rx="14.5" ry="7.5" fill="${FUR}"/>
-    <ellipse cx="38" cy="16" rx="7.5" ry="5.4" fill="${FUR}"/>
-    <circle cx="33.5" cy="9.6" r="4.3" fill="${FUR}"/>
-    <circle cx="33.5" cy="9.6" r="2.6" fill="${PINK}"/>
-    <path class="mp-leg mp-paw" data-phase="a" d="M35 21v6.5" stroke="${FUR}" stroke-width="2.6" stroke-linecap="round" style="transform-origin:35px 21px"/>
-    <circle cx="45" cy="17" r="1.6" fill="${PINK}"/>
-    <g stroke="${FUR_FAR}" stroke-width=".6" stroke-linecap="round">
-      <path d="M42 18.4 47.5 17.2M42 19.2 47.5 20.6"/>
-    </g>
-    <circle class="mp-eye" cx="38" cy="14.5" r="1.2" fill="${INK}"/>
-    <path class="mp-eye-closed" d="M36.6 14.7q1.4 1.1 2.8 0" fill="none" stroke="${INK}" stroke-width="1" stroke-linecap="round"/>
   </g>
 </svg>`;
 
@@ -101,6 +173,23 @@ function prefersReducedMotion(): MediaQueryList {
 }
 
 const viewportWidth = () => document.documentElement.clientWidth;
+const viewportHeight = () => document.documentElement.clientHeight;
+
+type Gesture = {
+  pointerId: number;
+  started: number;
+  point: Point;
+  phase: "press" | "carry";
+  pickedUpAt: number;
+};
+
+type Attention = {
+  phase: "approach" | "sniff" | "rear";
+  started: number;
+  point: Point;
+  fromX: number;
+  toX: number;
+};
 
 export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const style = document.createElement("style");
@@ -113,23 +202,163 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const hop = root.querySelector<HTMLElement>(".mp-hop")!;
   const flip = root.querySelector<HTMLElement>(".mp-flip")!;
   const squeak = root.querySelector<HTMLElement>(".mp-squeak")!;
+  const legs = Array.from(root.querySelectorAll<SVGElement>(".mp-leg"));
   document.head.append(style);
   document.body.append(root);
 
   let pet: Pet = createPet(viewportWidth(), Math.random);
   let frame = 0;
   let lastTime = 0;
-  const timers = new Set<number>();
+  let gesture: Gesture | null = null;
+  let cursor: { point: Point; since: number; visited: boolean } | null = null;
+  let attention: Attention | null = null;
+  let descent: { phase: "fall" | "land"; elapsed: number; lift: number } | null = null;
+  let lift = 0;
+  let swing = 0;
+  let swingVelocity = 0;
+  let tuck = 0;
+  let previousX = pet.x;
+  let clickTimer = 0;
+  let hopStarted: number | null = null;
+  let hopLift = 0;
+  let stride = 0;
+  let gaitSpeed = 0;
+  let face: number = pet.direction;
+  let rest = 0;
+  let tailPhase = 0;
+  let wash = 0;
+  const motion = prefersReducedMotion();
 
   const render = () => {
-    mouse.style.transform = `translate3d(${pet.x.toFixed(1)}px, 0, 0)`;
-    if (mouse.dataset.mode !== pet.mode) mouse.dataset.mode = pet.mode;
+    mouse.style.transform = `translate3d(${pet.x.toFixed(2)}px, ${(-(lift + hopLift)).toFixed(2)}px, 0)`;
+    const mode = motion.matches ? "sit" : gesture?.phase ?? descent?.phase ?? attention?.phase ?? pet.mode;
+    if (mouse.dataset.mode !== mode) mouse.dataset.mode = mode;
+    if (mode === "carry" || mode === "fall") {
+      mouse.style.setProperty("--mp-swing", `${swing.toFixed(2)}deg`);
+      mouse.style.setProperty("--mp-leg-swing", `${(swing * -.55).toFixed(2)}deg`);
+      mouse.style.setProperty("--mp-tail-swing", `${(swing * 1.5).toFixed(2)}deg`);
+      mouse.style.setProperty("--mp-body-width", (1 - .06 * tuck).toFixed(3));
+      mouse.style.setProperty("--mp-body-height", (1 + .11 * tuck).toFixed(3));
+    }
     const direction = String(pet.direction);
     if (flip.dataset.dir !== direction) flip.dataset.dir = direction;
   };
+
+  const sit = () => { pet = { ...pet, velocity: 0, mode: "sit", remainingMs: 900 }; };
+
+  const drawMotion = (time: number, dt: number, distance: number) => {
+    const movingOnFloor = !gesture && !descent && pet.mode !== "skid" && (!attention || attention.phase === "approach");
+    const speed = movingOnFloor && dt > 0 ? distance * 1_000 / dt : 0;
+    gaitSpeed += (speed - gaitSpeed) * (1 - Math.exp(-dt / 44));
+    const stepLength = 15 + Math.min(gaitSpeed / 150, 1) * 12;
+    stride = (stride + (movingOnFloor ? distance : 0) / stepLength) % 1;
+    const gait = gaitFrame(stride, gaitSpeed);
+    const dozing = !gesture && pet.mode === "sleep";
+    rest += ((dozing ? 1 : 0) - rest) * (1 - Math.exp(-dt / 140));
+    tailPhase = (tailPhase + dt / (240 + rest * 430)) % (Math.PI * 2);
+    const tail = gait.tail + Math.sin(tailPhase) * (3.2 - rest * 1.7);
+    const breath = 1 + rest * .038 * (1 - Math.cos(time / 440)) / 2;
+    const washTarget = !gesture && pet.mode === "groom" ? -14 * (1 - Math.cos(time / 83)) : 0;
+    wash += (washTarget - wash) * (1 - Math.exp(-dt / 40));
+    mouse.style.setProperty("--mp-tail", `${tail.toFixed(2)}deg`);
+    mouse.style.setProperty("--mp-bob", `${gait.bob.toFixed(2)}px`);
+    mouse.style.setProperty("--mp-breath", breath.toFixed(3));
+    mouse.style.setProperty("--mp-wash", `${wash.toFixed(2)}deg`);
+    if (attention?.phase === "sniff") {
+      const progress = Math.min((time - attention.started) / SNIFF_MS, 1);
+      const reach = 4 * Math.sin(Math.PI * progress) * (.72 + .28 * Math.sin(progress * 4 * Math.PI) ** 2);
+      mouse.style.setProperty("--mp-sniff", `${reach.toFixed(2)}px`);
+    }
+    legs.forEach((leg, index) => {
+      const foot = gait.feet[index];
+      leg.style.transform = `translateY(${(-foot.lift).toFixed(2)}px) rotate(${foot.angle.toFixed(2)}deg)`;
+    });
+    face += (pet.direction - face) * (1 - Math.exp(-dt / 35));
+    flip.style.setProperty("--mp-turn", face.toFixed(3));
+
+    if (hopStarted !== null) {
+      const progress = (time - hopStarted) / HOP_MS;
+      hopLift = hopHeight(progress);
+      if (progress >= 1) hopStarted = null;
+    }
+  };
+
+  const placeAtGrip = (blend: number) => {
+    if (!gesture) return;
+    const position = carryPosition(gesture.point, pet.direction, viewportWidth(), viewportHeight());
+    pet.x += (position.x - pet.x) * blend;
+    lift += (position.lift - lift) * blend;
+  };
+
+  const updateGesture = (time: number, dt: number) => {
+    if (!gesture) return;
+    if (gesture.phase === "press" && lift > 0) lift = Math.max(0, lift - dt * .13);
+    if (gesture.phase === "press" && time - gesture.started >= HOLD_MS) {
+      gesture.phase = "carry";
+      gesture.pickedUpAt = time;
+      previousX = pet.x;
+    }
+    if (gesture.phase === "carry") {
+      const age = time - gesture.pickedUpAt;
+      tuck = Math.min(age / 170, 1);
+      placeAtGrip(age >= 190 ? 1 : 1 - Math.exp(-dt / 42));
+      const target = Math.max(-10, Math.min(10, (pet.x - previousX) / Math.max(dt, 1) * 9)) * pet.direction;
+      const step = Math.min(dt / 1000, .032);
+      swingVelocity += ((target - swing) * 225 - swingVelocity * 19) * step;
+      swing += swingVelocity * step;
+      previousX = pet.x;
+    }
+  };
+
+  const updateAttention = (time: number) => {
+    if (attention) {
+      const elapsed = time - attention.started;
+      if (attention.phase === "approach") {
+        const progress = Math.min(elapsed / APPROACH_MS, 1);
+        const eased = progress * progress * (3 - 2 * progress);
+        pet.x = attention.fromX + (attention.toX - attention.fromX) * eased;
+        if (progress === 1) {
+          attention.phase = "sniff";
+          attention.started = time;
+        }
+      } else if (elapsed >= (attention.phase === "sniff" ? SNIFF_MS : REAR_MS)) {
+        attention = null;
+      }
+      return true;
+    }
+    if (!cursor || cursor.visited || time - cursor.since < SNIFF_DWELL_MS ||
+        pet.mode === "sleep" || pet.mode === "stretch" || pet.mode === "skid" || pet.mode === "run") return false;
+    const distance = sniffDistance(pet.x, pet.direction, cursor.point, viewportHeight());
+    if (distance === null) return false;
+    cursor.visited = true;
+    const toX = Math.max(0, Math.min(pet.x + pet.direction * (distance - 3), maxX(viewportWidth())));
+    attention = { phase: "approach", started: time, point: cursor.point, fromX: pet.x, toX };
+    sit();
+    return true;
+  };
+
+  const updateDescent = (dt: number) => {
+    if (!descent) return;
+    descent.elapsed += dt;
+    if (descent.phase === "fall") {
+      lift = Math.min(maxLift(viewportHeight()), Math.max(0, descent.lift - .003 * descent.elapsed ** 2));
+      const settle = lift === 0 ? 1 : Math.min(dt / 85, 1);
+      swing *= Math.max(0, 1 - settle);
+      tuck *= Math.max(0, 1 - settle);
+      if (lift === 0) descent = { phase: "land", elapsed: 0, lift: 0 };
+    } else if (descent.elapsed >= LAND_MS) {
+      descent = null;
+    }
+  };
+
   const tick = (time: number) => {
-    pet = advance(pet, lastTime === 0 ? 0 : time - lastTime, viewportWidth(), Math.random);
+    const dt = lastTime === 0 ? 0 : Math.min(time - lastTime, MAX_FRAME_MS);
     lastTime = time;
+    const x = pet.x;
+    if (gesture) updateGesture(time, dt);
+    else if (descent) updateDescent(dt);
+    else if (!updateAttention(time)) pet = advance(pet, dt, viewportWidth(), Math.random);
+    drawMotion(time, dt, Math.abs(pet.x - x));
     render();
     frame = requestAnimationFrame(tick);
   };
@@ -138,41 +367,144 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     frame = 0;
     lastTime = 0;
   };
-  const motion = prefersReducedMotion();
   const syncMotion = () => {
+    cancelInteraction();
     stopLoop();
     if (motion.matches) {
-      pet = { ...pet, mode: "sit" };
+      sit();
+      flip.style.setProperty("--mp-turn", String(pet.direction));
+      mouse.style.removeProperty("--mp-tail");
+      mouse.style.removeProperty("--mp-bob");
+      mouse.style.removeProperty("--mp-breath");
+      mouse.style.removeProperty("--mp-wash");
+      legs.forEach((leg) => leg.style.removeProperty("transform"));
       render();
     } else {
       frame = requestAnimationFrame(tick);
     }
   };
 
-  const flash = (element: HTMLElement, attribute: string, ms: number) => {
-    element.removeAttribute(attribute);
-    void element.offsetWidth;
-    element.setAttribute(attribute, "");
-    const timer = window.setTimeout(() => {
-      element.removeAttribute(attribute);
-      timers.delete(timer);
-    }, ms);
-    timers.add(timer);
+  const clearClick = () => {
+    window.clearTimeout(clickTimer);
+    hopStarted = null;
+    hopLift = 0;
+    hop.removeAttribute("data-hop");
+    squeak.removeAttribute("data-visible");
   };
-  const onClick = () => {
-    flash(hop, "data-hop", HOP_MS);
-    flash(squeak, "data-visible", SQUEAK_MS);
-    if (!motion.matches) pet = startle(pet);
+  const reactToClick = () => {
+    clearClick();
+    void hop.offsetWidth;
+    hop.setAttribute("data-hop", "");
+    squeak.setAttribute("data-visible", "");
+    clickTimer = window.setTimeout(clearClick, SQUEAK_MS);
+    if (!motion.matches) {
+      hopStarted = performance.now();
+      pet = startle(pet);
+    }
+  };
+  const releaseCapture = () => {
+    const pointerId = gesture?.pointerId;
+    gesture = null;
+    if (pointerId !== undefined && mouse.hasPointerCapture(pointerId)) mouse.releasePointerCapture(pointerId);
+  };
+  const cancelInteraction = () => {
+    if (gesture || descent) sit();
+    releaseCapture();
+    attention = cursor = descent = null;
+    swing = swingVelocity = tuck = lift = 0;
+    clearClick();
     render();
   };
+  const onDown = (event: PointerEvent) => {
+    if (gesture || !event.isPrimary || event.button !== 0 || descent) return;
+    event.preventDefault();
+    lift = Math.min(hopLift, maxLift(viewportHeight()));
+    clearClick();
+    pet.velocity = 0;
+    attention = cursor = null;
+    mouse.setPointerCapture(event.pointerId);
+    gesture = {
+      pointerId: event.pointerId, started: performance.now(),
+      point: { x: event.clientX, y: event.clientY }, phase: "press", pickedUpAt: 0,
+    };
+    if (!motion.matches) render();
+  };
+  const onMove = (event: PointerEvent) => {
+    const point = { x: event.clientX, y: event.clientY };
+    if (gesture?.pointerId === event.pointerId) {
+      gesture.point = point;
+      if ((event.buttons & 1) === 0) finishGesture(false);
+      else if (gesture.phase === "carry" && performance.now() - gesture.pickedUpAt >= 190) {
+        placeAtGrip(1);
+        render();
+      }
+      return;
+    }
+    if (motion.matches || gesture || event.pointerType !== "mouse") return;
+    if (event.buttons !== 0) {
+      clearAttention();
+      return;
+    }
+    if (attention?.phase === "sniff" && Math.abs(point.x - attention.point.x) <= 9 &&
+        point.y <= attention.point.y - 7 && point.y >= attention.point.y - 32) {
+      attention.phase = "rear";
+      attention.started = performance.now();
+    } else if (attention && (Math.abs(point.x - attention.point.x) > 9 ||
+        Math.abs(point.y - attention.point.y) > (attention.phase === "rear" ? 32 : 9))) {
+      attention = null;
+    }
+    if (!cursor || Math.hypot(point.x - cursor.point.x, point.y - cursor.point.y) > 5) {
+      cursor = { point, since: performance.now(), visited: false };
+    }
+  };
+  const finishGesture = (canClick: boolean) => {
+    if (!gesture) return;
+    const held = !motion.matches && performance.now() - gesture.started >= HOLD_MS;
+    const carrying = gesture.phase === "carry";
+    releaseCapture();
+    if (carrying || lift > 0) {
+      sit();
+      if (lift > 4) {
+        descent = { phase: "fall", elapsed: 0, lift };
+      } else {
+        lift = 0;
+        swing = tuck = 0;
+      }
+      swingVelocity = 0;
+    } else if (canClick && !held) {
+      reactToClick();
+    }
+    render();
+  };
+  const onUp = (event: PointerEvent) => {
+    if (gesture?.pointerId === event.pointerId && event.button === 0) finishGesture(true);
+  };
+  const onCancel = (event: PointerEvent) => {
+    if (gesture?.pointerId === event.pointerId) cancelInteraction();
+  };
+  const clearAttention = () => { attention = cursor = null; };
+  const onVisibility = () => { if (document.hidden) cancelInteraction(); };
   const onResize = () => {
+    clearAttention();
     pet = fit(pet, viewportWidth());
+    if (gesture?.phase === "carry") placeAtGrip(1);
+    lift = Math.min(lift, maxLift(viewportHeight()));
     render();
   };
 
-  mouse.addEventListener("click", onClick);
-  window.addEventListener("resize", onResize);
-  motion.addEventListener("change", syncMotion);
+  const listeners = new AbortController();
+  const options = { signal: listeners.signal };
+  mouse.addEventListener("pointerdown", onDown, options);
+  mouse.addEventListener("pointerup", onUp, options);
+  mouse.addEventListener("pointercancel", onCancel, options);
+  mouse.addEventListener("lostpointercapture", onCancel, options);
+  window.addEventListener("pointermove", onMove, { ...options, capture: true });
+  document.documentElement.addEventListener("pointerleave", clearAttention, options);
+  document.addEventListener("visibilitychange", onVisibility, options);
+  window.addEventListener("blur", cancelInteraction, options);
+  window.addEventListener("resize", onResize, options);
+  motion.addEventListener("change", syncMotion, options);
+  flip.style.setProperty("--mp-turn", String(face));
   render();
   syncMotion();
 
@@ -181,14 +513,14 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     if (disposed) return;
     disposed = true;
     stopLoop();
-    timers.forEach((timer) => window.clearTimeout(timer));
-    timers.clear();
-    mouse.removeEventListener("click", onClick);
-    window.removeEventListener("resize", onResize);
-    motion.removeEventListener("change", syncMotion);
+    listeners.abort();
+    releaseCapture();
+    clearClick();
+    signal.removeEventListener("abort", dispose);
     root.remove();
     style.remove();
   };
   signal.addEventListener("abort", dispose, { once: true });
+  if (signal.aborted) dispose();
   return dispose;
 }

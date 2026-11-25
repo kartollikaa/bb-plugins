@@ -1,8 +1,9 @@
-export type PetMode = "walk" | "run" | "sit" | "groom" | "sleep";
+export type PetMode = "walk" | "run" | "sit" | "groom" | "sleep" | "skid" | "stretch";
 export type Direction = 1 | -1;
 
 export interface Pet {
   x: number;
+  velocity: number;
   direction: Direction;
   mode: PetMode;
   remainingMs: number;
@@ -10,14 +11,19 @@ export interface Pet {
 
 export const PET_WIDTH = 48;
 export const MAX_FRAME_MS = 100;
+export const SKID_MS = 260;
 
-const SPEED_PX_PER_S: Record<PetMode, number> = { walk: 38, run: 150, sit: 0, groom: 0, sleep: 0 };
+const SPEED_PX_PER_S: Record<PetMode, number> = {
+  walk: 38, run: 150, sit: 0, groom: 0, sleep: 0, skid: 0, stretch: 0,
+};
 const DURATION_MS: Record<PetMode, readonly [number, number]> = {
   walk: [2_000, 5_000],
   run: [1_500, 3_500],
   sit: [1_500, 4_000],
   groom: [2_000, 3_500],
   sleep: [6_000, 14_000],
+  skid: [SKID_MS, SKID_MS],
+  stretch: [620, 620],
 };
 const AFTER_MOVING: ReadonlyArray<readonly [PetMode, number]> = [
   ["walk", 25],
@@ -57,6 +63,7 @@ function durationFor(mode: PetMode, random: Random): number {
 export function createPet(viewportWidth: number, random: Random): Pet {
   return {
     x: random() * maxX(viewportWidth),
+    velocity: 0,
     direction: random() < 0.5 ? 1 : -1,
     mode: "walk",
     remainingMs: durationFor("walk", random),
@@ -64,39 +71,64 @@ export function createPet(viewportWidth: number, random: Random): Pet {
 }
 
 function chooseNext(pet: Pet, random: Random): Pet {
-  const mode = pickWeighted(isMoving(pet.mode) ? AFTER_MOVING : AFTER_RESTING, random);
+  if (pet.mode === "skid") {
+    return { ...pet, velocity: 0, direction: reverse(pet.direction), mode: "run", remainingMs: durationFor("run", random) };
+  }
+  if (pet.mode === "sleep") {
+    return { ...pet, mode: "stretch", remainingMs: durationFor("stretch", random) };
+  }
+  const mode = pet.mode === "stretch" ? "walk" : pickWeighted(isMoving(pet.mode) ? AFTER_MOVING : AFTER_RESTING, random);
   const turns = isMoving(mode) && random() < TURN_AROUND_CHANCE;
   return {
     ...pet,
     mode,
-    direction: turns ? (pet.direction === 1 ? -1 : 1) : pet.direction,
+    direction: turns ? reverse(pet.direction) : pet.direction,
     remainingMs: durationFor(mode, random),
   };
 }
 
-/** Moves the pet by `dtMs`, bounces it off both window edges and switches mode when the current one runs out. */
+const reverse = (direction: Direction): Direction => direction === 1 ? -1 : 1;
+
 export function advance(pet: Pet, dtMs: number, viewportWidth: number, random: Random): Pet {
   const dt = Math.min(Math.max(dtMs, 0), MAX_FRAME_MS);
   const limit = maxX(viewportWidth);
-  let { x, direction } = pet;
-  x += direction * SPEED_PX_PER_S[pet.mode] * (dt / 1000);
-  if (x <= 0) {
-    x = 0;
-    direction = 1;
-  } else if (x >= limit) {
-    x = limit;
-    direction = -1;
+  let { x, velocity, direction } = pet;
+  const edge = direction === -1 ? 0 : limit;
+  const skidDistance = Math.min(16, limit / 2);
+  if (pet.mode === "skid" && pet.remainingMs > 0) {
+    const remainingFraction = Math.max(0, 1 - dt / pet.remainingMs);
+    const distance = Math.min(Math.abs(x - edge), skidDistance);
+    x = edge - direction * distance * remainingFraction ** 2;
+    velocity = direction * distance * remainingFraction * 2_000 / pet.remainingMs;
+  } else {
+    const target = direction * SPEED_PX_PER_S[pet.mode];
+    const difference = target - velocity;
+    const acceleration = Math.min(Math.abs(difference), dt * (target === 0 ? 1.2 : .85));
+    const nextVelocity = velocity + Math.sign(difference) * acceleration;
+    x += (velocity + nextVelocity) * dt / 2_000;
+    velocity = nextVelocity;
   }
-  const moved: Pet = { ...pet, x, direction, remainingMs: pet.remainingMs - dt };
+  const hitsEdge = direction === -1 ? x <= 0 : x >= limit;
+  x = Math.max(0, Math.min(x, limit));
+  if (limit > 0 && pet.mode === "run" && velocity * direction >= 75 && Math.abs(x - edge) <= skidDistance) {
+    x = edge - direction * Math.min(Math.abs(pet.x - edge), skidDistance);
+    return { ...pet, x, velocity, mode: "skid", remainingMs: SKID_MS };
+  }
+  if (hitsEdge && isMoving(pet.mode)) {
+    direction = reverse(direction);
+    velocity = 0;
+  }
+  const moved: Pet = { ...pet, x, velocity: limit === 0 ? 0 : velocity, direction, remainingMs: pet.remainingMs - dt };
   return moved.remainingMs > 0 ? moved : chooseNext(moved, random);
 }
 
 /** A click: the pet bolts the other way. */
 export function startle(pet: Pet): Pet {
-  return { ...pet, mode: "run", direction: pet.direction === 1 ? -1 : 1, remainingMs: STARTLE_MS };
+  return { ...pet, mode: "run", direction: reverse(pet.direction), remainingMs: STARTLE_MS };
 }
 
 /** Keeps the pet inside the window after a resize. */
 export function fit(pet: Pet, viewportWidth: number): Pet {
-  return { ...pet, x: Math.min(pet.x, maxX(viewportWidth)) };
+  const fitted = { ...pet, x: Math.min(pet.x, maxX(viewportWidth)) };
+  return fitted.mode === "skid" ? { ...fitted, velocity: 0, mode: "walk", remainingMs: 2_000 } : fitted;
 }

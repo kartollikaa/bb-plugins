@@ -8,6 +8,7 @@ import {
   maxX,
   MAX_FRAME_MS,
   PET_WIDTH,
+  SKID_MS,
   startle,
   type Pet,
   type PetMode,
@@ -17,6 +18,7 @@ const VIEWPORT = 800;
 const constant = (value: number) => () => value;
 const pet = (overrides: Partial<Pet> = {}): Pet => ({
   x: 100,
+  velocity: 0,
   direction: 1,
   mode: "walk",
   remainingMs: 5_000,
@@ -30,9 +32,19 @@ test("a walking pet moves in its direction", () => {
 });
 
 test("running is faster than walking", () => {
-  const walked = advance(pet({ mode: "walk" }), 50, VIEWPORT, constant(0)).x;
-  const ran = advance(pet({ mode: "run" }), 50, VIEWPORT, constant(0)).x;
+  const walked = advance(pet({ mode: "walk", velocity: 38 }), 50, VIEWPORT, constant(0)).x;
+  const ran = advance(pet({ mode: "run", velocity: 150 }), 50, VIEWPORT, constant(0)).x;
   assert.ok(ran - 100 > (walked - 100) * 2);
+});
+
+test("speed builds from a standing start and settles before a rest", () => {
+  const accelerating = advance(pet({ mode: "run" }), 16, VIEWPORT, constant(0));
+  assert.ok(accelerating.velocity > 0 && accelerating.velocity < 38);
+  const stopping = advance(pet({ mode: "sit", velocity: 80 }), 16, VIEWPORT, constant(0));
+  assert.ok(stopping.x > 100 && stopping.velocity < 80);
+  const stopped = advance(stopping, 100, VIEWPORT, constant(0));
+  assert.equal(stopped.velocity, 0);
+  assert.equal(advance(stopped, 100, VIEWPORT, constant(0)).x, stopped.x);
 });
 
 test("a resting pet stays put", () => {
@@ -42,16 +54,29 @@ test("a resting pet stays put", () => {
   }
 });
 
-test("it turns around at the right edge and stays inside", () => {
-  const edge = maxX(VIEWPORT);
-  const next = advance(pet({ mode: "run", x: edge - 1, direction: 1 }), 100, VIEWPORT, constant(0));
-  assert.equal(next.x, edge);
-  assert.equal(next.direction, -1);
+test("a sprint brakes before either edge and only turns after the skid", () => {
+  for (const direction of [-1, 1] as const) {
+    const edge = direction === 1 ? maxX(VIEWPORT) : 0;
+    let next = advance(pet({ mode: "run", x: edge - direction * 20, velocity: direction * 150, direction }), 40, VIEWPORT, constant(0));
+    assert.equal(next.mode, "skid");
+    const firstDistance = Math.abs(next.x - edge);
+    assert.ok(firstDistance > 0);
+    next = advance(next, 100, VIEWPORT, constant(0));
+    assert.equal(next.direction, direction);
+    assert.ok(Math.abs(next.x - edge) < firstDistance);
+    for (let elapsed = 100; elapsed < SKID_MS; elapsed += 100) {
+      next = advance(next, 100, VIEWPORT, constant(0));
+    }
+    assert.equal(next.x, edge);
+    assert.equal(next.mode, "run");
+    assert.equal(next.direction, -direction);
+  }
 });
 
-test("it turns around at the left edge", () => {
-  const next = advance(pet({ mode: "run", x: 1, direction: -1 }), 100, VIEWPORT, constant(0));
+test("a walking pet turns immediately at the edge", () => {
+  const next = advance(pet({ x: 1, direction: -1 }), 100, VIEWPORT, constant(0));
   assert.equal(next.x, 0);
+  assert.equal(next.mode, "walk");
   assert.equal(next.direction, 1);
 });
 
@@ -81,11 +106,19 @@ test("a moving pet that runs out of time picks the next mode by weight", () => {
   }
 });
 
-test("a resting pet always gets up and moves", () => {
+test("a sitting pet always gets up and moves", () => {
   for (const roll of [0, 0.5, 0.99]) {
-    const next = advance(pet({ mode: "sleep", remainingMs: 1 }), 10, VIEWPORT, constant(roll));
+    const next = advance(pet({ mode: "sit", remainingMs: 1 }), 10, VIEWPORT, constant(roll));
     assert.ok(isMoving(next.mode), `roll ${roll}`);
   }
+});
+
+test("the pet stretches after sleeping and wakes into a walk", () => {
+  const stretched = advance(pet({ mode: "sleep", remainingMs: 1 }), 10, VIEWPORT, constant(0));
+  assert.equal(stretched.mode, "stretch");
+  assert.equal(stretched.x, 100);
+  const awake = advance({ ...stretched, remainingMs: 1 }, 10, VIEWPORT, constant(0));
+  assert.equal(awake.mode, "walk");
 });
 
 test("a new mode may flip the direction", () => {

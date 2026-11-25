@@ -124,18 +124,18 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 ## mouse-pet — `plugins/mouse-pet/`
 
-- **What:** a small mouse that lives along the bottom edge of the bb window. It walks, runs, sits,
-  grooms and sleeps (with a floating "z"), turns at both window edges, and on a click hops, squeaks
-  "Pi!" and bolts the other way. Only the mouse takes clicks; the strip it moves in does not.
+- **What:** a small mouse that lives along the bottom edge of the bb window. Click to make it hop
+  and squeak, hold to carry it, or pause the pointer low and ahead of the mouse to invite a sniff.
+  It skids before turning at a run and stretches after sleeping. Only the mouse takes clicks.
 - **How:** a content script (`lib/mouse-pet.ts`) appends a fixed `[data-mouse-pet]` layer to `body`
   and moves the sprite with a `requestAnimationFrame` loop. Legs, tail, blink and poses are CSS
-  keyframes keyed on `data-mode`. The movement rules (modes, weights, durations, edge bounce) are pure
-  functions in `lib/pet.ts`. With `prefers-reduced-motion` it sits still and animations are off.
+  keyframes keyed on `data-mode`. Autonomous movement lives in `lib/pet.ts`, and grip and sniff
+  geometry in `lib/interaction.ts`. With `prefers-reduced-motion` it sits still and shows "Pi!" on a click.
 - **No commands or settings:** the server entry is empty because bb requires one. Turn the pet off by
   disabling the plugin.
 - **Agent skill:** `skills/mouse-pet/`.
-- **Tests:** `npm test` covers `test/pet.test.ts` (movement, bounce, mode choice, startle). Run
-  `npm run typecheck`. The sprite and animations are checked by eye in the app.
+- **Tests:** `npm test` covers the movement rules and gesture geometry. Run `npm run typecheck`.
+  Check the gestures, sprite and animations in the app.
 - MIT. Release and marketplace status: [publication.md](publication.md).
 
 ## power-pill — `plugins/power-pill/`

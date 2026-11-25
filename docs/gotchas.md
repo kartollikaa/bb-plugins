@@ -9,6 +9,10 @@ can find it by the error text.
 
 ## SDK
 
+- **An isolated npm build reports the temporary directory name as a missing lockfile package.**
+  Run `npm ci` from inside the copied plugin directory. In a sandbox, give npm a writable cache with
+  `--cache "$(mktemp -d)"`.
+
 - **`service refresh did not stop` after a reload or install** (plugin goes `degraded`). A background
   loop that awaits work and then a `sleep(ms, signal)` hangs when the abort arrived during the work:
   the `abort` listener is added too late. Return at once from `sleep` when `signal.aborted`, and pass
