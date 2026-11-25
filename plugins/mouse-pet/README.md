@@ -1,7 +1,8 @@
 # Mouse Pet
 
-A small grey mouse lives along the bottom edge of the bb window. Its paws and tail follow its pace.
-It accelerates into a run, skids before a fast turn, curls up to sleep and stretches when it wakes.
+A small grey mouse lives along the bottom edge of the bb window. It walks at low speed and bounds
+at a run, skids before a fast turn, curls up to sleep and stretches when it wakes. When it stops for
+a moment, it can turn to face you or sit with its back to you.
 
 - Click the mouse to make it hop, squeak "Pi!" and bolt.
 - Hold it for about half a second, then move the pointer to carry it within the window. It hangs

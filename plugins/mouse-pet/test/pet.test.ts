@@ -20,6 +20,7 @@ const pet = (overrides: Partial<Pet> = {}): Pet => ({
   x: 100,
   velocity: 0,
   direction: 1,
+  idleView: "profile",
   mode: "walk",
   remainingMs: 5_000,
   ...overrides,
@@ -123,6 +124,17 @@ test("a sitting pet always gets up and moves", () => {
   for (const roll of [0, 0.5, 0.99]) {
     const next = advance(pet({ mode: "sit", remainingMs: 1 }), 10, VIEWPORT, constant(roll));
     assert.ok(isMoving(next.mode), `roll ${roll}`);
+  }
+});
+
+test("a sit can face forward, away, or along the floor", () => {
+  for (const [roll, view] of [[.1, "profile"], [.4, "front"], [.8, "back"]] as const) {
+    const sequence = [.6, .5, roll];
+    const resting = advance(pet({ remainingMs: 1 }), 16, VIEWPORT, () => sequence.shift() ?? .5);
+    assert.equal(resting.mode, "sit");
+    assert.equal(resting.idleView, view);
+    const moving = advance({ ...resting, remainingMs: 1 }, 16, VIEWPORT, constant(.5));
+    assert.equal(moving.idleView, "profile");
   }
 });
 

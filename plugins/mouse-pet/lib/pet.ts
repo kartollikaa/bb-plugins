@@ -1,10 +1,12 @@
 export type PetMode = "walk" | "run" | "sit" | "groom" | "sleep" | "skid" | "stretch";
 export type Direction = 1 | -1;
+export type IdleView = "profile" | "front" | "back";
 
 export interface Pet {
   x: number;
   velocity: number;
   direction: Direction;
+  idleView: IdleView;
   mode: PetMode;
   remainingMs: number;
 }
@@ -65,6 +67,7 @@ export function createPet(viewportWidth: number, random: Random): Pet {
     x: random() * maxX(viewportWidth),
     velocity: 0,
     direction: random() < 0.5 ? 1 : -1,
+    idleView: "profile",
     mode: "walk",
     remainingMs: durationFor("walk", random),
   };
@@ -79,11 +82,14 @@ function chooseNext(pet: Pet, random: Random): Pet {
   }
   const mode = pet.mode === "stretch" ? "walk" : pickWeighted(isMoving(pet.mode) ? AFTER_MOVING : AFTER_RESTING, random);
   const turns = isMoving(mode) && random() < TURN_AROUND_CHANCE;
+  const duration = durationFor(mode, random);
+  const look = mode === "sit" ? random() : 0;
   return {
     ...pet,
     mode,
     direction: turns ? reverse(pet.direction) : pet.direction,
-    remainingMs: durationFor(mode, random),
+    idleView: mode === "sit" && look >= .24 ? (look < .62 ? "front" : "back") : "profile",
+    remainingMs: duration,
   };
 }
 

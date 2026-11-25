@@ -43,9 +43,16 @@ const STYLE = `
   -webkit-tap-highlight-color: transparent;
 }
 [${ROOT_ATTR}] .mp-hop, [${ROOT_ATTR}] .mp-flip, [${ROOT_ATTR}] svg { display: block; width: 100%; height: 100%; }
-[${ROOT_ATTR}] .mp-flip { position: relative; isolation: isolate; }
+[${ROOT_ATTR}] .mp-flip {
+  position: relative; isolation: isolate; transform-origin: 50% 97%;
+  transform: translateY(var(--mp-bound, 0px)) scale(var(--mp-bound-width, 1), var(--mp-bound-height, 1));
+}
 [${ROOT_ATTR}] .mp-profile { transform: scaleX(var(--mp-turn, 1)); opacity: var(--mp-profile, 1); }
-[${ROOT_ATTR}] .mp-anfas { position: absolute; inset: 0; opacity: calc(1 - var(--mp-profile, 1)); mix-blend-mode: plus-lighter; }
+[${ROOT_ATTR}] :is(.mp-anfas, .mp-rear-view) {
+  position: absolute; inset: 0; opacity: calc(1 - var(--mp-profile, 1)); mix-blend-mode: plus-lighter;
+}
+[${ROOT_ATTR}] .mp-rear-view, [${ROOT_ATTR}] [data-depth-view="back"] .mp-anfas { display: none; }
+[${ROOT_ATTR}] [data-depth-view="back"] .mp-rear-view { display: block; }
 [${ROOT_ATTR}] .mp-hop[data-hop] .mp-impact { animation: mp-hop-impact ${HOP_MS}ms ease-in-out both; }
 [${ROOT_ATTR}] svg { overflow: visible; }
 
@@ -203,6 +210,16 @@ const FRONT_SPRITE = `
   <path d="M21.5 19.5l-5-1m5 2-5 1m10-2 5-1m-5 2 5 1" stroke="${FUR_FAR}" stroke-width=".6" stroke-linecap="round" fill="none"/>
 </svg>`;
 
+const BACK_SPRITE = `
+<svg class="mp-rear-view" viewBox="0 0 48 29" aria-hidden="true" focusable="false">
+  <path d="M19 25l-2 2.5h3m9-2.5 2 2.5h-3" stroke="${FUR_FAR}" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+  <circle cx="18.3" cy="10.6" r="3.8" fill="${FUR_FAR}"/>
+  <circle cx="29.7" cy="10.6" r="3.8" fill="${FUR_FAR}"/>
+  <ellipse cx="24" cy="15.2" rx="7.5" ry="6.5" fill="${FUR}"/>
+  <ellipse cx="24" cy="20.2" rx="10.3" ry="7" fill="${FUR}"/>
+  <path d="M24.1 24.1c-.4 4.1 9.7 5.5 12.6 1.2 1.3-2 0-3.4-.9-4.1" stroke="${PINK}" stroke-width="1.7" stroke-linecap="round" fill="none"/>
+</svg>`;
+
 function prefersReducedMotion(): MediaQueryList {
   return window.matchMedia("(prefers-reduced-motion: reduce)");
 }
@@ -234,7 +251,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const root = document.createElement("div");
   root.setAttribute(ROOT_ATTR, "");
   root.setAttribute("aria-hidden", "true");
-  root.innerHTML = `<div class="mp-mouse" data-mode="walk"><span class="mp-squeak">Pi!</span><span class="mp-z">z</span><div class="mp-hop"><div class="mp-flip" data-dir="1">${SPRITE}${FRONT_SPRITE}</div></div></div>`;
+  root.innerHTML = `<div class="mp-mouse" data-mode="walk"><span class="mp-squeak">Pi!</span><span class="mp-z">z</span><div class="mp-hop"><div class="mp-flip" data-dir="1">${SPRITE}${FRONT_SPRITE}${BACK_SPRITE}</div></div></div>`;
   const mouse = root.querySelector<HTMLElement>(".mp-mouse")!;
   const hop = root.querySelector<HTMLElement>(".mp-hop")!;
   const flip = root.querySelector<HTMLElement>(".mp-flip")!;
@@ -249,7 +266,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   let gesture: Gesture | null = null;
   let cursor: { point: Point; since: number; visited: boolean } | null = null;
   let attention: Attention | null = null;
-  let descent: { phase: "fall" | "land"; elapsed: number; lift: number; x: number; vx: number; vy: number } | null = null;
+  let descent: { phase: "fall" | "land"; started: number; lift: number; x: number; vx: number; vy: number } | null = null;
   let lift = 0;
   let swing = 0;
   let swingVelocity = 0;
@@ -261,6 +278,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   let hopStartHeight = 0;
   let stride = 0;
   let gaitSpeed = 0;
+  let boundBlend = 1;
   let face: number = pet.direction;
   let turn = { from: face, to: face, progress: 1 };
   let rest = 0;
@@ -285,7 +303,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     if (flip.dataset.dir !== direction) flip.dataset.dir = direction;
   };
 
-  const sit = () => { pet = { ...pet, velocity: 0, mode: "sit", remainingMs: 900 }; };
+  const sit = () => { pet = { ...pet, velocity: 0, mode: "sit", idleView: "profile", remainingMs: 900 }; };
 
   const drawMotion = (time: number, dt: number, distance: number) => {
     const movingOnFloor = !gesture && !descent && pet.mode !== "skid" && (!attention || attention.phase === "approach");
@@ -294,6 +312,11 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     const stepLength = strideLength(gaitSpeed);
     stride = (stride + (movingOnFloor ? distance : 0) / stepLength) % 1;
     const gait = gaitFrame(stride, gaitSpeed);
+    const grounded = movingOnFloor && hopStarted === null && pet.mode === "run";
+    boundBlend += ((grounded ? 1 : 0) - boundBlend) * (1 - Math.exp(-dt / 36));
+    flip.style.setProperty("--mp-bound", `${(-gait.bound * boundBlend).toFixed(2)}px`);
+    flip.style.setProperty("--mp-bound-width", (1 + gait.shape * boundBlend).toFixed(3));
+    flip.style.setProperty("--mp-bound-height", (1 - gait.shape * boundBlend).toFixed(3));
     const dozing = !gesture && pet.mode === "sleep";
     rest += ((dozing ? 1 : 0) - rest) * (1 - Math.exp(-dt / 140));
     tailPhase = (tailPhase + dt / (240 + rest * 430)) % (Math.PI * 2);
@@ -314,11 +337,15 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       const shape = pawPath(index, foot.reach, foot.lift);
       if (leg.getAttribute("d") !== shape) leg.setAttribute("d", shape);
     });
-    const facing = Math.abs(pet.velocity) < 9 ? pet.direction : Math.sign(pet.velocity);
+    const depthView = !gesture && !attention && !descent && pet.mode === "sit" &&
+      Math.abs(pet.velocity) < 9 && pet.idleView !== "profile";
+    const facing = depthView ? 0 : Math.abs(pet.velocity) < 9 ? pet.direction : Math.sign(pet.velocity);
+    if (depthView) flip.dataset.depthView = pet.idleView;
     if (turn.to !== facing) turn = { from: face, to: facing, progress: 0 };
     turn.progress = Math.min(1, turn.progress + dt / 185);
     const view = turnFrame(turn.from, turn.to, turn.progress);
     face = view.yaw;
+    if (!depthView && Math.abs(face) >= .7) delete flip.dataset.depthView;
     flip.style.setProperty("--mp-turn", String((face < 0 ? -1 : 1) * view.width));
     flip.style.setProperty("--mp-profile", view.profile.toFixed(3));
 
@@ -402,19 +429,19 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     return true;
   };
 
-  const updateDescent = (dt: number) => {
+  const updateDescent = (time: number, dt: number) => {
     if (!descent) return;
-    descent.elapsed += dt;
+    const elapsed = Math.max(time - descent.started, 0);
     if (descent.phase === "fall") {
-      const position = fallFrame(descent.lift, descent.x, descent.vx, descent.vy, descent.elapsed / 1_000);
+      const position = fallFrame(descent.lift, descent.x, descent.vx, descent.vy, elapsed / 1_000);
       lift = Math.min(maxLift(viewportHeight()), position.lift);
       pet.x = Math.max(0, Math.min(maxX(viewportWidth()), position.x));
       const settle = lift === 0 ? 1 : Math.min(dt / 85, 1);
       swing *= Math.max(0, 1 - settle);
       tuck *= Math.max(0, 1 - settle);
       stretch *= Math.max(0, 1 - settle);
-      if (lift === 0) descent = { ...descent, phase: "land", elapsed: 0 };
-    } else if (descent.elapsed >= LAND_MS) {
+      if (lift === 0 && elapsed > 0) descent = { ...descent, phase: "land", started: time };
+    } else if (elapsed >= LAND_MS) {
       descent = null;
     }
   };
@@ -424,7 +451,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     lastTime = time;
     const x = pet.x;
     if (gesture) updateGesture(time, dt);
-    else if (descent) updateDescent(dt);
+    else if (descent) updateDescent(time, dt);
     else if (!updateAttention(time)) pet = advance(pet, dt, viewportWidth(), Math.random);
     drawMotion(time, dt, Math.abs(pet.x - x));
     render();
@@ -443,6 +470,9 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       gaitSpeed = 0;
       flip.style.setProperty("--mp-turn", String(pet.direction));
       flip.style.setProperty("--mp-profile", "1");
+      flip.style.removeProperty("--mp-bound");
+      flip.style.removeProperty("--mp-bound-width");
+      flip.style.removeProperty("--mp-bound-height");
       mouse.style.removeProperty("--mp-tail");
       mouse.style.removeProperty("--mp-breath");
       mouse.style.removeProperty("--mp-wash");
@@ -491,7 +521,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     event.preventDefault();
     lift = Math.min(hopLift, maxLift(viewportHeight()));
     clearClick();
-    pet = { ...pet, velocity: 0, direction: face < 0 ? -1 : 1 };
+    pet = { ...pet, velocity: 0, idleView: "profile", direction: Math.abs(face) < .15 ? pet.direction : face < 0 ? -1 : 1 };
     attention = cursor = null;
     mouse.setPointerCapture(event.pointerId);
     const time = performance.now();
@@ -539,10 +569,10 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       reactToClick();
     } else if (carrying || lift > 0) {
       sit();
-      if (lift > 4 || speed.y < -160) {
+      if (lift > 0 || speed.y < -160) {
         const headroom = Math.max(0, maxLift(viewportHeight()) - lift);
         const vy = Math.min(-speed.y, Math.sqrt(2 * FALL_GRAVITY * headroom));
-        descent = { phase: "fall", elapsed: 0, x: pet.x, lift, vx: speed.x, vy };
+        descent = { phase: "fall", started: performance.now(), x: pet.x, lift, vx: speed.x, vy };
       } else {
         lift = 0;
         swing = tuck = stretch = 0;

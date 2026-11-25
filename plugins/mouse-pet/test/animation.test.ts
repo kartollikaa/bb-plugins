@@ -23,6 +23,17 @@ test("a grounded paw stays put in the room while the body walks over it", () => 
   }
 });
 
+test("a sprint has a single raised bound between hind push-off and front landing", () => {
+  assert.equal(gaitFrame(.42, 38).bound, 0);
+  const flight = gaitFrame(.42, 150);
+  assert.ok(flight.bound > 3 && flight.feet.every(({ lift }) => lift > 0));
+  const landing = gaitFrame(.56, 150);
+  assert.ok(landing.bound < flight.bound);
+  assert.equal(landing.feet[1].lift, 0);
+  assert.equal(landing.feet[3].lift, 0);
+  assert.ok(gaitFrame(.7, 150).bound < .01);
+});
+
 test("a hop rises and falls between grounded anticipation and landing", () => {
   assert.equal(hopHeight(0), 0);
   assert.equal(hopHeight(.1), 0);
@@ -60,4 +71,6 @@ test("a drop inherits velocity on both axes and gravity returns it to the floor"
   assert.ok(movingDownRight.lift < still.lift);
   assert.equal(fallFrame(140, 200, 180, 300, .4).lift, 0);
   assert.deepEqual(fallFrame(140, 200, 180, 300, .4), fallFrame(140, 200, 180, 300, 1));
+  assert.equal(fallFrame(3, 200, 900, 0, .001).x, 200.9);
+  assert.ok(fallFrame(3, 200, 900, 0, .033).x > 229);
 });

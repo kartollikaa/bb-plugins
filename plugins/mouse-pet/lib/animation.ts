@@ -1,15 +1,22 @@
 const FULL_CYCLE = Math.PI * 2;
 
 const LEG_PHASES = [0, .58, .48, .06] as const;
-export const strideLength = (speed: number) => 14 + Math.min(speed / 150, 1) * 9;
+const BOUND_PHASES = [0, .47, .055, .53] as const;
+const running = (speed: number) => Math.min(Math.max((speed - 55) / 95, 0), 1);
+export const strideLength = (speed: number) => 14 + Math.min(speed / 38, 1) * 3 + running(speed) * 18;
+
+function pulse(phase: number, start: number, duration: number) {
+  const progress = Math.max(0, Math.min((phase - start) / duration, 1));
+  return Math.sin(Math.PI * progress) ** 2;
+}
 
 export function gaitFrame(phase: number, speed: number) {
   const effort = Math.min(speed / 38, 1);
-  const run = Math.min(Math.max((speed - 38) / 112, 0), 1);
-  const stance = .62 - run * .18;
+  const run = running(speed);
+  const stance = .62 - run * .29;
   const stride = strideLength(speed) * effort;
-  const feet = LEG_PHASES.map((offset) => {
-    const step = (phase + offset) % 1;
+  const feet = LEG_PHASES.map((offset, index) => {
+    const step = (phase + offset + (BOUND_PHASES[index] - offset) * run) % 1;
     const swing = Math.max((step - stance) / (1 - stance), 0);
     const reach = step < stance ? stance / 2 - step : stance * -.5 * Math.cos(Math.PI * swing);
     return {
@@ -17,9 +24,13 @@ export function gaitFrame(phase: number, speed: number) {
       lift: Math.sin(Math.PI * swing) ** 2 * (2.2 + run) * effort,
     };
   });
+  const airborne = pulse(phase, .24, .36);
+  const compression = pulse(phase, .12, .18) + pulse(phase, .57, .18);
   return {
     feet,
     tail: Math.sin((phase - .18) * FULL_CYCLE) * (1.7 + run * 2.4) * effort,
+    bound: airborne * run ** 2 * 3.8,
+    shape: (airborne * .04 - compression * .035) * run ** 2,
   };
 }
 

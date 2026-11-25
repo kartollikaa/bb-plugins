@@ -5,8 +5,9 @@ description: Explains the Mouse Pet plugin, a small mouse that runs along the bo
 
 # Mouse Pet
 
-The Mouse Pet plugin puts a small grey mouse along the bottom edge of the bb window. It skids when
-it reaches an edge at a run and stretches after sleeping. A click makes it hop, squeak "Pi!" and bolt.
+The Mouse Pet plugin puts a small grey mouse along the bottom edge of the bb window. It bounds
+when running, skids before a fast turn and stretches after sleeping. It sometimes pauses facing
+toward or away from you. A click makes it hop, squeak "Pi!" and bolt.
 
 Hold the primary button on the mouse for about half a second to pick it up and carry it inside the
 window. It hangs by its forepaws and follows the pointer's momentum. Release near the floor to set

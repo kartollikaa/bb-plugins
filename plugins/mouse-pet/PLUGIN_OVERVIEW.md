@@ -2,7 +2,8 @@ A small pet mouse lives along the bottom edge of the bb window and keeps you com
 
 ## What you get
 
-- A mouse that walks, runs, grooms and sleeps. It skids at the edge of the window and stretches after a nap.
+- A mouse that walks, bounds when running, grooms and sleeps. It turns to face you or show its back
+  when resting, skids at the edge and stretches after a nap.
 - A click makes it hop, squeak and run the other way.
 - Hold it briefly to carry it around the window. Release to set it down or watch it land.
 - Pause the pointer just ahead of it near the floor and it may come over to sniff.
