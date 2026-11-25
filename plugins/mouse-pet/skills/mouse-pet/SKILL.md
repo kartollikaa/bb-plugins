@@ -10,15 +10,16 @@ when running, skids before a fast turn and stretches after sleeping. It sometime
 haunches and watches the pointer, or pauses facing toward or away from you. A click makes it hop,
 squeak "Pi!" and bolt.
 
-Hold the primary button on the mouse for about half a second to pick it up and carry it inside the
-window. It hangs by its forepaws and follows the pointer's momentum. Release near the floor to set
+Press and drag the mouse by the scruff to carry it inside the window. Its legs hang and its body
+follows the pointer's momentum. Release near the floor to set
 it down, or higher up to let it drop. If the window loses focus, the mouse returns to the floor.
 To invite a sniff, leave the pointer still, low and
 just ahead of the mouse. Lift it slightly during the sniff and the mouse rears up to follow.
 
 The mouse can pull one mouse-sized piece of cheese in at a window edge and leave it at a random
 distance. It can pass the cheese before it takes a bite. After leaving it alone for a while it
-may run straight over to eat. It can fetch another piece once it finishes the current one.
+may run straight over and take two bites, then leave the rest for later. It can fetch another piece
+once it finishes the current one.
 
 It has no CLI command, agent tool or setting. Only the mouse itself catches clicks; the strip it moves
 in lets them through. To get rid of it, disable the plugin in bb's plugin settings

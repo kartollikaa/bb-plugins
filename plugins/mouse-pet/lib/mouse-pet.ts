@@ -1,7 +1,10 @@
 import { advance, createPet, fit, maxX, MAX_FRAME_MS, PET_WIDTH, startle, type Pet } from "./pet.ts";
-import { carryPosition, FLOOR_GAP, GRIP_X, GRIP_Y, gripArmPath, HOLD_MS, maxLift, PET_HEIGHT, sniffDistance, type Point } from "./interaction.ts";
+import {
+  carryPosition, DRAG_START_PX, FLOOR_GAP, GRIP_X, GRIP_Y, gripPoint, LONG_PRESS_MS,
+  maxLift, PET_HEIGHT, screenGripX, scruffPath, sniffDistance, type Point,
+} from "./interaction.ts";
 import { FALL_GRAVITY, fallFrame, followSpring, gaitFrame, HOP_LAUNCH, hopHeight, HOP_TOUCHDOWN, strideLength, turnFrame, type Spring } from "./animation.ts";
-import { advanceSnack, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "./snack.ts";
+import { advanceSnack, BITE_MS, biteMaskPath, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "./snack.ts";
 
 const ROOT_ATTR = "data-mouse-pet";
 const SQUEAK_MS = 700;
@@ -63,9 +66,6 @@ const STYLE = `
   pointer-events: none;
 }
 [${ROOT_ATTR}] .mp-cheese[data-edge="1"] svg { transform: scaleX(-1); }
-[${ROOT_ATTR}] .mp-cheese[data-bites="0"] .mp-bite-first,
-[${ROOT_ATTR}] .mp-cheese:is([data-bites="0"], [data-bites="1"]) .mp-bite-second,
-[${ROOT_ATTR}] .mp-cheese:not([data-bites="3"]) .mp-bite-third { display: none; }
 
 [${ROOT_ATTR}] .mp-tail, [${ROOT_ATTR}] .mp-eye,
 [${ROOT_ATTR}] .mp-impact, [${ROOT_ATTR}] .mp-wash { transform-box: view-box; }
@@ -75,10 +75,9 @@ const STYLE = `
 [${ROOT_ATTR}] .mp-eye-state, [${ROOT_ATTR}] .mp-eye-closed { transition: opacity .18s ease, transform .18s ease; }
 [${ROOT_ATTR}] .mp-eye-closed { opacity: 0; }
 [${ROOT_ATTR}] .mp-impact { transform-origin: 24px 28px; }
-[${ROOT_ATTR}] [data-mode="press"] { cursor: grab; }
-[${ROOT_ATTR}] [data-mode="carry"] { cursor: default; }
+[${ROOT_ATTR}] :is([data-mode="press"], [data-mode="carry"]) { cursor: grabbing; }
 [${ROOT_ATTR}] .mp-pose, [${ROOT_ATTR}] .mp-head, [${ROOT_ATTR}] .mp-front,
-[${ROOT_ATTR}] .mp-grip, [${ROOT_ATTR}] .mp-leg-pose, [${ROOT_ATTR}] .mp-tail-pose, [${ROOT_ATTR}] .mp-far-front {
+[${ROOT_ATTR}] .mp-scruff, [${ROOT_ATTR}] .mp-leg-pose, [${ROOT_ATTR}] .mp-tail-pose, [${ROOT_ATTR}] .mp-far-front {
   transform-box: view-box;
   transition: transform .16s ease-out, opacity .16s ease-out;
 }
@@ -86,14 +85,14 @@ const STYLE = `
 [${ROOT_ATTR}] .mp-head { transform-origin: 32px 17px; }
 [${ROOT_ATTR}] .mp-front { transform-origin: 35px 21px; }
 [${ROOT_ATTR}] .mp-wash { transform-origin: 35px 21px; transform: rotate(var(--mp-wash, 0deg)); }
-[${ROOT_ATTR}] .mp-grip { opacity: 0; }
+[${ROOT_ATTR}] .mp-scruff { opacity: 0; transition-duration: .09s; }
 [${ROOT_ATTR}] .mp-leg-pose { transform-origin: 19px 21px; }
 [${ROOT_ATTR}] .mp-tail-pose { transform-origin: 12px 19px; }
-[${ROOT_ATTR}] :is([data-mode="press"], [data-mode="carry"]) .mp-head { transform: rotate(-11deg) translateY(-1px); }
-[${ROOT_ATTR}] [data-mode="press"] .mp-front { transition-duration: .38s; transform: rotate(-95deg); }
-[${ROOT_ATTR}] [data-mode="carry"] .mp-front { opacity: 0; transform: rotate(-150deg); }
-[${ROOT_ATTR}] [data-mode="carry"] .mp-grip { opacity: 1; }
-[${ROOT_ATTR}] [data-mode="carry"] .mp-far-front { opacity: 0; }
+[${ROOT_ATTR}] [data-mode="press"] .mp-head { transform: rotate(-7deg) translateY(-.6px); }
+[${ROOT_ATTR}] [data-mode="press"] .mp-front { transition-duration: .09s; transform: rotate(-12deg); }
+[${ROOT_ATTR}] [data-mode="carry"] .mp-front { transform: translate(.3px, .9px) rotate(17deg); }
+[${ROOT_ATTR}] [data-mode="carry"] .mp-scruff { opacity: 1; }
+[${ROOT_ATTR}] [data-mode="carry"] .mp-far-front { transform: translate(.8px, 1.1px); }
 [${ROOT_ATTR}] [data-mode="carry"] .mp-head { transform: translateY(-1px) rotate(10deg); }
 [${ROOT_ATTR}] [data-mode="carry"] .mp-leg-pose { transform: translate(-1px, 1px) rotate(var(--mp-leg-swing, 0deg)); }
 [${ROOT_ATTR}] [data-mode="carry"] .mp-tail-pose { transform: rotate(var(--mp-tail-swing, 0deg)); }
@@ -126,7 +125,7 @@ const STYLE = `
 [${ROOT_ATTR}] [data-mode="perch"] .mp-tail-pose { transform: rotate(-26deg); }
 [${ROOT_ATTR}] [data-mode="fetch"] .mp-head { transform: translateX(2px) rotate(9deg); }
 [${ROOT_ATTR}] [data-mode="fetch"] .mp-front { transform: rotate(-87deg); }
-[${ROOT_ATTR}] [data-mode="eat"] .mp-head { animation: mp-nibble .31s ease-in-out infinite; }
+[${ROOT_ATTR}] [data-mode="eat"] .mp-head { animation: mp-nibble ${BITE_MS}ms ease-in-out infinite; }
 [${ROOT_ATTR}] [data-mode="eat"] .mp-front { transform: rotate(-115deg); }
 [${ROOT_ATTR}] [data-mode="groom"] .mp-head { transform: translate(-.6px, .3px) rotate(6deg); }
 [${ROOT_ATTR}] [data-mode="groom"] .mp-front { transform: rotate(-104deg); }
@@ -217,10 +216,7 @@ const SPRITE = `
         </g>
       </g>
     </g>
-    <g class="mp-grip" fill="none" stroke-width="2.45" stroke-linecap="round">
-      <path stroke="${FUR_FAR}"/>
-      <path stroke="${FUR}"/>
-    </g>
+    <path class="mp-scruff" fill="${FUR}"/>
   </g>
 </svg>`;
 
@@ -255,9 +251,7 @@ const CHEESE = `
   <svg viewBox="0 0 48 29" aria-hidden="true" focusable="false">
     <mask id="mp-cheese-bites" maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="29">
       <rect width="48" height="29" fill="white"/>
-      <circle class="mp-bite-first" cx="45" cy="13" r="6.3" fill="black"/>
-      <circle class="mp-bite-second" cx="45" cy="22" r="7.4" fill="black"/>
-      <circle class="mp-bite-third" cx="38.8" cy="18" r="7.4" fill="black"/>
+      <path class="mp-cheese-bites" fill="black"/>
     </mask>
     <g mask="url(#mp-cheese-bites)">
       <path d="M2.5 14.5 45.5 12v11.7L2.5 27z" fill="#efab39" stroke="#b96b24" stroke-width=".85" stroke-linejoin="round"/>
@@ -281,6 +275,8 @@ type Gesture = {
   pointerId: number;
   started: number;
   point: Point;
+  start: Point;
+  gripOffset: Point;
   phase: "press" | "carry";
   pickedUpAt: number;
   velocity: Point;
@@ -307,8 +303,9 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const flip = root.querySelector<HTMLElement>(".mp-flip")!;
   const squeak = root.querySelector<HTMLElement>(".mp-squeak")!;
   const legs = Array.from(root.querySelectorAll<SVGElement>(".mp-leg"));
-  const grip = Array.from(root.querySelectorAll<SVGElement>(".mp-grip path"));
+  const scruff = root.querySelector<SVGElement>(".mp-scruff")!;
   const cheese = root.querySelector<HTMLElement>(".mp-cheese")!;
+  const biteMask = cheese.querySelector<SVGElement>(".mp-cheese-bites")!;
   document.head.append(style);
   document.body.append(root);
 
@@ -357,8 +354,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       mouse.style.setProperty("--mp-body-height", scale.y.toFixed(3));
       mouse.style.setProperty("--mp-drag-x", `${offset.x.toFixed(2)}px`);
       mouse.style.setProperty("--mp-drag-y", `${offset.y.toFixed(2)}px`);
-      grip[0].setAttribute("d", gripArmPath(false, angle, scale, offset));
-      grip[1].setAttribute("d", gripArmPath(true, angle, scale, offset));
+      scruff.setAttribute("d", scruffPath(angle, scale, offset));
     }
     const direction = String(pet.direction);
     if (flip.dataset.dir !== direction) flip.dataset.dir = direction;
@@ -367,7 +363,10 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       cheese.style.transform = `translateX(${snack.cheese.x.toFixed(2)}px)`;
       const portion = String(snack.cheese.bites);
       const edge = String(snack.cheese.edge);
-      if (cheese.dataset.bites !== portion) cheese.dataset.bites = portion;
+      if (cheese.dataset.bites !== portion) {
+        cheese.dataset.bites = portion;
+        biteMask.setAttribute("d", biteMaskPath(snack.cheese.bites));
+      }
       if (cheese.dataset.edge !== edge) cheese.dataset.edge = edge;
     }
   };
@@ -390,7 +389,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       hopLift = hopHeight(progress, hopStartHeight);
       if (progress >= 1) hopStarted = null;
     }
-    const movingOnFloor = !gesture && !descent && !hopInFlight && pet.mode !== "skid" &&
+    const movingOnFloor = !gesture && !descent && !hopInFlight && pet.mode !== "skid" && snack.action?.kind !== "eat" &&
       (!attention || attention.phase === "approach");
     const speed = movingOnFloor && dt > 0 ? Math.abs(distance) * 1_000 / dt : 0;
     gaitSpeed += (speed - gaitSpeed) * (1 - Math.exp(-dt / 44));
@@ -450,11 +449,12 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     flip.style.setProperty("--mp-profile", view.profile.toFixed(3));
   };
 
-  const placeAtGrip = (blend: number) => {
+  const placeAtGrip = (time: number) => {
     if (!gesture) return;
-    const position = carryPosition(gesture.point, pet.direction, viewportWidth(), viewportHeight());
-    pet.x += (position.x - pet.x) * blend;
-    lift += (position.lift - lift) * blend;
+    const point = gripPoint(gesture.point, gesture.gripOffset, time - gesture.pickedUpAt);
+    const position = carryPosition(point, pet.direction, viewportWidth(), viewportHeight());
+    pet.x = position.x;
+    lift = position.lift;
   };
 
   const cursorVelocity = (pointer: Gesture, time: number) => {
@@ -478,14 +478,10 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const updateGesture = (time: number, dt: number) => {
     if (!gesture) return;
     if (gesture.phase === "press" && lift > 0) lift = Math.max(0, lift - dt * .13);
-    if (gesture.phase === "press" && time - gesture.started >= HOLD_MS) {
-      gesture.phase = "carry";
-      gesture.pickedUpAt = time;
-    }
     if (gesture.phase === "carry") {
       const age = time - gesture.pickedUpAt;
-      tuck = Math.min(age / 170, 1);
-      placeAtGrip(age >= 190 ? 1 : 1 - Math.exp(-dt / 42));
+      tuck = Math.min(age / 115, 1);
+      placeAtGrip(time);
       const speed = cursorVelocity(gesture, time);
       const target = Math.max(-14, Math.min(14, speed.x / 48)) * pet.direction;
       const extension = Math.max(-.11, Math.min(.17, -speed.y / 3_500));
@@ -636,9 +632,10 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     attention = cursor = null;
     mouse.setPointerCapture(event.pointerId);
     const time = performance.now();
+    const start = { x: event.clientX, y: event.clientY };
     gesture = {
       pointerId: event.pointerId, started: time, movedAt: time, velocity: { x: 0, y: 0 },
-      point: { x: event.clientX, y: event.clientY }, phase: "press", pickedUpAt: 0,
+      point: start, start, phase: "press", pickedUpAt: 0, gripOffset: { x: 0, y: 0 },
     };
     if (!motion.matches) render();
   };
@@ -646,9 +643,23 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     const point = { x: event.clientX, y: event.clientY };
     if (gesture?.pointerId === event.pointerId) {
       trackPointer(gesture, point);
-      if ((event.buttons & 1) === 0) finishGesture(false);
-      else if (gesture.phase === "carry" && performance.now() - gesture.pickedUpAt >= 190) {
-        placeAtGrip(1);
+      if ((event.buttons & 1) === 0) {
+        finishGesture(false);
+        return;
+      }
+      if (motion.matches) return;
+      const time = performance.now();
+      if (gesture.phase === "press" && Math.hypot(point.x - gesture.start.x, point.y - gesture.start.y) >= DRAG_START_PX) {
+        gesture.gripOffset = {
+          x: pet.x + screenGripX(pet.direction) - gesture.start.x,
+          y: viewportHeight() - FLOOR_GAP - PET_HEIGHT + GRIP_Y - lift - gesture.start.y,
+        };
+        gesture.phase = "carry";
+        gesture.pickedUpAt = time;
+        showProfile();
+      }
+      if (gesture.phase === "carry") {
+        placeAtGrip(time);
         render();
       }
       return;
@@ -672,7 +683,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   };
   const finishGesture = (canClick: boolean) => {
     if (!gesture) return;
-    const held = !motion.matches && performance.now() - gesture.started >= HOLD_MS;
+    const held = !motion.matches && performance.now() - gesture.started >= LONG_PRESS_MS;
     const carrying = gesture.phase === "carry";
     const speed = carrying ? cursorVelocity(gesture, performance.now()) : { x: 0, y: 0 };
     releaseCapture();
@@ -705,7 +716,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     clearAttention();
     snack = resizeSnack(snack, performance.now(), viewportWidth());
     pet = fit(pet, viewportWidth());
-    if (gesture?.phase === "carry") placeAtGrip(1);
+    if (gesture?.phase === "carry") placeAtGrip(performance.now());
     lift = Math.min(lift, maxLift(viewportHeight()));
     render();
   };

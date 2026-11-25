@@ -125,7 +125,7 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 ## mouse-pet — `plugins/mouse-pet/`
 
 - **What:** a small mouse that lives along the bottom edge of the bb window. Click to make it hop
-  and squeak, hold to carry it, or pause the pointer low and ahead of the mouse to invite a sniff.
+  and squeak, drag to carry it by the scruff, or pause the pointer low and ahead to invite a sniff.
   It skids before turning at a run and stretches after sleeping. Only the mouse takes clicks.
 - **How:** a content script (`lib/mouse-pet.ts`) appends a fixed `[data-mouse-pet]` layer to `body`
   and moves the sprite with a `requestAnimationFrame` loop. Gait follows distance traveled, and

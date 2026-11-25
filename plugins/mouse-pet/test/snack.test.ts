@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { advanceSnack, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "../lib/snack.ts";
+import { advanceSnack, biteMaskPath, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "../lib/snack.ts";
 import type { Pet } from "../lib/pet.ts";
 
 const WIDTH = 800;
@@ -72,9 +72,10 @@ test("the mouse can finish cheese from either side after the window shrinks", ()
     const away = { ...approaching, x: x === 0 ? 72 : 0 };
     const left = advanceSnack(first.snack, away, 24_500, 120, () => .99);
     const eating = advanceSnack(left.snack, approaching, 25_000, 120, preferToEat);
-    const done = advanceSnack(eating.snack, eating.pet, 26_300, 120, preferToEat);
+    const fed = advanceSnack(eating.snack, eating.pet, 26_300, 120, preferToEat);
     assert.equal(eating.snack.action?.kind, "eat");
-    assert.equal(done.snack.cheese, null);
+    assert.equal(fed.snack.cheese?.bites, 2);
+    assert.equal(fed.snack.action, null);
   }
 });
 
@@ -114,16 +115,39 @@ test("the pet leaves cheese alone after placing it and ignores the first later e
   const left = advanceSnack(first.snack, away, 26_000, WIDTH, () => .99);
   const eating = advanceSnack(left.snack, contact, 27_000, WIDTH, preferToEat);
   assert.equal(eating.snack.action?.kind, "eat");
-  const partlyEaten = advanceSnack(eating.snack, eating.pet, 27_500, WIDTH, preferToEat);
+  const partlyEaten = advanceSnack(eating.snack, eating.pet, 27_550, WIDTH, preferToEat);
   assert.equal(partlyEaten.snack.cheese?.bites, 1);
-  const paused = interruptSnack(partlyEaten.snack, 27_500, WIDTH);
+  const paused = interruptSnack(partlyEaten.snack, 27_550, WIDTH);
   assert.equal(paused.cheese?.bites, 1);
   assert.equal(paused.action, null);
   const anotherBite = advanceSnack(eating.snack, eating.pet, 28_050, WIDTH, preferToEat);
-  assert.equal(anotherBite.snack.cheese?.bites, 3);
+  assert.equal(anotherBite.snack.cheese?.bites, 2);
   assert.equal(anotherBite.snack.cheese?.x, placed.snack.cheese?.x);
-  const finished = advanceSnack(eating.snack, eating.pet, 28_300, WIDTH, preferToEat);
-  assert.equal(finished.snack.cheese, null);
-  assert.equal(advanceSnack(finished.snack, nearEdge, 29_000, WIDTH, preferToEat).snack.action, null);
-  assert.equal(advanceSnack(finished.snack, nearEdge, 41_000, WIDTH, preferToEat).snack.action?.kind, "fetch");
+  assert.equal(anotherBite.snack.action, null);
+  assert.equal(advanceSnack(anotherBite.snack, away, 29_000, WIDTH, preferToEat).snack.action, null);
+});
+
+test("a large piece lasts four visits and each bite exposes a different fixed-size mask", () => {
+  assert.equal(biteMaskPath(0), "");
+  assert.equal(new Set([1, 2, 3, 4, 5, 6, 7].map(biteMaskPath)).size, 7);
+  let next = fetchCheese();
+  let time = 24_000;
+  for (let visit = 1; visit <= 4; visit++) {
+    next = advanceSnack(next.snack, away, time, WIDTH, preferToEat);
+    assert.equal(next.snack.action?.kind, "seek");
+    const deadline = time + 6_000;
+    while (next.snack.action?.kind === "seek" && time < deadline) {
+      time += 16;
+      next = advanceSnack(next.snack, next.pet, time, WIDTH, preferToEat);
+    }
+    assert.equal(next.snack.action?.kind, "eat");
+    time += 1_100;
+    next = advanceSnack(next.snack, next.pet, time, WIDTH, preferToEat);
+    assert.equal(next.snack.action, null);
+    assert.equal(next.snack.cheese?.bites, visit < 4 ? visit * 2 : undefined);
+    time += 6_000;
+  }
+  assert.equal(next.snack.cheese, null);
+  assert.equal(advanceSnack(next.snack, nearEdge, time, WIDTH, preferToEat).snack.action, null);
+  assert.equal(advanceSnack(next.snack, nearEdge, time + 12_000, WIDTH, preferToEat).snack.action?.kind, "fetch");
 });

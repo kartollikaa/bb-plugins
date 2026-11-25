@@ -5,14 +5,15 @@ at a run, skids before a fast turn, curls up to sleep and stretches when it wake
 look around from its haunches, turn to face you or sit with its back to you.
 
 - Click the mouse to make it hop, squeak "Pi!" and bolt.
-- Hold it for about half a second, then move the pointer to carry it within the window. It hangs
-  by its forepaws and its body trails the pointer as it accelerates. Release at the floor to
+- Press and drag the mouse to pick it up by the scruff within the window. Its legs hang freely and
+  its body trails the pointer as it accelerates. Release at the floor to
   set it down, or release it in motion to let it fall with the pointer's velocity.
 - Pause the pointer low and just ahead of the mouse. It may take a couple of steps to sniff it.
   Lift the pointer a little during the sniff and the mouse rears up to follow.
 - The mouse sometimes pulls a mouse-sized piece of cheese in from an edge and leaves it at a
   different distance each time. It may pass the cheese a few times or notice it from across the
-  window and run back to take bites. There is only one piece at a time.
+  window and run back to take a couple of bites. It finishes the cheese over several visits.
+  There is only one piece at a time.
 
 Only the mouse takes clicks. With reduced motion on, it sits still and shows "Pi!" on a click.
 
