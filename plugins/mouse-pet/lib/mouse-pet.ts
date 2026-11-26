@@ -1,5 +1,5 @@
 import { advance, createPet, fit, isGrooming, maxX, MAX_FRAME_MS, PET_WIDTH, startle, type Pet } from "./pet.ts";
-import { advanceBurrow, burrowVisibility, findBurrow, nextBurrowAt, nextHopAt, recordClick, shouldHideFromClicks, type Burrow } from "./burrow.ts";
+import { advanceBurrow, burrowPortal, findBurrow, nextBurrowAt, nextHopAt, recordClick, shouldHideFromClicks, type Burrow } from "./burrow.ts";
 import { advancePerspective, createPerspective, perspectiveFrame } from "./perspective.ts";
 import {
   carryPosition, DRAG_START_PX, FLOOR_GAP, GRIP_X, GRIP_Y, gripPoint, LONG_PRESS_MS,
@@ -55,18 +55,21 @@ const STYLE = `
 }
 [${ROOT_ATTR}] .mp-hop, [${ROOT_ATTR}] .mp-flip, [${ROOT_ATTR}] svg { display: block; width: 100%; height: 100%; }
 [${ROOT_ATTR}] .mp-mouse[data-burrow] { pointer-events: none; }
-[${ROOT_ATTR}] [data-burrow] .mp-hop {
-  transform-origin: center bottom;
-  opacity: var(--mp-burrow-visibility);
-  transform: scale(calc(.52 + .48 * var(--mp-burrow-visibility)));
-}
 [${ROOT_ATTR}] .mp-burrow {
-  position: absolute; bottom: ${FLOOR_GAP}px; width: 24px; height: 20px;
-  border-radius: 60% 60% 16% 16%; pointer-events: none;
-  background: radial-gradient(ellipse at 50% 82%, #25222b 53%, #514956 65%, #817585 77%, transparent 79%);
+  position: absolute; bottom: ${FLOOR_GAP}px; width: 30px; height: 24px;
+  border-radius: 55% 55% 24% 24%; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 76%, #24202a 49%, #453c4b 61%, #76697b 71%, transparent 75%);
 }
-[${ROOT_ATTR}] .mp-burrow[data-edge="-1"] { left: -5px; }
-[${ROOT_ATTR}] .mp-burrow[data-edge="1"] { right: -5px; }
+[${ROOT_ATTR}] .mp-burrow[data-entry="-1"] { margin-left: -24px; }
+[${ROOT_ATTR}] .mp-burrow[data-entry="1"] { margin-left: -6px; }
+[${ROOT_ATTR}] .mp-burrow::after {
+  content: ""; position: absolute; z-index: 1; inset: auto 2px 0; height: 4px;
+  border-radius: 50%; background: linear-gradient(0deg, #635567, #3e3643);
+}
+[${ROOT_ATTR}] .mp-trunk {
+  transform-box: view-box; transform-origin: 23px 23px;
+  transform: scale(var(--mp-run-width, 1), var(--mp-run-height, 1));
+}
 [${ROOT_ATTR}] .mp-belly {
   transform-box: fill-box; transform-origin: center bottom;
   transform: scale(var(--mp-belly-width, 1), var(--mp-belly-height, 1));
@@ -109,7 +112,8 @@ const STYLE = `
   transition: transform .16s ease-out, opacity .16s ease-out;
 }
 [${ROOT_ATTR}] .mp-pose { transform-origin: 24px 28px; }
-[${ROOT_ATTR}] .mp-head { transform-origin: 32px 17px; }
+[${ROOT_ATTR}] .mp-head { transform-origin: 32px 17px; translate: var(--mp-run-reach, 0px); }
+[${ROOT_ATTR}] [data-burrow="peek"] .mp-head { translate: 2.1px; }
 [${ROOT_ATTR}] .mp-front { transform-origin: 35px 21px; }
 [${ROOT_ATTR}] .mp-groom-paw { transform-origin: 35px 21px; }
 [${ROOT_ATTR}] .mp-scruff { opacity: 0; transition-duration: .09s; }
@@ -243,7 +247,7 @@ const SPRITE = `
           <path class="mp-leg" d="${pawPath(2)}" stroke="${FUR}" stroke-width="2.25"/>
         </g>
         <g class="mp-doze">
-          <ellipse class="mp-belly" cx="23" cy="17" rx="14.5" ry="7.5" fill="${FUR}"/>
+          <g class="mp-trunk"><ellipse class="mp-belly" cx="23" cy="17" rx="14.5" ry="7.5" fill="${FUR}"/></g>
           <g class="mp-head">
             <ellipse cx="38" cy="16" rx="7.5" ry="5.4" fill="${FUR}"/>
             <circle cx="33.5" cy="9.6" r="4.3" fill="${FUR}"/>
@@ -368,6 +372,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   let metabolism = createMetabolism();
   let perspective = createPerspective(performance.now());
   let burrow: Burrow | null = null;
+  let portalX = 0;
   let recentClicks: number[] = [];
   let hideAt = nextBurrowAt(performance.now(), Math.random);
   let jumpAt = nextHopAt(performance.now(), Math.random);
@@ -415,10 +420,20 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     entrance.hidden = !burrow;
     if (burrow) {
       mouse.dataset.burrow = burrow.phase;
-      entrance.dataset.edge = String(burrow.edge);
-      mouse.style.setProperty("--mp-burrow-visibility", String(burrowVisibility(burrow)));
+      portalX = burrowPortal(viewportWidth(), burrow.edge);
+      entrance.style.left = `${portalX}px`;
+      entrance.dataset.entry = String(burrow.direction);
+      if (burrow.phase === "run") {
+        mouse.style.clipPath = "";
+      } else {
+        const clip = portalX - pet.x;
+        const left = burrow.direction < 0 ? clip : -32;
+        const right = burrow.direction > 0 ? PET_WIDTH - clip : -32;
+        mouse.style.clipPath = `inset(-48px ${right.toFixed(2)}px -8px ${left.toFixed(2)}px)`;
+      }
     } else {
       delete mouse.dataset.burrow;
+      mouse.style.clipPath = "";
     }
     const snackPose = snack.action?.kind === "seek" ? undefined : snack.action?.kind;
     const groundedPose = gaitSpeed > 9 && pet.mode !== "skid"
@@ -499,6 +514,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     face = view.yaw;
     perspective = advancePerspective(perspective, depthView && Math.abs(face) < .18 ? pet.idleView : "profile", time, dt, Math.random);
     const movingOnFloor = !gesture && !descent && !hopInFlight && pet.mode !== "skid" && snack.action?.kind !== "eat" &&
+      burrow?.phase !== "hide" && burrow?.phase !== "peek" &&
       (!attention || attention.phase === "approach");
     const speed = movingOnFloor && dt > 0 ? Math.abs(distance) * 1_000 / dt : 0;
     gaitSpeed += (speed - gaitSpeed) * (1 - Math.exp(-dt / 44));
@@ -513,6 +529,9 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     }
     gaitStyle = blendGaitStyle(gaitStyle, variant, dt);
     const gait = gaitFrame(stride, equivalentSpeed, pace, gaitStyle);
+    mouse.style.setProperty("--mp-run-width", gait.bodyWidth.toFixed(3));
+    mouse.style.setProperty("--mp-run-height", gait.bodyHeight.toFixed(3));
+    mouse.style.setProperty("--mp-run-reach", `${gait.headReach.toFixed(2)}px`);
     impact.style.transform = compression ? `scale(${1 + compression * .42}, ${1 - compression})` : "";
     const dozing = !gesture && pet.mode === "sleep" && gaitSpeed <= 9;
     rest += ((dozing ? 1 : 0) - rest) * (1 - Math.exp(-dt / 140));
@@ -679,7 +698,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       beginBurrow(time);
     }
     if (burrow) {
-      const hiding = advanceBurrow(burrow, pet, dt, viewportWidth(), pace);
+      const hiding = advanceBurrow(burrow, pet, dt, viewportWidth(), pace, perspectiveFrame(perspective).scale);
       burrow = hiding.burrow;
       pet = hiding.pet;
       distance = Math.min(Math.abs(pet.x - x), dt * .15);
@@ -740,6 +759,9 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       showProfile();
       mouse.style.removeProperty("--mp-tail");
       mouse.style.removeProperty("--mp-breath");
+      mouse.style.removeProperty("--mp-run-width");
+      mouse.style.removeProperty("--mp-run-height");
+      mouse.style.removeProperty("--mp-run-reach");
       legs.forEach((leg, index) => leg.setAttribute("d", pawPath(index)));
       render();
     } else {
@@ -896,6 +918,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     plants = [];
     snack = resizeSnack(snack, performance.now(), viewportWidth());
     if (!burrow || burrow.phase === "run") pet = fit(pet, viewportWidth());
+    else pet = { ...pet, x: pet.x + burrowPortal(viewportWidth(), burrow.edge) - portalX };
     if (gesture?.phase === "carry") placeAtGrip(performance.now());
     lift = Math.min(lift, maxLift(viewportHeight()));
     render();

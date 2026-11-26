@@ -42,7 +42,14 @@ export function gaitFrame(phase: number, speed: number, pace = 1, style: GaitSty
       lift: Math.sin(Math.PI * swing) ** 2 * (1.65 + run * 1.15) * effort * style.lift,
     };
   });
-  return { feet };
+  const extension = Math.cos(2 * Math.PI * (phase + .04));
+  const flex = run * (.065 + .02 * style.lift);
+  return {
+    feet,
+    bodyWidth: 1 + run * .025 + flex * extension,
+    bodyHeight: 1 - flex * .41 * extension,
+    headReach: .4 * run + .85 * run * extension,
+  };
 }
 
 export interface PawPlant {

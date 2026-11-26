@@ -62,6 +62,22 @@ test("the faster gait alternates diagonal pairs", () => {
   }
 });
 
+test("every running variant stretches the body as the near forepaw reaches", () => {
+  for (const variant of [0, 1, 2, 3] as const) {
+    const style = blendGaitStyle({ lift: 1, tail: 1 }, variant, 300);
+    for (const pace of [1, .48]) {
+      const gathered = gaitFrame(.46, 150, pace, style);
+      const reaching = gaitFrame(.98, 150, pace, style);
+      assert.ok(reaching.feet[3].reach > gathered.feet[3].reach);
+      assert.ok(reaching.bodyWidth - gathered.bodyWidth > .13);
+      assert.ok(reaching.bodyHeight < gathered.bodyHeight);
+      assert.ok(reaching.headReach > gathered.headReach);
+    }
+  }
+  assert.equal(gaitFrame(.49, 38).bodyWidth, 1);
+  assert.equal(gaitFrame(.12, 0).headReach, 0);
+});
+
 test("a loaded foreground mouse plants paws in the same room coordinates", () => {
   for (const direction of [-1, 1]) {
     const pace = .48;
