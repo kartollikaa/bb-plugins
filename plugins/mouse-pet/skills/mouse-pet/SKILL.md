@@ -5,13 +5,14 @@ description: Explains the Mouse Pet plugin, a small mouse that runs along the bo
 
 # Mouse Pet
 
-The Mouse Pet plugin puts a small grey mouse along the bottom edge of the bb window. It bounds
-when running, skids before a fast turn and stretches after sleeping. It sometimes sits on its
+The Mouse Pet plugin puts a small grey mouse along the bottom edge of the bb window. It takes
+even steps at low speed, trots in diagonal pairs, skids before a fast turn and stretches after sleeping. It sometimes sits on its
 haunches and watches the pointer, or pauses facing toward or away from you. A click makes it hop,
 squeak "Pi!" and bolt.
 
 During a pause, the mouse sometimes washes its face with a front paw or scratches behind its ear
-in quick bursts. It hops on its own, varies its walking, running and sleeping animations, and
+in quick bursts. It occasionally makes a small hop on its own, varies how high it lifts its paws
+and moves its body and tail as it walks and runs, and switches sleeping poses. It
 occasionally takes a few steps toward you while facing front. It stays closer as it moves around
 until it turns its back and steps away.
 

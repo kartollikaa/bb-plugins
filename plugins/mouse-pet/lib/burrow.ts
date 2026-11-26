@@ -40,9 +40,11 @@ export function advanceBurrow(
   const entrance = edge === -1 ? 0 : maxX(width);
   const elapsed = burrow.elapsed + dt;
   if (phase === "run") {
-    const speed = SPEED_PX_PER_S.run * pace;
+    const target = SPEED_PX_PER_S.run * pace;
+    const previous = Math.max(0, pet.velocity * edge);
+    const speed = previous + Math.min(dt * .85, Math.max(-dt * .85, target - previous));
     const distance = Math.abs(entrance - pet.x);
-    const step = Math.min(distance, speed * dt / 1_000);
+    const step = Math.min(distance, (previous + speed) * dt / 2_000);
     return {
       burrow: step === distance ? { ...burrow, phase: "enter", elapsed: 0 } : burrow,
       pet: { ...pet, x: pet.x + edge * step, velocity: edge * speed, direction: edge, mode: "run", idleView: "profile" },

@@ -1,10 +1,12 @@
 # Mouse Pet
 
-A small grey mouse lives along the bottom edge of the bb window. It walks at low speed and bounds
-at a run, skids before a fast turn, curls up to sleep and stretches when it wakes. It can stop and
+A small grey mouse lives along the bottom edge of the bb window. It takes an even four-beat step
+at low speed and trots with alternating diagonal pairs at a run. It skids before a fast turn,
+curls up to sleep and stretches when it wakes. It can stop and
 look around from its haunches, turn to face you or sit with its back to you. It sometimes stops to
 wash its face with a front paw, scratch behind its ear, or hop on its own. It has four variants
-each for walking, running and sleeping. Once in a while it takes a few steps toward you from a
+each for walking, running and sleeping. Gait variations share the same paw placement and vary
+the height of the steps and the movement of the body and tail. Once in a while it takes a few steps toward you from a
 front-facing pose and stays in the foreground until it turns its back and walks away.
 
 - Click the mouse to make it hop, squeak "Pi!" and bolt.

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fallFrame, followSpring, gaitFrame, hopHeight, nextMoveVariant, pounceHeight, sleepBreath, strideLength, turnFrame } from "../lib/animation.ts";
+import {
+  blendGaitStyle, fallFrame, followSpring, gaitFrame, hopCompression, hopHeight, HOP_TOUCHDOWN,
+  nextMoveVariant, pounceHeight, sleepBreath, strideLength, turnFrame,
+} from "../lib/animation.ts";
 
 test("all feet settle and the gait stops swinging the tail at rest", () => {
   for (const speed of [0, 15, 38, 150]) {
@@ -25,15 +28,21 @@ test("a grounded paw stays put in the room while the body walks over it", () => 
 
 test("walking advances each paw through the same motion one quarter-cycle apart", () => {
   const feet = gaitFrame(0, 38).feet;
-  for (const [index, foot] of feet.entries()) {
-    assert.deepEqual(foot, gaitFrame(index / 4, 38).feet[0]);
+  for (const [index, phase] of [0, .75, .5, .25].entries()) {
+    assert.deepEqual(feet[index], gaitFrame(phase, 38).feet[0]);
   }
 });
 
 test("each gait and sleeping breath has four variants without an immediate repeat", () => {
   const variants = [0, 1, 2, 3] as const;
+  const styles = variants.map((variant) => blendGaitStyle({ lift: 1, tail: 1, bob: 1 }, variant, 300));
   for (const speed of [38, 150]) {
-    assert.equal(new Set(variants.map((variant) => JSON.stringify(gaitFrame(.32, speed, variant)))).size, 4);
+    assert.equal(new Set(styles.map((style) => JSON.stringify(gaitFrame(.32, speed, 1, style)))).size, 4);
+    for (let i = 0; i < 100; i++) {
+      const ground = (style: typeof styles[number]) =>
+        gaitFrame(i / 100, speed, 1, style).feet.map(({ lift }) => lift === 0);
+      assert.ok(styles.every((style) => String(ground(style)) === String(ground(styles[0]))));
+    }
   }
   assert.equal(new Set(variants.map((variant) => sleepBreath(900, 1, variant))).size, 4);
   for (const variant of variants) {
@@ -43,16 +52,27 @@ test("each gait and sleeping breath has four variants without an immediate repea
   }
 });
 
-test("a sprint has a single raised bound between hind push-off and front landing", () => {
-  assert.equal(gaitFrame(.42, 38).bound, 0);
-  const flight = gaitFrame(.42, 150);
-  assert.ok(flight.bound > 3 && flight.feet.every(({ lift }) => lift > 0));
-  const landing = gaitFrame(.56, 150);
-  assert.ok(landing.bound < flight.bound);
-  assert.equal(landing.feet[1].lift, 0);
-  assert.equal(landing.feet[3].lift, 0);
-  assert.ok(gaitFrame(.84, 150).bound < .01);
-  assert.ok(strideLength(150) / 150 > .3);
+test("the faster gait alternates diagonal pairs with a small symmetrical rise", () => {
+  for (let i = 0; i < 100; i++) {
+    const { feet, bob } = gaitFrame(i / 100, 150);
+    assert.ok(Math.abs(feet[0].lift - feet[3].lift) < 1e-8);
+    assert.ok(Math.abs(feet[1].lift - feet[2].lift) < 1e-8);
+    assert.ok(feet.filter((foot) => foot.lift === 0).length >= 2);
+    assert.ok(bob < 1);
+  }
+});
+
+test("a loaded foreground mouse plants paws in the same room coordinates", () => {
+  for (const direction of [-1, 1]) {
+    const pace = .48;
+    const scale = 1.23;
+    const dx = direction * 2;
+    const speed = 38;
+    const foot = (x: number, phase: number) => x + direction * scale * gaitFrame(phase, speed, pace).feet[0].reach;
+    const start = foot(100, .1);
+    const next = foot(100 + dx, .1 + (dx * direction) / strideLength(speed, pace, scale));
+    assert.ok(Math.abs(start - next) < 1e-8);
+  }
 });
 
 test("a click hop lifts on the first frame and returns to the floor", () => {
@@ -70,6 +90,13 @@ test("a second hop starts at the current height and ends on the floor", () => {
   assert.equal(hopHeight(0, height), height);
   assert.ok(hopHeight(.14, height) > height);
   assert.equal(hopHeight(.9, height), 0);
+});
+
+test("a small solo hop has less lift and only compresses on landing", () => {
+  assert.ok(hopHeight(.42, 0, .58) < hopHeight(.42, 0, .85));
+  assert.equal(hopCompression(HOP_TOUCHDOWN - .01, .58), 0);
+  assert.ok(hopCompression(.94, .58) > 0);
+  assert.equal(hopCompression(1, .58), 0);
 });
 
 test("a pounce can perch at the cheese height before stepping down to the floor", () => {
