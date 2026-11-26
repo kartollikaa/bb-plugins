@@ -126,12 +126,15 @@ checkout, `path:~/Projects/bb --plugin <id>`, so a reload picks up local edits.
 
 - **What:** a small mouse that lives along the bottom edge of the bb window. Click to make it hop
   and squeak, drag to carry it by the scruff, or pause the pointer low and ahead to invite a sniff.
-  It skids before turning at a run and stretches after sleeping. Only the mouse takes clicks.
+  It skids before turning at a run, sometimes hops by itself, and retreats to a burrow after
+  repeated clicks or when left alone. It sometimes approaches the foreground and returns after
+  turning its back. Only the mouse takes clicks.
 - **How:** a content script (`lib/mouse-pet.ts`) appends a fixed `[data-mouse-pet]` layer to `body`
   and moves the sprite with a `requestAnimationFrame` loop. Gait follows distance traveled, and
   CSS poses articulate the head, paws and body. `lib/pet.ts` drives autonomous movement,
   `lib/animation.ts` samples gait and jumps, and `lib/interaction.ts` handles grip and sniff geometry.
-  `lib/snack.ts` tracks the one piece of cheese the mouse fetches and eats on its own.
+  `lib/snack.ts` tracks the one piece of cheese the mouse fetches, plays with, and eats on its own.
+  `lib/metabolism.ts` makes the mouse rounder and slower as it gains weight. It slims down while resting.
   With `prefers-reduced-motion` it sits still and shows "Pi!" on a click.
 - **No commands or settings:** the server entry is empty because bb requires one. Turn the pet off by
   disabling the plugin.

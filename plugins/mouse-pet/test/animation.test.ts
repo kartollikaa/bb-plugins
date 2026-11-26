@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fallFrame, followSpring, gaitFrame, hopHeight, strideLength, turnFrame } from "../lib/animation.ts";
+import { fallFrame, followSpring, gaitFrame, hopHeight, nextMoveVariant, pounceHeight, sleepBreath, strideLength, turnFrame } from "../lib/animation.ts";
 
 test("all feet settle and the gait stops swinging the tail at rest", () => {
   for (const speed of [0, 15, 38, 150]) {
@@ -27,6 +27,19 @@ test("walking advances each paw through the same motion one quarter-cycle apart"
   const feet = gaitFrame(0, 38).feet;
   for (const [index, foot] of feet.entries()) {
     assert.deepEqual(foot, gaitFrame(index / 4, 38).feet[0]);
+  }
+});
+
+test("each gait and sleeping breath has four variants without an immediate repeat", () => {
+  const variants = [0, 1, 2, 3] as const;
+  for (const speed of [38, 150]) {
+    assert.equal(new Set(variants.map((variant) => JSON.stringify(gaitFrame(.32, speed, variant)))).size, 4);
+  }
+  assert.equal(new Set(variants.map((variant) => sleepBreath(900, 1, variant))).size, 4);
+  for (const variant of variants) {
+    const choices = [0, .45, .9].map((roll) => nextMoveVariant(variant, roll));
+    assert.equal(new Set(choices).size, 3);
+    assert.ok(!choices.includes(variant));
   }
 });
 
@@ -57,6 +70,13 @@ test("a second hop starts at the current height and ends on the floor", () => {
   assert.equal(hopHeight(0, height), height);
   assert.ok(hopHeight(.14, height) > height);
   assert.equal(hopHeight(.9, height), 0);
+});
+
+test("a pounce can perch at the cheese height before stepping down to the floor", () => {
+  assert.equal(pounceHeight(0, 700, 18), 0);
+  assert.equal(pounceHeight(420, 700, 18), 18);
+  assert.equal(pounceHeight(625, 700, 18), 9);
+  assert.equal(pounceHeight(700, 700, 18), 0);
 });
 
 test("the carried body trails the grip and returns gradually after the cursor stops", () => {

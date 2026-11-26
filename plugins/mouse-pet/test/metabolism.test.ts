@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { advanceMetabolism, bellyScale, BURST_FULLNESS, createMetabolism, hunger } from "../lib/metabolism.ts";
+import { advanceMetabolism, bellyScale, createMetabolism, hunger, MAX_FULLNESS, movementPace } from "../lib/metabolism.ts";
 
 test("a completed bite satisfies hunger while the belly grows gradually", () => {
   const initial = createMetabolism();
@@ -40,13 +40,16 @@ test("a whole cheese barely changes the silhouette after a hungry start", () => 
   const fed = advanceMetabolism(createMetabolism(), 0, 0, 0, 8);
   const shape = bellyScale(fed.fullness);
   assert.ok(shape.width > 1 && shape.width < 1.06);
-  assert.ok(shape.height > 1 && shape.height < 1.09);
+  assert.ok(shape.height > 1 && shape.height < 1.14);
 });
 
-test("repeated overeating can still cause a burst and activity can prevent it", () => {
-  const first = advanceMetabolism(createMetabolism(), 0, 0, 0, 8);
-  const second = advanceMetabolism(first, 0, 0, 0, 8);
-  assert.ok(second.fullness < BURST_FULLNESS);
-  assert.ok(advanceMetabolism(second, 0, 0, 0, 8).fullness >= BURST_FULLNESS);
-  assert.ok(advanceMetabolism(second, 120_000, 12_000, 0, 8).fullness < BURST_FULLNESS);
+test("overeating tops out at a nearly round belly and resting gradually slims it", () => {
+  const fed = advanceMetabolism(createMetabolism(), 0, 0, 0, 200);
+  assert.equal(fed.fullness, MAX_FULLNESS);
+  const { width, height } = bellyScale(fed.fullness);
+  assert.ok(Math.abs(29 * width - 15 * height) < 2);
+  assert.ok(movementPace(fed.fullness) < movementPace(fed.fullness / 2));
+  const grown = advanceMetabolism(fed, 20_000, 0, 0, 1);
+  const asleep = advanceMetabolism(grown, 30_000, 0, 0, 0);
+  assert.ok(asleep.belly < grown.belly && asleep.belly > grown.belly * .95);
 });

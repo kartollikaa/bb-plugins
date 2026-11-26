@@ -13,9 +13,12 @@ export interface Point {
   y: number;
 }
 
-export function screenGripX(direction: Direction) {
-  return direction === 1 ? GRIP_X : PET_WIDTH - GRIP_X;
+export function screenGripX(direction: Direction, scale = 1) {
+  return PET_WIDTH / 2 + direction * (GRIP_X - PET_WIDTH / 2) * scale;
 }
+
+export const screenGripY = (height: number, scale = 1, shift = 0) =>
+  height - FLOOR_GAP + shift - (PET_HEIGHT - GRIP_Y) * scale;
 
 export function gripPoint(point: Point, initialOffset: Point, age: number): Point {
   const blend = Math.exp(-Math.max(age, 0) / 29);
@@ -38,11 +41,11 @@ export function scruffPath(angle: number, scale: Point, offset: Point) {
   return `M${GRIP_X} ${GRIP_Y}Q${point({ x: back.x + 1, y: GRIP_Y + 2 })} ${point(back)}L${point(front)}Q${point({ x: front.x - 1, y: GRIP_Y + 2 })} ${GRIP_X} ${GRIP_Y}Z`;
 }
 
-export function carryPosition(point: Point, direction: Direction, width: number, height: number) {
-  const gripX = screenGripX(direction);
+export function carryPosition(point: Point, direction: Direction, width: number, height: number, scale = 1, shift = 0) {
+  const gripX = screenGripX(direction, scale);
   return {
     x: Math.max(0, Math.min(point.x - gripX, maxX(width))),
-    lift: Math.max(0, Math.min(height - FLOOR_GAP - PET_HEIGHT + GRIP_Y - point.y, maxLift(height))),
+    lift: Math.max(0, Math.min(screenGripY(height, scale, shift) - point.y, maxLift(height))),
   };
 }
 

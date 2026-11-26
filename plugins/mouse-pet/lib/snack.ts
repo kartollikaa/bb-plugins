@@ -1,6 +1,8 @@
+import { HOP_MS, HOP_TOUCHDOWN } from "./animation.ts";
 import { advance, isGrooming, maxX, PET_WIDTH, type Direction, type Pet } from "./pet.ts";
 
-export const CHEESE_WIDTH = PET_WIDTH;
+export const CHEESE_WIDTH = 34;
+export const CHEESE_VIEWBOX_WIDTH = 48;
 export const BITE_MS = 520;
 // Each successive cut removes approximately one eighth of the projected cheese silhouette.
 const CUTS = [46, 40.3, 35.2, 30.8, 26.4, 21.6, 16.5, 10.5] as const;
@@ -18,8 +20,9 @@ interface Cheese {
 }
 
 type SnackAction =
-  | { kind: "fetch"; started: number; fromX: number; direction: Direction; distance: number }
+  | { kind: "fetch"; started: number; fromX: number; direction: Direction; distance: number; duration: number }
   | { kind: "seek"; updatedAt: number }
+  | { kind: "push" | "pounce"; started: number; duration: number; fromX: number; cheeseX: number; targetX: number }
   | { kind: "eat"; started: number; initialBites: number; fromX: number };
 
 export interface Snack {
@@ -28,19 +31,26 @@ export interface Snack {
   availableAt: number;
   touching: boolean;
   visits: number;
+  playAfter: number;
 }
 
 export function createSnack(time: number): Snack {
-  return { cheese: null, action: null, availableAt: time + 12_000, touching: false, visits: 0 };
+  return { cheese: null, action: null, availableAt: time + 12_000, touching: false, visits: 0, playAfter: time };
 }
 
 const clamp = (x: number, limit: number) => Math.max(0, Math.min(x, limit));
 const ease = (p: number) => p * p * (3 - 2 * p);
 const noseOffset = (direction: Direction) => direction === 1 ? PET_WIDTH - 3 : 3;
-const inwardOffset = (cheese: Cheese) => {
-  const bitAt = CUTS[cheese.bites] - 2;
-  return cheese.edge === 1 ? CHEESE_WIDTH - bitAt : bitAt;
-};
+const cheeseOffset = (cheese: Cheese, artX: number) =>
+  (cheese.edge === 1 ? CHEESE_VIEWBOX_WIDTH - artX : artX) * CHEESE_WIDTH / CHEESE_VIEWBOX_WIDTH;
+const inwardOffset = (cheese: Cheese) => cheeseOffset(cheese, CUTS[cheese.bites] - 2);
+
+export function cheeseLanding(cheese: Cheese) {
+  const artX = (2.5 + CUTS[cheese.bites] - 2) / 2;
+  const surfaceY = 14.5 + (2.6 - 14.5) * (artX - 2.5) / (31 - 2.5);
+  const paw = cheese.edge === 1 ? 35 : PET_WIDTH - 35;
+  return { x: cheese.x + cheeseOffset(cheese, artX) - paw, lift: 27.2 - surfaceY };
+}
 
 export function biteMaskPath(bites: number) {
   if (bites === 0) return "";
@@ -68,6 +78,35 @@ const beginEating = (snack: Snack, cheese: Cheese, pet: Pet, time: number): { sn
   pet: settle({ ...pet, direction: cheese.edge }),
 });
 
+function maybePlay(
+  snack: Snack, cheese: Cheese, pet: Pet, time: number, width: number, roll: number, pace: number,
+): { snack: Snack; pet: Pet } | null {
+  if (time < snack.playAfter || roll < .78) return null;
+  const kind = roll < .89 ? "push" : "pounce";
+  let targetX = fitCheese({ ...cheese, x: cheese.x + cheese.edge * (kind === "push" ? 22 : 9) }, width).x;
+  if (kind === "push" && targetX === cheese.x) return null;
+  if (kind === "pounce") {
+    const limit = maxX(width);
+    const landing = cheeseLanding(cheese).x;
+    if (landing < 0 || landing > limit) return null;
+    const targetLanding = landing + targetX - cheese.x;
+    targetX += clamp(targetLanding, limit) - targetLanding;
+  }
+  const atNose = mouthTarget(cheese, width);
+  return {
+    snack: {
+      ...snack,
+      playAfter: time + 16_000,
+      action: {
+        kind, started: time, duration: kind === "push" ? 760 / pace : 700,
+        fromX: kind === "push" ? atNose : pet.x, cheeseX: cheese.x, targetX,
+      },
+      touching: true,
+    },
+    pet: settle({ ...pet, direction: cheese.edge }, kind === "push" ? atNose : pet.x),
+  };
+}
+
 export function interruptSnack(snack: Snack, time: number, width: number): Snack {
   if (!snack.action) return snack;
   const cheese = snack.cheese
@@ -82,12 +121,11 @@ export function resizeSnack(snack: Snack, time: number, width: number): Snack {
 }
 
 export function advanceSnack(
-  snack: Snack, pet: Pet, time: number, width: number, random: () => number, hunger = .65,
+  snack: Snack, pet: Pet, time: number, width: number, random: () => number, hunger = .65, pace = 1,
 ): { snack: Snack; pet: Pet; bitesTaken?: number } {
   const { action, cheese } = snack;
   if (action?.kind === "fetch") {
-    const duration = 640 + action.distance * 13;
-    const progress = Math.min((time - action.started) / duration, 1);
+    const progress = Math.min((time - action.started) / action.duration, 1);
     const limit = maxX(width);
     const edge = action.direction === 1 ? limit : 0;
     const reach = ease(Math.max(0, Math.min(1, progress / .29)));
@@ -112,14 +150,33 @@ export function advanceSnack(
   if (action?.kind === "seek" && cheese) {
     const target = mouthTarget(cheese, width);
     const distance = target - pet.x;
-    if (Math.abs(distance) <= 3) return beginEating(snack, cheese, settle(pet, target), time);
+    if (Math.abs(distance) <= 3) {
+      return maybePlay(snack, cheese, pet, time, width, random(), pace) ??
+        beginEating(snack, cheese, settle(pet, target), time);
+    }
     const direction = distance < 0 ? -1 : 1;
     const seeking: Pet = {
       ...pet, direction, mode: Math.abs(distance) > 42 ? "run" : "walk", idleView: "profile", remainingMs: 1_000,
     };
     return {
       snack: { ...snack, action: { kind: "seek", updatedAt: time } },
-      pet: advance(seeking, time - action.updatedAt, width, random),
+      pet: advance(seeking, time - action.updatedAt, width, random, pace),
+    };
+  }
+  if (cheese && (action?.kind === "push" || action?.kind === "pounce")) {
+    const elapsed = time - action.started;
+    const progress = clamp(elapsed / action.duration, 1);
+    const touchdown = HOP_TOUCHDOWN * HOP_MS;
+    const slide = action.kind === "push" ? ease(progress) : ease(clamp((elapsed - touchdown) / 135, 1));
+    const current = { ...cheese, x: action.cheeseX + (action.targetX - action.cheeseX) * slide };
+    const x = action.kind === "push"
+      ? mouthTarget(current, width)
+      : action.fromX + (clamp(cheeseLanding(current).x, maxX(width)) - action.fromX) * ease(clamp(elapsed / touchdown, 1));
+    return {
+      snack: progress === 1
+        ? { ...snack, cheese: { ...current, tryAfter: time + 3_000, noticeAfter: time + 3_000 }, action: null, touching: false }
+        : { ...snack, cheese: current },
+      pet: settle(pet, x),
     };
   }
   if (action?.kind === "eat" && cheese) {
@@ -165,6 +222,8 @@ export function advanceSnack(
       return { snack: touching === snack.touching ? snack : { ...snack, touching }, pet };
     }
     const visits = snack.visits + 1;
+    const playing = maybePlay(snack, cheese, pet, time, width, random(), pace);
+    if (playing) return playing;
     const choosing = visits > 1 && (visits >= 4 || random() < .72);
     if (!choosing) return { snack: { ...snack, touching, visits }, pet };
     return beginEating({ ...snack, visits }, cheese, pet, time);
@@ -177,8 +236,9 @@ export function advanceSnack(
   const farthest = Math.min(146, limit - CHEESE_WIDTH / 2 - 6);
   const nearest = Math.min(60, farthest - 8);
   const distance = nearest + (farthest - nearest) * random();
+  const duration = (640 + distance * 13) / pace;
   return {
-    snack: { ...snack, action: { kind: "fetch", started: time, fromX: pet.x, direction, distance } },
+    snack: { ...snack, action: { kind: "fetch", started: time, fromX: pet.x, direction, distance, duration } },
     pet: settle({ ...pet, direction }),
   };
 }

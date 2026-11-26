@@ -11,7 +11,12 @@ haunches and watches the pointer, or pauses facing toward or away from you. A cl
 squeak "Pi!" and bolt.
 
 During a pause, the mouse sometimes washes its face with a front paw or scratches behind its ear
-in quick bursts.
+in quick bursts. It hops on its own, varies its walking, running and sleeping animations, and
+occasionally takes a few steps toward you while facing front. It stays closer as it moves around
+until it turns its back and steps away.
+
+Several quick clicks can send it to a burrow at the nearest window edge. It also goes there
+occasionally when left alone. It comes back out on its own.
 
 Press and drag the mouse by the scruff to carry it inside the window. Its legs hang and its body
 follows the pointer's momentum. Release near the floor to set
@@ -22,13 +27,14 @@ just ahead of the mouse. Lift it slightly during the sniff and the mouse rears u
 The mouse can pull one mouse-sized piece of cheese in at a window edge and leave it at a random
 distance. It can pass the cheese before it takes a bite. After leaving it alone for a while it
 may run straight over and take two bites, then leave the rest for later. It can fetch another piece
-once it finishes the current one.
+once it finishes the current one. Sometimes it plays with the cheese by pushing the piece or
+jumping onto it and sliding it across the floor.
 
 Each completed bite satisfies a fraction of the mouse's remaining hunger. A first piece of cheese
 rounds out the belly a little, while eating when already full adds more weight. Time and
 activity make it hungry again and slim it down, with running using more energy than walking.
-If too much excess weight builds up, it bursts into a puff. A new mouse walks in from an edge
-after a short pause.
+It slims down slowly while asleep. Several pieces of cheese can make it almost round, which
+slows both its walk and its run.
 
 It has no CLI command, agent tool or setting. Only the mouse itself catches clicks; the strip it moves
 in lets them through. To get rid of it, disable the plugin in bb's plugin settings

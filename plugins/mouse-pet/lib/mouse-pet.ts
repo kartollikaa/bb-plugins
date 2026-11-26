@@ -1,23 +1,26 @@
 import { advance, createPet, fit, isGrooming, maxX, MAX_FRAME_MS, PET_WIDTH, startle, type Pet } from "./pet.ts";
+import { advanceBurrow, burrowVisibility, findBurrow, nextBurrowAt, nextHopAt, recordClick, shouldHideFromClicks, type Burrow } from "./burrow.ts";
+import { advancePerspective, createPerspective, perspectiveFrame } from "./perspective.ts";
 import {
   carryPosition, DRAG_START_PX, FLOOR_GAP, GRIP_X, GRIP_Y, gripPoint, LONG_PRESS_MS,
-  maxLift, PET_HEIGHT, screenGripX, scruffPath, sniffDistance, type Point,
+  maxLift, PET_HEIGHT, screenGripX, screenGripY, scruffPath, sniffDistance, type Point,
 } from "./interaction.ts";
-import { FALL_GRAVITY, fallFrame, followSpring, gaitFrame, hopHeight, HOP_TOUCHDOWN, strideLength, turnFrame, type Spring } from "./animation.ts";
-import { advanceSnack, BITE_MS, biteMaskPath, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "./snack.ts";
-import { advanceMetabolism, bellyScale, BURST_FULLNESS, createMetabolism, hunger } from "./metabolism.ts";
+import {
+  FALL_GRAVITY, fallFrame, followSpring, gaitFrame, hopHeight, HOP_MS, HOP_TOUCHDOWN,
+  nextMoveVariant, pounceHeight, sleepBreath, strideLength, turnFrame, type MoveVariant, type Spring,
+} from "./animation.ts";
+import {
+  advanceSnack, BITE_MS, biteMaskPath, cheeseLanding, CHEESE_VIEWBOX_WIDTH, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack,
+} from "./snack.ts";
+import { advanceMetabolism, bellyScale, createMetabolism, hunger, movementPace } from "./metabolism.ts";
 
 const ROOT_ATTR = "data-mouse-pet";
 const SQUEAK_MS = 700;
-const HOP_MS = 420;
 const SNIFF_DWELL_MS = 650;
 const APPROACH_MS = 320;
 const SNIFF_MS = 900;
 const REAR_MS = 650;
 const LAND_MS = 180;
-const BURST_MS = 520;
-const RESPAWN_MS = 4_000;
-const ENTRY_MS = 1_050;
 
 const FUR = "#c9c9d6";
 const FUR_FAR = "#a3a3b3";
@@ -51,14 +54,19 @@ const STYLE = `
   -webkit-tap-highlight-color: transparent;
 }
 [${ROOT_ATTR}] .mp-hop, [${ROOT_ATTR}] .mp-flip, [${ROOT_ATTR}] svg { display: block; width: 100%; height: 100%; }
-[${ROOT_ATTR}] .mp-mouse[data-life] { pointer-events: none; }
-[${ROOT_ATTR}] [data-life="burst"] .mp-hop { transform-origin: 50% 65%; animation: mp-burst ${BURST_MS}ms ease-out both; }
-[${ROOT_ATTR}] [data-life="burst"]::after {
-  content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; left: 45%; top: 48%;
-  box-shadow: -14px -11px 0 ${FUR}, 1px -17px 0 ${PINK}, 13px -10px 0 ${FUR},
-    18px 1px 0 ${FUR_FAR}, -17px 2px 0 ${PINK};
-  animation: mp-burst-puffs ${BURST_MS}ms ease-out both;
+[${ROOT_ATTR}] .mp-mouse[data-burrow] { pointer-events: none; }
+[${ROOT_ATTR}] [data-burrow] .mp-hop {
+  transform-origin: center bottom;
+  opacity: var(--mp-burrow-visibility);
+  transform: scale(calc(.52 + .48 * var(--mp-burrow-visibility)));
 }
+[${ROOT_ATTR}] .mp-burrow {
+  position: absolute; bottom: ${FLOOR_GAP}px; width: 24px; height: 20px;
+  border-radius: 60% 60% 16% 16%; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 82%, #25222b 53%, #514956 65%, #817585 77%, transparent 79%);
+}
+[${ROOT_ATTR}] .mp-burrow[data-edge="-1"] { left: -5px; }
+[${ROOT_ATTR}] .mp-burrow[data-edge="1"] { right: -5px; }
 [${ROOT_ATTR}] .mp-belly {
   transform-box: fill-box; transform-origin: center bottom;
   transform: scale(var(--mp-belly-width, 1), var(--mp-belly-height, 1));
@@ -66,6 +74,12 @@ const STYLE = `
 [${ROOT_ATTR}] .mp-flip {
   position: relative; isolation: isolate; transform: translateY(var(--mp-bound, 0px));
 }
+[${ROOT_ATTR}] .mp-plane {
+  width: 100%; height: 100%; transform-origin: center bottom;
+  transform: translateY(var(--mp-depth-shift, 0px)) scale(var(--mp-depth-scale, 1));
+}
+[${ROOT_ATTR}] .mp-depth-left { transform: translateY(min(0px, var(--mp-depth-step, 0px))); }
+[${ROOT_ATTR}] .mp-depth-right { transform: translateY(min(0px, calc(-1 * var(--mp-depth-step, 0px)))); }
 [${ROOT_ATTR}] .mp-profile { transform: scaleX(var(--mp-turn, 1)); opacity: var(--mp-profile, 1); }
 [${ROOT_ATTR}] :is(.mp-anfas, .mp-rear-view) {
   position: absolute; inset: 0; opacity: calc(1 - var(--mp-profile, 1)); mix-blend-mode: plus-lighter;
@@ -91,6 +105,7 @@ const STYLE = `
 [${ROOT_ATTR}] .mp-eye-state, [${ROOT_ATTR}] .mp-eye-closed { transition: opacity .18s ease, transform .18s ease; }
 [${ROOT_ATTR}] .mp-eye-closed { opacity: 0; }
 [${ROOT_ATTR}] .mp-impact { transform-origin: 24px 28px; }
+[${ROOT_ATTR}] .mp-gait { transform-box: view-box; transform-origin: 24px 27px; transform: rotate(var(--mp-gait-rock, 0deg)); }
 [${ROOT_ATTR}] :is([data-mode="press"], [data-mode="carry"]) { cursor: grabbing; }
 [${ROOT_ATTR}] .mp-pose, [${ROOT_ATTR}] .mp-head, [${ROOT_ATTR}] .mp-front,
 [${ROOT_ATTR}] .mp-scruff, [${ROOT_ATTR}] .mp-leg-pose, [${ROOT_ATTR}] .mp-tail-pose, [${ROOT_ATTR}] .mp-far-front {
@@ -141,6 +156,8 @@ const STYLE = `
 [${ROOT_ATTR}] [data-mode="perch"] .mp-tail-pose { transform: rotate(-26deg); }
 [${ROOT_ATTR}] [data-mode="fetch"] .mp-head { transform: translateX(2px) rotate(9deg); }
 [${ROOT_ATTR}] [data-mode="fetch"] .mp-front { transform: rotate(-87deg); }
+[${ROOT_ATTR}] [data-mode="push"] .mp-head { transform: translate(1px, 2px) rotate(14deg); }
+[${ROOT_ATTR}] [data-mode="push"] .mp-front { transform: rotate(-48deg); }
 [${ROOT_ATTR}] [data-mode="eat"] .mp-head { animation: mp-nibble ${BITE_MS}ms ease-in-out infinite; }
 [${ROOT_ATTR}] [data-mode="eat"] .mp-front { transform: rotate(-115deg); }
 [${ROOT_ATTR}] :is([data-mode="groom"], [data-mode="scratch"]) .mp-pose {
@@ -162,6 +179,15 @@ const STYLE = `
 [${ROOT_ATTR}] [data-mode="sleep"] .mp-front { transform: rotate(-35deg); }
 [${ROOT_ATTR}] [data-mode="sleep"] .mp-leg-pose { transform: translateY(-2px) scaleY(.65); }
 [${ROOT_ATTR}] [data-mode="sleep"] .mp-tail-pose { transform: rotate(-25deg); }
+[${ROOT_ATTR}] [data-mode="sleep"][data-variant="1"] .mp-pose { transform: translate(-1px, 1px) rotate(-8deg) scale(.89, .91); }
+[${ROOT_ATTR}] [data-mode="sleep"][data-variant="1"] .mp-head { transform: translate(-5px, 3px) rotate(24deg); }
+[${ROOT_ATTR}] [data-mode="sleep"][data-variant="1"] .mp-tail-pose { transform: rotate(-58deg); }
+[${ROOT_ATTR}] [data-mode="sleep"][data-variant="2"] .mp-pose { transform: translateY(2.5px) scale(1.12, .79); }
+[${ROOT_ATTR}] [data-mode="sleep"][data-variant="2"] .mp-head { transform: translate(1px, 2.5px) rotate(13deg); }
+[${ROOT_ATTR}] [data-mode="sleep"][data-variant="2"] .mp-front { transform: translateX(3px) rotate(-51deg); }
+[${ROOT_ATTR}] [data-mode="sleep"][data-variant="3"] .mp-pose { transform: translateY(1px) rotate(9deg) scale(.94, .96); }
+[${ROOT_ATTR}] [data-mode="sleep"][data-variant="3"] .mp-head { transform: translate(-2px, 1px) rotate(-7deg); }
+[${ROOT_ATTR}] [data-mode="sleep"][data-variant="3"] .mp-tail-pose { transform: rotate(19deg); }
 [${ROOT_ATTR}] .mp-doze { transform-box: view-box; transform-origin: 24px 28px; transform: scaleY(var(--mp-breath, 1)); }
 [${ROOT_ATTR}] .mp-z {
   opacity: 0; position: absolute; left: 100%; bottom: 60%; margin-left: -4px;
@@ -209,16 +235,6 @@ const STYLE = `
 @keyframes mp-stretch-paw { 0%, 100% { transform: none; } 50% { transform: rotate(-33deg); } }
 @keyframes mp-z { from { opacity: 0; transform: translate(0, 4px); } 25% { opacity: 1; } to { opacity: 0; transform: translate(5px, -9px); } }
 @keyframes mp-pop { from { opacity: 0; transform: translate(-50%, 4px); } 15% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } to { opacity: 0; } }
-@keyframes mp-burst {
-  0% { opacity: 1; transform: scale(1); }
-  35% { opacity: 1; transform: scale(1.35); }
-  42%, 100% { opacity: 0; transform: scale(1.45); }
-}
-@keyframes mp-burst-puffs {
-  0%, 35% { opacity: 0; transform: scale(.5); }
-  42% { opacity: .95; }
-  100% { opacity: 0; transform: scale(2.45) translateY(-4px); }
-}
 
 @media (prefers-reduced-motion: reduce) {
   [${ROOT_ATTR}] * { animation: none !important; transition: none !important; }
@@ -228,6 +244,7 @@ const STYLE = `
 const SPRITE = `
 <svg class="mp-profile" viewBox="0 0 48 29" aria-hidden="true" focusable="false">
   <g class="mp-impact">
+  <g class="mp-gait">
     <g class="mp-pose">
       <g class="mp-tail-pose">
         <path class="mp-tail" d="M12 19C5 20 2 14 6 9" fill="none" stroke="${PINK}" stroke-width="1.8" stroke-linecap="round"/>
@@ -259,12 +276,16 @@ const SPRITE = `
     </g>
     <path class="mp-scruff" fill="${FUR}"/>
   </g>
+  </g>
 </svg>`;
 
 const FRONT_SPRITE = `
 <svg class="mp-anfas" viewBox="0 0 48 29" aria-hidden="true" focusable="false">
   <path d="M20 24q-6 1-9-3" stroke="${PINK}" stroke-width="1.7" stroke-linecap="round" fill="none"/>
-  <path d="M19 24l-1 3.5h2m9-3.5 1 3.5h-2" stroke="${FUR_FAR}" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+  <g stroke="${FUR_FAR}" stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path class="mp-depth-left" d="M19 24l-1 3.5h2"/>
+    <path class="mp-depth-right" d="M29 24l1 3.5h-2"/>
+  </g>
   <ellipse class="mp-belly" cx="24" cy="18.5" rx="9" ry="7.5" fill="${FUR}"/>
   <circle cx="18.4" cy="10.5" r="3.9" fill="${FUR}"/>
   <circle cx="29.6" cy="10.5" r="3.9" fill="${FUR}"/>
@@ -279,7 +300,10 @@ const FRONT_SPRITE = `
 
 const BACK_SPRITE = `
 <svg class="mp-rear-view" viewBox="0 0 48 29" aria-hidden="true" focusable="false">
-  <path d="M19 25l-2 2.5h3m9-2.5 2 2.5h-3" stroke="${FUR_FAR}" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+  <g stroke="${FUR_FAR}" stroke-width="2.8" stroke-linecap="round" fill="none">
+    <path class="mp-depth-left" d="M19 25l-2 2.5h3"/>
+    <path class="mp-depth-right" d="M29 25l2 2.5h-3"/>
+  </g>
   <circle cx="18.3" cy="10.6" r="3.8" fill="${FUR_FAR}"/>
   <circle cx="29.7" cy="10.6" r="3.8" fill="${FUR_FAR}"/>
   <ellipse cx="24" cy="15.2" rx="7.5" ry="6.5" fill="${FUR}"/>
@@ -289,7 +313,7 @@ const BACK_SPRITE = `
 
 const CHEESE = `
 <div class="mp-cheese" hidden>
-  <svg viewBox="0 0 48 29" aria-hidden="true" focusable="false">
+  <svg viewBox="0 0 ${CHEESE_VIEWBOX_WIDTH} 29" preserveAspectRatio="none" aria-hidden="true" focusable="false">
     <mask id="mp-cheese-bites" maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="29">
       <rect width="48" height="29" fill="white"/>
       <path class="mp-cheese-bites" fill="black"/>
@@ -338,7 +362,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const root = document.createElement("div");
   root.setAttribute(ROOT_ATTR, "");
   root.setAttribute("aria-hidden", "true");
-  root.innerHTML = `${CHEESE}<div class="mp-mouse" data-mode="walk"><span class="mp-squeak">Pi!</span><span class="mp-z">z</span><div class="mp-hop"><div class="mp-flip" data-dir="1">${SPRITE}${FRONT_SPRITE}${BACK_SPRITE}</div></div></div>`;
+  root.innerHTML = `<div class="mp-burrow" hidden></div>${CHEESE}<div class="mp-mouse" data-mode="walk"><span class="mp-squeak">Pi!</span><span class="mp-z">z</span><div class="mp-hop"><div class="mp-plane"><div class="mp-flip" data-dir="1">${SPRITE}${FRONT_SPRITE}${BACK_SPRITE}</div></div></div></div>`;
   const mouse = root.querySelector<HTMLElement>(".mp-mouse")!;
   const hop = root.querySelector<HTMLElement>(".mp-hop")!;
   const flip = root.querySelector<HTMLElement>(".mp-flip")!;
@@ -346,6 +370,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const legs = Array.from(root.querySelectorAll<SVGElement>(".mp-leg"));
   const scruff = root.querySelector<SVGElement>(".mp-scruff")!;
   const cheese = root.querySelector<HTMLElement>(".mp-cheese")!;
+  const entrance = root.querySelector<HTMLElement>(".mp-burrow")!;
   const biteMask = cheese.querySelector<SVGElement>(".mp-cheese-bites")!;
   document.head.append(style);
   document.body.append(root);
@@ -353,7 +378,14 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   let pet: Pet = createPet(viewportWidth(), Math.random);
   let snack = createSnack(performance.now());
   let metabolism = createMetabolism();
-  let life: { phase: "burst" | "enter"; started: number } | null = null;
+  let perspective = createPerspective(performance.now());
+  let burrow: Burrow | null = null;
+  let recentClicks: number[] = [];
+  let hideAt = nextBurrowAt(performance.now(), Math.random);
+  let jumpAt = nextHopAt(performance.now(), Math.random);
+  const variants: Record<"walk" | "run" | "sleep", MoveVariant> = { walk: 0, run: 0, sleep: 0 };
+  let variant: MoveVariant = 0;
+  let animatedMode: Pet["mode"] | null = null;
   let frame = 0;
   let lastTime = 0;
   let gesture: Gesture | null = null;
@@ -384,11 +416,24 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     const belly = bellyScale(metabolism.belly);
     mouse.style.setProperty("--mp-belly-width", belly.width.toFixed(3));
     mouse.style.setProperty("--mp-belly-height", belly.height.toFixed(3));
-    if (life) mouse.dataset.life = life.phase;
-    else delete mouse.dataset.life;
+    const { scale, shift, step } = perspectiveFrame(perspective);
+    mouse.style.setProperty("--mp-depth-scale", scale.toFixed(3));
+    mouse.style.setProperty("--mp-depth-shift", `${(shift - Math.abs(step) * 1.6).toFixed(2)}px`);
+    mouse.style.setProperty("--mp-depth-step", `${(step * 3.4).toFixed(2)}px`);
+    mouse.dataset.plane = perspective.depth === 0 ? "far" : perspective.depth === 1 ? "near" : "crossing";
+    mouse.hidden = burrow?.phase === "hide";
+    entrance.hidden = !burrow;
+    if (burrow) {
+      mouse.dataset.burrow = burrow.phase;
+      entrance.dataset.edge = String(burrow.edge);
+      mouse.style.setProperty("--mp-burrow-visibility", String(burrowVisibility(burrow)));
+    } else {
+      delete mouse.dataset.burrow;
+    }
     const snackPose = snack.action?.kind === "seek" ? undefined : snack.action?.kind;
     const mode = motion.matches ? "sit" : gesture?.phase ?? descent?.phase ?? attention?.phase ?? snackPose ?? pet.mode;
     if (mouse.dataset.mode !== mode) mouse.dataset.mode = mode;
+    if (mouse.dataset.variant !== String(variant)) mouse.dataset.variant = String(variant);
     mouse.toggleAttribute("data-moving", gaitSpeed > 4);
     if (mode === "carry" || mode === "fall") {
       const angle = swing.value - 27 * tuck;
@@ -430,20 +475,34 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
 
   const drawMotion = (time: number, dt: number, distance: number) => {
     let hopInFlight = false;
+    let pounceLanded = false;
+    hopLift = 0;
     if (hopStarted !== null) {
       const progress = (time - hopStarted) / HOP_MS;
       hopInFlight = progress < HOP_TOUCHDOWN;
       hopLift = hopHeight(progress, hopStartHeight);
-      if (progress >= 1) hopStarted = null;
+      if (progress >= 1) {
+        hopStarted = null;
+        hop.removeAttribute("data-hop");
+      }
+    }
+    if (snack.action?.kind === "pounce" && snack.cheese) {
+      const age = time - snack.action.started;
+      pounceLanded = age >= HOP_MS * HOP_TOUCHDOWN;
+      const perchLift = Math.min(maxLift(viewportHeight()), cheeseLanding(snack.cheese).lift);
+      hopLift = Math.max(hopLift, pounceHeight(age, snack.action.duration, perchLift));
+      hopInFlight = true;
     }
     const movingOnFloor = !gesture && !descent && !hopInFlight && pet.mode !== "skid" && snack.action?.kind !== "eat" &&
       (!attention || attention.phase === "approach");
     const speed = movingOnFloor && dt > 0 ? Math.abs(distance) * 1_000 / dt : 0;
     gaitSpeed += (speed - gaitSpeed) * (1 - Math.exp(-dt / 44));
-    const stepLength = strideLength(gaitSpeed);
+    const pace = movementPace(metabolism.belly);
+    const equivalentSpeed = gaitSpeed / pace;
+    const stepLength = strideLength(equivalentSpeed, variant, pace);
     const steps = snack.action?.kind === "fetch" ? distance * pet.direction : Math.abs(distance);
     stride = (stride + (movingOnFloor ? steps : 0) / stepLength + 1) % 1;
-    const gait = gaitFrame(stride, gaitSpeed);
+    const gait = gaitFrame(stride, equivalentSpeed, variant, pace);
     const grounded = movingOnFloor && hopStarted === null && pet.mode === "run";
     boundBlend += ((grounded ? 1 : 0) - boundBlend) * (1 - Math.exp(-dt / 36));
     const bound = gait.bound * boundBlend;
@@ -452,7 +511,8 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     rest += ((dozing ? 1 : 0) - rest) * (1 - Math.exp(-dt / 140));
     tailPhase = (tailPhase + dt / (240 + rest * 430)) % (Math.PI * 2);
     const tail = gait.tail + Math.sin(tailPhase) * (3.2 - rest * 1.7);
-    const breath = 1 + rest * .038 * (1 - Math.cos(time / 440)) / 2;
+    const breath = sleepBreath(time, rest, variants.sleep);
+    mouse.style.setProperty("--mp-gait-rock", `${gait.rock.toFixed(2)}deg`);
     mouse.style.setProperty("--mp-tail", `${tail.toFixed(2)}deg`);
     mouse.style.setProperty("--mp-breath", breath.toFixed(3));
     if (attention?.phase === "sniff") {
@@ -467,7 +527,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       mouse.style.setProperty("--mp-look-x", `${Math.max(-1, Math.min(1, x)).toFixed(2)}px`);
       mouse.style.setProperty("--mp-look-y", `${Math.max(-.85, Math.min(.5, y)).toFixed(2)}px`);
     }
-    const airborne = Math.min(hopLift / 16, 1);
+    const airborne = pounceLanded ? 0 : Math.min(hopLift / 16, 1);
     legs.forEach((leg, index) => {
       const foot = gait.feet[index];
       const front = index % 2 === 1;
@@ -484,6 +544,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     turn.progress = Math.min(1, turn.progress + dt / 185);
     const view = turnFrame(turn.from, turn.to, turn.progress);
     face = view.yaw;
+    perspective = advancePerspective(perspective, depthView && Math.abs(face) < .18 ? pet.idleView : "profile", time, dt, Math.random);
     if (!depthView && Math.abs(face) >= .7) delete flip.dataset.depthView;
     if (flip.dataset.depthView === "back") {
       const tailFollow = turn.to === 0 ? 13 * Math.sin(2 * Math.PI * turn.progress) * Math.sin(Math.PI * turn.progress) : 0;
@@ -496,7 +557,8 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const placeAtGrip = (time: number) => {
     if (!gesture) return;
     const point = gripPoint(gesture.point, gesture.gripOffset, time - gesture.pickedUpAt);
-    const position = carryPosition(point, pet.direction, viewportWidth(), viewportHeight());
+    const { scale, shift, step } = perspectiveFrame(perspective);
+    const position = carryPosition(point, pet.direction, viewportWidth(), viewportHeight(), scale, shift - Math.abs(step) * 1.6);
     pet.x = position.x;
     lift = position.lift;
   };
@@ -521,7 +583,9 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
 
   const updateGesture = (time: number, dt: number) => {
     if (!gesture) return;
-    if (gesture.phase === "press" && hopStarted !== null) pet = advance(pet, dt, viewportWidth(), Math.random);
+    if (gesture.phase === "press" && hopStarted !== null) {
+      pet = advance(pet, dt, viewportWidth(), Math.random, movementPace(metabolism.belly));
+    }
     if (gesture.phase === "carry") {
       const age = time - gesture.pickedUpAt;
       tuck = Math.min(age / 115, 1);
@@ -558,6 +622,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     const distance = sniffDistance(pet.x, pet.direction, cursor.point, viewportHeight());
     if (distance === null) return false;
     cursor.visited = true;
+    hideAt = nextBurrowAt(time, Math.random);
     const toX = Math.max(0, Math.min(pet.x + pet.direction * (distance - 3), maxX(viewportWidth())));
     attention = { phase: "approach", started: time, point: cursor.point, fromX: pet.x, toX };
     sit();
@@ -583,80 +648,72 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     }
   };
 
-  const arrive = (progress: number) => {
-    const limit = maxX(viewportWidth());
-    const inset = Math.min(28, limit / 2);
-    const fromLeft = -PET_WIDTH + (PET_WIDTH + inset) * progress;
-    pet.x = pet.direction === 1 ? fromLeft : limit - fromLeft;
-  };
-
-  const respawn = (time: number) => {
-    pet = createPet(viewportWidth(), Math.random);
-    metabolism = createMetabolism();
-    snack = createSnack(time);
-    mouse.hidden = false;
-    gaitSpeed = stride = rest = tailPhase = 0;
-    showProfile();
-  };
-
-  const updateLife = (time: number, dt: number) => {
-    if (!life) return false;
-    if (life.phase === "burst") {
-      const elapsed = time - life.started;
-      if (elapsed >= RESPAWN_MS) {
-        respawn(time);
-        life = { phase: "enter", started: time };
-        arrive(0);
-        drawMotion(time, dt, 0);
-      } else {
-        mouse.hidden = elapsed >= BURST_MS;
-      }
-    } else {
-      const x = pet.x;
-      const progress = Math.min(1, (time - life.started) / ENTRY_MS);
-      arrive(progress);
-      drawMotion(time, dt, pet.x - x);
-      if (progress === 1) life = null;
-    }
-    return true;
+  const beginBurrow = (time: number) => {
+    cancelInteraction();
+    burrow = findBurrow(pet, viewportWidth(), Math.random);
+    recentClicks = [];
+    hideAt = nextBurrowAt(time, Math.random);
+    jumpAt = nextHopAt(time, Math.random);
   };
 
   const tick = (time: number) => {
     const elapsed = lastTime === 0 ? 0 : Math.max(0, time - lastTime);
     const dt = Math.min(elapsed, MAX_FRAME_MS);
     lastTime = time;
-    if (!updateLife(time, dt)) updatePet(time, dt, elapsed);
+    updatePet(time, dt, elapsed);
     render();
     frame = requestAnimationFrame(tick);
   };
 
   const updatePet = (time: number, dt: number, elapsed: number) => {
     const x = pet.x;
+    const pace = movementPace(metabolism.belly);
+    const remainingMs = pet.remainingMs;
     let bites = 0;
     let distance = 0;
     let activeMs = 0;
-    if (gesture) updateGesture(time, dt);
+    const strolling = pet.mode === "walk" || pet.mode === "sit";
+    if (!burrow && !gesture && !descent && !snack.action && !attention && hopStarted === null && strolling && time >= hideAt) {
+      beginBurrow(time);
+    }
+    if (burrow) {
+      const hiding = advanceBurrow(burrow, pet, dt, viewportWidth(), pace);
+      burrow = hiding.burrow;
+      pet = hiding.pet;
+      distance = Math.min(Math.abs(pet.x - x), dt * .15);
+      if (!burrow) {
+        hideAt = nextBurrowAt(time, Math.random);
+        jumpAt = nextHopAt(time, Math.random);
+      }
+    } else if (gesture) updateGesture(time, dt);
     else if (descent) updateDescent(time, dt);
     else if (snack.action || !updateAttention(time)) {
-      const wasEatingOrFetching = Boolean(snack.action);
-      if (hopStarted === null) {
-        const next = advanceSnack(snack, pet, time, viewportWidth(), Math.random, hunger(metabolism));
+      const hadSnackAction = Boolean(snack.action);
+      if (hopStarted === null || snack.action?.kind === "pounce") {
+        const wasPouncing = snack.action?.kind === "pounce";
+        const next = advanceSnack(snack, pet, time, viewportWidth(), Math.random, hunger(metabolism), pace);
         snack = next.snack;
         pet = next.pet;
         bites = next.bitesTaken ?? 0;
+        if (!wasPouncing && snack.action?.kind === "pounce") startHop(time);
       }
-      if (!wasEatingOrFetching && !snack.action) pet = advance(pet, dt, viewportWidth(), Math.random);
+      if (!hadSnackAction && !snack.action) {
+        if (hopStarted === null && (pet.mode === "walk" || pet.mode === "run") && time >= jumpAt) {
+          startHop(time);
+          jumpAt = nextHopAt(time, Math.random);
+        }
+        pet = advance(pet, dt, viewportWidth(), Math.random, pace);
+      }
       if (bites === 0 && snack.action?.kind !== "eat") distance = Math.min(Math.abs(pet.x - x), dt * .15);
       if (isGrooming(pet.mode) || pet.mode === "stretch") activeMs = dt;
     }
+    if ((pet.mode === "walk" || pet.mode === "run" || pet.mode === "sleep") &&
+        (animatedMode !== pet.mode || (!snack.action && !burrow && pet.remainingMs > remainingMs))) {
+      variant = variants[pet.mode] = nextMoveVariant(variants[pet.mode], Math.random());
+    }
+    animatedMode = pet.mode;
     metabolism = advanceMetabolism(metabolism, elapsed, distance, activeMs, bites);
     drawMotion(time, dt, pet.x - x);
-    if (metabolism.fullness >= BURST_FULLNESS) {
-      life = { phase: "burst", started: time };
-      cancelInteraction();
-      snack = createSnack(time);
-      metabolism.belly = metabolism.fullness;
-    }
   };
   const stopLoop = () => {
     cancelAnimationFrame(frame);
@@ -666,18 +723,21 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const syncMotion = () => {
     cancelInteraction();
     stopLoop();
+    const time = performance.now();
+    hideAt = nextBurrowAt(time, Math.random);
+    jumpAt = nextHopAt(time, Math.random);
+    recentClicks = [];
     if (motion.matches) {
-      if (life) {
-        if (life.phase === "burst") respawn(performance.now());
-        arrive(1);
-        life = null;
-      }
+      burrow = null;
+      perspective = createPerspective(time);
+      pet = { ...pet, x: Math.max(0, Math.min(pet.x, maxX(viewportWidth()))) };
       sit();
       gaitSpeed = 0;
       showProfile();
       flip.style.removeProperty("--mp-bound");
       mouse.style.removeProperty("--mp-tail");
       mouse.style.removeProperty("--mp-breath");
+      mouse.style.removeProperty("--mp-gait-rock");
       legs.forEach((leg, index) => leg.setAttribute("d", pawPath(index)));
       render();
     } else {
@@ -692,18 +752,17 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     hop.removeAttribute("data-hop");
     squeak.removeAttribute("data-visible");
   };
-  const startHop = () => {
+  const startHop = (time: number) => {
+    hop.removeAttribute("data-hop");
     void hop.offsetWidth;
     hop.setAttribute("data-hop", "");
     hopStartHeight = hopLift = Math.min(maxLift(viewportHeight()), Math.max(3, lift));
     lift = 0;
-    hopStarted = performance.now();
-    pet = startle(pet);
-    showProfile();
+    hopStarted = time;
   };
   const squeakOnClick = () => {
     squeak.setAttribute("data-visible", "");
-    clickTimer = window.setTimeout(clearClick, SQUEAK_MS);
+    clickTimer = window.setTimeout(() => squeak.removeAttribute("data-visible"), SQUEAK_MS);
   };
   const releaseCapture = () => {
     const pointerId = gesture?.pointerId;
@@ -725,7 +784,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     render();
   };
   const onDown = (event: PointerEvent) => {
-    if (life || gesture || !event.isPrimary || event.button !== 0 || descent) return;
+    if (burrow || gesture || !event.isPrimary || event.button !== 0 || descent) return;
     event.preventDefault();
     lift = Math.min(hopLift, maxLift(viewportHeight()));
     clearClick();
@@ -739,7 +798,11 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       pointerId: event.pointerId, started: time, movedAt: time, velocity: { x: 0, y: 0 },
       point: start, start, phase: "press", pickedUpAt: 0, gripOffset: { x: 0, y: 0 },
     };
-    if (!motion.matches) startHop();
+    if (!motion.matches) {
+      startHop(time);
+      pet = startle(pet, movementPace(metabolism.belly));
+      showProfile();
+    }
     render();
   };
   const onMove = (event: PointerEvent) => {
@@ -756,9 +819,10 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
         lift = hopLift;
         clearClick();
         pet.velocity = 0;
+        const { scale, shift, step } = perspectiveFrame(perspective);
         gesture.gripOffset = {
-          x: pet.x + screenGripX(pet.direction) - gesture.start.x,
-          y: viewportHeight() - FLOOR_GAP - PET_HEIGHT + GRIP_Y - lift - gesture.start.y,
+          x: pet.x + screenGripX(pet.direction, scale) - gesture.start.x,
+          y: screenGripY(viewportHeight(), scale, shift - Math.abs(step) * 1.6) - lift - gesture.start.y,
         };
         gesture.phase = "carry";
         gesture.pickedUpAt = time;
@@ -770,7 +834,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       }
       return;
     }
-    if (motion.matches || life || gesture || event.pointerType !== "mouse") return;
+    if (motion.matches || burrow || gesture || event.pointerType !== "mouse") return;
     if (event.buttons !== 0) {
       clearAttention();
       return;
@@ -789,13 +853,18 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   };
   const finishGesture = (canClick: boolean) => {
     if (!gesture) return;
-    const held = !motion.matches && performance.now() - gesture.started >= LONG_PRESS_MS;
+    const time = performance.now();
+    const held = !motion.matches && time - gesture.started >= LONG_PRESS_MS;
     const carrying = gesture.phase === "carry";
     const speed = carrying ? cursorVelocity(gesture, performance.now()) : { x: 0, y: 0 };
     releaseCapture();
     if (!carrying && canClick && !held) {
-      squeakOnClick();
+      hideAt = nextBurrowAt(time, Math.random);
+      if (!motion.matches) recentClicks = recordClick(recentClicks, time);
+      if (shouldHideFromClicks(recentClicks)) beginBurrow(time);
+      else squeakOnClick();
     } else if (carrying || lift > 0) {
+      hideAt = nextBurrowAt(time, Math.random);
       sit();
       if (lift > 0 || speed.y < -160) {
         const headroom = Math.max(0, maxLift(viewportHeight()) - lift);
@@ -821,7 +890,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const onResize = () => {
     clearAttention();
     snack = resizeSnack(snack, performance.now(), viewportWidth());
-    if (life?.phase !== "enter") pet = fit(pet, viewportWidth());
+    if (!burrow || burrow.phase === "run") pet = fit(pet, viewportWidth());
     if (gesture?.phase === "carry") placeAtGrip(performance.now());
     lift = Math.min(lift, maxLift(viewportHeight()));
     render();

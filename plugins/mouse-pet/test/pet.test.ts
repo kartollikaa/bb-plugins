@@ -38,6 +38,16 @@ test("running is faster than walking", () => {
   assert.ok(ran - 100 > (walked - 100) * 2);
 });
 
+test("weight slows both paces and the click sprint", () => {
+  for (const mode of ["walk", "run"] as const) {
+    const state = pet({ mode });
+    const light = advance(state, 100, VIEWPORT, constant(0));
+    const heavy = advance(state, 100, VIEWPORT, constant(0), .48);
+    assert.ok(heavy.x < light.x);
+  }
+  assert.ok(Math.abs(startle(pet(), .48).velocity) < Math.abs(startle(pet()).velocity));
+});
+
 test("speed builds from a standing start and settles before a rest", () => {
   const accelerating = advance(pet({ mode: "run" }), 16, VIEWPORT, constant(0));
   assert.ok(accelerating.velocity > 0 && accelerating.velocity < 38);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { advanceSnack, biteMaskPath, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "../lib/snack.ts";
+import { advanceSnack, biteMaskPath, cheeseLanding, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "../lib/snack.ts";
 import type { Pet } from "../lib/pet.ts";
 
 const WIDTH = 800;
@@ -153,4 +153,51 @@ test("a large piece lasts four visits and each bite exposes a different fixed-si
   assert.equal(next.snack.cheese, null);
   assert.equal(advanceSnack(next.snack, nearEdge, time, WIDTH, preferToEat).snack.action, null);
   assert.equal(advanceSnack(next.snack, nearEdge, time + 12_000, WIDTH, preferToEat).snack.action?.kind, "fetch");
+});
+
+test("the mouse pushes or pounces on cheese, moves it, and leaves the bites untouched", () => {
+  for (const [roll, kind] of [[.8, "push"], [.9, "pounce"]] as const) {
+    const placed = fetchCheese();
+    const cheese = placed.snack.cheese!;
+    const contact = { ...nearEdge, x: cheese.x + CHEESE_WIDTH - 6 };
+    const playing = advanceSnack(placed.snack, contact, 24_000, WIDTH, () => roll);
+    assert.equal(playing.snack.action?.kind, kind);
+    const during = advanceSnack(playing.snack, playing.pet, 24_180, WIDTH, preferToEat);
+    assert.equal(during.snack.action?.kind, kind);
+    assert.ok(during.pet.x < playing.pet.x);
+    if (kind === "pounce") assert.equal(during.snack.cheese!.x, cheese.x);
+    const after = advanceSnack(during.snack, during.pet, 25_000, WIDTH, preferToEat);
+    assert.equal(after.snack.action, null);
+    assert.ok(after.snack.cheese!.x < cheese.x);
+    assert.equal(after.snack.cheese!.bites, 0);
+    assert.equal(after.bitesTaken, undefined);
+  }
+});
+
+test("a pounce lands its leading paw on the remaining edge of a nearly eaten slice", () => {
+  const placed = fetchCheese();
+  for (const edge of [-1, 1] as const) {
+    const cheese = { ...placed.snack.cheese!, edge, bites: 7, tryAfter: 0, noticeAfter: 0 };
+    const landing = cheeseLanding(cheese);
+    const paw = landing.x + (edge === -1 ? 13 : 35);
+    assert.ok(edge === -1 ? paw < cheese.x + 7 : paw > cheese.x + CHEESE_WIDTH - 7);
+    assert.ok(landing.lift < cheeseLanding({ ...cheese, bites: 0 }).lift);
+    const seeking = { ...placed.snack, cheese, action: { kind: "seek" as const, updatedAt: 24_000 } };
+    const x = cheese.x + (edge === -1 ? 6 : CHEESE_WIDTH - 6) - (edge === -1 ? 3 : 45);
+    const pounce = advanceSnack(seeking, { ...nearEdge, x, direction: edge }, 24_000, WIDTH, () => .9);
+    assert.equal(pounce.snack.action?.kind, "pounce");
+    const onCheese = advanceSnack(pounce.snack, pounce.pet, 24_480, WIDTH, preferToEat);
+    assert.equal(onCheese.pet.x, cheeseLanding(onCheese.snack.cheese!).x);
+  }
+});
+
+test("a pounce only starts if the leading paw can reach the cheese", () => {
+  const placed = fetchCheese();
+  for (const edge of [-1, 1] as const) {
+    const cheese = { ...placed.snack.cheese!, edge, bites: 7, x: edge === -1 ? 0 : WIDTH - CHEESE_WIDTH };
+    const seeking = { ...placed.snack, cheese, action: { kind: "seek" as const, updatedAt: 24_000 } };
+    const x = edge === -1 ? 3 : WIDTH - 48 - 3;
+    const next = advanceSnack(seeking, { ...nearEdge, x, direction: edge }, 24_000, WIDTH, () => .9);
+    assert.equal(next.snack.action?.kind, "eat");
+  }
 });

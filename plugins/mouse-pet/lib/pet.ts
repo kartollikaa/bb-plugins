@@ -15,7 +15,7 @@ export const PET_WIDTH = 48;
 export const MAX_FRAME_MS = 100;
 export const SKID_MS = 260;
 
-const SPEED_PX_PER_S: Record<PetMode, number> = {
+export const SPEED_PX_PER_S: Record<PetMode, number> = {
   walk: 38, run: 150, sit: 0, perch: 0, groom: 0, scratch: 0, sleep: 0, skid: 0, stretch: 0,
 };
 const DURATION_MS: Record<PetMode, readonly [number, number]> = {
@@ -100,12 +100,12 @@ function chooseNext(pet: Pet, random: Random): Pet {
 
 const reverse = (direction: Direction): Direction => direction === 1 ? -1 : 1;
 
-export function advance(pet: Pet, dtMs: number, viewportWidth: number, random: Random): Pet {
+export function advance(pet: Pet, dtMs: number, viewportWidth: number, random: Random, pace = 1): Pet {
   const dt = Math.min(Math.max(dtMs, 0), MAX_FRAME_MS);
   const limit = maxX(viewportWidth);
   let { x, velocity, direction } = pet;
   const edge = direction === -1 ? 0 : limit;
-  const skidDistance = Math.min(20, limit / 2);
+  const skidDistance = Math.min(20 * pace, limit / 2);
   if (pet.mode === "skid" && pet.remainingMs > 0) {
     const remainingFraction = Math.max(0, 1 - dt / pet.remainingMs);
     const slowed = velocity * remainingFraction;
@@ -113,7 +113,7 @@ export function advance(pet: Pet, dtMs: number, viewportWidth: number, random: R
     x += traveled;
     velocity = (edge - x) * direction > 0 ? slowed : 0;
   } else {
-    const target = direction * SPEED_PX_PER_S[pet.mode];
+    const target = direction * SPEED_PX_PER_S[pet.mode] * pace;
     const difference = target - velocity;
     const acceleration = Math.min(Math.abs(difference), dt * (target === 0 ? 1.2 : .85));
     const nextVelocity = velocity + Math.sign(difference) * acceleration;
@@ -122,7 +122,7 @@ export function advance(pet: Pet, dtMs: number, viewportWidth: number, random: R
   }
   const hitsEdge = direction === -1 ? x <= 0 : x >= limit;
   x = Math.max(0, Math.min(x, limit));
-  if (limit > 0 && pet.mode === "run" && velocity * direction >= 75 && Math.abs(x - edge) <= skidDistance) {
+  if (limit > 0 && pet.mode === "run" && velocity * direction >= 75 * pace && Math.abs(x - edge) <= skidDistance) {
     return { ...pet, x, velocity, mode: "skid", remainingMs: SKID_MS };
   }
   if (limit > 0 && hitsEdge && isMoving(pet.mode)) {
@@ -134,9 +134,9 @@ export function advance(pet: Pet, dtMs: number, viewportWidth: number, random: R
 }
 
 /** A click: the pet bolts the other way. */
-export function startle(pet: Pet): Pet {
+export function startle(pet: Pet, pace = 1): Pet {
   const direction = reverse(pet.direction);
-  return { ...pet, mode: "run", direction, velocity: direction * SPEED_PX_PER_S.run, remainingMs: STARTLE_MS };
+  return { ...pet, mode: "run", direction, velocity: direction * SPEED_PX_PER_S.run * pace, remainingMs: STARTLE_MS };
 }
 
 /** Keeps the pet inside the window after a resize. */
