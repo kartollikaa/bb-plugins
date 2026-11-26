@@ -6,8 +6,8 @@ import {
   maxLift, PET_HEIGHT, screenGripX, screenGripY, scruffPath, sniffDistance, type Point,
 } from "./interaction.ts";
 import {
-  blendGaitStyle, FALL_GRAVITY, fallFrame, followSpring, gaitFrame, hopCompression, hopHeight, HOP_MS, HOP_TOUCHDOWN,
-  nextMoveVariant, pounceHeight, sleepBreath, strideLength, turnFrame, type MoveVariant, type Spring,
+  anchorPaw, blendGaitStyle, FALL_GRAVITY, fallFrame, followSpring, gaitFrame, hopCompression, hopHeight, HOP_MS, HOP_TOUCHDOWN,
+  nextMoveVariant, pounceHeight, sleepBreath, strideLength, turnFrame, type MoveVariant, type PawPlant, type Spring,
 } from "./animation.ts";
 import {
   advanceSnack, BITE_MS, biteMaskPath, cheeseLanding, CHEESE_VIEWBOX_WIDTH, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack,
@@ -395,6 +395,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   let stride = 0;
   let gaitSpeed = 0;
   let gaitStyle = { lift: 1, bob: 1, tail: 1 };
+  let plants: PawPlant[] = [];
   let face: number = pet.direction;
   let turn = { from: face, to: face, progress: 1 };
   let rest = 0;
@@ -488,16 +489,27 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       hopLift = Math.max(hopLift, pounceHeight(age, snack.action.duration, perchLift));
       hopInFlight = true;
     }
+    const depthView = !gesture && !attention && !descent && !snack.action && pet.mode === "sit" &&
+      Math.abs(pet.velocity) < 9 && pet.idleView !== "profile";
+    const facing = depthView ? 0 : Math.abs(pet.velocity) < 9 ? pet.direction : Math.sign(pet.velocity);
+    if (depthView) flip.dataset.depthView = pet.idleView;
+    if (turn.to !== facing) turn = { from: face, to: facing, progress: 0 };
+    turn.progress = Math.min(1, turn.progress + dt / 185);
+    const view = turnFrame(turn.from, turn.to, turn.progress);
+    const reversed = (face < 0) !== (view.yaw < 0);
+    face = view.yaw;
+    perspective = advancePerspective(perspective, depthView && Math.abs(face) < .18 ? pet.idleView : "profile", time, dt, Math.random);
     const movingOnFloor = !gesture && !descent && !hopInFlight && pet.mode !== "skid" && snack.action?.kind !== "eat" &&
       (!attention || attention.phase === "approach");
     const speed = movingOnFloor && dt > 0 ? Math.abs(distance) * 1_000 / dt : 0;
     gaitSpeed += (speed - gaitSpeed) * (1 - Math.exp(-dt / 44));
     const pace = movementPace(metabolism.belly);
     const equivalentSpeed = gaitSpeed / pace;
-    const projection = perspectiveFrame(perspective).scale;
+    const projection = perspectiveFrame(perspective).scale * view.width;
+    const direction = face < 0 ? -1 : 1;
     const stepLength = strideLength(equivalentSpeed, pace, projection);
     if (movingOnFloor) {
-      stride += distance * (face < 0 ? -1 : 1) / stepLength;
+      stride += distance * direction / stepLength;
       stride -= Math.floor(stride);
     }
     gaitStyle = blendGaitStyle(gaitStyle, variant, dt);
@@ -525,23 +537,19 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       mouse.style.setProperty("--mp-look-y", `${Math.max(-.85, Math.min(.5, y)).toFixed(2)}px`);
     }
     const airborne = pounceLanded ? 0 : Math.min(hopLift / 16, 1);
+    const supportsWeight = movingOnFloor && !reversed && view.profile >= .9 &&
+      (gaitSpeed > 9 || pet.mode === "walk" || pet.mode === "run");
     legs.forEach((leg, index) => {
       const foot = gait.feet[index];
       const front = index % 2 === 1;
       const reach = foot.reach + airborne * (front ? 1.2 : -.8);
       const raise = foot.lift + airborne * (front ? .8 : 2);
-      const shape = pawPath(index, reach, raise, gait.bob);
+      const localX = PAWS[index].x + PAWS[index].toe - PET_WIDTH / 2 + reach;
+      plants[index] = anchorPaw(plants[index], localX, pet.x + PET_WIDTH / 2, direction * projection,
+        supportsWeight && raise === 0, dt);
+      const shape = pawPath(index, reach + plants[index].correction, raise, gait.bob);
       if (leg.getAttribute("d") !== shape) leg.setAttribute("d", shape);
     });
-    const depthView = !gesture && !attention && !descent && !snack.action && pet.mode === "sit" &&
-      Math.abs(pet.velocity) < 9 && pet.idleView !== "profile";
-    const facing = depthView ? 0 : Math.abs(pet.velocity) < 9 ? pet.direction : Math.sign(pet.velocity);
-    if (depthView) flip.dataset.depthView = pet.idleView;
-    if (turn.to !== facing) turn = { from: face, to: facing, progress: 0 };
-    turn.progress = Math.min(1, turn.progress + dt / 185);
-    const view = turnFrame(turn.from, turn.to, turn.progress);
-    face = view.yaw;
-    perspective = advancePerspective(perspective, depthView && Math.abs(face) < .18 ? pet.idleView : "profile", time, dt, Math.random);
     if (!depthView && Math.abs(face) >= .7) delete flip.dataset.depthView;
     if (flip.dataset.depthView === "back") {
       const tailFollow = turn.to === 0 ? 13 * Math.sin(2 * Math.PI * turn.progress) * Math.sin(Math.PI * turn.progress) : 0;
@@ -731,6 +739,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       pet = { ...pet, x: Math.max(0, Math.min(pet.x, maxX(viewportWidth()))) };
       sit();
       gaitSpeed = 0;
+      plants = [];
       showProfile();
       bobbing.forEach((part) => part.style.removeProperty("transform"));
       mouse.style.removeProperty("--mp-tail");
@@ -888,6 +897,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   };
   const onResize = () => {
     clearAttention();
+    plants = [];
     snack = resizeSnack(snack, performance.now(), viewportWidth());
     if (!burrow || burrow.phase === "run") pet = fit(pet, viewportWidth());
     if (gesture?.phase === "carry") placeAtGrip(performance.now());

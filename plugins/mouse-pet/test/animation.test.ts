@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  blendGaitStyle, fallFrame, followSpring, gaitFrame, hopCompression, hopHeight, HOP_TOUCHDOWN,
+  anchorPaw, blendGaitStyle, fallFrame, followSpring, gaitFrame, hopCompression, hopHeight, HOP_TOUCHDOWN,
   nextMoveVariant, pounceHeight, sleepBreath, strideLength, turnFrame,
 } from "../lib/animation.ts";
+import type { PawPlant } from "../lib/animation.ts";
+import { advance, type Pet } from "../lib/pet.ts";
 
 test("all feet settle and the gait stops swinging the tail at rest", () => {
   for (const speed of [0, 15, 38, 150]) {
@@ -72,6 +74,46 @@ test("a loaded foreground mouse plants paws in the same room coordinates", () =>
     const start = foot(100, .1);
     const next = foot(100 + dx, .1 + (dx * direction) / strideLength(speed, pace, scale));
     assert.ok(Math.abs(start - next) < 1e-8);
+  }
+});
+
+test("support stays anchored through acceleration and braking, then releases in swing", () => {
+  for (const direction of [-1, 1] as const) {
+    let pet: Pet = { x: 400, mode: "run", direction, velocity: 38 * direction, idleView: "profile", remainingMs: 20_000 };
+    let filtered = 38;
+    let phase = .36;
+    let plants: PawPlant[] = [];
+    let targets: number[] = [];
+    let anchoredFrames = 0;
+    let bareSlide = 0;
+    for (let frame = 0; frame < 34; frame++) {
+      if (frame === 15) pet.mode = "sit";
+      const previous = pet.x;
+      pet = advance(pet, 16, 1_000, () => 0);
+      const distance = (pet.x - previous) * direction;
+      filtered += (distance / .016 - filtered) * (1 - Math.exp(-16 / 44));
+      phase = (phase + distance / strideLength(filtered)) % 1;
+      const { feet } = gaitFrame(phase, filtered);
+      feet.forEach((foot, index) => {
+        const localX = 5 + foot.reach;
+        const support = foot.lift === 0 && filtered > 9;
+        const prior = plants[index];
+        const target = pet.x + localX * direction;
+        const plant = anchorPaw(prior, localX, pet.x, direction, support, 16);
+        if (support && prior?.supportX != null) {
+          assert.ok(Math.abs(plant.supportX! - prior.supportX) < 1e-8);
+          bareSlide = Math.max(bareSlide, Math.abs(target - targets[index]));
+          anchoredFrames++;
+        }
+        if (!support) {
+          assert.equal(plant.supportX, null);
+          assert.ok(Math.abs(plant.correction) <= Math.abs(prior?.correction ?? 0));
+        }
+        targets[index] = target;
+        plants[index] = plant;
+      });
+    }
+    assert.ok(anchoredFrames > 30 && bareSlide > .75);
   }
 });
 

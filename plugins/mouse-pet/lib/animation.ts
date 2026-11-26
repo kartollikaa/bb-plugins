@@ -54,6 +54,19 @@ export function gaitFrame(phase: number, speed: number, pace = 1, style: GaitSty
   };
 }
 
+export interface PawPlant {
+  supportX: number | null;
+  correction: number;
+}
+
+export function anchorPaw(previous: PawPlant | undefined, localX: number, center: number, scale: number, supporting: boolean, dt: number): PawPlant {
+  const predicted = supporting && previous?.supportX != null
+    ? (previous.supportX - center) / scale - localX
+    : (previous?.correction ?? 0) * Math.exp(-dt / 42);
+  const correction = Math.max(-7, Math.min(7, predicted));
+  return { correction, supportX: supporting ? center + (localX + correction) * scale : null };
+}
+
 export function sleepBreath(time: number, rest: number, variant: MoveVariant) {
   const [depth, period] = MOVES[variant].breath;
   return 1 + rest * depth * (1 - Math.cos(time / period)) / 2;
