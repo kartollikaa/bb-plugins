@@ -21,7 +21,8 @@ distance. It can pass the cheese before it takes a bite. After leaving it alone 
 may run straight over and take two bites, then leave the rest for later. It can fetch another piece
 once it finishes the current one.
 
-Each completed bite makes the mouse more satisfied and its belly gradually rounder. Time and
+Each completed bite satisfies a fraction of the mouse's remaining hunger. A first piece of cheese
+rounds out the belly a little, while eating when already full adds more weight. Time and
 activity make it hungry again and slim it down, with running using more energy than walking.
 If too much excess weight builds up, it bursts into a puff. A new mouse walks in from an edge
 after a short pause.

@@ -5,7 +5,7 @@ import {
 } from "./interaction.ts";
 import { FALL_GRAVITY, fallFrame, followSpring, gaitFrame, hopHeight, HOP_TOUCHDOWN, strideLength, turnFrame, type Spring } from "./animation.ts";
 import { advanceSnack, BITE_MS, biteMaskPath, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "./snack.ts";
-import { advanceMetabolism, BURST_FULLNESS, createMetabolism, hunger } from "./metabolism.ts";
+import { advanceMetabolism, bellyScale, BURST_FULLNESS, createMetabolism, hunger } from "./metabolism.ts";
 
 const ROOT_ATTR = "data-mouse-pet";
 const SQUEAK_MS = 700;
@@ -366,8 +366,9 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
 
   const render = () => {
     mouse.style.transform = `translate3d(${pet.x.toFixed(2)}px, ${(-(lift + hopLift)).toFixed(2)}px, 0)`;
-    mouse.style.setProperty("--mp-belly-width", (1 + .39 * metabolism.belly).toFixed(3));
-    mouse.style.setProperty("--mp-belly-height", (1 + .64 * metabolism.belly).toFixed(3));
+    const belly = bellyScale(metabolism.belly);
+    mouse.style.setProperty("--mp-belly-width", belly.width.toFixed(3));
+    mouse.style.setProperty("--mp-belly-height", belly.height.toFixed(3));
     if (life) mouse.dataset.life = life.phase;
     else delete mouse.dataset.life;
     const snackPose = snack.action?.kind === "seek" ? undefined : snack.action?.kind;

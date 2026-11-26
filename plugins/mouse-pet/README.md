@@ -14,7 +14,8 @@ look around from its haunches, turn to face you or sit with its back to you.
   different distance each time. It may pass the cheese a few times or notice it from across the
   window and run back to take a couple of bites. It finishes the cheese over several visits.
   There is only one piece at a time.
-- Each bite satisfies hunger and gradually rounds out the mouse's belly. The mouse gets hungry
+- A piece of cheese only slightly rounds out a hungry mouse's belly. Each bite satisfies a smaller
+  amount of hunger as the mouse fills up, and eating while full adds more weight. The mouse gets hungry
   and slims down over time, faster while running or otherwise active. If excess weight builds up,
   the mouse bursts into a puff and a new mouse walks in from an edge a few seconds later.
 
