@@ -5,6 +5,7 @@ import {
 } from "./interaction.ts";
 import { FALL_GRAVITY, fallFrame, followSpring, gaitFrame, hopHeight, HOP_TOUCHDOWN, strideLength, turnFrame, type Spring } from "./animation.ts";
 import { advanceSnack, BITE_MS, biteMaskPath, CHEESE_WIDTH, createSnack, interruptSnack, resizeSnack } from "./snack.ts";
+import { advanceMetabolism, BURST_FULLNESS, createMetabolism, hunger } from "./metabolism.ts";
 
 const ROOT_ATTR = "data-mouse-pet";
 const SQUEAK_MS = 700;
@@ -14,6 +15,9 @@ const APPROACH_MS = 320;
 const SNIFF_MS = 900;
 const REAR_MS = 650;
 const LAND_MS = 180;
+const BURST_MS = 520;
+const RESPAWN_MS = 4_000;
+const ENTRY_MS = 1_050;
 
 const FUR = "#c9c9d6";
 const FUR_FAR = "#a3a3b3";
@@ -47,6 +51,18 @@ const STYLE = `
   -webkit-tap-highlight-color: transparent;
 }
 [${ROOT_ATTR}] .mp-hop, [${ROOT_ATTR}] .mp-flip, [${ROOT_ATTR}] svg { display: block; width: 100%; height: 100%; }
+[${ROOT_ATTR}] .mp-mouse[data-life] { pointer-events: none; }
+[${ROOT_ATTR}] [data-life="burst"] .mp-hop { transform-origin: 50% 65%; animation: mp-burst ${BURST_MS}ms ease-out both; }
+[${ROOT_ATTR}] [data-life="burst"]::after {
+  content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; left: 45%; top: 48%;
+  box-shadow: -14px -11px 0 ${FUR}, 1px -17px 0 ${PINK}, 13px -10px 0 ${FUR},
+    18px 1px 0 ${FUR_FAR}, -17px 2px 0 ${PINK};
+  animation: mp-burst-puffs ${BURST_MS}ms ease-out both;
+}
+[${ROOT_ATTR}] .mp-belly {
+  transform-box: fill-box; transform-origin: center bottom;
+  transform: scale(var(--mp-belly-width, 1), var(--mp-belly-height, 1));
+}
 [${ROOT_ATTR}] .mp-flip {
   position: relative; isolation: isolate; transform: translateY(var(--mp-bound, 0px));
 }
@@ -177,6 +193,16 @@ const STYLE = `
 @keyframes mp-stretch-paw { 0%, 100% { transform: none; } 50% { transform: rotate(-33deg); } }
 @keyframes mp-z { from { opacity: 0; transform: translate(0, 4px); } 25% { opacity: 1; } to { opacity: 0; transform: translate(5px, -9px); } }
 @keyframes mp-pop { from { opacity: 0; transform: translate(-50%, 4px); } 15% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } to { opacity: 0; } }
+@keyframes mp-burst {
+  0% { opacity: 1; transform: scale(1); }
+  35% { opacity: 1; transform: scale(1.35); }
+  42%, 100% { opacity: 0; transform: scale(1.45); }
+}
+@keyframes mp-burst-puffs {
+  0%, 35% { opacity: 0; transform: scale(.5); }
+  42% { opacity: .95; }
+  100% { opacity: 0; transform: scale(2.45) translateY(-4px); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   [${ROOT_ATTR}] * { animation: none !important; transition: none !important; }
@@ -197,7 +223,7 @@ const SPRITE = `
           <path class="mp-leg" d="${pawPath(2)}" stroke="${FUR}" stroke-width="2.25"/>
         </g>
         <g class="mp-doze">
-          <ellipse cx="23" cy="17" rx="14.5" ry="7.5" fill="${FUR}"/>
+          <ellipse class="mp-belly" cx="23" cy="17" rx="14.5" ry="7.5" fill="${FUR}"/>
           <g class="mp-head">
             <ellipse cx="38" cy="16" rx="7.5" ry="5.4" fill="${FUR}"/>
             <circle cx="33.5" cy="9.6" r="4.3" fill="${FUR}"/>
@@ -223,7 +249,7 @@ const FRONT_SPRITE = `
 <svg class="mp-anfas" viewBox="0 0 48 29" aria-hidden="true" focusable="false">
   <path d="M20 24q-6 1-9-3" stroke="${PINK}" stroke-width="1.7" stroke-linecap="round" fill="none"/>
   <path d="M19 24l-1 3.5h2m9-3.5 1 3.5h-2" stroke="${FUR_FAR}" stroke-width="2.6" stroke-linecap="round" fill="none"/>
-  <ellipse cx="24" cy="18.5" rx="9" ry="7.5" fill="${FUR}"/>
+  <ellipse class="mp-belly" cx="24" cy="18.5" rx="9" ry="7.5" fill="${FUR}"/>
   <circle cx="18.4" cy="10.5" r="3.9" fill="${FUR}"/>
   <circle cx="29.6" cy="10.5" r="3.9" fill="${FUR}"/>
   <circle cx="18.4" cy="10.5" r="2.25" fill="${PINK}"/>
@@ -241,7 +267,7 @@ const BACK_SPRITE = `
   <circle cx="18.3" cy="10.6" r="3.8" fill="${FUR_FAR}"/>
   <circle cx="29.7" cy="10.6" r="3.8" fill="${FUR_FAR}"/>
   <ellipse cx="24" cy="15.2" rx="7.5" ry="6.5" fill="${FUR}"/>
-  <ellipse cx="24" cy="20.2" rx="10.3" ry="7" fill="${FUR}"/>
+  <ellipse class="mp-belly" cx="24" cy="20.2" rx="10.3" ry="7" fill="${FUR}"/>
   <path class="mp-rear-tail" d="M24.1 24.1c-.4 4.1 9.7 5.5 12.6 1.2 1.3-2 0-3.4-.9-4.1" stroke="${PINK}" stroke-width="1.7" stroke-linecap="round" fill="none"/>
 </svg>`;
 
@@ -310,6 +336,8 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
 
   let pet: Pet = createPet(viewportWidth(), Math.random);
   let snack = createSnack(performance.now());
+  let metabolism = createMetabolism();
+  let life: { phase: "burst" | "enter"; started: number } | null = null;
   let frame = 0;
   let lastTime = 0;
   let gesture: Gesture | null = null;
@@ -338,6 +366,10 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
 
   const render = () => {
     mouse.style.transform = `translate3d(${pet.x.toFixed(2)}px, ${(-(lift + hopLift)).toFixed(2)}px, 0)`;
+    mouse.style.setProperty("--mp-belly-width", (1 + .39 * metabolism.belly).toFixed(3));
+    mouse.style.setProperty("--mp-belly-height", (1 + .64 * metabolism.belly).toFixed(3));
+    if (life) mouse.dataset.life = life.phase;
+    else delete mouse.dataset.life;
     const snackPose = snack.action?.kind === "seek" ? undefined : snack.action?.kind;
     const mode = motion.matches ? "sit" : gesture?.phase ?? descent?.phase ?? attention?.phase ?? snackPose ?? pet.mode;
     if (mouse.dataset.mode !== mode) mouse.dataset.mode = mode;
@@ -538,24 +570,80 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     }
   };
 
+  const arrive = (progress: number) => {
+    const limit = maxX(viewportWidth());
+    const inset = Math.min(28, limit / 2);
+    const fromLeft = -PET_WIDTH + (PET_WIDTH + inset) * progress;
+    pet.x = pet.direction === 1 ? fromLeft : limit - fromLeft;
+  };
+
+  const respawn = (time: number) => {
+    pet = createPet(viewportWidth(), Math.random);
+    metabolism = createMetabolism();
+    snack = createSnack(time);
+    mouse.hidden = false;
+    gaitSpeed = stride = rest = tailPhase = wash = 0;
+    showProfile();
+  };
+
+  const updateLife = (time: number, dt: number) => {
+    if (!life) return false;
+    if (life.phase === "burst") {
+      const elapsed = time - life.started;
+      if (elapsed >= RESPAWN_MS) {
+        respawn(time);
+        life = { phase: "enter", started: time };
+        arrive(0);
+        drawMotion(time, dt, 0);
+      } else {
+        mouse.hidden = elapsed >= BURST_MS;
+      }
+    } else {
+      const x = pet.x;
+      const progress = Math.min(1, (time - life.started) / ENTRY_MS);
+      arrive(progress);
+      drawMotion(time, dt, pet.x - x);
+      if (progress === 1) life = null;
+    }
+    return true;
+  };
+
   const tick = (time: number) => {
-    const dt = lastTime === 0 ? 0 : Math.min(time - lastTime, MAX_FRAME_MS);
+    const elapsed = lastTime === 0 ? 0 : Math.max(0, time - lastTime);
+    const dt = Math.min(elapsed, MAX_FRAME_MS);
     lastTime = time;
+    if (!updateLife(time, dt)) updatePet(time, dt, elapsed);
+    render();
+    frame = requestAnimationFrame(tick);
+  };
+
+  const updatePet = (time: number, dt: number, elapsed: number) => {
     const x = pet.x;
+    let bites = 0;
+    let distance = 0;
+    let activeMs = 0;
     if (gesture) updateGesture(time, dt);
     else if (descent) updateDescent(time, dt);
     else if (snack.action || !updateAttention(time)) {
       const wasEatingOrFetching = Boolean(snack.action);
       if (hopStarted === null) {
-        const next = advanceSnack(snack, pet, time, viewportWidth(), Math.random);
+        const next = advanceSnack(snack, pet, time, viewportWidth(), Math.random, hunger(metabolism));
         snack = next.snack;
         pet = next.pet;
+        bites = next.bitesTaken ?? 0;
       }
       if (!wasEatingOrFetching && !snack.action) pet = advance(pet, dt, viewportWidth(), Math.random);
+      if (bites === 0 && snack.action?.kind !== "eat") distance = Math.min(Math.abs(pet.x - x), dt * .15);
+      if (pet.mode === "groom" || pet.mode === "stretch") activeMs = dt;
     }
+    metabolism = advanceMetabolism(metabolism, elapsed, distance, activeMs, bites);
     drawMotion(time, dt, pet.x - x);
-    render();
-    frame = requestAnimationFrame(tick);
+    if (metabolism.fullness >= BURST_FULLNESS) {
+      life = { phase: "burst", started: time };
+      cancelInteraction();
+      snack = createSnack(time);
+      metabolism.belly = metabolism.fullness;
+    }
   };
   const stopLoop = () => {
     cancelAnimationFrame(frame);
@@ -566,6 +654,11 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     cancelInteraction();
     stopLoop();
     if (motion.matches) {
+      if (life) {
+        if (life.phase === "burst") respawn(performance.now());
+        arrive(1);
+        life = null;
+      }
       sit();
       gaitSpeed = 0;
       showProfile();
@@ -620,7 +713,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     render();
   };
   const onDown = (event: PointerEvent) => {
-    if (gesture || !event.isPrimary || event.button !== 0 || descent) return;
+    if (life || gesture || !event.isPrimary || event.button !== 0 || descent) return;
     event.preventDefault();
     lift = Math.min(hopLift, maxLift(viewportHeight()));
     clearClick();
@@ -665,7 +758,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       }
       return;
     }
-    if (motion.matches || gesture || event.pointerType !== "mouse") return;
+    if (motion.matches || life || gesture || event.pointerType !== "mouse") return;
     if (event.buttons !== 0) {
       clearAttention();
       return;
@@ -716,7 +809,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const onResize = () => {
     clearAttention();
     snack = resizeSnack(snack, performance.now(), viewportWidth());
-    pet = fit(pet, viewportWidth());
+    if (life?.phase !== "enter") pet = fit(pet, viewportWidth());
     if (gesture?.phase === "carry") placeAtGrip(performance.now());
     lift = Math.min(lift, maxLift(viewportHeight()));
     render();

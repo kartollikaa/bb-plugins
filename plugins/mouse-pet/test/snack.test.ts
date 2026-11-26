@@ -117,6 +117,8 @@ test("the pet leaves cheese alone after placing it and ignores the first later e
   assert.equal(eating.snack.action?.kind, "eat");
   const partlyEaten = advanceSnack(eating.snack, eating.pet, 27_550, WIDTH, preferToEat);
   assert.equal(partlyEaten.snack.cheese?.bites, 1);
+  assert.equal(partlyEaten.bitesTaken, 1);
+  assert.equal(advanceSnack(partlyEaten.snack, partlyEaten.pet, 27_560, WIDTH, preferToEat).bitesTaken, 0);
   const paused = interruptSnack(partlyEaten.snack, 27_550, WIDTH);
   assert.equal(paused.cheese?.bites, 1);
   assert.equal(paused.action, null);
@@ -144,6 +146,7 @@ test("a large piece lasts four visits and each bite exposes a different fixed-si
     time += 1_100;
     next = advanceSnack(next.snack, next.pet, time, WIDTH, preferToEat);
     assert.equal(next.snack.action, null);
+    assert.equal(next.bitesTaken, 2);
     assert.equal(next.snack.cheese?.bites, visit < 4 ? visit * 2 : undefined);
     time += 6_000;
   }

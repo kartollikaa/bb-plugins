@@ -14,6 +14,9 @@ look around from its haunches, turn to face you or sit with its back to you.
   different distance each time. It may pass the cheese a few times or notice it from across the
   window and run back to take a couple of bites. It finishes the cheese over several visits.
   There is only one piece at a time.
+- Each bite satisfies hunger and gradually rounds out the mouse's belly. The mouse gets hungry
+  and slims down over time, faster while running or otherwise active. If excess weight builds up,
+  the mouse bursts into a puff and a new mouse walks in from an edge a few seconds later.
 
 Only the mouse takes clicks. With reduced motion on, it sits still and shows "Pi!" on a click.
 
@@ -27,6 +30,7 @@ Disable the plugin to remove the mouse.
   canceling the pointer sets the mouse back on the floor. Unloading removes the layer and listeners.
 - `lib/pet.ts` holds autonomous movement, `lib/animation.ts` samples the gait and hop, and
   `lib/interaction.ts` holds the grip and sniff geometry. `lib/snack.ts` tracks fetching and eating.
+  `lib/metabolism.ts` tracks fullness and satiety separately from movement and poses.
   `npm test` covers those modules.
 - `server.ts` is empty: bb requires a server entry.
 

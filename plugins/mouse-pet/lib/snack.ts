@@ -82,8 +82,8 @@ export function resizeSnack(snack: Snack, time: number, width: number): Snack {
 }
 
 export function advanceSnack(
-  snack: Snack, pet: Pet, time: number, width: number, random: () => number,
-): { snack: Snack; pet: Pet } {
+  snack: Snack, pet: Pet, time: number, width: number, random: () => number, hunger = .65,
+): { snack: Snack; pet: Pet; bitesTaken?: number } {
   const { action, cheese } = snack;
   if (action?.kind === "fetch") {
     const duration = 640 + action.distance * 13;
@@ -126,13 +126,15 @@ export function advanceSnack(
     const progress = Math.max(0, (time - action.started) / BITE_MS);
     const taken = Math.min(BITES_PER_VISIT, Math.floor(progress));
     const bites = action.initialBites + taken;
-    if (bites >= CUTS.length) return { snack: createSnack(time), pet: settle(pet) };
+    const bitesTaken = Math.min(bites, CUTS.length) - cheese.bites;
+    if (bites >= CUTS.length) return { snack: createSnack(time), pet: settle(pet), bitesTaken };
     const current = { ...cheese, bites };
     if (taken === BITES_PER_VISIT) {
       const resume = time + BETWEEN_VISITS_MS;
       return {
         snack: { ...snack, cheese: { ...current, tryAfter: resume, noticeAfter: resume }, action: null, visits: 0 },
         pet: settle(pet),
+        bitesTaken,
       };
     }
     const from = taken === 0 ? action.fromX : mouthTarget({ ...cheese, bites: bites - 1 }, width);
@@ -141,6 +143,7 @@ export function advanceSnack(
     return {
       snack: { ...snack, cheese: current },
       pet: settle(pet, from + (toward - from) * blend),
+      bitesTaken,
     };
   }
 
@@ -155,7 +158,7 @@ export function advanceSnack(
     if (!touching && time >= cheese.tryAfter && time >= cheese.noticeAfter) {
       const nextCheese = { ...cheese, noticeAfter: time + NOTICE_AGAIN_MS };
       const nextSnack = { ...snack, cheese: nextCheese, touching: false };
-      if (random() < .74) return { snack: { ...nextSnack, action: { kind: "seek", updatedAt: time } }, pet };
+      if (random() < .35 + .6 * hunger) return { snack: { ...nextSnack, action: { kind: "seek", updatedAt: time } }, pet };
       return { snack: nextSnack, pet };
     }
     if (!touching || snack.touching || time < cheese.tryAfter) {
