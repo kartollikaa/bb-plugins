@@ -10,6 +10,9 @@ when running, skids before a fast turn and stretches after sleeping. It sometime
 haunches and watches the pointer, or pauses facing toward or away from you. A click makes it hop,
 squeak "Pi!" and bolt.
 
+During a pause, the mouse sometimes washes its face with a front paw or scratches behind its ear
+in quick bursts.
+
 Press and drag the mouse by the scruff to carry it inside the window. Its legs hang and its body
 follows the pointer's momentum. Release near the floor to set
 it down, or higher up to let it drop. If the window loses focus, the mouse returns to the floor.

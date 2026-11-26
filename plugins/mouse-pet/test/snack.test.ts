@@ -47,7 +47,7 @@ test("the pet picks a random pull distance that keeps both the cheese and mouse 
 
 test("cheese never interrupts sleep, a waking stretch, grooming or perching", () => {
   const snack = createSnack(0);
-  for (const mode of ["sleep", "stretch", "groom", "perch"] as const) {
+  for (const mode of ["sleep", "stretch", "groom", "scratch", "perch"] as const) {
     const resting = { ...nearEdge, mode };
     const next = advanceSnack(snack, resting, 15_000, WIDTH, preferToEat);
     assert.equal(next.snack.action, null);

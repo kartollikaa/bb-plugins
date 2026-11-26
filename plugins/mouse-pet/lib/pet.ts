@@ -1,4 +1,4 @@
-export type PetMode = "walk" | "run" | "sit" | "perch" | "groom" | "sleep" | "skid" | "stretch";
+export type PetMode = "walk" | "run" | "sit" | "perch" | "groom" | "scratch" | "sleep" | "skid" | "stretch";
 export type Direction = 1 | -1;
 export type IdleView = "profile" | "front" | "back";
 
@@ -16,7 +16,7 @@ export const MAX_FRAME_MS = 100;
 export const SKID_MS = 260;
 
 const SPEED_PX_PER_S: Record<PetMode, number> = {
-  walk: 38, run: 150, sit: 0, perch: 0, groom: 0, sleep: 0, skid: 0, stretch: 0,
+  walk: 38, run: 150, sit: 0, perch: 0, groom: 0, scratch: 0, sleep: 0, skid: 0, stretch: 0,
 };
 const DURATION_MS: Record<PetMode, readonly [number, number]> = {
   walk: [2_000, 5_000],
@@ -24,6 +24,7 @@ const DURATION_MS: Record<PetMode, readonly [number, number]> = {
   sit: [1_500, 4_000],
   perch: [1_800, 3_500],
   groom: [2_000, 3_500],
+  scratch: [1_550, 2_200],
   sleep: [6_000, 14_000],
   skid: [SKID_MS, SKID_MS],
   stretch: [620, 620],
@@ -33,7 +34,8 @@ const AFTER_MOVING: ReadonlyArray<readonly [PetMode, number]> = [
   ["run", 25],
   ["sit", 15],
   ["perch", 10],
-  ["groom", 15],
+  ["groom", 8],
+  ["scratch", 7],
   ["sleep", 10],
 ];
 const AFTER_RESTING: ReadonlyArray<readonly [PetMode, number]> = [
@@ -46,6 +48,7 @@ const STARTLE_MS = 2_500;
 export type Random = () => number;
 
 export const isMoving = (mode: PetMode) => SPEED_PX_PER_S[mode] > 0;
+export const isGrooming = (mode: PetMode) => mode === "groom" || mode === "scratch";
 
 export const maxX = (viewportWidth: number) => Math.max(0, viewportWidth - PET_WIDTH);
 

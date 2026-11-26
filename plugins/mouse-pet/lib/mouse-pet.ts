@@ -1,4 +1,4 @@
-import { advance, createPet, fit, maxX, MAX_FRAME_MS, PET_WIDTH, startle, type Pet } from "./pet.ts";
+import { advance, createPet, fit, isGrooming, maxX, MAX_FRAME_MS, PET_WIDTH, startle, type Pet } from "./pet.ts";
 import {
   carryPosition, DRAG_START_PX, FLOOR_GAP, GRIP_X, GRIP_Y, gripPoint, LONG_PRESS_MS,
   maxLift, PET_HEIGHT, screenGripX, scruffPath, sniffDistance, type Point,
@@ -84,7 +84,7 @@ const STYLE = `
 [${ROOT_ATTR}] .mp-cheese[data-edge="1"] svg { transform: scaleX(-1); }
 
 [${ROOT_ATTR}] .mp-tail, [${ROOT_ATTR}] .mp-eye,
-[${ROOT_ATTR}] .mp-impact, [${ROOT_ATTR}] .mp-wash { transform-box: view-box; }
+[${ROOT_ATTR}] .mp-impact, [${ROOT_ATTR}] .mp-groom-paw { transform-box: view-box; }
 [${ROOT_ATTR}] .mp-tail { transform-origin: 12px 19px; transform: rotate(var(--mp-tail, 0deg)); }
 [${ROOT_ATTR}] .mp-eye { transform-origin: 38px 14.5px; }
 [${ROOT_ATTR}] [data-mode="sit"]:not([data-moving]) .mp-eye { animation: mp-blink 3.8s .7s infinite; }
@@ -100,7 +100,7 @@ const STYLE = `
 [${ROOT_ATTR}] .mp-pose { transform-origin: 24px 28px; }
 [${ROOT_ATTR}] .mp-head { transform-origin: 32px 17px; }
 [${ROOT_ATTR}] .mp-front { transform-origin: 35px 21px; }
-[${ROOT_ATTR}] .mp-wash { transform-origin: 35px 21px; transform: rotate(var(--mp-wash, 0deg)); }
+[${ROOT_ATTR}] .mp-groom-paw { transform-origin: 35px 21px; }
 [${ROOT_ATTR}] .mp-scruff { opacity: 0; transition-duration: .09s; }
 [${ROOT_ATTR}] .mp-leg-pose { transform-origin: 19px 21px; }
 [${ROOT_ATTR}] .mp-tail-pose { transform-origin: 12px 19px; }
@@ -143,10 +143,18 @@ const STYLE = `
 [${ROOT_ATTR}] [data-mode="fetch"] .mp-front { transform: rotate(-87deg); }
 [${ROOT_ATTR}] [data-mode="eat"] .mp-head { animation: mp-nibble ${BITE_MS}ms ease-in-out infinite; }
 [${ROOT_ATTR}] [data-mode="eat"] .mp-front { transform: rotate(-115deg); }
-[${ROOT_ATTR}] [data-mode="groom"] .mp-head { transform: translate(-.6px, .3px) rotate(6deg); }
-[${ROOT_ATTR}] [data-mode="groom"] .mp-front { transform: rotate(-104deg); }
-[${ROOT_ATTR}] :is([data-mode="sleep"], [data-mode="stretch"]) .mp-eye-state { opacity: 0; }
-[${ROOT_ATTR}] :is([data-mode="sleep"], [data-mode="stretch"]) .mp-eye-closed { opacity: 1; }
+[${ROOT_ATTR}] :is([data-mode="groom"], [data-mode="scratch"]) .mp-pose {
+  transform-origin: 19px 27px; transform: translateY(1px) rotate(-9deg);
+}
+[${ROOT_ATTR}] :is([data-mode="groom"], [data-mode="scratch"]) .mp-groom-paw { stroke: ${FUR_FAR}; }
+[${ROOT_ATTR}] [data-mode="groom"] .mp-head { transform: translate(-.5px, .8px) rotate(7deg); }
+[${ROOT_ATTR}] [data-mode="groom"] .mp-front { transform: rotate(-112deg); }
+[${ROOT_ATTR}] [data-mode="groom"] .mp-groom-paw { animation: mp-face-wash .56s .13s ease-in-out infinite; }
+[${ROOT_ATTR}] [data-mode="scratch"] .mp-head { transform: translate(-.9px, 1px) rotate(-8deg); }
+[${ROOT_ATTR}] [data-mode="scratch"] .mp-front { transform: rotate(-164deg); }
+[${ROOT_ATTR}] [data-mode="scratch"] .mp-groom-paw { animation: mp-ear-scratch .72s .13s ease-in-out infinite; }
+[${ROOT_ATTR}] :is([data-mode="sleep"], [data-mode="stretch"], [data-mode="groom"], [data-mode="scratch"]) .mp-eye-state { opacity: 0; }
+[${ROOT_ATTR}] :is([data-mode="sleep"], [data-mode="stretch"], [data-mode="groom"], [data-mode="scratch"]) .mp-eye-closed { opacity: 1; }
 [${ROOT_ATTR}] [data-mode="sleep"] .mp-pose {
   transform: translateY(2px) scale(1.03, .88); transition-duration: .36s;
 }
@@ -180,6 +188,14 @@ const STYLE = `
   0%, 100% { transform: translateY(1px) rotate(6deg); }
   35% { transform: translate(1px, 1.7px) rotate(11deg); }
   60% { transform: translateY(.6px) rotate(4deg); }
+}
+@keyframes mp-face-wash {
+  0%, 100% { transform: none; }
+  58% { transform: rotate(-35deg) translateY(.7px); }
+}
+@keyframes mp-ear-scratch {
+  0%, 22%, 44%, 100% { transform: none; }
+  11%, 33%, 55% { transform: rotate(-23deg) translateY(.8px); }
 }
 @keyframes mp-land {
   0%, 100% { transform: none; }
@@ -235,8 +251,8 @@ const SPRITE = `
           </g>
         </g>
         <g class="mp-front">
-          <g class="mp-wash">
-            <path class="mp-leg" d="${pawPath(3)}" fill="none" stroke="${FUR}" stroke-width="1.9" stroke-linecap="round"/>
+          <g class="mp-groom-paw" stroke="${FUR}">
+            <path class="mp-leg" d="${pawPath(3)}" fill="none" stroke-width="1.9" stroke-linecap="round"/>
           </g>
         </g>
       </g>
@@ -361,7 +377,6 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   let turn = { from: face, to: face, progress: 1 };
   let rest = 0;
   let tailPhase = 0;
-  let wash = 0;
   const motion = prefersReducedMotion();
 
   const render = () => {
@@ -438,11 +453,8 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     tailPhase = (tailPhase + dt / (240 + rest * 430)) % (Math.PI * 2);
     const tail = gait.tail + Math.sin(tailPhase) * (3.2 - rest * 1.7);
     const breath = 1 + rest * .038 * (1 - Math.cos(time / 440)) / 2;
-    const washTarget = !gesture && pet.mode === "groom" ? -14 * (1 - Math.cos(time / 83)) : 0;
-    wash += (washTarget - wash) * (1 - Math.exp(-dt / 40));
     mouse.style.setProperty("--mp-tail", `${tail.toFixed(2)}deg`);
     mouse.style.setProperty("--mp-breath", breath.toFixed(3));
-    mouse.style.setProperty("--mp-wash", `${wash.toFixed(2)}deg`);
     if (attention?.phase === "sniff") {
       const progress = Math.min((time - attention.started) / SNIFF_MS, 1);
       const reach = 4 * Math.sin(Math.PI * progress) * (.72 + .28 * Math.sin(progress * 4 * Math.PI) ** 2);
@@ -583,7 +595,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     metabolism = createMetabolism();
     snack = createSnack(time);
     mouse.hidden = false;
-    gaitSpeed = stride = rest = tailPhase = wash = 0;
+    gaitSpeed = stride = rest = tailPhase = 0;
     showProfile();
   };
 
@@ -635,7 +647,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       }
       if (!wasEatingOrFetching && !snack.action) pet = advance(pet, dt, viewportWidth(), Math.random);
       if (bites === 0 && snack.action?.kind !== "eat") distance = Math.min(Math.abs(pet.x - x), dt * .15);
-      if (pet.mode === "groom" || pet.mode === "stretch") activeMs = dt;
+      if (isGrooming(pet.mode) || pet.mode === "stretch") activeMs = dt;
     }
     metabolism = advanceMetabolism(metabolism, elapsed, distance, activeMs, bites);
     drawMotion(time, dt, pet.x - x);
@@ -666,7 +678,6 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       flip.style.removeProperty("--mp-bound");
       mouse.style.removeProperty("--mp-tail");
       mouse.style.removeProperty("--mp-breath");
-      mouse.style.removeProperty("--mp-wash");
       legs.forEach((leg, index) => leg.setAttribute("d", pawPath(index)));
       render();
     } else {

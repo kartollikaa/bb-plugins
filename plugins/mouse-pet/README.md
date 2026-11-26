@@ -2,7 +2,8 @@
 
 A small grey mouse lives along the bottom edge of the bb window. It walks at low speed and bounds
 at a run, skids before a fast turn, curls up to sleep and stretches when it wakes. It can stop and
-look around from its haunches, turn to face you or sit with its back to you.
+look around from its haunches, turn to face you or sit with its back to you. It sometimes stops to
+wash its face with a front paw or scratch behind its ear in quick bursts.
 
 - Click the mouse to make it hop, squeak "Pi!" and bolt.
 - Press and drag the mouse to pick it up by the scruff within the window. Its legs hang freely and

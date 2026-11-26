@@ -49,7 +49,7 @@ test("speed builds from a standing start and settles before a rest", () => {
 });
 
 test("a resting pet stays put", () => {
-  for (const mode of ["sit", "groom", "sleep"] as PetMode[]) {
+  for (const mode of ["sit", "groom", "scratch", "sleep"] as const) {
     assert.equal(isMoving(mode), false);
     assert.equal(advance(pet({ mode }), 50, VIEWPORT, constant(0)).x, 100);
   }
@@ -110,6 +110,7 @@ test("a moving pet that runs out of time picks the next mode by weight", () => {
     [0.6, "sit"],
     [0.7, "perch"],
     [0.8, "groom"],
+    [0.86, "scratch"],
     [0.95, "sleep"],
   ];
   for (const [roll, mode] of expected) {
@@ -161,12 +162,15 @@ test("a new mode may flip the direction", () => {
   assert.equal(next.direction, -1);
 });
 
-test("resting never flips the direction", () => {
-  const rolls = [0.85, 0, 0];
-  const random = () => rolls.shift() ?? 0;
-  const next = advance(pet({ mode: "walk", direction: 1, remainingMs: 1 }), 10, VIEWPORT, random);
-  assert.equal(next.mode, "groom");
-  assert.equal(next.direction, 1);
+test("the mouse grooms in profile and moves again when it finishes", () => {
+  for (const [roll, mode] of [[.8, "groom"], [.86, "scratch"]] as const) {
+    const resting = advance(pet({ idleView: "back", direction: -1, remainingMs: 1 }), 10, VIEWPORT, constant(roll));
+    assert.equal(resting.mode, mode);
+    assert.equal(resting.direction, -1);
+    assert.equal(resting.idleView, "profile");
+    const moving = advance({ ...resting, remainingMs: 1 }, 10, VIEWPORT, constant(.5));
+    assert.ok(isMoving(moving.mode));
+  }
 });
 
 test("a click makes it run the other way", () => {

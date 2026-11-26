@@ -1,4 +1,4 @@
-import { advance, maxX, PET_WIDTH, type Direction, type Pet } from "./pet.ts";
+import { advance, isGrooming, maxX, PET_WIDTH, type Direction, type Pet } from "./pet.ts";
 
 export const CHEESE_WIDTH = PET_WIDTH;
 export const BITE_MS = 520;
@@ -147,7 +147,7 @@ export function advanceSnack(
     };
   }
 
-  if (pet.mode === "sleep" || pet.mode === "stretch" || pet.mode === "groom" || pet.mode === "perch") {
+  if (pet.mode === "sleep" || pet.mode === "stretch" || isGrooming(pet.mode) || pet.mode === "perch") {
     return { snack, pet };
   }
 
