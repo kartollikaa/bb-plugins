@@ -11,8 +11,8 @@ haunches and watches the pointer, or pauses facing toward or away from you. A cl
 squeak "Pi!" and bolt.
 
 During a pause, the mouse sometimes washes its face with a front paw or scratches behind its ear
-in quick bursts. It occasionally makes a small hop on its own, varies how high it lifts its paws
-and moves its body and tail as it walks and runs, and switches sleeping poses. It
+in quick bursts. It occasionally makes a small hop on its own, varies step height and tail sway
+as it walks and runs, and switches sleeping poses. Its torso stays level through the stride. It
 occasionally takes a few steps toward you while facing front. It stays closer as it moves around
 until it turns its back and steps away.
 

@@ -1,10 +1,8 @@
-const FULL_CYCLE = Math.PI * 2;
-
 const MOVES = [
-  { lift: 1, bob: 1, tail: 1, breath: [.035, 480] },
-  { lift: 1.16, bob: .82, tail: .64, breath: [.043, 430] },
-  { lift: .78, bob: .66, tail: 1.12, breath: [.024, 590] },
-  { lift: 1.05, bob: 1.2, tail: 1.28, breath: [.039, 530] },
+  { lift: 1, tail: 1, breath: [.035, 480] },
+  { lift: 1.16, tail: .64, breath: [.043, 430] },
+  { lift: .78, tail: 1.12, breath: [.024, 590] },
+  { lift: 1.05, tail: 1.28, breath: [.039, 530] },
 ] as const;
 const WALK_OFFSETS = [0, .75, .5, .25] as const;
 
@@ -12,14 +10,13 @@ export type MoveVariant = 0 | 1 | 2 | 3;
 export const nextMoveVariant = (previous: MoveVariant, roll: number) =>
   ((previous + 1 + Math.floor(roll * (MOVES.length - 1))) % MOVES.length) as MoveVariant;
 
-interface GaitStyle { lift: number; bob: number; tail: number }
+interface GaitStyle { lift: number; tail: number }
 
 export function blendGaitStyle(style: GaitStyle, variant: MoveVariant, dt: number): GaitStyle {
   const target = MOVES[variant];
   const blend = 1 - Math.exp(-dt / 150);
   return {
     lift: style.lift + (target.lift - style.lift) * blend,
-    bob: style.bob + (target.bob - style.bob) * blend,
     tail: style.tail + (target.tail - style.tail) * blend,
   };
 }
@@ -45,13 +42,7 @@ export function gaitFrame(phase: number, speed: number, pace = 1, style: GaitSty
       lift: Math.sin(Math.PI * swing) ** 2 * (1.65 + run * 1.15) * effort * style.lift,
     };
   });
-  const walkBob = Math.sin(phase * FULL_CYCLE * 2) ** 2;
-  const trotBob = Math.sin(phase * FULL_CYCLE) ** 2;
-  return {
-    feet,
-    tail: Math.sin((phase - .18) * FULL_CYCLE) * (1.2 + run * 2) * effort * style.tail,
-    bob: (walkBob * .45 * (1 - run) + trotBob * .9 * run) * effort * style.bob,
-  };
+  return { feet };
 }
 
 export interface PawPlant {

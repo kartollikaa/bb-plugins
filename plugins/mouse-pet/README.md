@@ -6,8 +6,9 @@ curls up to sleep and stretches when it wakes. It can stop and
 look around from its haunches, turn to face you or sit with its back to you. It sometimes stops to
 wash its face with a front paw, scratch behind its ear, or hop on its own. It has four variants
 each for walking, running and sleeping. Gait variations share the same paw placement and vary
-the height of the steps and the movement of the body and tail. Once in a while it takes a few steps toward you from a
-front-facing pose and stays in the foreground until it turns its back and walks away.
+the height of the steps and the tail's sway. The torso stays level through the stride.
+Once in a while the mouse takes a few steps toward you from a front-facing pose and stays in
+the foreground until it turns its back and walks away.
 
 - Click the mouse to make it hop, squeak "Pi!" and bolt.
 - Several quick clicks send it into a burrow at the nearest edge. It also takes breaks in the

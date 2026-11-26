@@ -34,12 +34,12 @@ const PAWS = [
   { x: 35, y: 20.9, hock: .3, toe: 1.05 },
 ] as const;
 
-function pawPath(index: number, reach = 0, lift = 0, bodyRise = 0) {
+function pawPath(index: number, reach = 0, lift = 0) {
   const { x, y, hock, toe } = PAWS[index];
   const footX = (x + reach).toFixed(2);
   const footY = (27.2 - lift).toFixed(2);
   const bend = (x + hock + reach * .42).toFixed(2);
-  return `M${x} ${(y - bodyRise).toFixed(2)}Q${bend} ${(24.6 - lift * .42 - bodyRise * .45).toFixed(2)} ${footX} ${footY}q${toe * .5} .55 ${toe} .2`;
+  return `M${x} ${y}Q${bend} ${(24.6 - lift * .42).toFixed(2)} ${footX} ${footY}q${toe * .5} .55 ${toe} .2`;
 }
 
 const STYLE = `
@@ -233,16 +233,16 @@ const SPRITE = `
 <svg class="mp-profile" viewBox="0 0 48 29" aria-hidden="true" focusable="false">
   <g class="mp-impact">
     <g class="mp-pose">
-      <g class="mp-tail-mount"><g class="mp-tail-pose">
+      <g class="mp-tail-pose">
         <path class="mp-tail" d="M12 19C5 20 2 14 6 9" fill="none" stroke="${PINK}" stroke-width="1.8" stroke-linecap="round"/>
-      </g></g>
+      </g>
       <g class="mp-figure">
         <g class="mp-leg-pose" stroke-linecap="round" fill="none">
           <path class="mp-leg" d="${pawPath(0)}" stroke="${FUR_FAR}" stroke-width="2.05"/>
           <g class="mp-far-front"><path class="mp-leg" d="${pawPath(1)}" stroke="${FUR_FAR}" stroke-width="1.65"/></g>
           <path class="mp-leg" d="${pawPath(2)}" stroke="${FUR}" stroke-width="2.25"/>
         </g>
-        <g class="mp-torso"><g class="mp-doze">
+        <g class="mp-doze">
           <ellipse class="mp-belly" cx="23" cy="17" rx="14.5" ry="7.5" fill="${FUR}"/>
           <g class="mp-head">
             <ellipse cx="38" cy="16" rx="7.5" ry="5.4" fill="${FUR}"/>
@@ -253,7 +253,7 @@ const SPRITE = `
             <g class="mp-eye-state"><circle class="mp-eye" cx="38" cy="14.5" r="1.2" fill="${INK}"/></g>
             <path class="mp-eye-closed" d="M36.6 14.7q1.4 1.1 2.8 0" fill="none" stroke="${INK}" stroke-width="1" stroke-linecap="round"/>
           </g>
-        </g></g>
+        </g>
         <g class="mp-front">
           <g class="mp-groom-paw" stroke="${FUR}">
             <path class="mp-leg" d="${pawPath(3)}" fill="none" stroke-width="1.9" stroke-linecap="round"/>
@@ -354,7 +354,6 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   const hop = root.querySelector<HTMLElement>(".mp-hop")!;
   const flip = root.querySelector<HTMLElement>(".mp-flip")!;
   const impact = root.querySelector<SVGGElement>(".mp-impact")!;
-  const bobbing = root.querySelectorAll<SVGGElement>(".mp-torso, .mp-tail-mount");
   const squeak = root.querySelector<HTMLElement>(".mp-squeak")!;
   const legs = Array.from(root.querySelectorAll<SVGElement>(".mp-leg"));
   const scruff = root.querySelector<SVGElement>(".mp-scruff")!;
@@ -394,7 +393,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
   let hopStrength = 1;
   let stride = 0;
   let gaitSpeed = 0;
-  let gaitStyle = { lift: 1, bob: 1, tail: 1 };
+  let gaitStyle = { lift: 1, tail: 1 };
   let plants: PawPlant[] = [];
   let face: number = pet.direction;
   let turn = { from: face, to: face, progress: 1 };
@@ -514,13 +513,11 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
     }
     gaitStyle = blendGaitStyle(gaitStyle, variant, dt);
     const gait = gaitFrame(stride, equivalentSpeed, pace, gaitStyle);
-    const torsoMotion = `translateY(${(-gait.bob).toFixed(2)}px)`;
-    bobbing.forEach((part) => { if (part.style.transform !== torsoMotion) part.style.transform = torsoMotion; });
     impact.style.transform = compression ? `scale(${1 + compression * .42}, ${1 - compression})` : "";
     const dozing = !gesture && pet.mode === "sleep" && gaitSpeed <= 9;
     rest += ((dozing ? 1 : 0) - rest) * (1 - Math.exp(-dt / 140));
     tailPhase = (tailPhase + dt / (240 + rest * 430)) % (Math.PI * 2);
-    const tail = gait.tail + Math.sin(tailPhase) * (1.8 - rest * .9);
+    const tail = Math.sin(tailPhase) * (1.8 - rest * .9) * gaitStyle.tail;
     const breath = sleepBreath(time, rest, variants.sleep);
     mouse.style.setProperty("--mp-tail", `${tail.toFixed(2)}deg`);
     mouse.style.setProperty("--mp-breath", breath.toFixed(3));
@@ -547,7 +544,7 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       const localX = PAWS[index].x + PAWS[index].toe - PET_WIDTH / 2 + reach;
       plants[index] = anchorPaw(plants[index], localX, pet.x + PET_WIDTH / 2, direction * projection,
         supportsWeight && raise === 0, dt);
-      const shape = pawPath(index, reach + plants[index].correction, raise, gait.bob);
+      const shape = pawPath(index, reach + plants[index].correction, raise);
       if (leg.getAttribute("d") !== shape) leg.setAttribute("d", shape);
     });
     if (!depthView && Math.abs(face) >= .7) delete flip.dataset.depthView;
@@ -741,7 +738,6 @@ export function mountMousePet({ signal }: { signal: AbortSignal }): () => void {
       gaitSpeed = 0;
       plants = [];
       showProfile();
-      bobbing.forEach((part) => part.style.removeProperty("transform"));
       mouse.style.removeProperty("--mp-tail");
       mouse.style.removeProperty("--mp-breath");
       legs.forEach((leg, index) => leg.setAttribute("d", pawPath(index)));

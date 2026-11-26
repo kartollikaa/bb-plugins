@@ -7,13 +7,12 @@ import {
 import type { PawPlant } from "../lib/animation.ts";
 import { advance, type Pet } from "../lib/pet.ts";
 
-test("all feet settle and the gait stops swinging the tail at rest", () => {
+test("all feet settle at rest", () => {
   for (const speed of [0, 15, 38, 150]) {
-    const { feet, tail } = gaitFrame(.21, speed);
+    const { feet } = gaitFrame(.21, speed);
     assert.equal(feet.length, 4);
     assert.ok(feet.every(({ lift }) => lift >= 0));
     assert.equal(feet.some(({ lift }) => lift > 0), speed > 0);
-    assert.equal(Math.abs(tail) > 0, speed > 0);
   }
 });
 
@@ -37,7 +36,7 @@ test("walking advances each paw through the same motion one quarter-cycle apart"
 
 test("each gait and sleeping breath has four variants without an immediate repeat", () => {
   const variants = [0, 1, 2, 3] as const;
-  const styles = variants.map((variant) => blendGaitStyle({ lift: 1, tail: 1, bob: 1 }, variant, 300));
+  const styles = variants.map((variant) => blendGaitStyle({ lift: 1, tail: 1 }, variant, 300));
   for (const speed of [38, 150]) {
     assert.equal(new Set(styles.map((style) => JSON.stringify(gaitFrame(.32, speed, 1, style)))).size, 4);
     for (let i = 0; i < 100; i++) {
@@ -54,13 +53,12 @@ test("each gait and sleeping breath has four variants without an immediate repea
   }
 });
 
-test("the faster gait alternates diagonal pairs with a small symmetrical rise", () => {
+test("the faster gait alternates diagonal pairs", () => {
   for (let i = 0; i < 100; i++) {
-    const { feet, bob } = gaitFrame(i / 100, 150);
+    const { feet } = gaitFrame(i / 100, 150);
     assert.ok(Math.abs(feet[0].lift - feet[3].lift) < 1e-8);
     assert.ok(Math.abs(feet[1].lift - feet[2].lift) < 1e-8);
     assert.ok(feet.filter((foot) => foot.lift === 0).length >= 2);
-    assert.ok(bob < 1);
   }
 });
 
